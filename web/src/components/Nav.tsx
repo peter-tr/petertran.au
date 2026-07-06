@@ -18,6 +18,9 @@ export default function Nav() {
             <Link to="/#query">query</Link>
           </li>
           <li>
+            <Link to="/#contact">contact</Link>
+          </li>
+          <li>
             <a href="/peter-tran-resume.pdf" target="_blank" rel="noreferrer">
               download
             </a>

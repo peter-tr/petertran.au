@@ -6,6 +6,7 @@ import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
 import * as acm from "aws-cdk-lib/aws-certificatemanager";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
+import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as path from "path";
 
 export interface SiteStackProps extends StackProps {
@@ -24,7 +25,14 @@ export class SiteStack extends Stack {
       sortKey: { name: "sk", type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       removalPolicy: RemovalPolicy.DESTROY,
+      timeToLiveAttribute: "ttl",
     });
+
+    const anthropicSecret = secretsmanager.Secret.fromSecretNameV2(
+      this,
+      "AnthropicApiKey",
+      "petertran-au/anthropic-api-key"
+    );
 
     // --- GraphQL API (Lambda + Function URL, no API Gateway needed) ---
     const apiFn = new lambda.Function(this, "GraphQLFunction", {
@@ -32,10 +40,14 @@ export class SiteStack extends Stack {
       handler: "handler.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/dist")),
       memorySize: 256,
-      timeout: Duration.seconds(10),
-      environment: { TABLE_NAME: table.tableName },
+      timeout: Duration.seconds(15),
+      environment: {
+        TABLE_NAME: table.tableName,
+        ANTHROPIC_SECRET_ARN: anthropicSecret.secretArn,
+      },
     });
-    table.grantReadData(apiFn);
+    table.grantReadWriteData(apiFn);
+    anthropicSecret.grantRead(apiFn);
 
     const fnUrl = apiFn.addFunctionUrl({
       authType: lambda.FunctionUrlAuthType.NONE,

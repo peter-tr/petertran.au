@@ -132,24 +132,6 @@ a {
   margin: 0 0 1.6rem;
 }
 
-.hero-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem 1rem;
-  align-items: center;
-  margin-bottom: 2.2rem;
-}
-
-.badge {
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  color: var(--signal);
-  border: 1px solid var(--signal-dim);
-  border-radius: 999px;
-  padding: 0.25rem 0.65rem;
-  letter-spacing: 0.03em;
-}
-
 .hero-links {
   display: flex;
   flex-wrap: wrap;
@@ -468,12 +450,61 @@ a {
 /* ---------- explorer ---------- */
 
 .sandbox-frame {
+  display: flex;
+  flex-direction: column;
   border: 1px solid var(--rule);
   border-radius: var(--radius);
   overflow: hidden;
   height: 65vh;
   min-height: 480px;
+}
+
+.ask-ai {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.7rem 0.9rem;
+  border-bottom: 1px solid var(--rule);
+  background: var(--panel);
+  flex-wrap: wrap;
+}
+
+.ask-ai-input {
+  flex: 1 1 260px;
+  background: var(--ink);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  color: var(--paper);
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  padding: 0.5rem 0.75rem;
+}
+
+.ask-ai-input:focus {
+  outline: none;
+  border-color: var(--type);
+}
+
+.ask-ai-error {
+  flex-basis: 100%;
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  color: var(--string);
+}
+
+.ask-ai-note {
+  flex-basis: 100%;
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
+.graphiql-mount {
+  flex: 1 1 auto;
   position: relative;
+  overflow: hidden;
+  min-height: 0;
 }
 
 .sandbox-frame :is(.graphiql-container, .graphiql-dialog, .graphiql-dialog-overlay, .graphiql-tooltip),
@@ -491,19 +522,27 @@ a {
   --font-family-mono: var(--font-mono) !important;
 }
 
+.graphiql-mount .graphiql-container {
+  position: absolute;
+  inset: 0;
+  width: 133%;
+  height: 133%;
+  transform: scale(0.75);
+  transform-origin: top left;
+}
+
 @media (max-width: 640px) {
   .sandbox-frame {
     height: 75vh;
     min-height: 420px;
   }
 
-  .sandbox-frame .graphiql-container {
+  .graphiql-mount .graphiql-container {
     --sidebar-width: 44px;
     --toolbar-width: 32px;
-    width: 155%;
-    height: 155%;
-    transform: scale(0.645);
-    transform-origin: top left;
+    width: 200%;
+    height: 200%;
+    transform: scale(0.5);
   }
 }
 
@@ -512,6 +551,69 @@ a {
   font-size: 0.72rem;
   color: var(--muted-dim);
   word-break: break-all;
+}
+
+/* ---------- contact form ---------- */
+
+.contact-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-width: 32rem;
+}
+
+.form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.form-label {
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
+.form-input {
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  color: var(--paper);
+  font-family: var(--font-sans);
+  font-size: 0.95rem;
+  padding: 0.6rem 0.75rem;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--type);
+}
+
+.form-textarea {
+  resize: vertical;
+  font-family: var(--font-sans);
+}
+
+.run-btn {
+  align-self: flex-start;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--signal);
+  border: none;
+  border-radius: 6px;
+  padding: 0.55rem 1.3rem;
+  cursor: pointer;
+}
+
+.run-btn:hover {
+  filter: brightness(1.08);
+}
+
+.run-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 /* ---------- footer ---------- */
@@ -540,8 +642,10 @@ a {
 /* ---------- architecture diagram ---------- */
 
 .arch-diagram {
+  display: block;
   width: 100%;
   height: auto;
+  margin: 0 auto;
   font-family: var(--font-mono);
 }
 

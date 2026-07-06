@@ -196,4 +196,62 @@ type Query {
   External training programs completed outside regular employment or study.
   """
   programs: [Program!]!
+  """
+  Describe what you'd like to know in plain English, and get back a valid
+  GraphQL query against this exact schema. Powered by Claude.
+  """
+  generateQuery(prompt: String!): GeneratedQuery!
+}
+
+"""
+Result of asking the API to write a GraphQL query for you.
+"""
+type GeneratedQuery {
+  """
+  The generated GraphQL query text, ready to paste into the explorer. Null if
+  the request couldn't be answered from this schema.
+  """
+  query: String
+  """
+  Set when a query couldn't be generated, explaining why. Null on success.
+  """
+  message: String
+}
+
+"""
+Input for sending a message through the contact form.
+"""
+input ContactInput {
+  """
+  Sender's name.
+  """
+  name: String!
+  """
+  Sender's email address, so a reply can be sent.
+  """
+  email: String!
+  """
+  The message body.
+  """
+  message: String!
+}
+
+"""
+Result of submitting a contact message.
+"""
+type SendMessagePayload {
+  """
+  True if the message was received and stored successfully.
+  """
+  success: Boolean!
+}
+
+"""
+The single write operation this API exposes.
+"""
+type Mutation {
+  """
+  Send a message. Try it from the explorer above, or use the contact form on this page.
+  """
+  sendMessage(input: ContactInput!): SendMessagePayload!
 }

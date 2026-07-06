@@ -1,6 +1,7 @@
 import Hero from "../components/Hero";
 import ArchitectureSection from "../components/ArchitectureSection";
 import Explorer from "../components/Explorer";
+import ContactSection from "../components/ContactSection";
 import Footer from "../components/Footer";
 import type { ResumeData } from "../lib/types";
 
@@ -23,6 +24,7 @@ export default function Home({ data, error }: HomeProps) {
 
       <ArchitectureSection />
       <Explorer />
+      <ContactSection />
       <Footer email={data?.person.email} />
     </>
   );

@@ -1,6 +1,7 @@
 import { ApolloServer } from "@apollo/server";
 import { startStandaloneServer } from "@apollo/server/standalone";
 import { typeDefs } from "./schema.js";
+import { generateQuery } from "./generate-query.js";
 import { person, education, experience, projects, skills, programs, type Experience } from "./data.js";
 
 const resolvers = {
@@ -26,6 +27,13 @@ const resolvers = {
       return items;
     },
     programs: () => programs,
+    generateQuery: (_: unknown, args: { prompt: string }) => generateQuery(args.prompt),
+  },
+  Mutation: {
+    sendMessage: (_: unknown, args: { input: { name: string; email: string; message: string } }) => {
+      console.log("Mock sendMessage received:", args.input);
+      return { success: true };
+    },
   },
   Experience: {
     isCurrent: (parent: Experience) => parent.endDate === null,

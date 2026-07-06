@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import { GraphiQL } from "graphiql";
+import { GraphiQLProvider } from "@graphiql/react";
+import { GraphiQLInterface } from "graphiql";
 import { createGraphiQLFetcher } from "@graphiql/toolkit";
 import type { Storage as GraphiQLStorage } from "@graphiql/toolkit";
 import { explorerPlugin } from "@graphiql/plugin-explorer";
@@ -10,6 +11,7 @@ import "@graphiql/plugin-explorer/style.css";
 import "graphiql/graphiql.css";
 import { ENDPOINT } from "../lib/graphql";
 import Section from "./Section";
+import AskAI from "./AskAI";
 
 const DEFAULT_TABS = [
   {
@@ -17,11 +19,9 @@ const DEFAULT_TABS = [
 query WhoAmI {
   person {
     name
-    clearance
   }
   experience(currentOnly: true) {
     role
-    highlights
   }
 }`,
   },
@@ -72,20 +72,24 @@ export default function Explorer() {
   return (
     <Section id="query" typeName="Query" wide>
       <p className="project-desc" style={{ marginBottom: "1rem" }}>
-        This isn't a mockup — it's the real schema, introspected live from the API backing this page. Use the
-        explorer to click together a query, or write your own.
+        This isn't a mockup — it's the real schema, introspected live from the API backing this page. Ask in
+        plain English below, use the explorer to click together a query, or write your own.
       </p>
       {fetcher ? (
         <div className="sandbox-frame">
-          <GraphiQL
+          <GraphiQLProvider
             fetcher={fetcher}
-            defaultEditorToolsVisibility={false}
             defaultTabs={DEFAULT_TABS}
             plugins={[explorer]}
             referencePlugin={null}
             visiblePlugin={explorer}
             storage={noStorage}
-          />
+          >
+            <AskAI />
+            <div className="graphiql-mount">
+              <GraphiQLInterface defaultEditorToolsVisibility={false} />
+            </div>
+          </GraphiQLProvider>
         </div>
       ) : (
         <p className="status-line">// endpoint not configured</p>

@@ -91,3 +91,28 @@ export interface HeroQueryResult {
   person: { name: string };
   experience: { role: string; company: string }[];
 }
+
+export const SEND_MESSAGE_MUTATION = /* GraphQL */ `
+  mutation SendMessage($input: ContactInput!) {
+    sendMessage(input: $input) {
+      success
+    }
+  }
+`;
+
+export interface SendMessageResult {
+  sendMessage: { success: boolean };
+}
+
+export const GENERATE_QUERY_QUERY = /* GraphQL */ `
+  query GenerateQuery($prompt: String!) {
+    generateQuery(prompt: $prompt) {
+      query
+      message
+    }
+  }
+`;
+
+export interface GenerateQueryResult {
+  generateQuery: { query: string | null; message: string | null };
+}

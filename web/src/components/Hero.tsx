@@ -54,15 +54,9 @@ export default function Hero({ person }: HeroProps) {
       <p className="eyebrow">backend &amp; platform engineer · sydney, au</p>
       <h1>Peter Tran</h1>
       <p className="tagline">
-        I build the API layers banks and aircraft bet on — GraphQL federation at scale, and the
-        safety-critical systems underneath autonomous aircraft.
+        Backend and platform engineer, currently building GraphQL infrastructure at Commonwealth Bank.
+        Previously safety-critical embedded systems at Boeing.
       </p>
-
-      {person && (
-        <div className="hero-meta">
-          <span className="badge">{person.clearance}</span>
-        </div>
-      )}
 
       <div className="terminal">
         <div className="terminal-bar">
