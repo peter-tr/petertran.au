@@ -1,0 +1,199 @@
+"""
+A person -- in this schema, always Peter Tran.
+"""
+type Person {
+  """
+  Full name.
+  """
+  name: String!
+  """
+  Contact email address.
+  """
+  email: String!
+  """
+  City and country Peter is currently based in.
+  """
+  location: String!
+  """
+  Australian Government security clearance level held.
+  """
+  clearance: String!
+  """
+  External profile and site links.
+  """
+  links: [Link!]!
+}
+
+"""
+A single external link, e.g. LinkedIn, GitHub, or a personal site.
+"""
+type Link {
+  """
+  Human-readable label for the link, e.g. "GitHub".
+  """
+  label: String!
+  """
+  Fully-qualified URL.
+  """
+  url: String!
+}
+
+"""
+A degree completed at a university.
+"""
+type Education {
+  """
+  Name of the institution.
+  """
+  institution: String!
+  """
+  Degree title(s) conferred.
+  """
+  degree: String!
+  """
+  City and country of the institution.
+  """
+  location: String!
+  """
+  Month the degree program started, formatted YYYY-MM.
+  """
+  startDate: String!
+  """
+  Month the degree was completed, formatted YYYY-MM.
+  """
+  endDate: String!
+  """
+  Academic honors or GPA achieved.
+  """
+  honors: String!
+}
+
+"""
+A single role held at a company. Work history is a list of these,
+most recent first.
+"""
+type Experience {
+  """
+  Name of the employer.
+  """
+  company: String!
+  """
+  Job title held in this role.
+  """
+  role: String!
+  """
+  City and country this role was based in.
+  """
+  location: String!
+  """
+  Month this role started, formatted YYYY-MM.
+  """
+  startDate: String!
+  """
+  Month this role ended, formatted YYYY-MM. Null if the role is current.
+  """
+  endDate: String
+  """
+  True if this is the current role (endDate is null).
+  """
+  isCurrent: Boolean!
+  """
+  One-line description of the team or project this role sits within, if applicable.
+  """
+  summary: String
+  """
+  Bullet-point achievements from this role.
+  """
+  highlights: [String!]!
+}
+
+"""
+A side project built outside of full-time work.
+"""
+type Project {
+  """
+  Project name.
+  """
+  name: String!
+  """
+  Languages, frameworks, and services used to build it.
+  """
+  stack: [String!]!
+  """
+  What the project does, and what's notable about how it was built.
+  """
+  description: String!
+}
+
+"""
+A grouped set of related skills, e.g. "Languages" or "Infrastructure & Tools".
+"""
+type SkillCategory {
+  """
+  Name of the category.
+  """
+  category: String!
+  """
+  Individual skills or tools within this category.
+  """
+  items: [String!]!
+}
+
+"""
+An external training program or development scheme completed outside of
+regular employment or study.
+"""
+type Program {
+  """
+  Name of the program.
+  """
+  name: String!
+  """
+  Organization that ran the program.
+  """
+  organization: String!
+  """
+  What the program covered.
+  """
+  description: String!
+  """
+  Month the program started, formatted YYYY-MM.
+  """
+  startDate: String!
+  """
+  Month the program ended, formatted YYYY-MM.
+  """
+  endDate: String!
+}
+
+"""
+Read-only entry point into everything this API knows.
+"""
+type Query {
+  """
+  Who is behind this API.
+  """
+  person: Person!
+  """
+  Degrees completed, most recent first.
+  """
+  education: [Education!]!
+  """
+  Work history, most recent role first. Optionally filter by company name
+  (case-insensitive, partial match) or restrict to the current role only.
+  """
+  experience(company: String, currentOnly: Boolean): [Experience!]!
+  """
+  Side projects built outside of full-time work.
+  """
+  projects: [Project!]!
+  """
+  Skills grouped by category. Optionally filter to a single category
+  (case-insensitive, partial match), e.g. "Languages".
+  """
+  skills(category: String): [SkillCategory!]!
+  """
+  External training programs completed outside regular employment or study.
+  """
+  programs: [Program!]!
+}

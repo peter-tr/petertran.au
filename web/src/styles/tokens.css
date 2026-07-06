@@ -1,0 +1,19 @@
+:root {
+  --ink: #0b0e14;
+  --panel: #131824;
+  --panel-2: #1a2130;
+  --rule: #262e3d;
+  --paper: #eae7de;
+  --muted: #8a93a6;
+  --muted-dim: #5b6274;
+  --signal: #f2a93b;
+  --signal-dim: #8a6829;
+  --type: #63c7be;
+  --string: #e8896b;
+
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --font-sans: "IBM Plex Sans", -apple-system, "Segoe UI", sans-serif;
+
+  --content-width: 46rem;
+  --radius: 8px;
+}

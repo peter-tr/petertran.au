@@ -1,0 +1,29 @@
+#!/usr/bin/env node
+import "source-map-support/register";
+import { App } from "aws-cdk-lib";
+import { CertStack } from "../lib/cert-stack";
+import { SiteStack } from "../lib/site-stack";
+
+const app = new App();
+
+const domainName = "www.petertran.au";
+const alternateDomainNames = ["petertran.au"];
+const account = process.env.CDK_DEFAULT_ACCOUNT;
+
+// CloudFront certificates must live in us-east-1 regardless of where the
+// rest of the stack runs -- this is an AWS platform requirement, not a choice.
+const certStack = new CertStack(app, "PetertranCertStack", {
+  domainName,
+  alternateDomainNames,
+  env: { account, region: "us-east-1" },
+  crossRegionReferences: true,
+});
+
+// Everything else runs in Sydney, close to the actual audience.
+new SiteStack(app, "PetertranSiteStack", {
+  domainName,
+  alternateDomainNames,
+  certificate: certStack.certificate,
+  env: { account, region: "ap-southeast-2" },
+  crossRegionReferences: true,
+});

@@ -1,0 +1,27 @@
+{
+  "name": "petertran-au",
+  "private": true,
+  "workspaces": [
+    "infra",
+    "api",
+    "web"
+  ],
+  "scripts": {
+    "seed": "npm run seed --workspace=api",
+    "deploy": "npm run build --workspace=api && npm run build --workspace=web && npm run cdk -- deploy --workspace=infra",
+    "cdk": "npm run cdk --workspace=infra",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.6.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.3",
+    "globals": "^17.7.0",
+    "prettier": "^3.9.4",
+    "typescript-eslint": "^8.62.1"
+  }
+}
