@@ -5,16 +5,19 @@ import Home from "./pages/Home";
 import Resume from "./pages/Resume";
 import { useResumeData } from "./hooks/useResumeData";
 
-function ScrollToHash() {
+function ScrollManager() {
   const location = useLocation();
 
   useEffect(() => {
-    if (!location.hash) return;
-    const id = location.hash.slice(1);
     // Wait a tick so the target route's content has rendered before scrolling
     // -- React Router doesn't do this automatically like a full page load does.
     const raf = requestAnimationFrame(() => {
-      document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+      if (location.hash) {
+        const id = location.hash.slice(1);
+        document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+      } else {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
     });
     return () => cancelAnimationFrame(raf);
   }, [location.pathname, location.hash]);
@@ -27,7 +30,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <ScrollToHash />
+      <ScrollManager />
       <Nav />
       <main className="wrap" id="top">
         <Routes>

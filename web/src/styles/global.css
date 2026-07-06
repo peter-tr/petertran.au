@@ -132,6 +132,24 @@ a {
   margin: 0 0 1.6rem;
 }
 
+.hero-explorer-hint {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin: 1rem 0 0;
+}
+
+.hero-explorer-hint a {
+  color: var(--type);
+  text-decoration: none;
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 1px;
+}
+
+.hero-explorer-hint a:hover {
+  border-color: var(--type);
+}
+
 .hero-links {
   display: flex;
   flex-wrap: wrap;

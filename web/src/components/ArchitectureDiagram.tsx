@@ -4,7 +4,7 @@ export default function ArchitectureDiagram() {
       className="arch-diagram"
       viewBox="0 0 980 500"
       role="img"
-      aria-label="Architecture diagram: the browser loads the static site from CloudFront and S3, and talks directly to a Lambda-backed GraphQL API. The Lambda reads and writes resume data and rate-limit counters in DynamoDB, fetches an API key from Secrets Manager, and calls the Anthropic API (Claude Haiku) to generate queries. AWS CDK provisions all of it, deployed by GitHub Actions."
+      aria-label="Architecture diagram: the browser resolves www.petertran.au via a CNAME record at the CrazyDomains registrar, then loads the static site from CloudFront and S3, and talks directly to a Lambda-backed GraphQL API. The Lambda reads and writes resume data and rate-limit counters in DynamoDB, fetches an API key from Secrets Manager, and calls the Anthropic API (Claude Haiku) to generate queries. AWS CDK provisions all of it, deployed by GitHub Actions."
     >
       <defs>
         <marker
@@ -21,6 +21,14 @@ export default function ArchitectureDiagram() {
       </defs>
 
       {/* connectors */}
+      <line
+        x1="340"
+        y1="40"
+        x2="280"
+        y2="40"
+        className="arch-edge arch-edge-dashed"
+        markerEnd="url(#arrow)"
+      />
       <line x1="390" y1="60" x2="200" y2="118" className="arch-edge" markerEnd="url(#arrow)" />
       <line
         x1="450"
@@ -38,6 +46,9 @@ export default function ArchitectureDiagram() {
       <line x1="500" y1="428" x2="500" y2="398" className="arch-edge" markerEnd="url(#arrow)" />
 
       {/* labels on connectors */}
+      <text x="288" y="32" className="arch-edge-label">
+        DNS
+      </text>
       <text x="230" y="82" className="arch-edge-label">
         HTTPS
       </text>
@@ -62,6 +73,14 @@ export default function ArchitectureDiagram() {
       <text x="515" y="418" className="arch-edge-label">
         deploy on push
       </text>
+
+      {/* CrazyDomains (registrar) */}
+      <g>
+        <rect x="100" y="20" width="180" height="40" rx="8" className="arch-node arch-node-infra" />
+        <text x="190" y="45" className="arch-node-label">
+          CrazyDomains
+        </text>
+      </g>
 
       {/* Browser */}
       <g>

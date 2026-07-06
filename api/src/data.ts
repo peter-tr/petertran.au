@@ -166,7 +166,7 @@ export const skills: SkillCategory[] = [
     category: "Infrastructure & Tools",
     items: ["AWS", "DynamoDB", "PostgreSQL", "Kafka", "Docker", "GitHub Actions", "Grafana"],
   },
-  { category: "Certifications", items: ["AWS Certified Developer -- Associate"] },
+  { category: "Certifications", items: ["AWS Certified Developer - Associate"] },
 ];
 
 export const programs: Program[] = [

@@ -9,13 +9,26 @@ const GENERATE_QUERY_SYSTEM_PROMPT = `You write GraphQL queries against this exa
 ${typeDefs}
 
 Rules:
-- If the request can be answered by querying this schema, return "query" set to a
-  single valid query operation (never a mutation, even if asked), and "message" set
-  to null.
+- If the request is about contacting, messaging, reaching out to, or getting in
+  touch with Peter, return "query" set to exactly this mutation, verbatim, with the
+  string values left empty for the visitor to fill in themselves:
+  mutation ReachOut {
+    sendMessage(input: { name: "", email: "", message: "" }) {
+      success
+      message
+    }
+  }
+  Never invent a name, email address, or message on the visitor's behalf. Set
+  "message" to a short, friendly sentence telling them you've filled in the
+  message form below and they should add their details and click Run to send it.
+- Else if the request can be answered by querying this schema, return "query" set
+  to a single valid query operation (never a mutation in this case), and "message"
+  set to null.
 - If the request is unrelated to this schema (e.g. general knowledge, weather,
-  opinions, anything not about Peter's resume/skills/projects), return "query" set
-  to null and "message" set to a short, friendly sentence explaining that you can
-  only answer questions about the resume data in this schema.
+  opinions, anything not about Peter's resume/skills/projects, or contacting him),
+  return "query" set to null and "message" set to a short, friendly sentence
+  explaining that you can only answer questions about the resume data in this
+  schema.
 - Name generated operations with a short PascalCase name.
 - Only select fields and arguments that exist in the schema above.
 - Do not include any explanation, commentary, or markdown code fences.`;

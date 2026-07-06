@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { runQuery, HERO_QUERY, type HeroQueryResult } from "../lib/graphql";
 import type { Person } from "../lib/types";
 
@@ -91,6 +92,11 @@ export default function Hero({ person }: HeroProps) {
           </div>
         </div>
       </div>
+
+      <p className="hero-explorer-hint">
+        That's a real response, not a mock — the same schema is fully browsable below.{" "}
+        <Link to="/#query">Try the query explorer →</Link>
+      </p>
 
       {person && (
         <div className="hero-links" style={{ marginTop: "1.6rem" }}>

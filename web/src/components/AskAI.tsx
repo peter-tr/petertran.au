@@ -2,15 +2,31 @@ import { useState, type FormEvent } from "react";
 import { useGraphiQL, useGraphiQLActions } from "@graphiql/react";
 import { runQuery, GENERATE_QUERY_QUERY, type GenerateQueryResult } from "../lib/graphql";
 
-const OPERATION_NAME_PATTERN = /(?:query|mutation|subscription)\s+(\w+)/;
+const OPERATION_PATTERN = /(query|mutation|subscription)\s+(\w+)/;
+const DEFAULT_DRAFT_NOTE =
+  "I've filled in the message form below -- add your details and click Run to send it.";
 
 export default function AskAI() {
   const queryEditor = useGraphiQL((state) => state.queryEditor);
+  const isFetching = useGraphiQL((state) => state.isFetching);
   const { run, setOperationName } = useGraphiQLActions();
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+
+  // Tracks whether the in-flight (or just-finished) GraphQL request was one we
+  // kicked off ourselves, so we only show the "running…" note for that request
+  // -- there's a real network round trip between run() and the response
+  // landing. Cleared by comparing against the previous isFetching value during
+  // render (React's documented pattern for derived state) rather than an
+  // effect, since flipping state from inside an effect trips the linter.
+  const [awaitingResult, setAwaitingResult] = useState(false);
+  const [prevIsFetching, setPrevIsFetching] = useState(isFetching);
+  if (isFetching !== prevIsFetching) {
+    setPrevIsFetching(isFetching);
+    if (!isFetching) setAwaitingResult(false);
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -36,10 +52,19 @@ export default function AskAI() {
       // set the operation name ourselves before running: leaving the store's
       // stale operationName from a previous query causes "Unknown operation
       // named X" once run() executes against this new document.
-      const operationMatch = OPERATION_NAME_PATTERN.exec(query);
-      if (operationMatch) setOperationName(operationMatch[1]);
+      const operationMatch = OPERATION_PATTERN.exec(query);
+      const operationType = operationMatch?.[1];
+      if (operationMatch) setOperationName(operationMatch[2]);
       queryEditor.setValue(query);
-      run();
+
+      if (operationType === "mutation") {
+        // Never auto-send a real side-effecting mutation on the visitor's
+        // behalf -- draft it into the editor and let them review and click Run.
+        setNote(message ?? DEFAULT_DRAFT_NOTE);
+      } else {
+        setAwaitingResult(true);
+        run();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
@@ -59,6 +84,7 @@ export default function AskAI() {
       <button className="run-btn" type="submit" disabled={loading}>
         {loading ? "Thinking…" : "Ask Claude ▸"}
       </button>
+      {awaitingResult && <span className="ask-ai-note">// running the generated query…</span>}
       {note && <span className="ask-ai-note">// {note}</span>}
       {error && <span className="ask-ai-error">// {error}</span>}
     </form>
