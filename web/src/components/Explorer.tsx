@@ -26,6 +26,21 @@ query WhoAmI {
 }`,
   },
   {
+    query: `# Fill in the fields below and hit Run to send a real message.
+mutation ReachOut {
+  sendMessage(
+    input: {
+      name: ""
+      email: ""
+      message: ""
+    }
+  ) {
+    success
+    message
+  }
+}`,
+  },
+  {
     query: `query WorkHistory {
   experience {
     company

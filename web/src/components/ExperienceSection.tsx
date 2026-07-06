@@ -1,4 +1,5 @@
 import Section from "./Section";
+import CompanyBadge from "./CompanyBadge";
 import { formatRange } from "../lib/format";
 import type { Experience } from "../lib/types";
 
@@ -8,9 +9,12 @@ export default function ExperienceSection({ experience }: { experience: Experien
       {experience.map((role, i) => (
         <div className={`role ${role.isCurrent ? "current" : ""}`} key={`${role.company}-${role.role}-${i}`}>
           <div className="role-top">
-            <span className="role-title">
-              {role.role} <span className="role-company">— {role.company}</span>
-            </span>
+            <div className="role-heading">
+              <CompanyBadge company={role.company} />
+              <span className="role-title">
+                {role.role} <span className="role-company">— {role.company}</span>
+              </span>
+            </div>
             <span className="role-dates">{formatRange(role.startDate, role.endDate)}</span>
           </div>
           {role.summary && <p className="role-summary">{role.summary}</p>}

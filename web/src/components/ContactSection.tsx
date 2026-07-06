@@ -10,6 +10,7 @@ export default function ContactSection() {
   const [message, setMessage] = useState("");
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
+  const [confirmation, setConfirmation] = useState<string | null>(null);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -22,6 +23,7 @@ export default function ContactSection() {
       });
       if (result.sendMessage.success) {
         setStatus("sent");
+        setConfirmation(result.sendMessage.message);
         setName("");
         setEmail("");
         setMessage("");
@@ -42,7 +44,7 @@ export default function ContactSection() {
       </p>
 
       {status === "sent" ? (
-        <p className="status-line">// message received -- thanks, I&apos;ll get back to you.</p>
+        <p className="status-line">// {confirmation}</p>
       ) : (
         <form className="contact-form" onSubmit={handleSubmit}>
           <div className="form-row">

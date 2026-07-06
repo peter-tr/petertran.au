@@ -244,6 +244,10 @@ type SendMessagePayload {
   True if the message was received and stored successfully.
   """
   success: Boolean!
+  """
+  A friendly confirmation to show the sender.
+  """
+  message: String!
 }
 
 """

@@ -2,6 +2,7 @@ import { ApolloServer } from "@apollo/server";
 import { startStandaloneServer } from "@apollo/server/standalone";
 import { typeDefs } from "./schema.js";
 import { generateQuery } from "./generate-query.js";
+import { validateContactInput, CONTACT_CONFIRMATION_MESSAGE, type ContactInput } from "./contact.js";
 import { person, education, experience, projects, skills, programs, type Experience } from "./data.js";
 
 const resolvers = {
@@ -30,9 +31,10 @@ const resolvers = {
     generateQuery: (_: unknown, args: { prompt: string }) => generateQuery(args.prompt),
   },
   Mutation: {
-    sendMessage: (_: unknown, args: { input: { name: string; email: string; message: string } }) => {
+    sendMessage: (_: unknown, args: { input: ContactInput }) => {
+      validateContactInput(args.input);
       console.log("Mock sendMessage received:", args.input);
-      return { success: true };
+      return { success: true, message: CONTACT_CONFIRMATION_MESSAGE };
     },
   },
   Experience: {

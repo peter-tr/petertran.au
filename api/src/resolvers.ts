@@ -2,16 +2,9 @@ import { randomUUID } from "node:crypto";
 import { QueryCommand, GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
 import { ddb, TABLE_NAME, PK } from "./ddb.js";
 import { generateQuery } from "./generate-query.js";
+import { validateContactInput, CONTACT_CONFIRMATION_MESSAGE, type ContactInput } from "./contact.js";
 import type { Context } from "./context.js";
 import type { Education, Experience, Person, Program, Project, SkillCategory } from "./data.js";
-
-interface ContactInput {
-  name: string;
-  email: string;
-  message: string;
-}
-
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 async function queryPrefix<T>(prefix: string): Promise<T[]> {
   const res = await ddb.send(
@@ -58,17 +51,8 @@ export const resolvers = {
   },
   Mutation: {
     sendMessage: async (_: unknown, args: { input: ContactInput }) => {
+      validateContactInput(args.input);
       const { name, email, message } = args.input;
-
-      if (!name.trim() || !email.trim() || !message.trim()) {
-        throw new Error("name, email, and message are all required.");
-      }
-      if (!EMAIL_PATTERN.test(email)) {
-        throw new Error("That doesn't look like a valid email address.");
-      }
-      if (name.length > 200 || email.length > 200 || message.length > 5000) {
-        throw new Error("One of the fields is too long.");
-      }
 
       await ddb.send(
         new PutCommand({
@@ -82,7 +66,7 @@ export const resolvers = {
         })
       );
 
-      return { success: true };
+      return { success: true, message: CONTACT_CONFIRMATION_MESSAGE };
     },
   },
   Experience: {

@@ -96,12 +96,13 @@ export const SEND_MESSAGE_MUTATION = /* GraphQL */ `
   mutation SendMessage($input: ContactInput!) {
     sendMessage(input: $input) {
       success
+      message
     }
   }
 `;
 
 export interface SendMessageResult {
-  sendMessage: { success: boolean };
+  sendMessage: { success: boolean; message: string };
 }
 
 export const GENERATE_QUERY_QUERY = /* GraphQL */ `
