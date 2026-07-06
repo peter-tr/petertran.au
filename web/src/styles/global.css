@@ -582,8 +582,8 @@ a {
 
 @media (max-width: 640px) {
   .sandbox-frame {
-    height: 75vh;
-    min-height: 420px;
+    height: 65vh;
+    min-height: 370px;
   }
 
   .graphiql-mount .graphiql-container {
