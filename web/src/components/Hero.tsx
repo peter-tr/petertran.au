@@ -3,7 +3,12 @@ import { Link } from "react-router-dom";
 import { runQuery, HERO_QUERY, type HeroQueryResult } from "../lib/graphql";
 import type { Person } from "../lib/types";
 
-const QUERY_LINES = ["query Hero {", "  person { name }", "  experience { role company isCurrent }", "}"];
+const QUERY_LINES = [
+  "query Hero {",
+  "  person { name }",
+  "  experience(currentOnly: true) { role company }",
+  "}",
+];
 const FULL_QUERY = QUERY_LINES.join("\n");
 
 function prefersReducedMotion() {
@@ -17,12 +22,7 @@ interface HeroProps {
 export default function Hero({ person }: HeroProps) {
   const [typed, setTyped] = useState(() => (prefersReducedMotion() ? FULL_QUERY : ""));
   const [typingDone, setTypingDone] = useState(prefersReducedMotion);
-  const [result, setResult] = useState<{
-    name: string;
-    role: string;
-    company: string;
-    previousCompany: string | null;
-  } | null>(null);
+  const [result, setResult] = useState<{ name: string; role: string; company: string } | null>(null);
   const [errored, setErrored] = useState(false);
 
   useEffect(() => {
@@ -43,13 +43,10 @@ export default function Hero({ person }: HeroProps) {
   useEffect(() => {
     runQuery<HeroQueryResult>(HERO_QUERY)
       .then((data) => {
-        const current = data.experience.find((e) => e.isCurrent) ?? data.experience[0];
-        const previous = data.experience.find((e) => !e.isCurrent && e.company !== current?.company);
         setResult({
           name: data.person.name,
-          role: current?.role ?? "Software Engineer",
-          company: current?.company ?? "",
-          previousCompany: previous?.company ?? null,
+          role: data.experience[0]?.role ?? "Software Engineer",
+          company: data.experience[0]?.company ?? "",
         });
       })
       .catch(() => setErrored(true));
@@ -59,7 +56,6 @@ export default function Hero({ person }: HeroProps) {
   const displayName = result?.name ?? person?.name ?? "Peter Tran";
   const displayRole = result?.role ?? "Backend Software Engineer";
   const displayCompany = result?.company ?? "Commonwealth Bank of Australia";
-  const displayPreviousCompany = result?.previousCompany ?? "Boeing Australia";
 
   return (
     <header className="hero">
@@ -100,11 +96,7 @@ export default function Hero({ person }: HeroProps) {
                 </div>
                 <div>
                   &nbsp;&nbsp;<span className="key">"company"</span>:{" "}
-                  <span className="str">"{displayCompany}"</span>,
-                </div>
-                <div>
-                  &nbsp;&nbsp;<span className="key">"previously"</span>:{" "}
-                  <span className="str">"{displayPreviousCompany}"</span>
+                  <span className="str">"{displayCompany}"</span>
                 </div>
                 {"}"}
               </>

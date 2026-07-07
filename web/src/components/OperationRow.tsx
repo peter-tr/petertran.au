@@ -48,30 +48,37 @@ export default function OperationRow({ op }: { op: OperationStat }) {
       {expanded && (
         <tr className="ops-detail-row">
           <td colSpan={3}>
-            {op.lastQuery ? (
-              <>
-                <pre className="op-query">{op.lastQuery}</pre>
-                {op.lastVariables && (
-                  <pre className="op-query op-variables">{formatVariables(op.lastVariables)}</pre>
-                )}
-              </>
-            ) : (
-              <p className="op-no-sample">
-                No query sample for this operation -- mutations aren&apos;t sampled, to keep contact-form
-                submissions private.
-              </p>
-            )}
+            <div className="ops-detail">
+              {op.lastQuery ? (
+                <>
+                  <p className="ops-detail-label">Query</p>
+                  <pre className="op-query">{op.lastQuery}</pre>
+                  {op.lastVariables && (
+                    <>
+                      <p className="ops-detail-label">Variables</p>
+                      <pre className="op-query op-variables">{formatVariables(op.lastVariables)}</pre>
+                    </>
+                  )}
+                </>
+              ) : (
+                <p className="op-no-sample">
+                  No query sample for this operation -- mutations aren&apos;t sampled, to keep contact-form
+                  submissions private.
+                </p>
+              )}
 
-            {op.lastTraceId && (
-              <>
-                {traceLoading && <p className="status-line">// loading trace…</p>}
-                {traceError && <p className="status-line">// {traceError}</p>}
-                {trace && trace.length > 0 && <TraceWaterfall segments={trace} />}
-                {trace && trace.length === 0 && (
-                  <p className="op-no-sample">// trace has expired or wasn&apos;t found.</p>
-                )}
-              </>
-            )}
+              {op.lastTraceId && (
+                <>
+                  <p className="ops-detail-label">Trace</p>
+                  {traceLoading && <p className="status-line">// loading trace…</p>}
+                  {traceError && <p className="status-line">// {traceError}</p>}
+                  {trace && trace.length > 0 && <TraceWaterfall segments={trace} />}
+                  {trace && trace.length === 0 && (
+                    <p className="op-no-sample">// trace has expired or wasn&apos;t found.</p>
+                  )}
+                </>
+              )}
+            </div>
           </td>
         </tr>
       )}

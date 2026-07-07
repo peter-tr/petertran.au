@@ -72,13 +72,7 @@ export const person: Person = {
 };
 
 export const personal: Personal = {
-  hobbies: [
-    "Home-labbing Kubernetes clusters for no good reason",
-    "Flight simulators (some habits from the MQ-28 days die hard)",
-    "Bouldering",
-    "Mechanical keyboards",
-    "Building a compelling case for a fourth monitor",
-  ],
+  hobbies: ["Bouldering", "Badminton"],
   currentlyInto: "Rust -- mostly rewriting things that already worked fine in TypeScript, for the vibes.",
   funFact:
     "This section exists because I told Claude to 'be creative' instead of giving it real hobbies. Everything above is (mostly) true.",

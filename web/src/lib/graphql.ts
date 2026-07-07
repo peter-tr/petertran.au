@@ -86,17 +86,16 @@ export const HERO_QUERY = /* GraphQL */ `
     person {
       name
     }
-    experience {
+    experience(currentOnly: true) {
       role
       company
-      isCurrent
     }
   }
 `;
 
 export interface HeroQueryResult {
   person: { name: string };
-  experience: { role: string; company: string; isCurrent: boolean }[];
+  experience: { role: string; company: string }[];
 }
 
 export const SEND_MESSAGE_MUTATION = /* GraphQL */ `

@@ -1,5 +1,4 @@
 import Hero from "../components/Hero";
-import TechStackSection from "../components/TechStackSection";
 import ArchitectureSection from "../components/ArchitectureSection";
 import SystemStatsSection from "../components/SystemStatsSection";
 import Explorer from "../components/Explorer";
@@ -24,7 +23,6 @@ export default function Home({ data, error }: HomeProps) {
         </p>
       )}
 
-      <TechStackSection />
       <ArchitectureSection />
       <Explorer />
       <ContactSection />

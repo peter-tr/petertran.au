@@ -973,18 +973,39 @@ a {
 
 .ops-detail-row td {
   border-top: none;
-  padding: 0 0 1rem;
+  padding: 0;
+}
+
+.ops-detail {
+  margin: 0.3rem 0 1.2rem 0.6rem;
+  padding: 0.9rem 1rem 1rem 1.1rem;
+  border-left: 2px solid var(--signal-dim);
+  background: var(--panel-2);
+  border-radius: 0 6px 6px 0;
+}
+
+.ops-detail-label {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--muted-dim);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin: 0.9rem 0 0.35rem;
+}
+
+.ops-detail-label:first-child {
+  margin-top: 0;
 }
 
 .op-query {
   font-family: var(--font-mono);
   font-size: 0.78rem;
   color: var(--paper);
-  background: var(--panel);
+  background: var(--ink);
   border: 1px solid var(--rule);
   border-radius: 6px;
   padding: 0.7rem 0.9rem;
-  margin: 0.4rem 0 0;
+  margin: 0;
   overflow-x: auto;
   white-space: pre;
 }
@@ -997,7 +1018,7 @@ a {
   font-family: var(--font-mono);
   font-size: 0.78rem;
   color: var(--muted-dim);
-  margin: 0.4rem 0 0;
+  margin: 0;
 }
 
 .trace-waterfall {
