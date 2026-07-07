@@ -1,4 +1,5 @@
 import Section from "./Section";
+import CompanyBadge from "./CompanyBadge";
 import { formatRange } from "../lib/format";
 import type { Education, Program } from "../lib/types";
 
@@ -14,7 +15,10 @@ export default function EducationSection({
       {education.map((e) => (
         <div className="fact" key={e.institution}>
           <div className="role-top">
-            <span className="fact-title">{e.institution}</span>
+            <div className="role-heading">
+              <CompanyBadge company={e.institution} />
+              <span className="fact-title">{e.institution}</span>
+            </div>
             <span className="fact-dates">{formatRange(e.startDate, e.endDate)}</span>
           </div>
           <p className="fact-sub">{e.degree}</p>
@@ -24,7 +28,10 @@ export default function EducationSection({
       {programs.map((p) => (
         <div className="fact" key={p.name}>
           <div className="role-top">
-            <span className="fact-title">{p.name}</span>
+            <div className="role-heading">
+              <CompanyBadge company={p.organization} />
+              <span className="fact-title">{p.name}</span>
+            </div>
             <span className="fact-dates">{formatRange(p.startDate, p.endDate)}</span>
           </div>
           <p className="fact-sub">{p.description}</p>

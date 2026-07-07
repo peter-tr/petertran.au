@@ -1,7 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { FaLinkedin, FaGithub, FaFilePdf } from "react-icons/fa6";
 import { runQuery, HERO_QUERY, type HeroQueryResult } from "../lib/graphql";
 import type { Person } from "../lib/types";
+
+const LINK_ICONS: Record<string, typeof FaLinkedin> = {
+  LinkedIn: FaLinkedin,
+  GitHub: FaGithub,
+};
 
 const QUERY_LINES = [
   "query Hero {",
@@ -112,12 +118,17 @@ export default function Hero({ person }: HeroProps) {
 
       {person && (
         <div className="hero-links" style={{ marginTop: "1.6rem" }}>
-          {person.links.map((link) => (
-            <a key={link.url} href={link.url} target="_blank" rel="noreferrer">
-              {link.label}
-            </a>
-          ))}
+          {person.links.map((link) => {
+            const Icon = LINK_ICONS[link.label];
+            return (
+              <a key={link.url} href={link.url} target="_blank" rel="noreferrer">
+                {Icon && <Icon aria-hidden="true" />}
+                {link.label}
+              </a>
+            );
+          })}
           <a href="/peter-tran-resume.pdf" target="_blank" rel="noreferrer">
+            <FaFilePdf aria-hidden="true" />
             Resume (PDF)
           </a>
         </div>

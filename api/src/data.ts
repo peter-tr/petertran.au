@@ -66,7 +66,6 @@ export const person: Person = {
   links: [
     { label: "LinkedIn", url: "https://linkedin.com/in/peter-k-tran" },
     { label: "GitHub", url: "https://github.com/peter-tr" },
-    { label: "Website", url: "https://www.petertran.au" },
   ],
 };
 
@@ -183,6 +182,13 @@ export const projects: Project[] = [
     description:
       "Built a RAG pipeline with Hugging Face Transformers and FAISS, benchmarking BM25, DPR, and TILDEv2 retrieval; TILDEv2 outperformed BM25 (nDCG@3: 0.77 vs. 0.48, +61%) with statistical significance.",
     url: null,
+  },
+  {
+    name: "Fit2Learn",
+    stack: ["PHP", "CodeIgniter", "MySQL", "jQuery", "Bootstrap"],
+    description:
+      "An educational fitness platform teaching exercise and nutrition through community-driven courses, aimed at people intimidated by expensive gym programs or low-quality online videos. Course creation and search, social features (likes, ratings, comments, subscriptions), and MFA plus encrypted payment details.",
+    url: "https://github.com/peter-tr/fit2learn",
   },
 ];
 

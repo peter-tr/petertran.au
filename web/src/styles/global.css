@@ -173,6 +173,9 @@ a {
 }
 
 .hero-links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
   font-family: var(--font-mono);
   font-size: 0.85rem;
   text-decoration: none;
@@ -483,6 +486,24 @@ a {
   border: 1px solid rgba(99, 199, 190, 0.35);
   border-radius: 999px;
   padding: 0.2rem 0.6rem;
+}
+
+.chip-cert {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--signal);
+  border-color: rgba(242, 169, 59, 0.45);
+  background: rgba(242, 169, 59, 0.08);
+  text-decoration: none;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.chip-cert:hover {
+  border-color: var(--signal);
+  background: rgba(242, 169, 59, 0.16);
 }
 
 .project-desc {
