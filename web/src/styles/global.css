@@ -953,6 +953,7 @@ a {
 
 .ops-table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   font-family: var(--font-mono);
   font-size: 0.82rem;
@@ -973,8 +974,25 @@ a {
   color: var(--muted);
 }
 
+/* table-layout: fixed keeps the table (and the page) from being stretched
+   wider than the viewport by the raw, non-wrapping GraphQL/JSON text inside
+   the expanded detail row -- that content now scrolls within .op-query's own
+   overflow-x instead. Explicit column widths replace the auto-sizing that
+   fixed layout gives up. */
+.ops-table th:first-child,
 .ops-table td:first-child {
+  width: 55%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--paper);
+}
+
+.ops-table th:nth-child(2),
+.ops-table td:nth-child(2),
+.ops-table th:nth-child(3),
+.ops-table td:nth-child(3) {
+  width: 22.5%;
 }
 
 .ops-row {
