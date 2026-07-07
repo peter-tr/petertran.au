@@ -8,7 +8,9 @@ export default function ArchitectureSection() {
         This page isn't just a static resume - it's served by the exact kind of system it describes: a
         Lambda-backed GraphQL API, deployed with AWS CDK, in front of a database of its own content.
       </p>
-      <ArchitectureDiagram />
+      <div className="arch-diagram-scroll">
+        <ArchitectureDiagram />
+      </div>
     </Section>
   );
 }

@@ -32,6 +32,10 @@ type Personal {
   Hobbies and interests outside of work.
   """
   hobbies: [String!]!
+  """
+  Favorite foods.
+  """
+  favoriteFoods: [String!]!
 }
 
 """

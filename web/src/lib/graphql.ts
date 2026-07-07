@@ -75,6 +75,7 @@ export const RESUME_QUERY = /* GraphQL */ `
     }
     personal {
       hobbies
+      favoriteFoods
     }
   }
 `;

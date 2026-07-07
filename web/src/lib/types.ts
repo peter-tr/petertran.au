@@ -53,6 +53,7 @@ export interface Program {
 
 export interface Personal {
   hobbies: string[];
+  favoriteFoods: string[];
 }
 
 export interface ResumeData {

@@ -16,6 +16,7 @@ export interface Person {
 
 export interface Personal {
   hobbies: string[];
+  favoriteFoods: string[];
 }
 
 export interface Education {
@@ -71,6 +72,7 @@ export const person: Person = {
 
 export const personal: Personal = {
   hobbies: ["Bouldering", "Badminton"],
+  favoriteFoods: ["Sushi", "Matcha", "Coffee", "Pizza"],
 };
 
 export const education: Education[] = [
