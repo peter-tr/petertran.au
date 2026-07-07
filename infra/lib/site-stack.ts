@@ -67,6 +67,15 @@ export class SiteStack extends Stack {
       "SesRecipientIdentity",
       "peter2002tran@outlook.com"
     );
+    // No DMARC record at all reads as a red flag to strict filters (Outlook
+    // especially) even when DKIM/SPF both pass -- p=none is monitor-only, so
+    // it can't cause legitimate mail to be rejected while still signaling
+    // "this domain has a real DMARC policy."
+    new route53.TxtRecord(this, "DmarcRecord", {
+      zone: hostedZone,
+      recordName: "_dmarc",
+      values: ["v=DMARC1; p=none; rua=mailto:peter2002tran@outlook.com"],
+    });
 
     // --- GraphQL API (Lambda + Function URL, no API Gateway needed) ---
     const apiFn = new lambda.Function(this, "GraphQLFunction", {

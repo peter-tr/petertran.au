@@ -7,6 +7,7 @@ import {
   type TraceBreakdownResult,
 } from "../lib/graphql";
 import TraceWaterfall from "./TraceWaterfall";
+import GraphQLCode from "./GraphQLCode";
 
 function formatVariables(raw: string | null): string | null {
   if (!raw) return null;
@@ -52,7 +53,7 @@ export default function OperationRow({ op }: { op: OperationStat }) {
               {op.lastQuery ? (
                 <>
                   <p className="ops-detail-label">Query</p>
-                  <pre className="op-query">{op.lastQuery}</pre>
+                  <GraphQLCode code={op.lastQuery} />
                   {op.lastVariables && (
                     <>
                       <p className="ops-detail-label">Variables</p>

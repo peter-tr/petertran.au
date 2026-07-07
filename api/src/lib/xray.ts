@@ -10,21 +10,25 @@ export interface TraceSegment {
 
 interface RawSegment {
   name: string;
+  origin?: string;
   start_time: number;
   end_time?: number;
+  inferred?: boolean;
   subsegments?: RawSegment[];
 }
 
-function flatten(segment: RawSegment, rootStart: number, out: TraceSegment[]): void {
-  const end = segment.end_time ?? segment.start_time;
-  out.push({
-    name: segment.name,
-    startOffsetMs: Math.round((segment.start_time - rootStart) * 1000),
-    durationMs: Math.round((end - segment.start_time) * 1000),
-  });
-  for (const child of segment.subsegments ?? []) {
-    flatten(child, rootStart, out);
+function collectAll(nodes: RawSegment[], out: RawSegment[]): void {
+  for (const node of nodes) {
+    out.push(node);
+    if (node.subsegments) collectAll(node.subsegments, out);
   }
+}
+
+function displayName(node: RawSegment): string {
+  // Both the Lambda platform's own wrapper segment and the segment our SDK
+  // creates for the actual handler code report distinct `origin` values but
+  // are both really "the Lambda" from a reader's point of view.
+  return node.origin?.startsWith("AWS::Lambda") ? "Lambda" : node.name;
 }
 
 // Fetches a specific trace by ID (captured alongside each operation's stats
@@ -32,19 +36,46 @@ function flatten(segment: RawSegment, rootStart: number, out: TraceSegment[]): v
 // This only reflects what actually happened inside the Lambda invocation --
 // X-Ray has no visibility into the browser or CloudFront/S3, which aren't
 // part of the same trace.
+//
+// BatchGetTraces returns a flat array of segment documents, not a clean
+// tree: our own SDK-created "work" segment nests its DynamoDB/Anthropic
+// subsegments inline, but the Lambda platform's own wrapper segment is a
+// separate top-level entry, and each downstream AWS call additionally gets
+// an `inferred: true` twin (X-Ray's service-map bookkeeping) duplicating a
+// subsegment that's already captured elsewhere in the same trace.
 export async function getTraceBreakdown(traceId: string): Promise<TraceSegment[]> {
   const res = await xray.send(new BatchGetTracesCommand({ TraceIds: [traceId] }));
   const trace = res.Traces?.[0];
   if (!trace?.Segments?.length) return [];
 
-  const parsed = trace.Segments.map((s) =>
+  const topLevel = trace.Segments.map((s) =>
     s.Document ? (JSON.parse(s.Document) as RawSegment) : null
   ).filter((s): s is RawSegment => s !== null);
-  if (parsed.length === 0) return [];
+  if (topLevel.length === 0) return [];
 
-  const rootStart = Math.min(...parsed.map((s) => s.start_time));
+  const all: RawSegment[] = [];
+  collectAll(topLevel, all);
+
+  const real = all.filter((node) => !node.inferred);
+  const rootStart = Math.min(...real.map((node) => node.start_time));
+
+  // Keep only the earliest (outermost) "Lambda" entry -- it already spans
+  // the full invocation, so any inner one is a fully-overlapping duplicate.
+  let sawLambda = false;
   const out: TraceSegment[] = [];
-  for (const segment of parsed) flatten(segment, rootStart, out);
+  for (const node of real.sort((a, b) => a.start_time - b.start_time)) {
+    const name = displayName(node);
+    if (name === "Lambda") {
+      if (sawLambda) continue;
+      sawLambda = true;
+    }
+    const end = node.end_time ?? node.start_time;
+    out.push({
+      name,
+      startOffsetMs: Math.round((node.start_time - rootStart) * 1000),
+      durationMs: Math.round((end - node.start_time) * 1000),
+    });
+  }
 
-  return out.sort((a, b) => a.startOffsetMs - b.startOffsetMs);
+  return out;
 }

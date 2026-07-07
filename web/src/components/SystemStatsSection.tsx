@@ -14,6 +14,7 @@ const TILES: { key: NumericStatKey; label: string; format: (value: number) => st
   { key: "avgDurationMs", label: "avg duration", format: (v) => `${v}ms` },
   { key: "errorsLast24h", label: "errors / 24h", format: (v) => v.toLocaleString() },
   { key: "aiQueriesTotal", label: "Ask Claude queries served", format: (v) => v.toLocaleString() },
+  { key: "uniqueVisitors", label: "unique visitors / 30d", format: (v) => v.toLocaleString() },
 ];
 
 type OperationsRange = "recent" | "all";

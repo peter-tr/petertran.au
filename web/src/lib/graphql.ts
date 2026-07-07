@@ -132,6 +132,7 @@ export const SYSTEM_STATS_QUERY = /* GraphQL */ `
         avgDurationMs
         errorsLast24h
         aiQueriesTotal
+        uniqueVisitors
         operations {
           name
           count
@@ -200,6 +201,7 @@ export interface SystemStatsResult {
       avgDurationMs: number;
       errorsLast24h: number;
       aiQueriesTotal: number;
+      uniqueVisitors: number;
       operations: OperationStat[];
       operationsLast3Days: OperationStat[];
       requestsByHour: HourlyCount[];

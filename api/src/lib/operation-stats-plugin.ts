@@ -2,6 +2,7 @@ import type { ApolloServerPlugin } from "@apollo/server";
 import { UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import * as AWSXRay from "aws-xray-sdk-core";
 import { ddb, TABLE_NAME } from "./ddb";
+import type { Context } from "../context";
 
 const RETENTION_DAYS = 30;
 
@@ -64,15 +65,40 @@ async function recordOperation(
   );
 }
 
+// One item per day holding a DynamoDB String Set of source IPs -- ADD on a
+// set is naturally idempotent, so this gives a real unique-visitor count
+// without needing cookies or any client-side identifier.
+async function recordVisitor(sourceIp: string): Promise<void> {
+  const ttl = Math.floor(Date.now() / 1000) + RETENTION_DAYS * 24 * 60 * 60;
+  await ddb.send(
+    new UpdateCommand({
+      TableName: TABLE_NAME,
+      Key: { pk: "STATS", sk: `VISITORS#${dayKey(new Date())}` },
+      UpdateExpression: "ADD #ips :ip SET #ttl = :ttl",
+      ExpressionAttributeNames: { "#ips": "ips", "#ttl": "ttl" },
+      ExpressionAttributeValues: { ":ip": new Set([sourceIp]), ":ttl": ttl },
+    })
+  );
+}
+
 // Records a count + cumulative duration per named operation, feeding the
 // "operations" breakdown in systemStats. Runs on every request in production
 // only -- dev-server.ts builds its own ApolloServer without this plugin, so
 // local dev never touches DynamoDB for it.
-export const operationStatsPlugin: ApolloServerPlugin = {
+export const operationStatsPlugin: ApolloServerPlugin<Context> = {
   async requestDidStart() {
     const start = Date.now();
     return {
       async willSendResponse(requestContext) {
+        const sourceIp = requestContext.contextValue.sourceIp;
+        if (sourceIp) {
+          try {
+            await recordVisitor(sourceIp);
+          } catch {
+            // Best-effort -- never let stats tracking break a real response.
+          }
+        }
+
         const name = requestContext.operationName ?? "Anonymous";
         if (IGNORED_OPERATIONS.has(name)) return;
 

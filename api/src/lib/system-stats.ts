@@ -28,6 +28,7 @@ export interface SystemStats {
   operations: OperationStats[];
   operationsLast3Days: OperationStats[];
   requestsByHour: HourlyCount[];
+  uniqueVisitors: number;
 }
 
 interface LambdaMetrics {
@@ -122,6 +123,30 @@ async function getAiQueriesTotal(): Promise<number> {
     new GetCommand({ TableName: TABLE_NAME, Key: { pk: "STATS", sk: "AI_QUERIES" } })
   );
   return (res.Item?.count as number | undefined) ?? 0;
+}
+
+const VISITOR_PREFIX = "VISITORS#";
+
+// Each day's item holds a native DynamoDB String Set of source IPs (deduped
+// by ADD at write time) -- unioning those sets across all retained days
+// gives a real unique-visitor count with no cookies or client-side ID.
+// Bounded to the same 30-day retention as everything else in this table.
+async function getUniqueVisitors(): Promise<number> {
+  const res = await ddb.send(
+    new QueryCommand({
+      TableName: TABLE_NAME,
+      KeyConditionExpression: "pk = :pk AND begins_with(sk, :prefix)",
+      ExpressionAttributeValues: { ":pk": "STATS", ":prefix": VISITOR_PREFIX },
+    })
+  );
+
+  const allIps = new Set<string>();
+  for (const item of res.Items ?? []) {
+    const ips = (item.ips as Set<string> | string[] | undefined) ?? [];
+    for (const ip of ips) allIps.add(ip);
+  }
+
+  return allIps.size;
 }
 
 const MAX_OPERATIONS_SHOWN = 8;
@@ -230,12 +255,13 @@ async function getOperationStats(): Promise<{ allTime: OperationStats[]; recent:
 }
 
 export async function getSystemStats(functionName: string | undefined): Promise<SystemStats> {
-  const [metrics, aiQueriesTotal, operationStats] = await Promise.all([
+  const [metrics, aiQueriesTotal, operationStats, uniqueVisitors] = await Promise.all([
     functionName
       ? getLambdaMetrics(functionName)
       : Promise.resolve({ requests: 0, avgDuration: 0, errors: 0, requestsByHour: [] }),
     getAiQueriesTotal(),
     getOperationStats(),
+    getUniqueVisitors(),
   ]);
 
   return {
@@ -243,6 +269,7 @@ export async function getSystemStats(functionName: string | undefined): Promise<
     avgDurationMs: Math.round(metrics.avgDuration * 10) / 10,
     errorsLast24h: Math.round(metrics.errors),
     aiQueriesTotal,
+    uniqueVisitors,
     operations: operationStats.allTime,
     operationsLast3Days: operationStats.recent,
     requestsByHour: metrics.requestsByHour,

@@ -285,6 +285,11 @@ type SystemStats {
   """
   aiQueriesTotal: Int!
   """
+  Unique visitor IPs seen in the last 30 days. No cookies or client-side
+  tracking -- derived from the source IP already used for rate limiting.
+  """
+  uniqueVisitors: Int!
+  """
   Call count and average latency per named GraphQL operation over the last
   30 days, most-called first, capped to the top 8. Operation names are
   unbounded (AI-generated queries get a fresh Claude-chosen name each time),

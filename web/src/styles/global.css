@@ -821,7 +821,7 @@ a {
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 1px;
   background: var(--rule);
   border: 1px solid var(--rule);
@@ -986,12 +986,12 @@ a {
 
 .op-query {
   font-family: var(--font-mono);
-  font-size: 0.78rem;
+  font-size: 0.7rem;
   color: var(--paper);
   background: var(--ink);
   border: 1px solid var(--rule);
   border-radius: 6px;
-  padding: 0.7rem 0.9rem;
+  padding: 0.6rem 0.8rem;
   margin: 0;
   overflow-x: auto;
   white-space: pre;
@@ -999,6 +999,31 @@ a {
 
 .op-variables {
   color: var(--string);
+}
+
+.gql-keyword {
+  color: var(--type);
+}
+
+.gql-name {
+  color: var(--paper);
+}
+
+.gql-string {
+  color: var(--string);
+}
+
+.gql-variable {
+  color: var(--signal);
+}
+
+.gql-comment {
+  color: var(--muted-dim);
+  font-style: italic;
+}
+
+.gql-punct {
+  color: var(--muted-dim);
 }
 
 .op-no-sample {
