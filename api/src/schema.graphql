@@ -249,21 +249,22 @@ type Meta {
   """
   traceBreakdown(traceId: String!): [TraceSegment!]!
   """
-  Real AWS usage cost for the current calendar month so far, in USD, before
-  any promotional credits are applied - pulled from AWS Cost Explorer and
+  Real all-time AWS usage cost for this project, in USD, before any
+  promotional credits are applied - pulled from AWS Cost Explorer (limited to
+  the last 12 months, comfortably covering this project's whole history) and
   cached for a few hours, since Cost Explorer itself only updates about once
   a day.
   """
   awsCostUsd: Float!
   """
-  Real Anthropic API usage cost for the current calendar month so far, in
-  USD - pulled from Anthropic's Cost Report API and cached for about an
-  hour. Zero if no Admin API key is configured.
+  Real all-time Anthropic API usage cost for this project, in USD - pulled
+  from Anthropic's Cost Report API (also limited to the last 12 months) and
+  cached for about an hour. Zero if no Admin API key is configured.
   """
   anthropicCostUsd: Float!
   """
-  awsCostUsd + anthropicCostUsd - the site's total real running cost this
-  month so far.
+  awsCostUsd + anthropicCostUsd - the site's total real running cost since
+  it was built.
   """
   totalCostUsd: Float!
 }

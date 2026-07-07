@@ -26,7 +26,7 @@ export default function Footer({ email }: { email?: string }) {
         {cost && (
           <>
             {" "}
-            · real cost this month: ${cost.totalCostUsd.toFixed(4)} (AWS ${cost.awsCostUsd.toFixed(4)} +
+            · real cost since launch: ${cost.totalCostUsd.toFixed(4)} (AWS ${cost.awsCostUsd.toFixed(4)} +
             Anthropic ${cost.anthropicCostUsd.toFixed(4)})
           </>
         )}

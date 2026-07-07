@@ -49,7 +49,22 @@ const RETENTION_DAYS = 30;
 // Requires an Admin API key (separate from the messages-API key used
 // elsewhere) - returns 0 rather than failing if it's not configured, since
 // this is a nice-to-have footer figure, not core functionality.
-export async function getAnthropicCostThisMonthUsd(): Promise<number> {
+//
+// Also coalesces concurrent in-flight calls: the footer queries awsCostUsd,
+// anthropicCostUsd, and totalCostUsd as three sibling fields, and totalCostUsd
+// itself calls this function again - without this, a single cold-cache page
+// load would fire the whole ~12-request paginated fetch twice back to back.
+let inFlight: Promise<number> | null = null;
+
+export async function getAnthropicAllTimeCostUsd(): Promise<number> {
+  if (inFlight) return inFlight;
+  inFlight = fetchAnthropicAllTimeCostUsd().finally(() => {
+    inFlight = null;
+  });
+  return inFlight;
+}
+
+async function fetchAnthropicAllTimeCostUsd(): Promise<number> {
   const apiKey = await getAnthropicAdminApiKey();
   if (!apiKey) return 0;
 
@@ -60,12 +75,16 @@ export async function getAnthropicCostThisMonthUsd(): Promise<number> {
   }
 
   const now = new Date();
-  const startingAt = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  // 12 months back comfortably covers this project's whole history (and
+  // matches the same lookback used for the AWS side); the cost endpoint
+  // caps at 31 daily buckets per page, so a range this wide means fetchCost
+  // below paginates through roughly a dozen requests.
+  const startingAt = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 12, 1));
   const endingAt = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
 
   let amountUsd: number;
   try {
-    amountUsd = await fetchAnthropicCostThisMonthUsd(apiKey, startingAt, endingAt);
+    amountUsd = await fetchAnthropicCostUsd(apiKey, startingAt, endingAt);
   } catch (err) {
     console.error("Failed to fetch Anthropic cost report:", err);
     return (cached.Item?.amountUsd as number | undefined) ?? 0;
@@ -86,11 +105,7 @@ export async function getAnthropicCostThisMonthUsd(): Promise<number> {
   return amountUsd;
 }
 
-async function fetchAnthropicCostThisMonthUsd(
-  apiKey: string,
-  startingAt: Date,
-  endingAt: Date
-): Promise<number> {
+async function fetchAnthropicCostUsd(apiKey: string, startingAt: Date, endingAt: Date): Promise<number> {
   let totalCents = 0;
   let page: string | undefined;
 
@@ -107,7 +122,7 @@ async function fetchAnthropicCostThisMonthUsd(
         "anthropic-version": "2023-06-01",
         "x-api-key": apiKey,
       },
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) throw new Error(`Anthropic cost_report returned ${res.status}`);
 

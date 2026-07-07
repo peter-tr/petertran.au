@@ -18,7 +18,23 @@ function dateStr(date: Date): string {
 // so results are cached in DynamoDB (not just in-memory) to survive cold
 // starts and keep this to a handful of real calls per day regardless of
 // traffic.
-export async function getAwsCostThisMonthUsd(): Promise<number> {
+//
+// Also coalesces concurrent in-flight calls: the footer queries awsCostUsd,
+// anthropicCostUsd, and totalCostUsd as three sibling fields, and totalCostUsd
+// itself calls this function again - without this, a single cold-cache page
+// load would fire two real (paid) Cost Explorer calls back to back instead
+// of one.
+let inFlight: Promise<number> | null = null;
+
+export async function getAwsAllTimeCostUsd(): Promise<number> {
+  if (inFlight) return inFlight;
+  inFlight = fetchAwsAllTimeCostUsd().finally(() => {
+    inFlight = null;
+  });
+  return inFlight;
+}
+
+async function fetchAwsAllTimeCostUsd(): Promise<number> {
   const cached = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: CACHE_KEY }));
   const fetchedAt = cached.Item?.fetchedAt as string | undefined;
   if (fetchedAt && Date.now() - new Date(fetchedAt).getTime() < CACHE_TTL_MS) {
@@ -26,12 +42,15 @@ export async function getAwsCostThisMonthUsd(): Promise<number> {
   }
 
   const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  // Cost Explorer refuses to look back more than 14 months - 12 is a safe
+  // margin under that, and this project's AWS resources are all much younger
+  // than that anyway, so it effectively captures the account's whole history.
+  const start = new Date(now.getFullYear(), now.getMonth() - 12, 1);
   // Cost Explorer's End is exclusive, so End = today would exclude today's
   // usage entirely - use tomorrow instead to include today's (estimated)
   // spend, which Cost Explorer does support returning same-day.
   const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-  const amountUsd = await fetchAwsCostThisMonthUsd(start, end);
+  const amountUsd = await fetchAwsCostUsd(start, end);
 
   await ddb.send(
     new PutCommand({
@@ -48,7 +67,7 @@ export async function getAwsCostThisMonthUsd(): Promise<number> {
   return amountUsd;
 }
 
-async function fetchAwsCostThisMonthUsd(start: Date, end: Date): Promise<number> {
+async function fetchAwsCostUsd(start: Date, end: Date): Promise<number> {
   const res = await costExplorer.send(
     new GetCostAndUsageCommand({
       TimePeriod: { Start: dateStr(start), End: dateStr(end) },

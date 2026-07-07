@@ -91,7 +91,10 @@ export class SiteStack extends Stack {
       handler: "handler.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/dist")),
       memorySize: 256,
-      timeout: Duration.seconds(15),
+      // 30s (not the default 15s) to leave headroom for the all-time cost
+      // fields on a cold cache: Anthropic's cost report caps at 31 days per
+      // page, so a 12-month lookback can take a dozen-odd sequential requests.
+      timeout: Duration.seconds(30),
       environment: {
         TABLE_NAME: table.tableName,
         ANTHROPIC_SECRET_ARN: anthropicSecret.secretArn,
