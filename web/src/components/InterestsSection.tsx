@@ -24,6 +24,16 @@ export default function InterestsSection({ interests }: { interests: Interests }
           ))}
         </div>
       </div>
+      <div className="skill-row">
+        <span className="skill-cat">Favorite shows</span>
+        <div className="skill-items">
+          {interests.favoriteShows.map((show) => (
+            <span className="chip" key={show}>
+              {show}
+            </span>
+          ))}
+        </div>
+      </div>
     </Section>
   );
 }

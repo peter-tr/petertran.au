@@ -14,12 +14,14 @@ import {
 // Deliberately sparse/spiky, matching what a low-traffic personal site's real
 // CloudWatch numbers actually look like -- useful for testing the chart's
 // axis scaling against a realistic worst case.
-const MOCK_HOURLY_COUNTS = [0, 1, 0, 0, 2, 0, 1, 3, 0, 0, 1, 0, 5, 2, 0, 1, 0, 0, 3, 8, 4, 1, 0, 2];
+const MOCK_DAILY_COUNTS = [
+  0, 2, 1, 0, 3, 0, 0, 1, 4, 0, 2, 0, 0, 1, 6, 3, 0, 0, 2, 1, 0, 5, 2, 0, 1, 0, 3, 8, 4, 1,
+];
 
-function mockRequestsByHour() {
+function mockRequestsByDay() {
   const now = Date.now();
-  return MOCK_HOURLY_COUNTS.map((count, i) => ({
-    timestamp: new Date(now - (MOCK_HOURLY_COUNTS.length - 1 - i) * 60 * 60 * 1000).toISOString(),
+  return MOCK_DAILY_COUNTS.map((count, i) => ({
+    timestamp: new Date(now - (MOCK_DAILY_COUNTS.length - 1 - i) * 24 * 60 * 60 * 1000).toISOString(),
     count,
   }));
 }
@@ -66,10 +68,10 @@ export const devResolvers = {
   Meta: {
     generateQuery: (_: unknown, args: { prompt: string }) => generateQuery(args.prompt),
     systemStats: () => ({
-      requestsLast24h: 128,
+      requestsTotal: 128,
       avgDurationMs: 42.5,
       aiQueriesTotal: 17,
-      uniqueVisitors: 42,
+      uniqueVisitorsTotal: 42,
       operations: [
         {
           name: "Resume",
@@ -100,7 +102,7 @@ export const devResolvers = {
           name: "SystemStats",
           count: 9,
           avgDurationMs: 210.6,
-          lastQuery: "query SystemStats {\n  meta { systemStats { requestsLast24h } }\n}",
+          lastQuery: "query SystemStats {\n  meta { systemStats { requestsTotal } }\n}",
           lastVariables: null,
           lastTraceId: "mock-trace-systemstats",
         },
@@ -113,7 +115,7 @@ export const devResolvers = {
           lastTraceId: null,
         },
       ],
-      operationsLast3Days: [
+      operationsLast30Days: [
         {
           name: "Resume",
           count: 12,
@@ -143,12 +145,12 @@ export const devResolvers = {
           name: "SystemStats",
           count: 3,
           avgDurationMs: 198.2,
-          lastQuery: "query SystemStats {\n  meta { systemStats { requestsLast24h } }\n}",
+          lastQuery: "query SystemStats {\n  meta { systemStats { requestsTotal } }\n}",
           lastVariables: null,
           lastTraceId: "mock-trace-systemstats",
         },
       ],
-      requestsByHour: mockRequestsByHour(),
+      requestsByDay: mockRequestsByDay(),
     }),
     traceBreakdown: () => MOCK_TRACE_BREAKDOWN,
     awsCostUsd: () => 0.0027,

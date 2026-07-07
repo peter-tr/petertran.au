@@ -17,6 +17,7 @@ export interface Person {
 export interface Interests {
   hobbies: string[];
   favoriteFoods: string[];
+  favoriteShows: string[];
 }
 
 export interface Education {
@@ -70,8 +71,9 @@ export const person: Person = {
 };
 
 export const interests: Interests = {
-  hobbies: ["Bouldering", "Badminton"],
+  hobbies: ["Bouldering", "Badminton", "Mahjong", "Poker", "Catan", "Fashion", "Hiking", "Running", "Gym"],
   favoriteFoods: ["Sushi", "Matcha", "Coffee", "Pizza"],
+  favoriteShows: ["Suits", "Stranger Things", "Severance", "Breaking Bad"],
 };
 
 export const education: Education[] = [

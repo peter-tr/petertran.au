@@ -54,6 +54,7 @@ export interface Program {
 export interface Interests {
   hobbies: string[];
   favoriteFoods: string[];
+  favoriteShows: string[];
 }
 
 export interface ResumeData {

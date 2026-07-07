@@ -15,25 +15,24 @@ export interface OperationStats {
   lastTraceId: string | null;
 }
 
-export interface HourlyCount {
+export interface DailyCount {
   timestamp: string;
   count: number;
 }
 
 export interface SystemStats {
-  requestsLast24h: number;
+  requestsTotal: number;
   avgDurationMs: number;
   aiQueriesTotal: number;
   operations: OperationStats[];
-  operationsLast3Days: OperationStats[];
-  requestsByHour: HourlyCount[];
-  uniqueVisitors: number;
+  operationsLast30Days: OperationStats[];
+  requestsByDay: DailyCount[];
+  uniqueVisitorsTotal: number;
 }
 
 interface LambdaMetrics {
-  requests: number;
   avgDuration: number;
-  requestsByHour: HourlyCount[];
+  requestsByDay: DailyCount[];
 }
 
 const METRICS_CACHE_TTL_MS = 60_000;
@@ -52,9 +51,15 @@ async function getLambdaMetrics(functionName: string): Promise<LambdaMetrics> {
   return data;
 }
 
+const CHART_WINDOW_DAYS = 30;
+
 async function fetchLambdaMetrics(functionName: string): Promise<LambdaMetrics> {
   const end = new Date();
-  const start = new Date(end.getTime() - 24 * 60 * 60 * 1000);
+  // One shared time range for both queries below (GetMetricData applies
+  // StartTime/EndTime to the whole call, not per-query) - daily buckets over
+  // 30 days rather than hourly over 24h, since a low-traffic personal site's
+  // real hourly counts are almost all zero.
+  const start = new Date(end.getTime() - CHART_WINDOW_DAYS * 24 * 60 * 60 * 1000);
   const dimensions = [{ Name: "FunctionName", Value: functionName }];
 
   const res = await cloudwatch.send(
@@ -64,14 +69,6 @@ async function fetchLambdaMetrics(functionName: string): Promise<LambdaMetrics> 
       ScanBy: "TimestampAscending",
       MetricDataQueries: [
         {
-          Id: "requests",
-          MetricStat: {
-            Metric: { Namespace: "AWS/Lambda", MetricName: "Invocations", Dimensions: dimensions },
-            Period: 86400,
-            Stat: "Sum",
-          },
-        },
-        {
           Id: "duration",
           MetricStat: {
             Metric: { Namespace: "AWS/Lambda", MetricName: "Duration", Dimensions: dimensions },
@@ -80,10 +77,10 @@ async function fetchLambdaMetrics(functionName: string): Promise<LambdaMetrics> 
           },
         },
         {
-          Id: "requestsByHour",
+          Id: "requestsByDay",
           MetricStat: {
             Metric: { Namespace: "AWS/Lambda", MetricName: "Invocations", Dimensions: dimensions },
-            Period: 3600,
+            Period: 86400,
             Stat: "Sum",
           },
         },
@@ -92,19 +89,20 @@ async function fetchLambdaMetrics(functionName: string): Promise<LambdaMetrics> 
   );
 
   const result = (id: string) => res.MetricDataResults?.find((r) => r.Id === id);
-  const valueFor = (id: string) => result(id)?.Values?.[0] ?? 0;
 
-  const hourly = result("requestsByHour");
-  const requestsByHour: HourlyCount[] = (hourly?.Timestamps ?? []).map((timestamp, i) => ({
+  const daily = result("requestsByDay");
+  const requestsByDay: DailyCount[] = (daily?.Timestamps ?? []).map((timestamp, i) => ({
     timestamp: timestamp.toISOString(),
-    count: Math.round(hourly?.Values?.[i] ?? 0),
+    count: Math.round(daily?.Values?.[i] ?? 0),
   }));
 
-  return {
-    requests: valueFor("requests"),
-    avgDuration: valueFor("duration"),
-    requestsByHour,
-  };
+  // Most recent day's average duration, rather than a single bucket spanning
+  // the whole window - the duration query shares the same 30-day range as
+  // requestsByDay above, so its values are also one-per-day.
+  const durationValues = result("duration")?.Values ?? [];
+  const avgDuration = durationValues.length > 0 ? durationValues[durationValues.length - 1] : 0;
+
+  return { avgDuration, requestsByDay };
 }
 
 async function getAiQueriesTotal(): Promise<number> {
@@ -114,32 +112,30 @@ async function getAiQueriesTotal(): Promise<number> {
   return (res.Item?.count as number | undefined) ?? 0;
 }
 
-const VISITOR_PREFIX = "VISITORS#";
-
-// Each day's item holds a native DynamoDB String Set of source IPs (deduped
-// by ADD at write time) -- unioning those sets across all retained days
-// gives a real unique-visitor count with no cookies or client-side ID.
-// Bounded to the same 30-day retention as everything else in this table.
-async function getUniqueVisitors(): Promise<number> {
+// A single running counter (see operation-stats-plugin.ts), never bucketed
+// or expired, so this is a true lifetime total rather than a window that
+// resets to a small (or zero) number on a low-traffic site.
+async function getTotalRequests(): Promise<number> {
   const res = await ddb.send(
-    new QueryCommand({
-      TableName: TABLE_NAME,
-      KeyConditionExpression: "pk = :pk AND begins_with(sk, :prefix)",
-      ExpressionAttributeValues: { ":pk": "STATS", ":prefix": VISITOR_PREFIX },
-    })
+    new GetCommand({ TableName: TABLE_NAME, Key: { pk: "STATS", sk: "TOTAL_REQUESTS" } })
   );
+  return (res.Item?.count as number | undefined) ?? 0;
+}
 
-  const allIps = new Set<string>();
-  for (const item of res.Items ?? []) {
-    const ips = (item.ips as Set<string> | string[] | undefined) ?? [];
-    for (const ip of ips) allIps.add(ip);
-  }
-
-  return allIps.size;
+// One item holding every source IP ever seen, in a single DynamoDB String
+// Set (deduped by ADD at write time, see operation-stats-plugin.ts) -- a
+// real all-time unique-visitor count with no cookies or client-side ID, and
+// no reset window.
+async function getUniqueVisitorsTotal(): Promise<number> {
+  const res = await ddb.send(
+    new GetCommand({ TableName: TABLE_NAME, Key: { pk: "STATS", sk: "VISITORS_ALL_TIME" } })
+  );
+  const ips = (res.Item?.ips as Set<string> | string[] | undefined) ?? [];
+  return [...ips].length;
 }
 
 const MAX_OPERATIONS_SHOWN = 8;
-const RECENT_DAYS = 3;
+const RECENT_DAYS = 30;
 
 interface OperationAggregate {
   count: number;
@@ -175,15 +171,14 @@ function finalizeAggregate(agg: Map<string, OperationAggregate>): OperationStats
     .slice(0, MAX_OPERATIONS_SHOWN);
 }
 
-// Reads day-bucketed items (sk = "OP#<name>#<YYYY-MM-DD>") and aggregates
-// them two ways: across everything still in the table (bounded by the
-// plugin's TTL, so "all time" really means "last RETENTION_DAYS days"), and
-// across just the last few days for a view of current activity. Both are
-// capped to the top N by count, since AI-generated queries can mint a new
-// name every time and the table places no limit on how many accumulate.
-// Each bucket may also carry a sample of the last query it saw (queries
-// only -- see the plugin for why mutations are excluded); we surface the
-// single most recent sample across all of an operation's buckets.
+// Reads day-bucketed items (sk = "OP#<name>#<YYYY-MM-DD>", kept forever - see
+// the plugin) and aggregates them two ways: across everything ever recorded
+// (true all time), and across just the last 30 days for a view of recent
+// activity. Both are capped to the top N by count, since AI-generated
+// queries can mint a new name every time and the table places no limit on
+// how many accumulate. Each bucket may also carry a sample of the last query
+// it saw (queries only -- see the plugin for why mutations are excluded); we
+// surface the single most recent sample across all of an operation's buckets.
 async function getOperationStats(): Promise<{ allTime: OperationStats[]; recent: OperationStats[] }> {
   const res = await ddb.send(
     new QueryCommand({
@@ -244,22 +239,21 @@ async function getOperationStats(): Promise<{ allTime: OperationStats[]; recent:
 }
 
 export async function getSystemStats(functionName: string | undefined): Promise<SystemStats> {
-  const [metrics, aiQueriesTotal, operationStats, uniqueVisitors] = await Promise.all([
-    functionName
-      ? getLambdaMetrics(functionName)
-      : Promise.resolve({ requests: 0, avgDuration: 0, requestsByHour: [] }),
+  const [metrics, aiQueriesTotal, operationStats, requestsTotal, uniqueVisitorsTotal] = await Promise.all([
+    functionName ? getLambdaMetrics(functionName) : Promise.resolve({ avgDuration: 0, requestsByDay: [] }),
     getAiQueriesTotal(),
     getOperationStats(),
-    getUniqueVisitors(),
+    getTotalRequests(),
+    getUniqueVisitorsTotal(),
   ]);
 
   return {
-    requestsLast24h: Math.round(metrics.requests),
+    requestsTotal,
     avgDurationMs: Math.round(metrics.avgDuration * 10) / 10,
     aiQueriesTotal,
-    uniqueVisitors,
+    uniqueVisitorsTotal,
     operations: operationStats.allTime,
-    operationsLast3Days: operationStats.recent,
-    requestsByHour: metrics.requestsByHour,
+    operationsLast30Days: operationStats.recent,
+    requestsByDay: metrics.requestsByDay,
   };
 }

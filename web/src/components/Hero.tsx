@@ -68,9 +68,9 @@ export default function Hero({ person }: HeroProps) {
       <p className="eyebrow">backend software engineer · sydney, australia</p>
       <h1>Peter Tran</h1>
       <p className="tagline">
-        Backend software engineer who likes building the infrastructure other engineers build on top of —
-        these days that's GraphQL federation at bank scale; before that, safety-critical software for
-        autonomous aircraft.
+        I grew up in Brisbane, studied software engineering at the University of Queensland, and now work on
+        GraphQL federation at Commonwealth Bank in Sydney — before that, Boeing and Services Australia. I
+        enjoy helping the people around me, and I'm always keen to learn something new.
       </p>
 
       <div className="terminal">

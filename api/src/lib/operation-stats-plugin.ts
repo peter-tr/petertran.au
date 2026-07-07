@@ -4,8 +4,6 @@ import * as AWSXRay from "aws-xray-sdk-core";
 import { ddb, TABLE_NAME } from "./ddb";
 import type { Context } from "../context";
 
-const RETENTION_DAYS = 30;
-
 // IntrospectionQuery is standard tooling bookkeeping, not real usage --
 // GraphiQL fires it automatically on every page load to build its
 // autocomplete/docs, regardless of anything the visitor actually does.
@@ -22,21 +20,20 @@ interface QuerySample {
   variables: Record<string, unknown> | undefined;
 }
 
-// Bucketed by day (not one running total) so getSystemStats can break usage
-// down into "recent" vs "all time" windows, and so a TTL can naturally cap
-// storage growth -- AI-generated queries get a fresh Claude-chosen name each
-// time, so the set of distinct operation names is unbounded otherwise.
+// Bucketed by day (no TTL - kept forever) so getSystemStats can break usage
+// down into "last 30 days" vs true all-time. A low-traffic personal site
+// accumulates at most a few hundred of these rows a year even with
+// AI-generated queries minting a fresh operation name each time, so
+// unbounded retention here is cheap.
 async function recordOperation(
   name: string,
   durationMs: number,
   sample: QuerySample | null,
   traceId: string | null
 ): Promise<void> {
-  const ttl = Math.floor(Date.now() / 1000) + RETENTION_DAYS * 24 * 60 * 60;
-
-  const setClauses = ["#ttl = :ttl"];
-  const names: Record<string, string> = { "#count": "count", "#totalMs": "totalMs", "#ttl": "ttl" };
-  const values: Record<string, unknown> = { ":incr": 1, ":duration": durationMs, ":ttl": ttl };
+  const setClauses: string[] = [];
+  const names: Record<string, string> = { "#count": "count", "#totalMs": "totalMs" };
+  const values: Record<string, unknown> = { ":incr": 1, ":duration": durationMs };
 
   // Mutations are never sampled -- the sendMessage/ReachOut mutation carries a
   // visitor's real name/email/message, and this data feeds a public GraphQL
@@ -56,29 +53,46 @@ async function recordOperation(
     values[":lastTraceId"] = traceId;
   }
 
+  const updateExpression =
+    `ADD #count :incr, #totalMs :duration` + (setClauses.length > 0 ? ` SET ${setClauses.join(", ")}` : "");
+
   await ddb.send(
     new UpdateCommand({
       TableName: TABLE_NAME,
       Key: { pk: "STATS", sk: `OP#${name}#${dayKey(new Date())}` },
-      UpdateExpression: `ADD #count :incr, #totalMs :duration SET ${setClauses.join(", ")}`,
+      UpdateExpression: updateExpression,
       ExpressionAttributeNames: names,
       ExpressionAttributeValues: values,
     })
   );
 }
 
-// One item per day holding a DynamoDB String Set of source IPs -- ADD on a
-// set is naturally idempotent, so this gives a real unique-visitor count
-// without needing cookies or any client-side identifier.
-async function recordVisitor(sourceIp: string): Promise<void> {
-  const ttl = Math.floor(Date.now() / 1000) + RETENTION_DAYS * 24 * 60 * 60;
+// A single running counter, never bucketed or expired -- the site's true
+// lifetime request count, immune to the "resets to a small number every
+// day/month" problem a windowed metric has on a low-traffic personal site.
+async function recordTotalRequests(): Promise<void> {
   await ddb.send(
     new UpdateCommand({
       TableName: TABLE_NAME,
-      Key: { pk: "STATS", sk: `VISITORS#${dayKey(new Date())}` },
-      UpdateExpression: "ADD #ips :ip SET #ttl = :ttl",
-      ExpressionAttributeNames: { "#ips": "ips", "#ttl": "ttl" },
-      ExpressionAttributeValues: { ":ip": new Set([sourceIp]), ":ttl": ttl },
+      Key: { pk: "STATS", sk: "TOTAL_REQUESTS" },
+      UpdateExpression: "ADD #count :incr",
+      ExpressionAttributeNames: { "#count": "count" },
+      ExpressionAttributeValues: { ":incr": 1 },
+    })
+  );
+}
+
+// One item, one DynamoDB String Set of every source IP ever seen -- ADD on a
+// set is naturally idempotent, so this gives a real all-time unique-visitor
+// count with no cookies or client-side identifier, and no reset window.
+async function recordVisitorAllTime(sourceIp: string): Promise<void> {
+  await ddb.send(
+    new UpdateCommand({
+      TableName: TABLE_NAME,
+      Key: { pk: "STATS", sk: "VISITORS_ALL_TIME" },
+      UpdateExpression: "ADD #ips :ip",
+      ExpressionAttributeNames: { "#ips": "ips" },
+      ExpressionAttributeValues: { ":ip": new Set([sourceIp]) },
     })
   );
 }
@@ -95,10 +109,16 @@ export const operationStatsPlugin: ApolloServerPlugin<Context> = {
         const sourceIp = requestContext.contextValue.sourceIp;
         if (sourceIp) {
           try {
-            await recordVisitor(sourceIp);
+            await recordVisitorAllTime(sourceIp);
           } catch {
             // Best-effort -- never let stats tracking break a real response.
           }
+        }
+
+        try {
+          await recordTotalRequests();
+        } catch {
+          // Best-effort -- never let stats tracking break a real response.
         }
 
         const name = requestContext.operationName ?? "Anonymous";

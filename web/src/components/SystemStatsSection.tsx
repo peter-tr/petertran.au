@@ -7,13 +7,13 @@ import { QUERY_RAN_EVENT } from "../lib/events";
 
 type Stats = SystemStatsResult["meta"]["systemStats"];
 
-type NumericStatKey = Exclude<keyof Stats, "operations" | "operationsLast3Days" | "requestsByHour">;
+type NumericStatKey = Exclude<keyof Stats, "operations" | "operationsLast30Days" | "requestsByDay">;
 
 const TILES: { key: NumericStatKey; label: string; format: (value: number) => string }[] = [
-  { key: "requestsLast24h", label: "requests / 24h", format: (v) => v.toLocaleString() },
+  { key: "requestsTotal", label: "total requests", format: (v) => v.toLocaleString() },
   { key: "avgDurationMs", label: "avg duration", format: (v) => `${v}ms` },
   { key: "aiQueriesTotal", label: "Ask Claude queries served", format: (v) => v.toLocaleString() },
-  { key: "uniqueVisitors", label: "unique visitors / 30d", format: (v) => v.toLocaleString() },
+  { key: "uniqueVisitorsTotal", label: "unique visitors", format: (v) => v.toLocaleString() },
 ];
 
 type OperationsRange = "recent" | "all";
@@ -63,7 +63,7 @@ export default function SystemStatsSection() {
 
   const activeOperations = stats
     ? opsRange === "recent"
-      ? stats.operationsLast3Days
+      ? stats.operationsLast30Days
       : stats.operations
     : [];
 
@@ -87,7 +87,7 @@ export default function SystemStatsSection() {
             ))}
           </div>
 
-          <RequestsChart data={stats.requestsByHour} />
+          <RequestsChart data={stats.requestsByDay} />
 
           {activeOperations.length > 0 && (
             <div className="ops-block">
@@ -99,7 +99,7 @@ export default function SystemStatsSection() {
                   className={opsRange === "recent" ? "active" : ""}
                   onClick={() => setOpsRange("recent")}
                 >
-                  last 3 days
+                  last 30 days
                 </button>
                 <button
                   type="button"
@@ -108,7 +108,7 @@ export default function SystemStatsSection() {
                   className={opsRange === "all" ? "active" : ""}
                   onClick={() => setOpsRange("all")}
                 >
-                  last 30 days
+                  all time
                 </button>
               </div>
               <table className="ops-table">

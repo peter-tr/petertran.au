@@ -36,6 +36,10 @@ type Interests {
   Favorite foods.
   """
   favoriteFoods: [String!]!
+  """
+  Favorite TV shows.
+  """
+  favoriteShows: [String!]!
 }
 
 """
@@ -292,9 +296,10 @@ Live operational stats about the API serving this schema.
 """
 type SystemStats {
   """
-  Number of times the GraphQL Lambda has been invoked in the last 24 hours.
+  Total number of times the GraphQL Lambda has ever been invoked - a single
+  running counter, not a rolling window, so it never resets.
   """
-  requestsLast24h: Int!
+  requestsTotal: Int!
   """
   Average Lambda execution duration in milliseconds over the last 24 hours.
   """
@@ -304,37 +309,37 @@ type SystemStats {
   """
   aiQueriesTotal: Int!
   """
-  Unique visitor IPs seen in the last 30 days. No cookies or client-side
-  tracking - derived from the source IP already used for rate limiting.
+  All-time unique visitor IPs. No cookies or client-side tracking - derived
+  from the source IP already used for rate limiting.
   """
-  uniqueVisitors: Int!
+  uniqueVisitorsTotal: Int!
   """
-  Call count and average latency per named GraphQL operation over the last
-  30 days, most-called first, capped to the top 8. Operation names are
-  unbounded (AI-generated queries get a fresh Claude-chosen name each time),
-  so this is a rolling window, not true all-time history.
+  Call count and average latency per named GraphQL operation across all time,
+  most-called first, capped to the top 8. Operation names are unbounded
+  (AI-generated queries get a fresh Claude-chosen name each time), which is
+  why this is capped rather than exhaustive.
   """
   operations: [OperationStats!]!
   """
-  Same breakdown as `operations`, but only counting the last 3 days.
+  Same breakdown as `operations`, but only counting the last 30 days.
   """
-  operationsLast3Days: [OperationStats!]!
+  operationsLast30Days: [OperationStats!]!
   """
-  Hourly request counts for the last 24 hours, oldest first.
+  Daily request counts for the last 30 days, oldest first.
   """
-  requestsByHour: [HourlyCount!]!
+  requestsByDay: [DailyCount!]!
 }
 
 """
-Number of requests in a single hourly bucket.
+Number of requests in a single daily bucket.
 """
-type HourlyCount {
+type DailyCount {
   """
-  ISO 8601 timestamp (UTC) for the start of this hour.
+  ISO 8601 timestamp (UTC) for the start of this day.
   """
   timestamp: String!
   """
-  Number of requests during this hour.
+  Number of requests during this day.
   """
   count: Int!
 }

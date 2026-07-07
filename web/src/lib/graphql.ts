@@ -76,6 +76,7 @@ export const RESUME_QUERY = /* GraphQL */ `
     interests {
       hobbies
       favoriteFoods
+      favoriteShows
     }
   }
 `;
@@ -129,10 +130,10 @@ export const SYSTEM_STATS_QUERY = /* GraphQL */ `
   query SystemStats {
     meta {
       systemStats {
-        requestsLast24h
+        requestsTotal
         avgDurationMs
         aiQueriesTotal
-        uniqueVisitors
+        uniqueVisitorsTotal
         operations {
           name
           count
@@ -141,7 +142,7 @@ export const SYSTEM_STATS_QUERY = /* GraphQL */ `
           lastVariables
           lastTraceId
         }
-        operationsLast3Days {
+        operationsLast30Days {
           name
           count
           avgDurationMs
@@ -149,7 +150,7 @@ export const SYSTEM_STATS_QUERY = /* GraphQL */ `
           lastVariables
           lastTraceId
         }
-        requestsByHour {
+        requestsByDay {
           timestamp
           count
         }
@@ -208,7 +209,7 @@ export interface FooterQueryResult {
   meta: { awsCostUsd: number; anthropicCostUsd: number; totalCostUsd: number };
 }
 
-export interface HourlyCount {
+export interface DailyCount {
   timestamp: string;
   count: number;
 }
@@ -216,13 +217,13 @@ export interface HourlyCount {
 export interface SystemStatsResult {
   meta: {
     systemStats: {
-      requestsLast24h: number;
+      requestsTotal: number;
       avgDurationMs: number;
       aiQueriesTotal: number;
-      uniqueVisitors: number;
+      uniqueVisitorsTotal: number;
       operations: OperationStat[];
-      operationsLast3Days: OperationStat[];
-      requestsByHour: HourlyCount[];
+      operationsLast30Days: OperationStat[];
+      requestsByDay: DailyCount[];
     };
   };
 }
