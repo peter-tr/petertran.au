@@ -32,14 +32,6 @@ type Personal {
   Hobbies and interests outside of work.
   """
   hobbies: [String!]!
-  """
-  Something Peter is currently learning or exploring, work-related or not.
-  """
-  currentlyInto: String
-  """
-  A short, non-resume fact.
-  """
-  funFact: String
 }
 
 """

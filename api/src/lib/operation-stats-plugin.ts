@@ -5,6 +5,11 @@ import { ddb, TABLE_NAME } from "./ddb";
 
 const RETENTION_DAYS = 30;
 
+// Standard tooling bookkeeping, not real usage -- GraphiQL fires this
+// automatically on every page load to build its autocomplete/docs, regardless
+// of anything the visitor actually does.
+const IGNORED_OPERATIONS = new Set(["IntrospectionQuery"]);
+
 function dayKey(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
@@ -69,6 +74,8 @@ export const operationStatsPlugin: ApolloServerPlugin = {
     return {
       async willSendResponse(requestContext) {
         const name = requestContext.operationName ?? "Anonymous";
+        if (IGNORED_OPERATIONS.has(name)) return;
+
         const isMutation = requestContext.operation?.operation === "mutation";
         const sample = isMutation
           ? null

@@ -16,8 +16,6 @@ export interface Person {
 
 export interface Personal {
   hobbies: string[];
-  currentlyInto: string | null;
-  funFact: string | null;
 }
 
 export interface Education {
@@ -73,9 +71,6 @@ export const person: Person = {
 
 export const personal: Personal = {
   hobbies: ["Bouldering", "Badminton"],
-  currentlyInto: "Rust -- mostly rewriting things that already worked fine in TypeScript, for the vibes.",
-  funFact:
-    "This section exists because I told Claude to 'be creative' instead of giving it real hobbies. Everything above is (mostly) true.",
 };
 
 export const education: Education[] = [

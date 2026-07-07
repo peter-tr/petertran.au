@@ -53,8 +53,6 @@ export interface Program {
 
 export interface Personal {
   hobbies: string[];
-  currentlyInto: string | null;
-  funFact: string | null;
 }
 
 export interface ResumeData {

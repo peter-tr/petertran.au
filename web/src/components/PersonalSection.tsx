@@ -14,18 +14,6 @@ export default function PersonalSection({ personal }: { personal: Personal }) {
           ))}
         </div>
       </div>
-
-      {personal.currentlyInto && (
-        <p className="personal-line">
-          <span className="personal-key">currentlyInto</span> {personal.currentlyInto}
-        </p>
-      )}
-
-      {personal.funFact && (
-        <p className="personal-line">
-          <span className="personal-key">funFact</span> {personal.funFact}
-        </p>
-      )}
     </Section>
   );
 }
