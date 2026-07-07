@@ -1,4 +1,4 @@
-import { BatchWriteCommand } from "@aws-sdk/lib-dynamodb";
+import { BatchWriteCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { ddb, TABLE_NAME, PK } from "../lib/ddb";
 import { person, interests, education, experience, projects, skills, programs } from "../data";
 
@@ -17,24 +17,47 @@ function rows(): Row[] {
   return out;
 }
 
+async function batchWrite(requests: Record<string, unknown>[]): Promise<void> {
+  for (let i = 0; i < requests.length; i += 25) {
+    const chunk = requests.slice(i, i + 25);
+    await ddb.send(new BatchWriteCommand({ RequestItems: { [TABLE_NAME]: chunk } }));
+  }
+}
+
+// Only these index-numbered prefixes are owned by this script - MESSAGE#
+// (contact-form submissions) and anything else under this pk is unrelated
+// data this script must never touch, let alone delete.
+const MANAGED_PREFIXES = ["EDUCATION#", "EXPERIENCE#", "PROJECT#", "SKILL#", "PROGRAM#"];
+
 async function main() {
   const items = rows();
-  console.log(`Seeding ${items.length} items into table "${TABLE_NAME}"...`);
+  const freshKeys = new Set(items.map((row) => row.sk));
 
-  const chunks: Row[][] = [];
-  for (let i = 0; i < items.length; i += 25) chunks.push(items.slice(i, i + 25));
+  // Index-numbered rows (EDUCATION#0, PROJECT#1, etc.) are overwritten in
+  // place by sk, but if an array shrinks the old tail entries (e.g.
+  // PROJECT#2, PROJECT#3 after removing two projects) are never touched by
+  // the writes below - find and remove anything under this pk, WITHIN THE
+  // PREFIXES THIS SCRIPT OWNS, that the current data no longer produces.
+  const existing = await ddb.send(
+    new QueryCommand({
+      TableName: TABLE_NAME,
+      KeyConditionExpression: "pk = :pk",
+      ExpressionAttributeValues: { ":pk": PK },
+    })
+  );
+  const staleKeys = (existing.Items ?? [])
+    .map((item) => item.sk as string)
+    .filter((sk) => MANAGED_PREFIXES.some((prefix) => sk.startsWith(prefix)) && !freshKeys.has(sk));
 
-  for (const chunk of chunks) {
-    await ddb.send(
-      new BatchWriteCommand({
-        RequestItems: {
-          [TABLE_NAME]: chunk.map((row) => ({
-            PutRequest: { Item: { pk: PK, sk: row.sk, type: row.type, data: row.data } },
-          })),
-        },
-      })
-    );
+  if (staleKeys.length > 0) {
+    console.log(`Removing ${staleKeys.length} stale item(s): ${staleKeys.join(", ")}`);
+    await batchWrite(staleKeys.map((sk) => ({ DeleteRequest: { Key: { pk: PK, sk } } })));
   }
+
+  console.log(`Seeding ${items.length} items into table "${TABLE_NAME}"...`);
+  await batchWrite(
+    items.map((row) => ({ PutRequest: { Item: { pk: PK, sk: row.sk, type: row.type, data: row.data } } }))
+  );
 
   console.log("Done.");
 }

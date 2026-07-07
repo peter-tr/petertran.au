@@ -8,8 +8,8 @@ import { companyInitials, companyAccent } from "../lib/companyBadge";
 const LOGO_IMAGES: Record<string, { src: string; invert?: boolean }> = {
   "Commonwealth Bank of Australia": { src: "/logos/commonwealth-bank.svg" },
   "Services Australia": { src: "/logos/services-australia.png", invert: true },
-  "University of Queensland": { src: "/logos/uq.svg" },
-  "Australian Defence Force": { src: "/logos/adf.svg" },
+  "University of Queensland": { src: "/logos/uq.png" },
+  "Australian Defence Force": { src: "/logos/adf.png" },
 };
 
 export default function CompanyBadge({ company }: { company: string }) {

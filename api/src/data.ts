@@ -170,25 +170,11 @@ export const projects: Project[] = [
     url: "https://github.com/peter-tr/petertran.au",
   },
   {
-    name: "Fit2Track",
-    stack: ["Node.js", "React", "React Native", "PostgreSQL", "AWS", "LangChain"],
-    description:
-      "A fitness app where users create challenges triggered by QR codes or geofencing. Features a WYSIWYG editor, AI-generated content, Google Maps, and Google Sign-In; deployed on auto-scaling EC2 + ALB.",
-    url: null,
-  },
-  {
     name: "Retrieval-Augmented Generation Pipeline",
     stack: ["Python", "PyTorch", "Machine Learning"],
     description:
       "Built a RAG pipeline with Hugging Face Transformers and FAISS, benchmarking BM25, DPR, and TILDEv2 retrieval; TILDEv2 outperformed BM25 (nDCG@3: 0.77 vs. 0.48, +61%) with statistical significance.",
     url: null,
-  },
-  {
-    name: "Fit2Learn",
-    stack: ["PHP", "CodeIgniter", "MySQL", "jQuery", "Bootstrap"],
-    description:
-      "An educational fitness platform teaching exercise and nutrition through community-driven courses, aimed at people intimidated by expensive gym programs or low-quality online videos. Course creation and search, social features (likes, ratings, comments, subscriptions), and MFA plus encrypted payment details.",
-    url: "https://github.com/peter-tr/fit2learn",
   },
 ];
 
