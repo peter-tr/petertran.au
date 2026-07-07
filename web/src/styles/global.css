@@ -617,8 +617,8 @@ a {
 
 @media (max-width: 640px) {
   .sandbox-frame {
-    height: 65vh;
-    min-height: 370px;
+    height: 55vh;
+    min-height: 315px;
   }
 
   .graphiql-mount .graphiql-container {
@@ -725,23 +725,12 @@ a {
 
 /* ---------- architecture diagram ---------- */
 
-.arch-diagram-scroll {
-  overflow-x: auto;
-}
-
 .arch-diagram {
   display: block;
   width: 100%;
   height: auto;
   margin: 0 auto;
   font-family: var(--font-mono);
-}
-
-@media (max-width: 640px) {
-  .arch-diagram {
-    width: auto;
-    min-width: 760px;
-  }
 }
 
 .arch-node {

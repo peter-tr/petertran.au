@@ -5,6 +5,7 @@ import { GraphiQLInterface } from "graphiql";
 import { createGraphiQLFetcher } from "@graphiql/toolkit";
 import type { Storage as GraphiQLStorage } from "@graphiql/toolkit";
 import { explorerPlugin } from "@graphiql/plugin-explorer";
+import "@graphiql/react/setup-workers/vite";
 import "@graphiql/react/style.css";
 import "@graphiql/plugin-doc-explorer/style.css";
 import "@graphiql/plugin-history/style.css";
