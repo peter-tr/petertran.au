@@ -27,9 +27,11 @@ export async function getAwsCostThisMonthUsd(): Promise<number> {
 
   const now = new Date();
   const start = new Date(now.getFullYear(), now.getMonth(), 1);
-  // Cost Explorer's End is exclusive, so on the first day of the month there's
-  // no completed day to report yet - avoid calling with Start === End.
-  const amountUsd = start >= now ? 0 : await fetchAwsCostThisMonthUsd(start, now);
+  // Cost Explorer's End is exclusive, so End = today would exclude today's
+  // usage entirely - use tomorrow instead to include today's (estimated)
+  // spend, which Cost Explorer does support returning same-day.
+  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  const amountUsd = await fetchAwsCostThisMonthUsd(start, end);
 
   await ddb.send(
     new PutCommand({
