@@ -10,6 +10,9 @@ export interface OperationStats {
   name: string;
   count: number;
   avgDurationMs: number;
+  lastQuery: string | null;
+  lastVariables: string | null;
+  lastTraceId: string | null;
 }
 
 export interface HourlyCount {
@@ -127,14 +130,32 @@ const RECENT_DAYS = 3;
 interface OperationAggregate {
   count: number;
   totalMs: number;
+  latestSampleDay: string | null;
+  lastQuery: string | null;
+  lastVariables: string | null;
+  lastTraceId: string | null;
+}
+
+function newAggregate(): OperationAggregate {
+  return {
+    count: 0,
+    totalMs: 0,
+    latestSampleDay: null,
+    lastQuery: null,
+    lastVariables: null,
+    lastTraceId: null,
+  };
 }
 
 function finalizeAggregate(agg: Map<string, OperationAggregate>): OperationStats[] {
   return Array.from(agg.entries())
-    .map(([name, { count, totalMs }]) => ({
+    .map(([name, { count, totalMs, lastQuery, lastVariables, lastTraceId }]) => ({
       name,
       count,
       avgDurationMs: count > 0 ? Math.round((totalMs / count) * 10) / 10 : 0,
+      lastQuery,
+      lastVariables,
+      lastTraceId,
     }))
     .sort((a, b) => b.count - a.count)
     .slice(0, MAX_OPERATIONS_SHOWN);
@@ -146,6 +167,9 @@ function finalizeAggregate(agg: Map<string, OperationAggregate>): OperationStats
 // across just the last few days for a view of current activity. Both are
 // capped to the top N by count, since AI-generated queries can mint a new
 // name every time and the table places no limit on how many accumulate.
+// Each bucket may also carry a sample of the last query it saw (queries
+// only -- see the plugin for why mutations are excluded); we surface the
+// single most recent sample across all of an operation's buckets.
 async function getOperationStats(): Promise<{ allTime: OperationStats[]; recent: OperationStats[] }> {
   const res = await ddb.send(
     new QueryCommand({
@@ -163,6 +187,28 @@ async function getOperationStats(): Promise<{ allTime: OperationStats[]; recent:
   const allTimeAgg = new Map<string, OperationAggregate>();
   const recentAgg = new Map<string, OperationAggregate>();
 
+  const applyTo = (
+    map: Map<string, OperationAggregate>,
+    name: string,
+    day: string,
+    count: number,
+    totalMs: number,
+    lastQuery: string | null,
+    lastVariables: string | null,
+    lastTraceId: string | null
+  ) => {
+    const entry = map.get(name) ?? newAggregate();
+    entry.count += count;
+    entry.totalMs += totalMs;
+    if (lastQuery && (!entry.latestSampleDay || day > entry.latestSampleDay)) {
+      entry.latestSampleDay = day;
+      entry.lastQuery = lastQuery;
+      entry.lastVariables = lastVariables;
+      entry.lastTraceId = lastTraceId;
+    }
+    map.set(name, entry);
+  };
+
   for (const item of res.Items ?? []) {
     const withoutPrefix = (item.sk as string).slice(OPERATION_PREFIX.length);
     const separatorIndex = withoutPrefix.lastIndexOf("#");
@@ -170,17 +216,13 @@ async function getOperationStats(): Promise<{ allTime: OperationStats[]; recent:
     const day = separatorIndex >= 0 ? withoutPrefix.slice(separatorIndex + 1) : "";
     const count = (item.count as number | undefined) ?? 0;
     const totalMs = (item.totalMs as number | undefined) ?? 0;
+    const lastQuery = (item.lastQuery as string | undefined) ?? null;
+    const lastVariables = (item.lastVariables as string | null | undefined) ?? null;
+    const lastTraceId = (item.lastTraceId as string | undefined) ?? null;
 
-    const allEntry = allTimeAgg.get(name) ?? { count: 0, totalMs: 0 };
-    allEntry.count += count;
-    allEntry.totalMs += totalMs;
-    allTimeAgg.set(name, allEntry);
-
+    applyTo(allTimeAgg, name, day, count, totalMs, lastQuery, lastVariables, lastTraceId);
     if (recentDayKeys.has(day)) {
-      const recentEntry = recentAgg.get(name) ?? { count: 0, totalMs: 0 };
-      recentEntry.count += count;
-      recentEntry.totalMs += totalMs;
-      recentAgg.set(name, recentEntry);
+      applyTo(recentAgg, name, day, count, totalMs, lastQuery, lastVariables, lastTraceId);
     }
   }
 

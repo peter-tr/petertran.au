@@ -139,11 +139,17 @@ export const SYSTEM_STATS_QUERY = /* GraphQL */ `
           name
           count
           avgDurationMs
+          lastQuery
+          lastVariables
+          lastTraceId
         }
         operationsLast3Days {
           name
           count
           avgDurationMs
+          lastQuery
+          lastVariables
+          lastTraceId
         }
         requestsByHour {
           timestamp
@@ -158,6 +164,31 @@ export interface OperationStat {
   name: string;
   count: number;
   avgDurationMs: number;
+  lastQuery: string | null;
+  lastVariables: string | null;
+  lastTraceId: string | null;
+}
+
+export const TRACE_BREAKDOWN_QUERY = /* GraphQL */ `
+  query TraceBreakdown($traceId: String!) {
+    meta {
+      traceBreakdown(traceId: $traceId) {
+        name
+        startOffsetMs
+        durationMs
+      }
+    }
+  }
+`;
+
+export interface TraceSegment {
+  name: string;
+  startOffsetMs: number;
+  durationMs: number;
+}
+
+export interface TraceBreakdownResult {
+  meta: { traceBreakdown: TraceSegment[] };
 }
 
 export interface HourlyCount {

@@ -243,6 +243,33 @@ type Meta {
   DynamoDB -- not mocked.
   """
   systemStats: SystemStats!
+  """
+  AWS X-Ray timing breakdown for a specific past request, keyed by the
+  traceId from one of `systemStats`'s operations. Only covers what actually
+  happens inside the Lambda invocation (its own execution, DynamoDB calls,
+  the Anthropic API call) -- X-Ray has no visibility into the browser or
+  CloudFront/S3, since those aren't part of the same trace. Empty if the
+  trace has expired or wasn't found.
+  """
+  traceBreakdown(traceId: String!): [TraceSegment!]!
+}
+
+"""
+One timed segment (or subsegment) within a single AWS X-Ray trace.
+"""
+type TraceSegment {
+  """
+  What this segment represents, e.g. "Lambda", "DynamoDB", or "Anthropic API".
+  """
+  name: String!
+  """
+  Milliseconds after the trace's start that this segment began.
+  """
+  startOffsetMs: Float!
+  """
+  How long this segment took, in milliseconds.
+  """
+  durationMs: Float!
 }
 
 """
@@ -313,6 +340,21 @@ type OperationStats {
   Average end-to-end latency in milliseconds for this operation.
   """
   avgDurationMs: Float!
+  """
+  The most recent query text run under this operation name. Null for
+  mutations (never sampled, to avoid recording contact-form submissions)
+  and for operations that predate this field.
+  """
+  lastQuery: String
+  """
+  Variables from that same sample call, JSON-encoded. Null if it had none.
+  """
+  lastVariables: String
+  """
+  AWS X-Ray trace ID for that same sample call, if X-Ray was active. Pass
+  this to `traceBreakdown` to see its Lambda/DynamoDB/Anthropic timing.
+  """
+  lastTraceId: String
 }
 
 """

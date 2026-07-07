@@ -3,7 +3,9 @@ import { QueryCommand, GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
 import { ddb, TABLE_NAME, PK } from "../lib/ddb";
 import { generateQuery } from "../lib/generate-query";
 import { getSystemStats } from "../lib/system-stats";
+import { getTraceBreakdown } from "../lib/xray";
 import { validateContactInput, CONTACT_CONFIRMATION_MESSAGE, type ContactInput } from "../lib/contact";
+import { sendContactNotification } from "../lib/email";
 import type { Context } from "../context";
 import type { Education, Experience, Person, Personal, Program, Project, SkillCategory } from "../data";
 
@@ -58,6 +60,7 @@ export const resolvers = {
     generateQuery: (_: unknown, args: { prompt: string }, context: Context) =>
       generateQuery(args.prompt, context.sourceIp),
     systemStats: (_: unknown, __: unknown, context: Context) => getSystemStats(context.functionName),
+    traceBreakdown: (_: unknown, args: { traceId: string }) => getTraceBreakdown(args.traceId),
   },
   Mutation: {
     sendMessage: async (_: unknown, args: { input: ContactInput }) => {
@@ -75,6 +78,13 @@ export const resolvers = {
           },
         })
       );
+
+      try {
+        await sendContactNotification(args.input);
+      } catch {
+        // The message is already safely stored above -- never fail the
+        // mutation just because the email notification didn't go out.
+      }
 
       return { success: true, message: CONTACT_CONFIRMATION_MESSAGE };
     },

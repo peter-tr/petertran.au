@@ -24,6 +24,10 @@ new SiteStack(app, "PetertranSiteStack", {
   domainName,
   alternateDomainNames,
   certificate: certStack.certificate,
+  // Route 53 zone was created manually (see the Route 53 migration), not by
+  // this stack -- referenced by ID/name so SES can add DKIM records to it.
+  hostedZoneId: "Z0088163WL3F617J73T",
+  hostedZoneName: "petertran.au",
   env: { account, region: "ap-southeast-2" },
   crossRegionReferences: true,
 });

@@ -8,12 +8,16 @@ import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as iam from "aws-cdk-lib/aws-iam";
+import * as route53 from "aws-cdk-lib/aws-route53";
+import * as ses from "aws-cdk-lib/aws-ses";
 import * as path from "path";
 
 export interface SiteStackProps extends StackProps {
   domainName: string;
   alternateDomainNames?: string[];
   certificate: acm.ICertificate;
+  hostedZoneId: string;
+  hostedZoneName: string;
 }
 
 export class SiteStack extends Stack {
@@ -35,6 +39,19 @@ export class SiteStack extends Stack {
       "petertran-au/anthropic-api-key"
     );
 
+    // --- Contact form email notifications ---
+    // Verifies the whole domain via DNS (auto-adds DKIM/MAIL FROM records to
+    // the existing Route 53 zone) so the Lambda can send FROM an
+    // @petertran.au address. Still in the SES sandbox, but that's fine here:
+    // the only recipient is Peter's own inbox, which he verifies separately.
+    const hostedZone = route53.PublicHostedZone.fromPublicHostedZoneAttributes(this, "PetertranHostedZone", {
+      hostedZoneId: props.hostedZoneId,
+      zoneName: props.hostedZoneName,
+    });
+    const emailIdentity = new ses.EmailIdentity(this, "SesDomainIdentity", {
+      identity: ses.Identity.publicHostedZone(hostedZone),
+    });
+
     // --- GraphQL API (Lambda + Function URL, no API Gateway needed) ---
     const apiFn = new lambda.Function(this, "GraphQLFunction", {
       runtime: lambda.Runtime.NODEJS_20_X,
@@ -45,15 +62,24 @@ export class SiteStack extends Stack {
       environment: {
         TABLE_NAME: table.tableName,
         ANTHROPIC_SECRET_ARN: anthropicSecret.secretArn,
+        CONTACT_FROM_EMAIL: "contact@petertran.au",
+        CONTACT_TO_EMAIL: "peter2002tran@outlook.com",
       },
+      // Traces every invocation to X-Ray -- lets the systemStats dashboard
+      // show a real Lambda/DynamoDB/Anthropic timing breakdown per operation.
+      tracing: lambda.Tracing.ACTIVE,
     });
     table.grantReadWriteData(apiFn);
     anthropicSecret.grantRead(apiFn);
-    // CloudWatch metrics (for the systemStats query) have no resource-level
-    // scoping -- "*" is required here regardless of which function is asking.
+    emailIdentity.grantSendEmail(apiFn);
+    // CloudWatch metrics (for the systemStats query) and X-Ray traces (for
+    // traceBreakdown) have no resource-level scoping -- "*" is required here
+    // regardless of which function is asking. `Tracing.ACTIVE` above already
+    // grants write access (PutTraceSegments); this adds the read APIs needed
+    // to query a trace back out.
     apiFn.addToRolePolicy(
       new iam.PolicyStatement({
-        actions: ["cloudwatch:GetMetricData"],
+        actions: ["cloudwatch:GetMetricData", "xray:GetTraceSummaries", "xray:BatchGetTraces"],
         resources: ["*"],
       })
     );

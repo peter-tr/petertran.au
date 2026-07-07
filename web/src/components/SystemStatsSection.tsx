@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import Section from "./Section";
 import RequestsChart from "./RequestsChart";
+import OperationRow from "./OperationRow";
 import { runQuery, SYSTEM_STATS_QUERY, type SystemStatsResult } from "../lib/graphql";
 import { QUERY_RAN_EVENT } from "../lib/events";
 
@@ -120,14 +121,14 @@ export default function SystemStatsSection() {
                 </thead>
                 <tbody>
                   {activeOperations.map((op) => (
-                    <tr key={op.name}>
-                      <td>{op.name}</td>
-                      <td>{op.count.toLocaleString()}</td>
-                      <td>{op.avgDurationMs}ms</td>
-                    </tr>
+                    <OperationRow op={op} key={op.name} />
                   ))}
                 </tbody>
               </table>
+              <p className="section-hint" style={{ marginTop: "0.6rem" }}>
+                Click a row to see the actual query it ran, and its Lambda / DynamoDB / Anthropic trace
+                breakdown where available.
+              </p>
             </div>
           )}
         </>

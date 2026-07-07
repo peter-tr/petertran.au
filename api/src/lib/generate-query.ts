@@ -1,4 +1,6 @@
 import { UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import * as AWSXRay from "aws-xray-sdk-core";
+import type Anthropic from "@anthropic-ai/sdk";
 import { typeDefs } from "../schema";
 import { getAnthropicClient } from "./anthropic-client";
 import { assertNotRateLimited } from "./rate-limit";
@@ -57,18 +59,8 @@ async function recordAiQueryServed(sourceIp: string | undefined): Promise<void> 
   );
 }
 
-export async function generateQuery(prompt: string, sourceIp?: string): Promise<GenerateQueryResult> {
-  const trimmed = prompt.trim();
-  if (!trimmed) throw new Error("prompt is required.");
-  if (trimmed.length > MAX_PROMPT_LENGTH) {
-    throw new Error(`Keep the prompt under ${MAX_PROMPT_LENGTH} characters.`);
-  }
-
-  await assertNotRateLimited(sourceIp);
-
-  const client = await getAnthropicClient();
-
-  const response = await client.messages.parse({
+async function callAnthropic(client: Anthropic, trimmed: string) {
+  return client.messages.parse({
     model: "claude-haiku-4-5",
     max_tokens: 512,
     system: GENERATE_QUERY_SYSTEM_PROMPT,
@@ -88,6 +80,34 @@ export async function generateQuery(prompt: string, sourceIp?: string): Promise<
       },
     },
   });
+}
+
+export async function generateQuery(prompt: string, sourceIp?: string): Promise<GenerateQueryResult> {
+  const trimmed = prompt.trim();
+  if (!trimmed) throw new Error("prompt is required.");
+  if (trimmed.length > MAX_PROMPT_LENGTH) {
+    throw new Error(`Keep the prompt under ${MAX_PROMPT_LENGTH} characters.`);
+  }
+
+  await assertNotRateLimited(sourceIp);
+
+  const client = await getAnthropicClient();
+
+  // Not an AWS SDK call, so X-Ray can't auto-instrument it -- wrap it in its
+  // own subsegment so the trace breakdown shows how much of the latency is
+  // actually Anthropic vs. our own code.
+  const response = process.env.AWS_LAMBDA_FUNCTION_NAME
+    ? await AWSXRay.captureAsyncFunc("Anthropic API", async (subsegment) => {
+        try {
+          const res = await callAnthropic(client, trimmed);
+          subsegment?.close();
+          return res;
+        } catch (err) {
+          subsegment?.close(err instanceof Error ? err : undefined);
+          throw err;
+        }
+      })
+    : await callAnthropic(client, trimmed);
 
   const parsed = response.parsed_output as GenerateQueryResult | null;
   if (!parsed) throw new Error("Claude didn't return a valid response -- try rephrasing.");

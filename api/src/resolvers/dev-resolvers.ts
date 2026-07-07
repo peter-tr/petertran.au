@@ -24,6 +24,16 @@ function mockRequestsByHour() {
   }));
 }
 
+// Fake but representative -- there's no real X-Ray daemon locally, so this
+// is what a GenerateQuery invocation's trace looks like in production: most
+// of the time is the Anthropic call, with DynamoDB in single-digit ms.
+const MOCK_TRACE_BREAKDOWN = [
+  { name: "Lambda", startOffsetMs: 0, durationMs: 940 },
+  { name: "DynamoDB (rate limit)", startOffsetMs: 4, durationMs: 11 },
+  { name: "Anthropic API", startOffsetMs: 18, durationMs: 902 },
+  { name: "DynamoDB (usage counter)", startOffsetMs: 922, durationMs: 9 },
+];
+
 // Mock resolvers used only by dev/server.ts -- static data, no DynamoDB,
 // CloudWatch, or Anthropic calls (generateQuery is real; everything else is
 // hardcoded) so the frontend can be developed without live AWS credentials.
@@ -61,20 +71,86 @@ export const devResolvers = {
       errorsLast24h: 0,
       aiQueriesTotal: 17,
       operations: [
-        { name: "Resume", count: 54, avgDurationMs: 61.2 },
-        { name: "Hero", count: 41, avgDurationMs: 38.9 },
-        { name: "GenerateQuery", count: 17, avgDurationMs: 940.4 },
-        { name: "SystemStats", count: 9, avgDurationMs: 210.6 },
-        { name: "SendMessage", count: 3, avgDurationMs: 55.0 },
+        {
+          name: "Resume",
+          count: 54,
+          avgDurationMs: 61.2,
+          lastQuery: "query Resume {\n  person { name }\n  experience { role company }\n}",
+          lastVariables: null,
+          lastTraceId: "mock-trace-resume",
+        },
+        {
+          name: "Hero",
+          count: 41,
+          avgDurationMs: 38.9,
+          lastQuery: "query Hero {\n  person { name }\n  experience { role company isCurrent }\n}",
+          lastVariables: null,
+          lastTraceId: "mock-trace-hero",
+        },
+        {
+          name: "GenerateQuery",
+          count: 17,
+          avgDurationMs: 940.4,
+          lastQuery:
+            "query GenerateQuery($prompt: String!) {\n  meta { generateQuery(prompt: $prompt) { query message } }\n}",
+          lastVariables: JSON.stringify({ prompt: "tell me something fun about peter" }),
+          lastTraceId: "mock-trace-generatequery",
+        },
+        {
+          name: "SystemStats",
+          count: 9,
+          avgDurationMs: 210.6,
+          lastQuery: "query SystemStats {\n  meta { systemStats { requestsLast24h } }\n}",
+          lastVariables: null,
+          lastTraceId: "mock-trace-systemstats",
+        },
+        {
+          name: "SendMessage",
+          count: 3,
+          avgDurationMs: 55.0,
+          lastQuery: null,
+          lastVariables: null,
+          lastTraceId: null,
+        },
       ],
       operationsLast3Days: [
-        { name: "Resume", count: 12, avgDurationMs: 58.4 },
-        { name: "Hero", count: 9, avgDurationMs: 36.1 },
-        { name: "GenerateQuery", count: 4, avgDurationMs: 902.7 },
-        { name: "SystemStats", count: 3, avgDurationMs: 198.2 },
+        {
+          name: "Resume",
+          count: 12,
+          avgDurationMs: 58.4,
+          lastQuery: "query Resume {\n  person { name }\n  experience { role company }\n}",
+          lastVariables: null,
+          lastTraceId: "mock-trace-resume",
+        },
+        {
+          name: "Hero",
+          count: 9,
+          avgDurationMs: 36.1,
+          lastQuery: "query Hero {\n  person { name }\n  experience { role company isCurrent }\n}",
+          lastVariables: null,
+          lastTraceId: "mock-trace-hero",
+        },
+        {
+          name: "GenerateQuery",
+          count: 4,
+          avgDurationMs: 902.7,
+          lastQuery:
+            "query GenerateQuery($prompt: String!) {\n  meta { generateQuery(prompt: $prompt) { query message } }\n}",
+          lastVariables: JSON.stringify({ prompt: "tell me something fun about peter" }),
+          lastTraceId: "mock-trace-generatequery",
+        },
+        {
+          name: "SystemStats",
+          count: 3,
+          avgDurationMs: 198.2,
+          lastQuery: "query SystemStats {\n  meta { systemStats { requestsLast24h } }\n}",
+          lastVariables: null,
+          lastTraceId: "mock-trace-systemstats",
+        },
       ],
       requestsByHour: mockRequestsByHour(),
     }),
+    traceBreakdown: () => MOCK_TRACE_BREAKDOWN,
   },
   Mutation: {
     sendMessage: (_: unknown, args: { input: ContactInput }) => {
