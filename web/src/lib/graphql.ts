@@ -60,6 +60,7 @@ export const RESUME_QUERY = /* GraphQL */ `
       name
       stack
       description
+      url
     }
     skills {
       category
@@ -107,13 +108,67 @@ export interface SendMessageResult {
 
 export const GENERATE_QUERY_QUERY = /* GraphQL */ `
   query GenerateQuery($prompt: String!) {
-    generateQuery(prompt: $prompt) {
-      query
-      message
+    meta {
+      generateQuery(prompt: $prompt) {
+        query
+        message
+      }
     }
   }
 `;
 
 export interface GenerateQueryResult {
-  generateQuery: { query: string | null; message: string | null };
+  meta: { generateQuery: { query: string | null; message: string | null } };
+}
+
+export const SYSTEM_STATS_QUERY = /* GraphQL */ `
+  query SystemStats {
+    meta {
+      systemStats {
+        requestsLast24h
+        avgDurationMs
+        errorsLast24h
+        aiQueriesTotal
+        operations {
+          name
+          count
+          avgDurationMs
+        }
+        operationsLast3Days {
+          name
+          count
+          avgDurationMs
+        }
+        requestsByHour {
+          timestamp
+          count
+        }
+      }
+    }
+  }
+`;
+
+export interface OperationStat {
+  name: string;
+  count: number;
+  avgDurationMs: number;
+}
+
+export interface HourlyCount {
+  timestamp: string;
+  count: number;
+}
+
+export interface SystemStatsResult {
+  meta: {
+    systemStats: {
+      requestsLast24h: number;
+      avgDurationMs: number;
+      errorsLast24h: number;
+      aiQueriesTotal: number;
+      operations: OperationStat[];
+      operationsLast3Days: OperationStat[];
+      requestsByHour: HourlyCount[];
+    };
+  };
 }

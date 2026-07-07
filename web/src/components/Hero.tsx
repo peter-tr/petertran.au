@@ -93,7 +93,7 @@ export default function Hero({ person }: HeroProps) {
         </div>
       </div>
 
-      <p className="hero-explorer-hint">
+      <p className="section-hint">
         That's a real response, not a mock — the same schema is fully browsable below.{" "}
         <Link to="/#query">Try the query explorer →</Link>
       </p>

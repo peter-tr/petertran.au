@@ -1,6 +1,6 @@
 import { BatchWriteCommand } from "@aws-sdk/lib-dynamodb";
-import { ddb, TABLE_NAME, PK } from "./ddb.js";
-import { person, education, experience, projects, skills, programs } from "./data.js";
+import { ddb, TABLE_NAME, PK } from "../lib/ddb";
+import { person, education, experience, projects, skills, programs } from "../data";
 
 type Row = { sk: string; type: string; data: unknown };
 

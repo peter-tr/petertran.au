@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { QueryCommand, GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
-import { ddb, TABLE_NAME, PK } from "./ddb.js";
-import { generateQuery } from "./generate-query.js";
-import { validateContactInput, CONTACT_CONFIRMATION_MESSAGE, type ContactInput } from "./contact.js";
-import type { Context } from "./context.js";
-import type { Education, Experience, Person, Program, Project, SkillCategory } from "./data.js";
+import { ddb, TABLE_NAME, PK } from "../lib/ddb";
+import { generateQuery } from "../lib/generate-query";
+import { getSystemStats } from "../lib/system-stats";
+import { validateContactInput, CONTACT_CONFIRMATION_MESSAGE, type ContactInput } from "../lib/contact";
+import type { Context } from "../context";
+import type { Education, Experience, Person, Program, Project, SkillCategory } from "../data";
 
 async function queryPrefix<T>(prefix: string): Promise<T[]> {
   const res = await ddb.send(
@@ -46,8 +47,12 @@ export const resolvers = {
       return items;
     },
     programs: () => queryPrefix<Program>("PROGRAM#"),
+    meta: () => ({}),
+  },
+  Meta: {
     generateQuery: (_: unknown, args: { prompt: string }, context: Context) =>
       generateQuery(args.prompt, context.sourceIp),
+    systemStats: (_: unknown, __: unknown, context: Context) => getSystemStats(context.functionName),
   },
   Mutation: {
     sendMessage: async (_: unknown, args: { input: ContactInput }) => {

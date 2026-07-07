@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { Link } from "react-router-dom";
 import { GraphiQLProvider } from "@graphiql/react";
 import { GraphiQLInterface } from "graphiql";
 import { createGraphiQLFetcher } from "@graphiql/toolkit";
@@ -111,6 +112,10 @@ export default function Explorer() {
       )}
       <p className="endpoint-hint" style={{ marginTop: "0.8rem" }}>
         POST {ENDPOINT ?? "endpoint not configured"}
+      </p>
+      <p className="section-hint">
+        Curious how this API is actually holding up?{" "}
+        <Link to="/#stats">See live request counts and latency →</Link>
       </p>
     </Section>
   );

@@ -38,7 +38,7 @@ export default function AskAI() {
 
     try {
       const result = await runQuery<GenerateQueryResult>(GENERATE_QUERY_QUERY, { prompt });
-      const { query, message } = result.generateQuery;
+      const { query, message } = result.meta.generateQuery;
 
       if (!query) {
         setNote(message ?? "I couldn't turn that into a query against this schema.");

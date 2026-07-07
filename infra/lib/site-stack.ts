@@ -7,6 +7,7 @@ import * as acm from "aws-cdk-lib/aws-certificatemanager";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
+import * as iam from "aws-cdk-lib/aws-iam";
 import * as path from "path";
 
 export interface SiteStackProps extends StackProps {
@@ -48,6 +49,14 @@ export class SiteStack extends Stack {
     });
     table.grantReadWriteData(apiFn);
     anthropicSecret.grantRead(apiFn);
+    // CloudWatch metrics (for the systemStats query) have no resource-level
+    // scoping -- "*" is required here regardless of which function is asking.
+    apiFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["cloudwatch:GetMetricData"],
+        resources: ["*"],
+      })
+    );
 
     const fnUrl = apiFn.addFunctionUrl({
       authType: lambda.FunctionUrlAuthType.NONE,

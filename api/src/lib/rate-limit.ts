@@ -1,6 +1,6 @@
 import { UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { ConditionalCheckFailedException } from "@aws-sdk/client-dynamodb";
-import { ddb, TABLE_NAME } from "./ddb.js";
+import { ddb, TABLE_NAME } from "./ddb";
 
 const LIMIT_PER_MINUTE = 5;
 const WINDOW_SECONDS = 120;

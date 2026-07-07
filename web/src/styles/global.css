@@ -148,21 +148,21 @@ a {
   margin: 0 0 1.6rem;
 }
 
-.hero-explorer-hint {
+.section-hint {
   font-family: var(--font-mono);
   font-size: 0.85rem;
   color: var(--muted);
   margin: 1rem 0 0;
 }
 
-.hero-explorer-hint a {
+.section-hint a {
   color: var(--type);
   text-decoration: none;
   border-bottom: 1px solid var(--rule);
   padding-bottom: 1px;
 }
 
-.hero-explorer-hint a:hover {
+.section-hint a:hover {
   border-color: var(--type);
 }
 
@@ -431,11 +431,30 @@ a {
   margin-bottom: 1.8rem;
 }
 
+.project-heading {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
 .project-name {
   font-family: var(--font-mono);
   font-weight: 600;
   color: var(--paper);
-  margin-right: 0.6rem;
+}
+
+.project-link {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--type);
+  text-decoration: none;
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 1px;
+}
+
+.project-link:hover {
+  border-color: var(--type);
 }
 
 .stack {
@@ -766,6 +785,133 @@ a {
 .arch-edge-label {
   fill: var(--muted-dim);
   font-size: 11px;
+}
+
+/* ---------- system stats ---------- */
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: var(--rule);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.stat-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  background: var(--panel);
+  padding: 1rem 1.1rem;
+}
+
+.stat-value {
+  font-family: var(--font-mono);
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: var(--signal);
+}
+
+.stat-label {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--muted);
+  letter-spacing: 0.01em;
+}
+
+@media (max-width: 640px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.requests-chart {
+  margin-top: 1.4rem;
+}
+
+.chart-title {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--muted);
+  letter-spacing: 0.01em;
+  margin: 0 0 0.5rem;
+}
+
+.requests-chart-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.chart-bar {
+  fill: var(--signal);
+}
+
+.chart-baseline {
+  stroke: var(--rule);
+  stroke-width: 1;
+}
+
+.chart-axis-label,
+.chart-axis-tick {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  fill: var(--muted-dim);
+}
+
+.ops-block {
+  margin-top: 1.4rem;
+}
+
+.ops-toggle {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 0.7rem;
+}
+
+.ops-toggle button {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--muted);
+  background: none;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  padding: 0.25rem 0.7rem;
+  cursor: pointer;
+}
+
+.ops-toggle button.active {
+  color: var(--ink);
+  background: var(--signal);
+  border-color: var(--signal);
+}
+
+.ops-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+}
+
+.ops-table th {
+  text-align: left;
+  color: var(--muted-dim);
+  font-weight: 600;
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  padding: 0 0.8rem 0.5rem 0;
+}
+
+.ops-table td {
+  padding: 0.4rem 0.8rem 0.4rem 0;
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+}
+
+.ops-table td:first-child {
+  color: var(--paper);
 }
 
 /* ---------- states ---------- */

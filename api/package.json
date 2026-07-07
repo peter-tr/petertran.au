@@ -5,14 +5,15 @@
   "type": "module",
   "scripts": {
     "build": "esbuild src/handler.ts --bundle --platform=node --target=node20 --format=esm --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url);\" --outfile=dist/handler.mjs --external:@aws-sdk/* && cp src/schema.graphql dist/schema.graphql",
-    "seed": "tsx src/seed.ts",
-    "dev": "tsx src/dev-server.ts",
+    "seed": "tsx src/dev/seed.ts",
+    "dev": "tsx src/dev/server.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",
     "@apollo/server": "^4.11.0",
     "@as-integrations/aws-lambda": "^3.1.0",
+    "@aws-sdk/client-cloudwatch": "^3.1080.0",
     "@aws-sdk/client-dynamodb": "^3.658.0",
     "@aws-sdk/client-secrets-manager": "^3.658.0",
     "@aws-sdk/lib-dynamodb": "^3.658.0",

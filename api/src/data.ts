@@ -37,6 +37,7 @@ export interface Project {
   name: string;
   stack: string[];
   description: string;
+  url: string | null;
 }
 
 export interface SkillCategory {
@@ -143,16 +144,35 @@ export const experience: Experience[] = [
 
 export const projects: Project[] = [
   {
+    name: "petertran.au -- this site",
+    stack: [
+      "TypeScript",
+      "React",
+      "GraphQL (Apollo Server)",
+      "AWS CDK",
+      "Lambda",
+      "DynamoDB",
+      "CloudFront",
+      "Claude API",
+      "GitHub Actions",
+    ],
+    description:
+      "This portfolio is the project: a publicly queryable GraphQL API (this very schema) backing a React front end, deployed entirely on AWS via CDK -- Lambda, DynamoDB, CloudFront, Secrets Manager -- with GitHub Actions CI/CD over OIDC. Includes a live GraphiQL explorer, a Claude Haiku-powered natural-language query generator, and this systemStats query pulling real CloudWatch metrics.",
+    url: "https://github.com/peter-tr/petertran.au",
+  },
+  {
     name: "Fit2Track",
     stack: ["Node.js", "React", "React Native", "PostgreSQL", "AWS", "LangChain"],
     description:
       "A fitness app where users create challenges triggered by QR codes or geofencing. Features a WYSIWYG editor, AI-generated content, Google Maps, and Google Sign-In; deployed on auto-scaling EC2 + ALB.",
+    url: null,
   },
   {
     name: "Retrieval-Augmented Generation Pipeline",
     stack: ["Python", "PyTorch", "Machine Learning"],
     description:
       "Built a RAG pipeline with Hugging Face Transformers and FAISS, benchmarking BM25, DPR, and TILDEv2 retrieval; TILDEv2 outperformed BM25 (nDCG@3: 0.77 vs. 0.48, +61%) with statistical significance.",
+    url: null,
   },
 ];
 

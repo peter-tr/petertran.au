@@ -1,6 +1,8 @@
-import { typeDefs } from "./schema.js";
-import { getAnthropicClient } from "./anthropic-client.js";
-import { assertNotRateLimited } from "./rate-limit.js";
+import { UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { typeDefs } from "../schema";
+import { getAnthropicClient } from "./anthropic-client";
+import { assertNotRateLimited } from "./rate-limit";
+import { ddb, TABLE_NAME } from "./ddb";
 
 const MAX_PROMPT_LENGTH = 300;
 
@@ -38,6 +40,21 @@ export interface GenerateQueryResult {
   message: string | null;
 }
 
+// Best-effort usage counter for the "little dashboard" of live stats -- skips
+// entirely in local dev, same as rate limiting, since there's no sourceIp there.
+async function recordAiQueryServed(sourceIp: string | undefined): Promise<void> {
+  if (!sourceIp) return;
+  await ddb.send(
+    new UpdateCommand({
+      TableName: TABLE_NAME,
+      Key: { pk: "STATS", sk: "AI_QUERIES" },
+      UpdateExpression: "ADD #count :incr",
+      ExpressionAttributeNames: { "#count": "count" },
+      ExpressionAttributeValues: { ":incr": 1 },
+    })
+  );
+}
+
 export async function generateQuery(prompt: string, sourceIp?: string): Promise<GenerateQueryResult> {
   const trimmed = prompt.trim();
   if (!trimmed) throw new Error("prompt is required.");
@@ -72,6 +89,8 @@ export async function generateQuery(prompt: string, sourceIp?: string): Promise<
 
   const parsed = response.parsed_output as GenerateQueryResult | null;
   if (!parsed) throw new Error("Claude didn't return a valid response -- try rephrasing.");
+
+  await recordAiQueryServed(sourceIp);
 
   return parsed;
 }
