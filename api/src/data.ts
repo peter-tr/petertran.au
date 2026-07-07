@@ -14,6 +14,12 @@ export interface Person {
   links: Link[];
 }
 
+export interface Personal {
+  hobbies: string[];
+  currentlyInto: string | null;
+  funFact: string | null;
+}
+
 export interface Education {
   institution: string;
   degree: string;
@@ -63,6 +69,19 @@ export const person: Person = {
     { label: "GitHub", url: "https://github.com/peter-tr" },
     { label: "Website", url: "https://www.petertran.au" },
   ],
+};
+
+export const personal: Personal = {
+  hobbies: [
+    "Home-labbing Kubernetes clusters for no good reason",
+    "Flight simulators (some habits from the MQ-28 days die hard)",
+    "Bouldering",
+    "Mechanical keyboards",
+    "Building a compelling case for a fourth monitor",
+  ],
+  currentlyInto: "Rust -- mostly rewriting things that already worked fine in TypeScript, for the vibes.",
+  funFact:
+    "This section exists because I told Claude to 'be creative' instead of giving it real hobbies. Everything above is (mostly) true.",
 };
 
 export const education: Education[] = [

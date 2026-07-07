@@ -51,8 +51,15 @@ export interface Program {
   endDate: string;
 }
 
+export interface Personal {
+  hobbies: string[];
+  currentlyInto: string | null;
+  funFact: string | null;
+}
+
 export interface ResumeData {
   person: Person;
+  personal: Personal;
   education: Education[];
   experience: Experience[];
   projects: Project[];

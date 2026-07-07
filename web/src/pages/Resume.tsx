@@ -2,6 +2,7 @@ import ExperienceSection from "../components/ExperienceSection";
 import ProjectsSection from "../components/ProjectsSection";
 import SkillsSection from "../components/SkillsSection";
 import EducationSection from "../components/EducationSection";
+import PersonalSection from "../components/PersonalSection";
 import Footer from "../components/Footer";
 import type { ResumeData } from "../lib/types";
 
@@ -33,6 +34,7 @@ export default function Resume({ data, error }: ResumeProps) {
           <EducationSection education={data.education} programs={data.programs} />
           <ProjectsSection projects={data.projects} />
           <SkillsSection skills={data.skills} />
+          <PersonalSection personal={data.personal} />
         </>
       )}
 

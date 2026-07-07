@@ -25,6 +25,24 @@ type Person {
 }
 
 """
+The human behind the resume -- hobbies and interests outside of work.
+"""
+type Personal {
+  """
+  Hobbies and interests outside of work.
+  """
+  hobbies: [String!]!
+  """
+  Something Peter is currently learning or exploring, work-related or not.
+  """
+  currentlyInto: String
+  """
+  A short, non-resume fact.
+  """
+  funFact: String
+}
+
+"""
 A single external link, e.g. LinkedIn, GitHub, or a personal site.
 """
 type Link {
@@ -200,6 +218,10 @@ type Query {
   External training programs completed outside regular employment or study.
   """
   programs: [Program!]!
+  """
+  The human behind the resume -- hobbies and interests outside of work.
+  """
+  personal: Personal!
   """
   Utility operations about this API itself, rather than about Peter.
   """

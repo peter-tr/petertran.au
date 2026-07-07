@@ -5,7 +5,7 @@ import { generateQuery } from "../lib/generate-query";
 import { getSystemStats } from "../lib/system-stats";
 import { validateContactInput, CONTACT_CONFIRMATION_MESSAGE, type ContactInput } from "../lib/contact";
 import type { Context } from "../context";
-import type { Education, Experience, Person, Program, Project, SkillCategory } from "../data";
+import type { Education, Experience, Person, Personal, Program, Project, SkillCategory } from "../data";
 
 async function queryPrefix<T>(prefix: string): Promise<T[]> {
   const res = await ddb.send(
@@ -47,6 +47,11 @@ export const resolvers = {
       return items;
     },
     programs: () => queryPrefix<Program>("PROGRAM#"),
+    personal: async (): Promise<Personal> => {
+      const res = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { pk: PK, sk: "PERSONAL" } }));
+      if (!res.Item) throw new Error("Personal record not found -- has the table been seeded?");
+      return res.Item.data as Personal;
+    },
     meta: () => ({}),
   },
   Meta: {

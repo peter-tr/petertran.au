@@ -1,6 +1,15 @@
 import { generateQuery } from "../lib/generate-query";
 import { validateContactInput, CONTACT_CONFIRMATION_MESSAGE, type ContactInput } from "../lib/contact";
-import { person, education, experience, projects, skills, programs, type Experience } from "../data";
+import {
+  person,
+  personal,
+  education,
+  experience,
+  projects,
+  skills,
+  programs,
+  type Experience,
+} from "../data";
 
 // Deliberately sparse/spiky, matching what a low-traffic personal site's real
 // CloudWatch numbers actually look like -- useful for testing the chart's
@@ -41,6 +50,7 @@ export const devResolvers = {
       return items;
     },
     programs: () => programs,
+    personal: () => personal,
     meta: () => ({}),
   },
   Meta: {

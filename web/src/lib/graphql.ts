@@ -73,6 +73,11 @@ export const RESUME_QUERY = /* GraphQL */ `
       startDate
       endDate
     }
+    personal {
+      hobbies
+      currentlyInto
+      funFact
+    }
   }
 `;
 
@@ -81,16 +86,17 @@ export const HERO_QUERY = /* GraphQL */ `
     person {
       name
     }
-    experience(currentOnly: true) {
+    experience {
       role
       company
+      isCurrent
     }
   }
 `;
 
 export interface HeroQueryResult {
   person: { name: string };
-  experience: { role: string; company: string }[];
+  experience: { role: string; company: string; isCurrent: boolean }[];
 }
 
 export const SEND_MESSAGE_MUTATION = /* GraphQL */ `

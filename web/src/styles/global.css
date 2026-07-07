@@ -508,6 +508,19 @@ a {
   }
 }
 
+.personal-line {
+  font-size: 0.92rem;
+  color: var(--muted);
+  margin: 0 0 0.5rem;
+}
+
+.personal-key {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--type);
+  margin-right: 0.5rem;
+}
+
 /* ---------- education / programs ---------- */
 
 .fact {
