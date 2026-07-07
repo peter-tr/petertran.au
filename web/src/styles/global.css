@@ -375,6 +375,18 @@ a {
   background: var(--panel);
 }
 
+.company-badge-logo {
+  border-color: var(--rule);
+  padding: 0.3rem;
+}
+
+.company-badge-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
 .role-title {
   font-family: var(--font-mono);
   font-size: 1rem;

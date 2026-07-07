@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <rect width="32" height="32" rx="7" fill="#0b0e14" />
+  <text
+    x="16"
+    y="23"
+    text-anchor="middle"
+    font-family="ui-monospace, 'SF Mono', 'IBM Plex Mono', Menlo, monospace"
+    font-size="20"
+    font-weight="700"
+    fill="#63c7be"
+  >{}</text>
+</svg>
