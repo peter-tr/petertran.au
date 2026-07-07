@@ -81,9 +81,11 @@ export const resolvers = {
 
       try {
         await sendContactNotification(args.input);
-      } catch {
+      } catch (err) {
         // The message is already safely stored above -- never fail the
-        // mutation just because the email notification didn't go out.
+        // mutation just because the email notification didn't go out. Still
+        // log it, though, so a real delivery failure is actually visible.
+        console.error("Contact notification email failed to send:", err);
       }
 
       return { success: true, message: CONTACT_CONFIRMATION_MESSAGE };

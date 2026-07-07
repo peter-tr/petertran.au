@@ -50,7 +50,23 @@ export class SiteStack extends Stack {
     });
     const emailIdentity = new ses.EmailIdentity(this, "SesDomainIdentity", {
       identity: ses.Identity.publicHostedZone(hostedZone),
+      // Without this, the envelope-from (Return-Path) defaults to
+      // amazonses.com, which fails SPF alignment for petertran.au -- strict
+      // filters (Outlook in particular) are much more likely to junk mail
+      // from a brand-new domain that doesn't align. This adds the required
+      // MX + SPF TXT records to the same Route 53 zone automatically.
+      mailFromDomain: "mail.petertran.au",
     });
+    // While the account is in the SES sandbox, IAM enforces ses:SendEmail on
+    // the RECIPIENT identity too, not just the sender's -- this one was
+    // created out-of-band via the CLI (it's Peter's own inbox, verified by
+    // him clicking the link SES emailed him), so it's imported here rather
+    // than owned by this stack.
+    const recipientIdentity = ses.EmailIdentity.fromEmailIdentityName(
+      this,
+      "SesRecipientIdentity",
+      "peter2002tran@outlook.com"
+    );
 
     // --- GraphQL API (Lambda + Function URL, no API Gateway needed) ---
     const apiFn = new lambda.Function(this, "GraphQLFunction", {
@@ -72,6 +88,7 @@ export class SiteStack extends Stack {
     table.grantReadWriteData(apiFn);
     anthropicSecret.grantRead(apiFn);
     emailIdentity.grantSendEmail(apiFn);
+    recipientIdentity.grantSendEmail(apiFn);
     // CloudWatch metrics (for the systemStats query) and X-Ray traces (for
     // traceBreakdown) have no resource-level scoping -- "*" is required here
     // regardless of which function is asking. `Tracing.ACTIVE` above already

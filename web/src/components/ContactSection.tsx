@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import Section from "./Section";
 import { runQuery, SEND_MESSAGE_MUTATION, type SendMessageResult } from "../lib/graphql";
+import { QUERY_RAN_EVENT } from "../lib/events";
 
 type Status = "idle" | "sending" | "sent" | "error";
 
@@ -27,6 +28,10 @@ export default function ContactSection() {
         setName("");
         setEmail("");
         setMessage("");
+        // This form bypasses the Explorer/GraphiQL entirely, so it needs to
+        // dispatch this itself -- the stats dashboard only hears about
+        // queries run from inside the GraphiQL provider otherwise.
+        window.dispatchEvent(new Event(QUERY_RAN_EVENT));
       } else {
         throw new Error("Message wasn't accepted -- please try again.");
       }

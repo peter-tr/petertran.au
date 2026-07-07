@@ -13,7 +13,7 @@ export async function sendContactNotification(input: ContactInput): Promise<void
   const to = process.env.CONTACT_TO_EMAIL;
   if (!from || !to) return;
 
-  await ses.send(
+  const res = await ses.send(
     new SendEmailCommand({
       FromEmailAddress: from,
       Destination: { ToAddresses: [to] },
@@ -28,4 +28,5 @@ export async function sendContactNotification(input: ContactInput): Promise<void
       },
     })
   );
+  console.log(`Contact notification sent, SES MessageId: ${res.MessageId}`);
 }
