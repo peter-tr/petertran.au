@@ -49,12 +49,17 @@ export default function AskAI() {
       // Setting the Monaco editor's value directly (not just the tab-state data)
       // is what actually updates the visible editor -- GraphiQL only syncs
       // Monaco -> store on user edits, never store -> Monaco. We also have to
-      // set the operation name ourselves before running: leaving the store's
-      // stale operationName from a previous query causes "Unknown operation
-      // named X" once run() executes against this new document.
+      // reset the operation name ourselves before running, unconditionally:
+      // leaving the store's stale operationName from a previous query causes
+      // "Unknown operation named X" once run() executes against this new
+      // document. Claude usually names operations, but can return an
+      // anonymous shorthand query (`{ ... }`) with no name at all -- passing
+      // null here (despite the type only declaring `string`) is how you tell
+      // GraphiQL "no override," so the server auto-selects the document's one
+      // operation instead of trying to match the previous tab's stale name.
       const operationMatch = OPERATION_PATTERN.exec(query);
       const operationType = operationMatch?.[1];
-      if (operationMatch) setOperationName(operationMatch[2]);
+      setOperationName((operationMatch?.[2] ?? null) as unknown as string);
       queryEditor.setValue(query);
 
       if (operationType === "mutation") {

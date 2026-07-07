@@ -13,6 +13,7 @@ import "graphiql/graphiql.css";
 import { ENDPOINT } from "../lib/graphql";
 import Section from "./Section";
 import AskAI from "./AskAI";
+import QueryRanBridge from "./QueryRanBridge";
 
 const DEFAULT_TABS = [
   {
@@ -101,6 +102,7 @@ export default function Explorer() {
             visiblePlugin={explorer}
             storage={noStorage}
           >
+            <QueryRanBridge />
             <AskAI />
             <div className="graphiql-mount">
               <GraphiQLInterface defaultEditorToolsVisibility={false} />

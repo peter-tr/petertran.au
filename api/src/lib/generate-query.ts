@@ -31,7 +31,9 @@ Rules:
   return "query" set to null and "message" set to a short, friendly sentence
   explaining that you can only answer questions about the resume data in this
   schema.
-- Name generated operations with a short PascalCase name.
+- Always write the "query" keyword followed by a short PascalCase name, e.g.
+  "query FunFact { ... }" -- never the anonymous shorthand ("{ ... }" with no
+  "query"/name), even for a single simple field.
 - Only select fields and arguments that exist in the schema above.
 - Do not include any explanation, commentary, or markdown code fences.`;
 

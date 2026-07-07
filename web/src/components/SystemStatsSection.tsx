@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import Section from "./Section";
 import RequestsChart from "./RequestsChart";
 import { runQuery, SYSTEM_STATS_QUERY, type SystemStatsResult } from "../lib/graphql";
+import { QUERY_RAN_EVENT } from "../lib/events";
 
 type Stats = SystemStatsResult["meta"]["systemStats"];
 
@@ -28,6 +29,22 @@ export default function SystemStatsSection() {
     runQuery<SystemStatsResult>(SYSTEM_STATS_QUERY)
       .then((result) => setStats(result.meta.systemStats))
       .catch((err) => setError(err instanceof Error ? err.message : "Something went wrong."));
+  }, []);
+
+  // Also refetch whenever a query completes anywhere in the explorer --
+  // the operation-stats write happens server-side before that response is
+  // sent, so the numbers are already there to pick up by the time this fires.
+  useEffect(() => {
+    function onQueryRan() {
+      setLoading(true);
+      setError(null);
+      runQuery<SystemStatsResult>(SYSTEM_STATS_QUERY)
+        .then((result) => setStats(result.meta.systemStats))
+        .catch((err) => setError(err instanceof Error ? err.message : "Something went wrong."))
+        .finally(() => setLoading(false));
+    }
+    window.addEventListener(QUERY_RAN_EVENT, onQueryRan);
+    return () => window.removeEventListener(QUERY_RAN_EVENT, onQueryRan);
   }, []);
 
   async function handleRefresh() {
