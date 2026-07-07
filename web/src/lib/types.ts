@@ -51,14 +51,14 @@ export interface Program {
   endDate: string;
 }
 
-export interface Personal {
+export interface Interests {
   hobbies: string[];
   favoriteFoods: string[];
 }
 
 export interface ResumeData {
   person: Person;
-  personal: Personal;
+  interests: Interests;
   education: Education[];
   experience: Experience[];
   projects: Project[];

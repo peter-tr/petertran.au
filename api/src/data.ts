@@ -14,7 +14,7 @@ export interface Person {
   links: Link[];
 }
 
-export interface Personal {
+export interface Interests {
   hobbies: string[];
   favoriteFoods: string[];
 }
@@ -70,7 +70,7 @@ export const person: Person = {
   ],
 };
 
-export const personal: Personal = {
+export const interests: Interests = {
   hobbies: ["Bouldering", "Badminton"],
   favoriteFoods: ["Sushi", "Matcha", "Coffee", "Pizza"],
 };

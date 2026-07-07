@@ -2,7 +2,7 @@ import { generateQuery } from "../lib/generate-query";
 import { validateContactInput, CONTACT_CONFIRMATION_MESSAGE, type ContactInput } from "../lib/contact";
 import {
   person,
-  personal,
+  interests,
   education,
   experience,
   projects,
@@ -60,7 +60,7 @@ export const devResolvers = {
       return items;
     },
     programs: () => programs,
-    personal: () => personal,
+    interests: () => interests,
     meta: () => ({}),
   },
   Meta: {

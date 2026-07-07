@@ -27,7 +27,7 @@ type Person {
 """
 The human behind the resume - hobbies and interests outside of work.
 """
-type Personal {
+type Interests {
   """
   Hobbies and interests outside of work.
   """
@@ -217,7 +217,7 @@ type Query {
   """
   The human behind the resume - hobbies and interests outside of work.
   """
-  personal: Personal!
+  interests: Interests!
   """
   Utility operations about this API itself, rather than about Peter.
   """

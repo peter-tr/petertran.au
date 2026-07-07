@@ -73,7 +73,7 @@ export const RESUME_QUERY = /* GraphQL */ `
       startDate
       endDate
     }
-    personal {
+    interests {
       hobbies
       favoriteFoods
     }

@@ -1,13 +1,13 @@
 import { BatchWriteCommand } from "@aws-sdk/lib-dynamodb";
 import { ddb, TABLE_NAME, PK } from "../lib/ddb";
-import { person, personal, education, experience, projects, skills, programs } from "../data";
+import { person, interests, education, experience, projects, skills, programs } from "../data";
 
 type Row = { sk: string; type: string; data: unknown };
 
 function rows(): Row[] {
   const out: Row[] = [
     { sk: "PERSON", type: "PERSON", data: person },
-    { sk: "PERSONAL", type: "PERSONAL", data: personal },
+    { sk: "PERSONAL", type: "PERSONAL", data: interests },
   ];
   education.forEach((e, i) => out.push({ sk: `EDUCATION#${i}`, type: "EDUCATION", data: e }));
   experience.forEach((e, i) => out.push({ sk: `EXPERIENCE#${i}`, type: "EXPERIENCE", data: e }));

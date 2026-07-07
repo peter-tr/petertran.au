@@ -1,13 +1,13 @@
 import Section from "./Section";
-import type { Personal } from "../lib/types";
+import type { Interests } from "../lib/types";
 
-export default function PersonalSection({ personal }: { personal: Personal }) {
+export default function InterestsSection({ interests }: { interests: Interests }) {
   return (
-    <Section id="personal" typeName="Personal">
+    <Section id="interests" typeName="Interests">
       <div className="skill-row">
         <span className="skill-cat">Hobbies</span>
         <div className="skill-items">
-          {personal.hobbies.map((hobby) => (
+          {interests.hobbies.map((hobby) => (
             <span className="chip" key={hobby}>
               {hobby}
             </span>
@@ -17,7 +17,7 @@ export default function PersonalSection({ personal }: { personal: Personal }) {
       <div className="skill-row">
         <span className="skill-cat">Favorite foods</span>
         <div className="skill-items">
-          {personal.favoriteFoods.map((food) => (
+          {interests.favoriteFoods.map((food) => (
             <span className="chip" key={food}>
               {food}
             </span>

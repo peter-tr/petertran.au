@@ -9,7 +9,7 @@ const DEFAULT_DRAFT_NOTE =
 export default function AskAI() {
   const queryEditor = useGraphiQL((state) => state.queryEditor);
   const isFetching = useGraphiQL((state) => state.isFetching);
-  const { run, setOperationName } = useGraphiQLActions();
+  const { run, setOperationName, prettifyEditors } = useGraphiQLActions();
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +30,13 @@ export default function AskAI() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!prompt.trim() || loading) return;
+    if (loading) return;
+
+    if (!prompt.trim()) {
+      setError("Type a question first.");
+      setNote(null);
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -61,6 +67,9 @@ export default function AskAI() {
       const operationType = operationMatch?.[1];
       setOperationName((operationMatch?.[2] ?? null) as unknown as string);
       queryEditor.setValue(query);
+      // Claude sometimes returns a valid but single-line/minified query -
+      // reformat it in place so the editor always shows readable, indented GraphQL.
+      await prettifyEditors();
 
       if (operationType === "mutation") {
         // Never auto-send a real side-effecting mutation on the visitor's
@@ -82,7 +91,10 @@ export default function AskAI() {
       <input
         className="ask-ai-input"
         value={prompt}
-        onChange={(e) => setPrompt(e.target.value)}
+        onChange={(e) => {
+          setPrompt(e.target.value);
+          if (error) setError(null);
+        }}
         placeholder="Ask in plain English, e.g. “what's he working on, and what tech does he use?”"
         maxLength={300}
       />
