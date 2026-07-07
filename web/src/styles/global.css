@@ -86,6 +86,22 @@ a {
   color: var(--paper);
 }
 
+@media (max-width: 640px) {
+  .nav-inner {
+    padding: 0.8rem 1rem;
+  }
+
+  .nav-links {
+    gap: 0.85rem;
+  }
+
+  /* The "petertran.au" mark already links home, so drop the redundant
+     link here first when space is tight. */
+  .nav-home {
+    display: none;
+  }
+}
+
 /* ---------- hero ---------- */
 
 .hero {

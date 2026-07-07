@@ -8,7 +8,7 @@ export default function Nav() {
           petertran.au
         </Link>
         <ul className="nav-links">
-          <li>
+          <li className="nav-home">
             <Link to="/">home</Link>
           </li>
           <li>

@@ -30,9 +30,9 @@ export default function Resume({ data, error }: ResumeProps) {
       {data && (
         <>
           <ExperienceSection experience={data.experience} />
+          <EducationSection education={data.education} programs={data.programs} />
           <ProjectsSection projects={data.projects} />
           <SkillsSection skills={data.skills} />
-          <EducationSection education={data.education} programs={data.programs} />
         </>
       )}
 
