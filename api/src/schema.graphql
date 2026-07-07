@@ -255,6 +255,17 @@ type Meta {
   a day.
   """
   awsCostUsd: Float!
+  """
+  Real Anthropic API usage cost for the current calendar month so far, in
+  USD - pulled from Anthropic's Cost Report API and cached for about an
+  hour. Zero if no Admin API key is configured.
+  """
+  anthropicCostUsd: Float!
+  """
+  awsCostUsd + anthropicCostUsd - the site's total real running cost this
+  month so far.
+  """
+  totalCostUsd: Float!
 }
 
 """

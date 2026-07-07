@@ -192,18 +192,20 @@ export interface TraceBreakdownResult {
 // Deliberately its own tiny query rather than reusing SYSTEM_STATS_QUERY:
 // systemStats' resolver does a batch of CloudWatch/DynamoDB work regardless
 // of which of its fields are actually selected, and Footer renders on every
-// page - awsCostUsd is cheap (DynamoDB-cached) precisely because it's kept
-// as its own top-level Meta field, not a member of SystemStats.
+// page - these cost fields are cheap (DynamoDB-cached) precisely because
+// they're kept as their own top-level Meta fields, not members of SystemStats.
 export const FOOTER_QUERY = /* GraphQL */ `
   query Footer {
     meta {
       awsCostUsd
+      anthropicCostUsd
+      totalCostUsd
     }
   }
 `;
 
 export interface FooterQueryResult {
-  meta: { awsCostUsd: number };
+  meta: { awsCostUsd: number; anthropicCostUsd: number; totalCostUsd: number };
 }
 
 export interface HourlyCount {

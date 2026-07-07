@@ -152,6 +152,8 @@ export const devResolvers = {
     }),
     traceBreakdown: () => MOCK_TRACE_BREAKDOWN,
     awsCostUsd: () => 0.0027,
+    anthropicCostUsd: () => 0.0927,
+    totalCostUsd: () => 0.0954,
   },
   Mutation: {
     sendMessage: (_: unknown, args: { input: ContactInput }) => {

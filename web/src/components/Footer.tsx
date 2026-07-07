@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import { runQuery, FOOTER_QUERY, type FooterQueryResult } from "../lib/graphql";
 
+type Cost = FooterQueryResult["meta"];
+
 export default function Footer({ email }: { email?: string }) {
-  const [costUsd, setCostUsd] = useState<number | null>(null);
+  const [cost, setCost] = useState<Cost | null>(null);
 
   useEffect(() => {
     runQuery<FooterQueryResult>(FOOTER_QUERY)
-      .then((result) => setCostUsd(result.meta.awsCostUsd))
+      .then((result) => setCost(result.meta))
       .catch(() => {});
   }, []);
 
@@ -21,7 +23,13 @@ export default function Footer({ email }: { email?: string }) {
           source
         </a>{" "}
         · built with AWS CDK · Lambda · DynamoDB · CloudFront
-        {costUsd !== null && <> · real AWS cost this month: ${costUsd.toFixed(4)}</>}
+        {cost && (
+          <>
+            {" "}
+            · real cost this month: ${cost.totalCostUsd.toFixed(4)} (AWS ${cost.awsCostUsd.toFixed(4)} +
+            Anthropic ${cost.anthropicCostUsd.toFixed(4)})
+          </>
+        )}
       </span>
     </footer>
   );

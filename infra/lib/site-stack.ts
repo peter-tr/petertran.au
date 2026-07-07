@@ -38,6 +38,14 @@ export class SiteStack extends Stack {
       "AnthropicApiKey",
       "petertran-au/anthropic-api-key"
     );
+    // Read-only cost/usage reporting credential, separate from the messages
+    // API key above -- kept as its own secret rather than a Lambda env var
+    // for consistency with how the other Anthropic key is stored.
+    const anthropicAdminSecret = secretsmanager.Secret.fromSecretNameV2(
+      this,
+      "AnthropicAdminApiKey",
+      "petertran-au/anthropic-admin-key"
+    );
 
     // --- Contact form email notifications ---
     // Verifies the whole domain via DNS (auto-adds DKIM/MAIL FROM records to
@@ -87,6 +95,7 @@ export class SiteStack extends Stack {
       environment: {
         TABLE_NAME: table.tableName,
         ANTHROPIC_SECRET_ARN: anthropicSecret.secretArn,
+        ANTHROPIC_ADMIN_SECRET_ARN: anthropicAdminSecret.secretArn,
         CONTACT_FROM_EMAIL: "contact@petertran.au",
         CONTACT_TO_EMAIL: "peter2002tran@outlook.com",
       },
@@ -96,6 +105,7 @@ export class SiteStack extends Stack {
     });
     table.grantReadWriteData(apiFn);
     anthropicSecret.grantRead(apiFn);
+    anthropicAdminSecret.grantRead(apiFn);
     emailIdentity.grantSendEmail(apiFn);
     recipientIdentity.grantSendEmail(apiFn);
     // CloudWatch metrics (for the systemStats query), X-Ray traces (for
