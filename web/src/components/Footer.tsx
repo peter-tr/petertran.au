@@ -1,4 +1,15 @@
+import { useEffect, useState } from "react";
+import { runQuery, FOOTER_QUERY, type FooterQueryResult } from "../lib/graphql";
+
 export default function Footer({ email }: { email?: string }) {
+  const [costUsd, setCostUsd] = useState<number | null>(null);
+
+  useEffect(() => {
+    runQuery<FooterQueryResult>(FOOTER_QUERY)
+      .then((result) => setCostUsd(result.meta.awsCostUsd))
+      .catch(() => {});
+  }, []);
+
   return (
     <footer className="footer">
       <span>
@@ -10,6 +21,7 @@ export default function Footer({ email }: { email?: string }) {
           source
         </a>{" "}
         · built with AWS CDK · Lambda · DynamoDB · CloudFront
+        {costUsd !== null && <> · real AWS cost this month: ${costUsd.toFixed(4)}</>}
       </span>
     </footer>
   );

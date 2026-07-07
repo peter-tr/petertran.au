@@ -4,6 +4,7 @@ import { ddb, TABLE_NAME, PK } from "../lib/ddb";
 import { generateQuery } from "../lib/generate-query";
 import { getSystemStats } from "../lib/system-stats";
 import { getTraceBreakdown } from "../lib/xray";
+import { getAwsCostThisMonthUsd } from "../lib/aws-cost";
 import { validateContactInput, CONTACT_CONFIRMATION_MESSAGE, type ContactInput } from "../lib/contact";
 import { sendContactNotification } from "../lib/email";
 import type { Context } from "../context";
@@ -61,6 +62,7 @@ export const resolvers = {
       generateQuery(args.prompt, context.sourceIp),
     systemStats: (_: unknown, __: unknown, context: Context) => getSystemStats(context.functionName),
     traceBreakdown: (_: unknown, args: { traceId: string }) => getTraceBreakdown(args.traceId),
+    awsCostUsd: () => getAwsCostThisMonthUsd(),
   },
   Mutation: {
     sendMessage: async (_: unknown, args: { input: ContactInput }, context: Context) => {

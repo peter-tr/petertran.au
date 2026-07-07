@@ -1,5 +1,6 @@
 import { SESv2Client, SendEmailCommand } from "@aws-sdk/client-sesv2";
 import type { ContactInput } from "./contact";
+import { getLocationForIp } from "./geoip";
 
 const ses = new SESv2Client({});
 
@@ -39,6 +40,7 @@ export async function sendContactNotification(input: ContactInput, meta: Submiss
   const receivedAtAest = `${AEST_FORMATTER.format(new Date(meta.receivedAt))} AEST/AEDT`;
   const sourceIp = meta.sourceIp ?? "unknown";
   const userAgent = meta.userAgent ?? "unknown";
+  const location = (await getLocationForIp(meta.sourceIp)) ?? "unknown";
 
   const res = await ses.send(
     new SendEmailCommand({
@@ -57,7 +59,7 @@ export async function sendContactNotification(input: ContactInput, meta: Submiss
           Subject: { Data: `New message from ${name} via petertran.au` },
           Body: {
             Text: {
-              Data: `From: ${name} <${email}>\nReceived: ${receivedAtAest}\nIP: ${sourceIp}\nDevice: ${userAgent}\n\n${message}`,
+              Data: `From: ${name} <${email}>\nReceived: ${receivedAtAest}\nIP: ${sourceIp}\nLocation: ${location}\nDevice: ${userAgent}\n\n${message}`,
             },
             Html: {
               Data: `<!doctype html>
@@ -70,6 +72,7 @@ export async function sendContactNotification(input: ContactInput, meta: Submiss
     <p style="color: #999; font-size: 0.85em;">
       Received ${escapeHtml(receivedAtAest)}<br>
       IP: ${escapeHtml(sourceIp)}<br>
+      Location: ${escapeHtml(location)}<br>
       Device: ${escapeHtml(userAgent)}
     </p>
   </body>

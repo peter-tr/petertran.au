@@ -98,14 +98,20 @@ export class SiteStack extends Stack {
     anthropicSecret.grantRead(apiFn);
     emailIdentity.grantSendEmail(apiFn);
     recipientIdentity.grantSendEmail(apiFn);
-    // CloudWatch metrics (for the systemStats query) and X-Ray traces (for
-    // traceBreakdown) have no resource-level scoping -- "*" is required here
-    // regardless of which function is asking. `Tracing.ACTIVE` above already
-    // grants write access (PutTraceSegments); this adds the read APIs needed
-    // to query a trace back out.
+    // CloudWatch metrics (for the systemStats query), X-Ray traces (for
+    // traceBreakdown), and Cost Explorer (for awsCostUsd) have no
+    // resource-level scoping -- "*" is required here regardless of which
+    // function is asking. `Tracing.ACTIVE` above already grants write access
+    // (PutTraceSegments); this adds the read APIs needed to query a trace
+    // back out.
     apiFn.addToRolePolicy(
       new iam.PolicyStatement({
-        actions: ["cloudwatch:GetMetricData", "xray:GetTraceSummaries", "xray:BatchGetTraces"],
+        actions: [
+          "cloudwatch:GetMetricData",
+          "xray:GetTraceSummaries",
+          "xray:BatchGetTraces",
+          "ce:GetCostAndUsage",
+        ],
         resources: ["*"],
       })
     );

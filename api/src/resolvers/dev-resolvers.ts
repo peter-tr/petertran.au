@@ -151,6 +151,7 @@ export const devResolvers = {
       requestsByHour: mockRequestsByHour(),
     }),
     traceBreakdown: () => MOCK_TRACE_BREAKDOWN,
+    awsCostUsd: () => 0.0027,
   },
   Mutation: {
     sendMessage: (_: unknown, args: { input: ContactInput }) => {

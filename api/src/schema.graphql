@@ -248,6 +248,13 @@ type Meta {
   trace has expired or wasn't found.
   """
   traceBreakdown(traceId: String!): [TraceSegment!]!
+  """
+  Real AWS usage cost for the current calendar month so far, in USD, before
+  any promotional credits are applied - pulled from AWS Cost Explorer and
+  cached for a few hours, since Cost Explorer itself only updates about once
+  a day.
+  """
+  awsCostUsd: Float!
 }
 
 """
