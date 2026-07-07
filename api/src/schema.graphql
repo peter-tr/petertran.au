@@ -1,5 +1,5 @@
 """
-A person -- in this schema, always Peter Tran.
+A person - in this schema, always Peter Tran.
 """
 type Person {
   """
@@ -25,7 +25,7 @@ type Person {
 }
 
 """
-The human behind the resume -- hobbies and interests outside of work.
+The human behind the resume - hobbies and interests outside of work.
 """
 type Personal {
   """
@@ -211,7 +211,7 @@ type Query {
   """
   programs: [Program!]!
   """
-  The human behind the resume -- hobbies and interests outside of work.
+  The human behind the resume - hobbies and interests outside of work.
   """
   personal: Personal!
   """
@@ -221,7 +221,7 @@ type Query {
 }
 
 """
-Utility operations about this API itself -- separated from the resume
+Utility operations about this API itself - separated from the resume
 content above since none of this is actually about Peter.
 """
 type Meta {
@@ -232,14 +232,14 @@ type Meta {
   generateQuery(prompt: String!): GeneratedQuery!
   """
   Live operational stats about this API itself, pulled from CloudWatch and
-  DynamoDB -- not mocked.
+  DynamoDB - not mocked.
   """
   systemStats: SystemStats!
   """
   AWS X-Ray timing breakdown for a specific past request, keyed by the
   traceId from one of `systemStats`'s operations. Only covers what actually
   happens inside the Lambda invocation (its own execution, DynamoDB calls,
-  the Anthropic API call) -- X-Ray has no visibility into the browser or
+  the Anthropic API call) - X-Ray has no visibility into the browser or
   CloudFront/S3, since those aren't part of the same trace. Empty if the
   trace has expired or wasn't found.
   """
@@ -277,16 +277,12 @@ type SystemStats {
   """
   avgDurationMs: Float!
   """
-  Number of Lambda errors in the last 24 hours.
-  """
-  errorsLast24h: Int!
-  """
   Total number of Ask Claude queries served since launch.
   """
   aiQueriesTotal: Int!
   """
   Unique visitor IPs seen in the last 30 days. No cookies or client-side
-  tracking -- derived from the source IP already used for rate limiting.
+  tracking - derived from the source IP already used for rate limiting.
   """
   uniqueVisitors: Int!
   """

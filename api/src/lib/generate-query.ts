@@ -34,7 +34,7 @@ Rules:
   explaining that you can only answer questions about the resume data in this
   schema.
 - Always write the "query" keyword followed by a short PascalCase name, e.g.
-  "query FunFact { ... }" -- never the anonymous shorthand ("{ ... }" with no
+  "query FunFact { ... }" - never the anonymous shorthand ("{ ... }" with no
   "query"/name), even for a single simple field.
 - Only select fields and arguments that exist in the schema above.
 - Do not include any explanation, commentary, or markdown code fences.`;
@@ -44,7 +44,7 @@ export interface GenerateQueryResult {
   message: string | null;
 }
 
-// Best-effort usage counter for the "little dashboard" of live stats -- skips
+// Best-effort usage counter for the "little dashboard" of live stats - skips
 // entirely in local dev, same as rate limiting, since there's no sourceIp there.
 async function recordAiQueryServed(sourceIp: string | undefined): Promise<void> {
   if (!sourceIp) return;
@@ -93,7 +93,7 @@ export async function generateQuery(prompt: string, sourceIp?: string): Promise<
 
   const client = await getAnthropicClient();
 
-  // Not an AWS SDK call, so X-Ray can't auto-instrument it -- wrap it in its
+  // Not an AWS SDK call, so X-Ray can't auto-instrument it - wrap it in its
   // own subsegment so the trace breakdown shows how much of the latency is
   // actually Anthropic vs. our own code.
   const response = process.env.AWS_LAMBDA_FUNCTION_NAME
@@ -110,7 +110,7 @@ export async function generateQuery(prompt: string, sourceIp?: string): Promise<
     : await callAnthropic(client, trimmed);
 
   const parsed = response.parsed_output as GenerateQueryResult | null;
-  if (!parsed) throw new Error("Claude didn't return a valid response -- try rephrasing.");
+  if (!parsed) throw new Error("Claude didn't return a valid response - try rephrasing.");
 
   await recordAiQueryServed(sourceIp);
 

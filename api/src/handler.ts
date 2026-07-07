@@ -18,6 +18,7 @@ export const handler = startServerAndCreateLambdaHandler(
   {
     context: async ({ event, context }) => ({
       sourceIp: event.requestContext?.http?.sourceIp,
+      userAgent: event.headers?.["user-agent"],
       functionName: context.functionName,
     }),
   }

@@ -130,7 +130,6 @@ export const SYSTEM_STATS_QUERY = /* GraphQL */ `
       systemStats {
         requestsLast24h
         avgDurationMs
-        errorsLast24h
         aiQueriesTotal
         uniqueVisitors
         operations {
@@ -199,7 +198,6 @@ export interface SystemStatsResult {
     systemStats: {
       requestsLast24h: number;
       avgDurationMs: number;
-      errorsLast24h: number;
       aiQueriesTotal: number;
       uniqueVisitors: number;
       operations: OperationStat[];

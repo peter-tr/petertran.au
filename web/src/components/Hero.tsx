@@ -59,10 +59,10 @@ export default function Hero({ person }: HeroProps) {
 
   return (
     <header className="hero">
-      <p className="eyebrow">backend &amp; platform engineer · sydney, au</p>
+      <p className="eyebrow">backend software engineer · sydney, australia</p>
       <h1>Peter Tran</h1>
       <p className="tagline">
-        Backend and platform engineer who likes building the infrastructure other engineers build on top of —
+        Backend software engineer who likes building the infrastructure other engineers build on top of —
         these days that's GraphQL federation at bank scale; before that, safety-critical software for
         autonomous aircraft.
       </p>

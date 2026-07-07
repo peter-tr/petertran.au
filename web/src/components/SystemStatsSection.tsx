@@ -12,7 +12,6 @@ type NumericStatKey = Exclude<keyof Stats, "operations" | "operationsLast3Days" 
 const TILES: { key: NumericStatKey; label: string; format: (value: number) => string }[] = [
   { key: "requestsLast24h", label: "requests / 24h", format: (v) => v.toLocaleString() },
   { key: "avgDurationMs", label: "avg duration", format: (v) => `${v}ms` },
-  { key: "errorsLast24h", label: "errors / 24h", format: (v) => v.toLocaleString() },
   { key: "aiQueriesTotal", label: "Ask Claude queries served", format: (v) => v.toLocaleString() },
   { key: "uniqueVisitors", label: "unique visitors / 30d", format: (v) => v.toLocaleString() },
 ];
@@ -71,8 +70,8 @@ export default function SystemStatsSection() {
   return (
     <Section id="stats" typeName="SystemStats">
       <p className="project-desc" style={{ marginBottom: "1rem" }}>
-        Real numbers pulled from CloudWatch and DynamoDB for the Lambda behind this page -- not mocked, and
-        not polled continuously (CloudWatch only updates on its own ~1 minute cadence anyway).
+        Real numbers pulled from CloudWatch and DynamoDB for the Lambda behind this page - not mocked, and not
+        polled continuously (CloudWatch only updates on its own ~1 minute cadence anyway).
       </p>
 
       {error && <p className="status-line">// couldn&apos;t load stats right now ({error}).</p>}

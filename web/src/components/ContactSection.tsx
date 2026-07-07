@@ -29,11 +29,11 @@ export default function ContactSection() {
         setEmail("");
         setMessage("");
         // This form bypasses the Explorer/GraphiQL entirely, so it needs to
-        // dispatch this itself -- the stats dashboard only hears about
+        // dispatch this itself - the stats dashboard only hears about
         // queries run from inside the GraphiQL provider otherwise.
         window.dispatchEvent(new Event(QUERY_RAN_EVENT));
       } else {
-        throw new Error("Message wasn't accepted -- please try again.");
+        throw new Error("Message wasn't accepted - please try again.");
       }
     } catch (err) {
       setStatus("error");
@@ -44,7 +44,7 @@ export default function ContactSection() {
   return (
     <Section id="contact" typeName="Mutation">
       <p className="project-desc" style={{ marginBottom: "1.2rem" }}>
-        This form calls <code>sendMessage(input: ContactInput!)</code> on the same API used above -- no
+        This form calls <code>sendMessage(input: ContactInput!)</code> on the same API used above - no
         separate backend, just the mutation this page is documenting.
       </p>
 

@@ -27,7 +27,7 @@ export async function assertNotRateLimited(sourceIp: string | undefined): Promis
     );
   } catch (err) {
     if (err instanceof ConditionalCheckFailedException) {
-      throw new Error("Too many requests -- please wait a moment and try again.", { cause: err });
+      throw new Error("Too many requests - please wait a moment and try again.", { cause: err });
     }
     throw err;
   }

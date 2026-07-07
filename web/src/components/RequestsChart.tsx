@@ -6,7 +6,7 @@ const AXIS_BAND_HEIGHT = 22;
 const BAR_GAP = 3;
 
 // Scales the axis ceiling to the actual data range (rounded up to a clean
-// 1/2/5/10 step) instead of some fixed large scale -- otherwise a personal
+// 1/2/5/10 step) instead of some fixed large scale - otherwise a personal
 // site's real 0-8 requests/hour would render as a flat sliver at the bottom
 // of an oversized chart.
 function niceAxisMax(max: number): number {

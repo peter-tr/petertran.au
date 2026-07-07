@@ -23,7 +23,6 @@ export interface HourlyCount {
 export interface SystemStats {
   requestsLast24h: number;
   avgDurationMs: number;
-  errorsLast24h: number;
   aiQueriesTotal: number;
   operations: OperationStats[];
   operationsLast3Days: OperationStats[];
@@ -34,7 +33,6 @@ export interface SystemStats {
 interface LambdaMetrics {
   requests: number;
   avgDuration: number;
-  errors: number;
   requestsByHour: HourlyCount[];
 }
 
@@ -82,14 +80,6 @@ async function fetchLambdaMetrics(functionName: string): Promise<LambdaMetrics> 
           },
         },
         {
-          Id: "errors",
-          MetricStat: {
-            Metric: { Namespace: "AWS/Lambda", MetricName: "Errors", Dimensions: dimensions },
-            Period: 86400,
-            Stat: "Sum",
-          },
-        },
-        {
           Id: "requestsByHour",
           MetricStat: {
             Metric: { Namespace: "AWS/Lambda", MetricName: "Invocations", Dimensions: dimensions },
@@ -113,7 +103,6 @@ async function fetchLambdaMetrics(functionName: string): Promise<LambdaMetrics> 
   return {
     requests: valueFor("requests"),
     avgDuration: valueFor("duration"),
-    errors: valueFor("errors"),
     requestsByHour,
   };
 }
@@ -258,7 +247,7 @@ export async function getSystemStats(functionName: string | undefined): Promise<
   const [metrics, aiQueriesTotal, operationStats, uniqueVisitors] = await Promise.all([
     functionName
       ? getLambdaMetrics(functionName)
-      : Promise.resolve({ requests: 0, avgDuration: 0, errors: 0, requestsByHour: [] }),
+      : Promise.resolve({ requests: 0, avgDuration: 0, requestsByHour: [] }),
     getAiQueriesTotal(),
     getOperationStats(),
     getUniqueVisitors(),
@@ -267,7 +256,6 @@ export async function getSystemStats(functionName: string | undefined): Promise<
   return {
     requestsLast24h: Math.round(metrics.requests),
     avgDurationMs: Math.round(metrics.avgDuration * 10) / 10,
-    errorsLast24h: Math.round(metrics.errors),
     aiQueriesTotal,
     uniqueVisitors,
     operations: operationStats.allTime,

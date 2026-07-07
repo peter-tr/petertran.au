@@ -68,7 +68,6 @@ export const devResolvers = {
     systemStats: () => ({
       requestsLast24h: 128,
       avgDurationMs: 42.5,
-      errorsLast24h: 0,
       aiQueriesTotal: 17,
       uniqueVisitors: 42,
       operations: [

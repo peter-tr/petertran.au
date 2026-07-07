@@ -4,7 +4,7 @@ export interface ContactInput {
   message: string;
 }
 
-export const CONTACT_CONFIRMATION_MESSAGE = "Thanks -- you'll hear back from me soon.";
+export const CONTACT_CONFIRMATION_MESSAGE = "Thanks - you'll hear back from me soon.";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

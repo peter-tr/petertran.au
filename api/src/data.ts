@@ -80,7 +80,7 @@ export const education: Education[] = [
     location: "Brisbane, Australia",
     startDate: "2020-02",
     endDate: "2024-12",
-    honors: "First Class Honours -- GPA: 6.35/7",
+    honors: "First Class Honours - GPA: 6.35/7",
   },
 ];
 
@@ -92,9 +92,9 @@ export const experience: Experience[] = [
     startDate: "2026-02",
     endDate: null,
     summary:
-      "NetBank Next -- rebuilding the backend of CommBank's online banking (17M+ customers, 170 TPS) onto a federated GraphQL API -- one of the bank's first large-scale GraphQL federation deployments",
+      "NetBank Next - rebuilding the backend of CommBank's online banking (17M+ customers, 170 TPS) onto a federated GraphQL API - one of the bank's first large-scale GraphQL federation deployments",
     highlights: [
-      "Drove architectural decisions for the GraphQL federation platform -- supergraph composition, schema governance, observability, subgraph CI/CD -- and implemented its core infrastructure, enabling 10+ service domains to independently build and deploy subgraphs",
+      "Drove architectural decisions for the GraphQL federation platform - supergraph composition, schema governance, observability, subgraph CI/CD - and implemented its core infrastructure, enabling 10+ service domains to independently build and deploy subgraphs",
       "Built and own three GraphQL subgraphs (Accounts, Transactions, Parties), migrating legacy REST/SOAP endpoints onto the federated layer and cutting p95 latency from 500ms to 300ms (40%)",
       "Designed a custom GraphQL directive enforcing OAuth 2.0 scope-based authorization, giving field- and entity-level access control over sensitive financial data",
       "Built an MCP server exposing the supergraph to AI agents, used by 200+ engineers to query the schema and customer usage in natural language instead of hand-writing GraphQL introspection",
@@ -110,7 +110,7 @@ export const experience: Experience[] = [
     summary: null,
     highlights: [
       "Built event-driven ingestion and storage pipelines (SQS -> Lambda -> S3/PostgreSQL -> Kafka) within CommBank's Payment Data Platform, normalizing 5,000 payment events/sec into ISO 20022 as a common cross-bank, cross-country standard",
-      "Joined NetBank Next at inception (Sep 2025), built its first subgraphs -- promoted to the platform team",
+      "Joined NetBank Next at inception (Sep 2025), built its first subgraphs - promoted to the platform team",
     ],
   },
   {
@@ -152,7 +152,7 @@ export const experience: Experience[] = [
 
 export const projects: Project[] = [
   {
-    name: "petertran.au -- this site",
+    name: "petertran.au - this site",
     stack: [
       "TypeScript",
       "React",
@@ -165,7 +165,7 @@ export const projects: Project[] = [
       "GitHub Actions",
     ],
     description:
-      "This portfolio is the project: a publicly queryable GraphQL API (this very schema) backing a React front end, deployed entirely on AWS via CDK -- Lambda, DynamoDB, CloudFront, Secrets Manager -- with GitHub Actions CI/CD over OIDC. Includes a live GraphiQL explorer, a Claude Haiku-powered natural-language query generator, and this systemStats query pulling real CloudWatch metrics.",
+      "This portfolio is the project: a publicly queryable GraphQL API (this very schema) backing a React front end, deployed entirely on AWS via CDK - Lambda, DynamoDB, CloudFront, Secrets Manager - with GitHub Actions CI/CD over OIDC. Includes a live GraphiQL explorer, a Claude Haiku-powered natural-language query generator, and this systemStats query pulling real CloudWatch metrics.",
     url: "https://github.com/peter-tr/petertran.au",
   },
   {

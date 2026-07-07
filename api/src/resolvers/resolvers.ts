@@ -24,7 +24,7 @@ export const resolvers = {
   Query: {
     person: async (): Promise<Person> => {
       const res = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { pk: PK, sk: "PERSON" } }));
-      if (!res.Item) throw new Error("Person record not found -- has the table been seeded?");
+      if (!res.Item) throw new Error("Person record not found - has the table been seeded?");
       return res.Item.data as Person;
     },
     education: () => queryPrefix<Education>("EDUCATION#"),
@@ -51,7 +51,7 @@ export const resolvers = {
     programs: () => queryPrefix<Program>("PROGRAM#"),
     personal: async (): Promise<Personal> => {
       const res = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { pk: PK, sk: "PERSONAL" } }));
-      if (!res.Item) throw new Error("Personal record not found -- has the table been seeded?");
+      if (!res.Item) throw new Error("Personal record not found - has the table been seeded?");
       return res.Item.data as Personal;
     },
     meta: () => ({}),
@@ -63,26 +63,31 @@ export const resolvers = {
     traceBreakdown: (_: unknown, args: { traceId: string }) => getTraceBreakdown(args.traceId),
   },
   Mutation: {
-    sendMessage: async (_: unknown, args: { input: ContactInput }) => {
+    sendMessage: async (_: unknown, args: { input: ContactInput }, context: Context) => {
       validateContactInput(args.input);
       const { name, email, message } = args.input;
+      const receivedAt = new Date().toISOString();
 
       await ddb.send(
         new PutCommand({
           TableName: TABLE_NAME,
           Item: {
             pk: PK,
-            sk: `MESSAGE#${new Date().toISOString()}#${randomUUID()}`,
+            sk: `MESSAGE#${receivedAt}#${randomUUID()}`,
             type: "MESSAGE",
-            data: { name, email, message, receivedAt: new Date().toISOString() },
+            data: { name, email, message, receivedAt },
           },
         })
       );
 
       try {
-        await sendContactNotification(args.input);
+        await sendContactNotification(args.input, {
+          receivedAt,
+          sourceIp: context.sourceIp,
+          userAgent: context.userAgent,
+        });
       } catch (err) {
-        // The message is already safely stored above -- never fail the
+        // The message is already safely stored above - never fail the
         // mutation just because the email notification didn't go out. Still
         // log it, though, so a real delivery failure is actually visible.
         console.error("Contact notification email failed to send:", err);

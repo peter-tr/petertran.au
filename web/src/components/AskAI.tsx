@@ -4,7 +4,7 @@ import { runQuery, GENERATE_QUERY_QUERY, type GenerateQueryResult } from "../lib
 
 const OPERATION_PATTERN = /(query|mutation|subscription)\s+(\w+)/;
 const DEFAULT_DRAFT_NOTE =
-  "I've filled in the message form below -- add your details and click Run to send it.";
+  "I've filled in the message form below - add your details and click Run to send it.";
 
 export default function AskAI() {
   const queryEditor = useGraphiQL((state) => state.queryEditor);
@@ -17,7 +17,7 @@ export default function AskAI() {
 
   // Tracks whether the in-flight (or just-finished) GraphQL request was one we
   // kicked off ourselves, so we only show the "running…" note for that request
-  // -- there's a real network round trip between run() and the response
+  // - there's a real network round trip between run() and the response
   // landing. Cleared by comparing against the previous isFetching value during
   // render (React's documented pattern for derived state) rather than an
   // effect, since flipping state from inside an effect trips the linter.
@@ -44,16 +44,16 @@ export default function AskAI() {
         setNote(message ?? "I couldn't turn that into a query against this schema.");
         return;
       }
-      if (!queryEditor) throw new Error("Editor isn't ready yet -- try again in a moment.");
+      if (!queryEditor) throw new Error("Editor isn't ready yet - try again in a moment.");
 
       // Setting the Monaco editor's value directly (not just the tab-state data)
-      // is what actually updates the visible editor -- GraphiQL only syncs
+      // is what actually updates the visible editor - GraphiQL only syncs
       // Monaco -> store on user edits, never store -> Monaco. We also have to
       // reset the operation name ourselves before running, unconditionally:
       // leaving the store's stale operationName from a previous query causes
       // "Unknown operation named X" once run() executes against this new
       // document. Claude usually names operations, but can return an
-      // anonymous shorthand query (`{ ... }`) with no name at all -- passing
+      // anonymous shorthand query (`{ ... }`) with no name at all - passing
       // null here (despite the type only declaring `string`) is how you tell
       // GraphiQL "no override," so the server auto-selects the document's one
       // operation instead of trying to match the previous tab's stale name.
@@ -64,7 +64,7 @@ export default function AskAI() {
 
       if (operationType === "mutation") {
         // Never auto-send a real side-effecting mutation on the visitor's
-        // behalf -- draft it into the editor and let them review and click Run.
+        // behalf - draft it into the editor and let them review and click Run.
         setNote(message ?? DEFAULT_DRAFT_NOTE);
       } else {
         setAwaitingResult(true);

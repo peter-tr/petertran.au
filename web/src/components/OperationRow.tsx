@@ -63,7 +63,7 @@ export default function OperationRow({ op }: { op: OperationStat }) {
                 </>
               ) : (
                 <p className="op-no-sample">
-                  No query sample for this operation -- mutations aren&apos;t sampled, to keep contact-form
+                  No query sample for this operation - mutations aren&apos;t sampled, to keep contact-form
                   submissions private.
                 </p>
               )}
