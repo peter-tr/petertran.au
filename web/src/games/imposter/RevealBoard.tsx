@@ -112,6 +112,7 @@ export default function RevealBoard({ gameId, players: initialPlayers, onAllReve
                 {isImposter && <p className="imposter-role-badge">You are the IMPOSTER</p>}
                 {word !== null ? (
                   <>
+                    {isImposter && <p className="imposter-hint">Your hint word (not the real word):</p>}
                     <p className="imposter-word">{word}</p>
                     <p className="project-desc">Memorize it, then tap outside to pass it on.</p>
                   </>

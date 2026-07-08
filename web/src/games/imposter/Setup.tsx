@@ -35,6 +35,7 @@ export default function ImposterSetup() {
   const [customCategory, setCustomCategory] = useState("");
   const [names, setNames] = useState<string[]>(prefillNames?.length ? prefillNames : ["", "", ""]);
   const [imposterCount, setImposterCount] = useState(1);
+  const [imposterCountNotice, setImposterCountNotice] = useState<string | null>(null);
   const [hintEnabled, setHintEnabled] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -48,8 +49,10 @@ export default function ImposterSetup() {
       .catch((err) => setCategoriesError(err instanceof Error ? err.message : "Failed to load categories"));
   }, []);
 
-  const validNames = names.map((n) => n.trim()).filter(Boolean);
-  const maxImposters = maxImposterCount(validNames.length);
+  // Blank fields default to "Player N" rather than being dropped, so the
+  // game can start without everyone having typed a name yet.
+  const effectiveNames = names.map((n, i) => n.trim() || `Player ${i + 1}`);
+  const maxImposters = maxImposterCount(effectiveNames.length);
   // Derived rather than synced back into state via an effect - imposterCount
   // only ever needs clamping at the point it's read (displayed or submitted).
   const effectiveImposterCount = Math.min(imposterCount, maxImposters);
@@ -59,15 +62,31 @@ export default function ImposterSetup() {
   }
 
   function addPlayer() {
+    setImposterCountNotice(null);
     setNames((prev) => (prev.length >= MAX_PLAYERS ? prev : [...prev, ""]));
   }
 
   function removePlayer(index: number) {
+    setImposterCountNotice(null);
     setNames((prev) => (prev.length <= MIN_PLAYERS ? prev : prev.filter((_, i) => i !== index)));
   }
 
-  const canSubmit =
-    !submitting && validNames.length >= MIN_PLAYERS && (wordSource === "AI" || categoryId !== null);
+  function clearNames() {
+    setNames((prev) => prev.map(() => ""));
+  }
+
+  function incrementImposterCount() {
+    if (effectiveImposterCount >= maxImposters) {
+      setImposterCountNotice(
+        `Add more players to allow more imposters (up to ${maxImposters} with ${effectiveNames.length} players).`
+      );
+      return;
+    }
+    setImposterCountNotice(null);
+    setImposterCount(effectiveImposterCount + 1);
+  }
+
+  const canSubmit = !submitting && names.length >= MIN_PLAYERS && (wordSource === "AI" || categoryId !== null);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -80,7 +99,7 @@ export default function ImposterSetup() {
         wordSource,
         categoryId: wordSource === "BUILTIN" ? categoryId : undefined,
         customCategory: wordSource === "AI" && aiThemeMode === "custom" ? customCategory.trim() || undefined : undefined,
-        playerNames: validNames,
+        playerNames: effectiveNames,
         imposterCount: effectiveImposterCount,
         hintEnabled,
       });
@@ -176,7 +195,10 @@ export default function ImposterSetup() {
 
         <div className="imposter-field-group">
           <p className="form-label">
-            Players <span className="imposter-hint">({MIN_PLAYERS}–{MAX_PLAYERS})</span>
+            Players{" "}
+            <span className="imposter-hint">
+              ({MIN_PLAYERS}–{MAX_PLAYERS}, names optional - blank ones become "Player N")
+            </span>
           </p>
           <div className="imposter-player-list">
             {names.map((name, i) => (
@@ -200,14 +222,19 @@ export default function ImposterSetup() {
               </div>
             ))}
           </div>
-          <button
-            type="button"
-            className="imposter-add-btn"
-            onClick={addPlayer}
-            disabled={names.length >= MAX_PLAYERS}
-          >
-            + Add player
-          </button>
+          <div className="imposter-player-actions">
+            <button
+              type="button"
+              className="imposter-add-btn"
+              onClick={addPlayer}
+              disabled={names.length >= MAX_PLAYERS}
+            >
+              + Add player
+            </button>
+            <button type="button" className="imposter-add-btn" onClick={clearNames}>
+              Clear names
+            </button>
+          </div>
         </div>
 
         <div className="imposter-field-group">
@@ -216,7 +243,10 @@ export default function ImposterSetup() {
             <button
               type="button"
               className="imposter-remove-btn"
-              onClick={() => setImposterCount(Math.max(1, effectiveImposterCount - 1))}
+              onClick={() => {
+                setImposterCountNotice(null);
+                setImposterCount(Math.max(1, effectiveImposterCount - 1));
+              }}
               disabled={effectiveImposterCount <= 1}
               aria-label="Fewer imposters"
             >
@@ -226,13 +256,13 @@ export default function ImposterSetup() {
             <button
               type="button"
               className="imposter-remove-btn"
-              onClick={() => setImposterCount(Math.min(maxImposters, effectiveImposterCount + 1))}
-              disabled={effectiveImposterCount >= maxImposters}
+              onClick={incrementImposterCount}
               aria-label="More imposters"
             >
               +
             </button>
           </div>
+          {imposterCountNotice && <p className="status-line">// {imposterCountNotice}</p>}
         </div>
 
         <div className="imposter-field-group">

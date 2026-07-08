@@ -92,6 +92,11 @@
   cursor: not-allowed;
 }
 
+.imposter-player-actions {
+  display: flex;
+  gap: 1.2rem;
+}
+
 .imposter-add-btn {
   align-self: flex-start;
   font-family: var(--font-mono);

@@ -1,11 +1,15 @@
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { BrowserRouter, Routes, Route, Link, useLocation } from "react-router-dom";
 import Nav from "./components/Nav";
-import Home from "./pages/Home";
-import Resume from "./pages/Resume";
-import ImposterSetup from "./games/imposter/Setup";
-import ImposterGame from "./games/imposter/Game";
 import { useResumeData } from "./hooks/useResumeData";
+
+// Lazy-loaded per route so each one only downloads what it needs - Home
+// alone pulls in GraphiQL/Monaco (several MB), which the Imposter game (and
+// every other route) has no reason to fetch just to render.
+const Home = lazy(() => import("./pages/Home"));
+const Resume = lazy(() => import("./pages/Resume"));
+const ImposterSetup = lazy(() => import("./games/imposter/Setup"));
+const ImposterGame = lazy(() => import("./games/imposter/Game"));
 
 function ScrollManager() {
   const location = useLocation();
@@ -56,12 +60,14 @@ export default function App() {
       <ScrollManager />
       <AppNav />
       <main className="wrap" id="top">
-        <Routes>
-          <Route path="/" element={<Home data={data} error={error} />} />
-          <Route path="/resume" element={<Resume data={data} error={error} />} />
-          <Route path="/imposter" element={<ImposterSetup />} />
-          <Route path="/imposter/:gameId" element={<ImposterGame />} />
-        </Routes>
+        <Suspense fallback={<p className="status-line">// loading…</p>}>
+          <Routes>
+            <Route path="/" element={<Home data={data} error={error} />} />
+            <Route path="/resume" element={<Resume data={data} error={error} />} />
+            <Route path="/imposter" element={<ImposterSetup />} />
+            <Route path="/imposter/:gameId" element={<ImposterGame />} />
+          </Routes>
+        </Suspense>
       </main>
     </BrowserRouter>
   );
