@@ -9,6 +9,8 @@ import {
   type ImposterWordSource,
   type CreateImposterGameResult,
 } from "./api";
+import { addRecentGame } from "./recentGames";
+import RecentGames from "./RecentGames";
 import "./imposter.css";
 
 const MIN_PLAYERS = 3;
@@ -103,6 +105,12 @@ export default function ImposterSetup() {
         imposterCount: effectiveImposterCount,
         hintEnabled,
       });
+      addRecentGame({
+        gameId: res.createImposterGame.gameId,
+        categoryLabel: res.createImposterGame.categoryLabel,
+        playerNames: res.createImposterGame.players.map((p) => p.name),
+        createdAt: new Date().toISOString(),
+      });
       navigate(`/imposter/${res.createImposterGame.gameId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't start the game - please try again.");
@@ -120,6 +128,8 @@ export default function ImposterSetup() {
           different. Pass the device around, discuss out loud, and vote out whoever seems off.
         </p>
       </header>
+
+      <RecentGames />
 
       <form className="imposter-setup" onSubmit={handleSubmit}>
         <div className="imposter-field-group">

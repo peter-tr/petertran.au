@@ -167,14 +167,21 @@ export interface RevealOutcome {
 }
 
 export function applyReveal(game: GameRecord, playerId: string): RevealOutcome {
-  if (game.phase !== "REVEAL") throw new Error("This game isn't in its reveal phase anymore.");
-
   const index = game.players.findIndex((p) => p.id === playerId);
   if (index === -1) throw new Error("That player isn't in this game.");
-  if (game.players[index].hasRevealed) throw new Error("This player has already revealed their word.");
 
   const isImposter = game.imposterIndexes.includes(index);
   const word = isImposter ? game.imposterWord : game.civilianWord;
+
+  // A player who already revealed is just peeking again (e.g. they left and
+  // came back) -- replay their word read-only instead of erroring, and skip
+  // the phase check below entirely so this works even after the game has
+  // moved on to DISCUSSION.
+  if (game.players[index].hasRevealed) {
+    return { game, word, isImposter };
+  }
+
+  if (game.phase !== "REVEAL") throw new Error("This game isn't in its reveal phase anymore.");
 
   const players = game.players.map((p, i) => (i === index ? { ...p, hasRevealed: true } : p));
   const done = players.every((p) => p.hasRevealed);

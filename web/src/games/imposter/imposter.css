@@ -131,6 +131,65 @@
   cursor: not-allowed;
 }
 
+.imposter-recent-games {
+  padding: 1rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+
+.imposter-recent-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.imposter-recent-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.imposter-recent-link {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+  text-decoration: none;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  transition: border-color 0.15s ease;
+}
+
+.imposter-recent-link:hover {
+  border-color: var(--signal-dim);
+}
+
+.imposter-recent-code {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  color: var(--signal);
+  letter-spacing: 0.05em;
+}
+
+.imposter-recent-meta {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--paper);
+}
+
+.imposter-recent-time {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--muted-dim);
+  margin-left: auto;
+}
+
 /* ---------- reveal board ---------- */
 
 .imposter-board-wrap {
@@ -176,6 +235,24 @@
 .imposter-box-done {
   color: var(--type);
   border-color: var(--rule);
+  cursor: pointer;
+}
+
+.imposter-box-done:hover {
+  border-color: var(--type);
+}
+
+.imposter-back-link {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--muted-dim);
+  text-decoration: none;
+  margin-bottom: 1rem;
+}
+
+.imposter-back-link:hover {
+  color: var(--paper);
 }
 
 .imposter-box-active {

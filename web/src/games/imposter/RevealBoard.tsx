@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import {
   runImposterQuery,
   REVEAL_IMPOSTER_WORD_MUTATION,
@@ -76,8 +77,12 @@ export default function RevealBoard({ gameId, players: initialPlayers, onAllReve
 
   return (
     <div className="imposter-board-wrap">
+      <Link to="/imposter" className="imposter-back-link">
+        ← Back to start
+      </Link>
       <p className="section-hint">
         Everyone can go in any order. Tap your name, make sure only you can see the screen, then reveal.
+        Already seen yours? Tap your name again to check it.
       </p>
       <div className="imposter-board">
         {players.map((player) => {
@@ -87,11 +92,10 @@ export default function RevealBoard({ gameId, players: initialPlayers, onAllReve
               key={player.id}
               type="button"
               className={`imposter-box imposter-box-${status}`}
-              disabled={player.hasRevealed}
               onClick={() => openModal(player)}
             >
               <span className="imposter-box-name">{player.name}</span>
-              <span className="imposter-box-status">{status === "done" ? "seen ✓" : "tap to view"}</span>
+              <span className="imposter-box-status">{status === "done" ? "seen ✓ · view again" : "tap to view"}</span>
             </button>
           );
         })}
@@ -108,7 +112,11 @@ export default function RevealBoard({ gameId, players: initialPlayers, onAllReve
                 </p>
                 {error && <p className="status-line">// {error}</p>}
                 <button className="run-btn" type="button" onClick={handleReveal} disabled={revealing}>
-                  {revealing ? "Revealing…" : "Tap to reveal your word"}
+                  {revealing
+                    ? "Revealing…"
+                    : openPlayer.hasRevealed
+                      ? "Tap to view your word again"
+                      : "Tap to reveal your word"}
                 </button>
               </>
             ) : (
