@@ -1,5 +1,6 @@
 import { generateQuery } from "../lib/generate-query";
 import { validateContactInput, CONTACT_CONFIRMATION_MESSAGE, type ContactInput } from "../lib/contact";
+import { estimateLambdaCostUsd } from "../lib/lambda-cost";
 import {
   person,
   interests,
@@ -35,6 +36,99 @@ const MOCK_TRACE_BREAKDOWN = [
   { name: "Anthropic API", startOffsetMs: 18, durationMs: 902 },
   { name: "DynamoDB (usage counter)", startOffsetMs: 922, durationMs: 9 },
 ];
+
+const MOCK_OPERATIONS = [
+  {
+    name: "Resume",
+    count: 54,
+    avgDurationMs: 61.2,
+    lastQuery: "query Resume {\n  person { name }\n  experience { role company }\n}",
+    lastVariables: null,
+    lastTraceId: "mock-trace-resume",
+  },
+  {
+    name: "Hero",
+    count: 41,
+    avgDurationMs: 38.9,
+    lastQuery: "query Hero {\n  person { name }\n  experience { role company isCurrent }\n}",
+    lastVariables: null,
+    lastTraceId: "mock-trace-hero",
+  },
+  {
+    name: "GenerateQuery",
+    count: 17,
+    avgDurationMs: 940.4,
+    lastQuery:
+      "query GenerateQuery($prompt: String!) {\n  meta { generateQuery(prompt: $prompt) { query message } }\n}",
+    lastVariables: JSON.stringify({ prompt: "tell me something fun about peter" }),
+    lastTraceId: "mock-trace-generatequery",
+  },
+  {
+    name: "SystemStats",
+    count: 9,
+    avgDurationMs: 210.6,
+    lastQuery: "query SystemStats {\n  meta { systemStats { requestsTotal } }\n}",
+    lastVariables: null,
+    lastTraceId: "mock-trace-systemstats",
+  },
+  {
+    name: "SendMessage",
+    count: 3,
+    avgDurationMs: 55.0,
+    lastQuery: null,
+    lastVariables: null,
+    lastTraceId: null,
+  },
+];
+
+const MOCK_OPERATIONS_RECENT = [
+  {
+    name: "Resume",
+    count: 12,
+    avgDurationMs: 58.4,
+    lastQuery: "query Resume {\n  person { name }\n  experience { role company }\n}",
+    lastVariables: null,
+    lastTraceId: "mock-trace-resume",
+  },
+  {
+    name: "Hero",
+    count: 9,
+    avgDurationMs: 36.1,
+    lastQuery: "query Hero {\n  person { name }\n  experience { role company isCurrent }\n}",
+    lastVariables: null,
+    lastTraceId: "mock-trace-hero",
+  },
+  {
+    name: "GenerateQuery",
+    count: 4,
+    avgDurationMs: 902.7,
+    lastQuery:
+      "query GenerateQuery($prompt: String!) {\n  meta { generateQuery(prompt: $prompt) { query message } }\n}",
+    lastVariables: JSON.stringify({ prompt: "tell me something fun about peter" }),
+    lastTraceId: "mock-trace-generatequery",
+  },
+  {
+    name: "SystemStats",
+    count: 3,
+    avgDurationMs: 198.2,
+    lastQuery: "query SystemStats {\n  meta { systemStats { requestsTotal } }\n}",
+    lastVariables: null,
+    lastTraceId: "mock-trace-systemstats",
+  },
+];
+
+// Same estimateLambdaCostUsd used by the real resolver, applied to the mock
+// avgDurationMs/count above (totalDurationMs isn't tracked in these mocks, so
+// avgDurationMs * count approximates it) -- keeps dev data honest to the same
+// formula production actually uses instead of another hardcoded guess.
+function withEstimatedCost<T extends { avgDurationMs: number; count: number }>(
+  ops: T[]
+): (T & { estimatedCostUsd: number })[] {
+  return ops.map((op) => ({
+    ...op,
+    estimatedCostUsd: estimateLambdaCostUsd(op.avgDurationMs * op.count, op.count),
+  }));
+}
 
 // Mock resolvers used only by dev/server.ts -- static data, no DynamoDB,
 // CloudWatch, or Anthropic calls (generateQuery is real; everything else is
@@ -72,84 +166,8 @@ export const devResolvers = {
       avgDurationMs: 42.5,
       aiQueriesTotal: 17,
       uniqueVisitorsTotal: 42,
-      operations: [
-        {
-          name: "Resume",
-          count: 54,
-          avgDurationMs: 61.2,
-          lastQuery: "query Resume {\n  person { name }\n  experience { role company }\n}",
-          lastVariables: null,
-          lastTraceId: "mock-trace-resume",
-        },
-        {
-          name: "Hero",
-          count: 41,
-          avgDurationMs: 38.9,
-          lastQuery: "query Hero {\n  person { name }\n  experience { role company isCurrent }\n}",
-          lastVariables: null,
-          lastTraceId: "mock-trace-hero",
-        },
-        {
-          name: "GenerateQuery",
-          count: 17,
-          avgDurationMs: 940.4,
-          lastQuery:
-            "query GenerateQuery($prompt: String!) {\n  meta { generateQuery(prompt: $prompt) { query message } }\n}",
-          lastVariables: JSON.stringify({ prompt: "tell me something fun about peter" }),
-          lastTraceId: "mock-trace-generatequery",
-        },
-        {
-          name: "SystemStats",
-          count: 9,
-          avgDurationMs: 210.6,
-          lastQuery: "query SystemStats {\n  meta { systemStats { requestsTotal } }\n}",
-          lastVariables: null,
-          lastTraceId: "mock-trace-systemstats",
-        },
-        {
-          name: "SendMessage",
-          count: 3,
-          avgDurationMs: 55.0,
-          lastQuery: null,
-          lastVariables: null,
-          lastTraceId: null,
-        },
-      ],
-      operationsLast30Days: [
-        {
-          name: "Resume",
-          count: 12,
-          avgDurationMs: 58.4,
-          lastQuery: "query Resume {\n  person { name }\n  experience { role company }\n}",
-          lastVariables: null,
-          lastTraceId: "mock-trace-resume",
-        },
-        {
-          name: "Hero",
-          count: 9,
-          avgDurationMs: 36.1,
-          lastQuery: "query Hero {\n  person { name }\n  experience { role company isCurrent }\n}",
-          lastVariables: null,
-          lastTraceId: "mock-trace-hero",
-        },
-        {
-          name: "GenerateQuery",
-          count: 4,
-          avgDurationMs: 902.7,
-          lastQuery:
-            "query GenerateQuery($prompt: String!) {\n  meta { generateQuery(prompt: $prompt) { query message } }\n}",
-          lastVariables: JSON.stringify({ prompt: "tell me something fun about peter" }),
-          lastTraceId: "mock-trace-generatequery",
-        },
-        {
-          name: "SystemStats",
-          count: 3,
-          avgDurationMs: 198.2,
-          lastQuery: "query SystemStats {\n  meta { systemStats { requestsTotal } }\n}",
-          lastVariables: null,
-          lastTraceId: "mock-trace-systemstats",
-        },
-      ],
+      operations: withEstimatedCost(MOCK_OPERATIONS),
+      operationsLast30Days: withEstimatedCost(MOCK_OPERATIONS_RECENT),
       requestsByDay: mockRequestsByDay(),
     }),
     traceBreakdown: () => MOCK_TRACE_BREAKDOWN,

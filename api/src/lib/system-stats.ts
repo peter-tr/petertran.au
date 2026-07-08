@@ -1,6 +1,7 @@
 import { CloudWatchClient, GetMetricDataCommand } from "@aws-sdk/client-cloudwatch";
 import { GetCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { ddb, TABLE_NAME } from "./ddb";
+import { estimateLambdaCostUsd } from "./lambda-cost";
 
 const cloudwatch = new CloudWatchClient({});
 
@@ -10,6 +11,7 @@ export interface OperationStats {
   name: string;
   count: number;
   avgDurationMs: number;
+  estimatedCostUsd: number;
   lastQuery: string | null;
   lastVariables: string | null;
   lastTraceId: string | null;
@@ -159,14 +161,18 @@ function newAggregate(): OperationAggregate {
 
 function finalizeAggregate(agg: Map<string, OperationAggregate>): OperationStats[] {
   return Array.from(agg.entries())
-    .map(([name, { count, totalMs, lastQuery, lastVariables, lastTraceId }]) => ({
-      name,
-      count,
-      avgDurationMs: count > 0 ? Math.round((totalMs / count) * 10) / 10 : 0,
-      lastQuery,
-      lastVariables,
-      lastTraceId,
-    }))
+    .map(([name, { count, totalMs, lastQuery, lastVariables, lastTraceId }]) => {
+      const avgDurationMs = count > 0 ? Math.round((totalMs / count) * 10) / 10 : 0;
+      return {
+        name,
+        count,
+        avgDurationMs,
+        estimatedCostUsd: estimateLambdaCostUsd(totalMs, count),
+        lastQuery,
+        lastVariables,
+        lastTraceId,
+      };
+    })
     .sort((a, b) => b.count - a.count)
     .slice(0, MAX_OPERATIONS_SHOWN);
 }

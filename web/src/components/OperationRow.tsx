@@ -6,6 +6,7 @@ import {
   type TraceSegment,
   type TraceBreakdownResult,
 } from "../lib/graphql";
+import { formatCostUsd } from "../lib/format";
 import TraceWaterfall from "./TraceWaterfall";
 import GraphQLCode from "./GraphQLCode";
 
@@ -45,10 +46,11 @@ export default function OperationRow({ op }: { op: OperationStat }) {
         </td>
         <td>{op.count.toLocaleString()}</td>
         <td>{op.avgDurationMs}ms</td>
+        <td>{formatCostUsd(op.estimatedCostUsd)}</td>
       </tr>
       {expanded && (
         <tr className="ops-detail-row">
-          <td colSpan={3}>
+          <td colSpan={4}>
             <div className="ops-detail">
               {op.lastQuery ? (
                 <>

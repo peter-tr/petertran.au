@@ -362,6 +362,15 @@ type OperationStats {
   """
   avgDurationMs: Float!
   """
+  Estimated total AWS Lambda cost of every call to this operation, in USD,
+  derived from its measured total duration and this function's fixed 256MB
+  memory allocation using AWS's published Lambda pricing for ap-southeast-2
+  (this project's region). Covers Lambda compute + invocation cost only - not
+  a real bill line item (AWS doesn't meter at this granularity), and excludes
+  DynamoDB, CloudWatch, and Anthropic costs these calls may also incur.
+  """
+  estimatedCostUsd: Float!
+  """
   The most recent query text run under this operation name. Null for
   mutations (never sampled, to avoid recording contact-form submissions)
   and for operations that predate this field.

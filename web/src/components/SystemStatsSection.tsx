@@ -117,6 +117,9 @@ export default function SystemStatsSection() {
                     <th>operation</th>
                     <th>count</th>
                     <th>avg latency</th>
+                    <th title="Estimated Lambda compute + invocation cost, summed across every call - not a real per-request AWS bill line item.">
+                      est. cost
+                    </th>
                   </tr>
                 </thead>
                 <tbody>

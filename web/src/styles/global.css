@@ -981,7 +981,7 @@ a {
    fixed layout gives up. */
 .ops-table th:first-child,
 .ops-table td:first-child {
-  width: 55%;
+  width: 40%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -989,10 +989,18 @@ a {
 }
 
 .ops-table th:nth-child(2),
-.ops-table td:nth-child(2),
+.ops-table td:nth-child(2) {
+  width: 15%;
+}
+
 .ops-table th:nth-child(3),
 .ops-table td:nth-child(3) {
-  width: 22.5%;
+  width: 20%;
+}
+
+.ops-table th:nth-child(4),
+.ops-table td:nth-child(4) {
+  width: 25%;
 }
 
 .ops-row {

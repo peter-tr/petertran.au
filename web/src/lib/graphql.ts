@@ -138,6 +138,7 @@ export const SYSTEM_STATS_QUERY = /* GraphQL */ `
           name
           count
           avgDurationMs
+          estimatedCostUsd
           lastQuery
           lastVariables
           lastTraceId
@@ -146,6 +147,7 @@ export const SYSTEM_STATS_QUERY = /* GraphQL */ `
           name
           count
           avgDurationMs
+          estimatedCostUsd
           lastQuery
           lastVariables
           lastTraceId
@@ -163,6 +165,7 @@ export interface OperationStat {
   name: string;
   count: number;
   avgDurationMs: number;
+  estimatedCostUsd: number;
   lastQuery: string | null;
   lastVariables: string | null;
   lastTraceId: string | null;
