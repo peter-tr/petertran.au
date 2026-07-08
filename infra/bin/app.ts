@@ -3,6 +3,7 @@ import "source-map-support/register";
 import { App } from "aws-cdk-lib";
 import { CertStack } from "../lib/cert-stack";
 import { SiteStack } from "../lib/site-stack";
+import { GamesStack } from "../lib/games-stack";
 
 const app = new App();
 
@@ -30,4 +31,12 @@ new SiteStack(app, "PetertranSiteStack", {
   hostedZoneName: "petertran.au",
   env: { account, region: "ap-southeast-2" },
   crossRegionReferences: true,
+});
+
+// Games and other misc side-projects - deployed independently of the resume
+// site/API above, with their own Lambda(s) and table.
+new GamesStack(app, "PetertranGamesStack", {
+  domainName,
+  alternateDomainNames,
+  env: { account, region: "ap-southeast-2" },
 });

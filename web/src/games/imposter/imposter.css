@@ -1,0 +1,274 @@
+/* Styles for the Imposter game - deliberately its own stylesheet, separate
+   from the resume site's global.css, since this game is a standalone
+   side-project rather than portfolio content. Reuses the same design
+   tokens (../../styles/tokens.css, loaded globally) for visual consistency. */
+
+.imposter-setup {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  padding-bottom: 3rem;
+}
+
+.imposter-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.imposter-hint {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--muted-dim);
+  margin: 0;
+}
+
+.imposter-category-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.imposter-category-btn {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--muted);
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.9rem;
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.imposter-category-btn:hover {
+  color: var(--paper);
+  border-color: var(--muted);
+}
+
+.imposter-category-btn.active {
+  color: var(--signal);
+  border-color: var(--signal-dim);
+}
+
+.imposter-player-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.imposter-player-row {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.imposter-player-row .form-input {
+  flex: 1;
+}
+
+.imposter-remove-btn {
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  color: var(--muted-dim);
+  background: transparent;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  width: 2.4rem;
+  height: 2.4rem;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.imposter-remove-btn:hover:not(:disabled) {
+  color: var(--string);
+  border-color: var(--string);
+}
+
+.imposter-remove-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.imposter-player-actions {
+  display: flex;
+  gap: 1.2rem;
+}
+
+.imposter-add-btn {
+  align-self: flex-start;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--type);
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.imposter-add-btn:hover:not(:disabled) {
+  color: var(--paper);
+}
+
+.imposter-stepper {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.imposter-stepper-value {
+  font-family: var(--font-mono);
+  font-size: 1.1rem;
+  color: var(--paper);
+  min-width: 1.4rem;
+  text-align: center;
+}
+
+.imposter-add-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* ---------- reveal board ---------- */
+
+.imposter-board-wrap {
+  padding-bottom: 3rem;
+}
+
+.imposter-board {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  gap: 0.8rem;
+  margin-top: 1.2rem;
+}
+
+.imposter-box {
+  font-family: var(--font-mono);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 6rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--rule);
+  background: var(--panel);
+  color: var(--muted-dim);
+  cursor: not-allowed;
+  padding: 0.8rem;
+  text-align: center;
+}
+
+.imposter-box-name {
+  font-size: 0.92rem;
+}
+
+.imposter-box-status {
+  font-size: 0.72rem;
+}
+
+.imposter-box-waiting {
+  opacity: 0.5;
+}
+
+.imposter-box-done {
+  color: var(--type);
+  border-color: var(--rule);
+}
+
+.imposter-box-active {
+  color: var(--signal);
+  border-color: var(--signal-dim);
+  background: var(--panel-2);
+  cursor: pointer;
+  box-shadow: 0 0 0 3px rgba(242, 169, 59, 0.12);
+}
+
+.imposter-box-active:hover {
+  border-color: var(--signal);
+}
+
+.imposter-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(11, 14, 20, 0.82);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  z-index: 50;
+}
+
+.imposter-modal {
+  width: 100%;
+  max-width: 22rem;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 1.8rem 1.5rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.imposter-modal-name {
+  font-family: var(--font-mono);
+  color: var(--paper);
+  font-size: 1.05rem;
+  margin: 0;
+}
+
+.imposter-role-badge {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  color: var(--string);
+  border: 1px solid var(--string);
+  border-radius: var(--radius);
+  padding: 0.3rem 0.7rem;
+  margin: 0;
+}
+
+.imposter-word {
+  font-family: var(--font-mono);
+  font-size: 1.8rem;
+  font-weight: 600;
+  color: var(--signal);
+  margin: 0;
+}
+
+.imposter-word-alt {
+  color: var(--string);
+}
+
+/* ---------- discussion / results ---------- */
+
+.imposter-discussion,
+.imposter-results {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+  padding-bottom: 3rem;
+}
+
+.imposter-results-imposter {
+  font-size: 1.05rem;
+  color: var(--paper);
+}
+
+.imposter-first-player {
+  font-family: var(--font-mono);
+  font-size: 1.1rem;
+  color: var(--signal);
+  margin: 0;
+}
+
+.imposter-results-words {
+  display: flex;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
