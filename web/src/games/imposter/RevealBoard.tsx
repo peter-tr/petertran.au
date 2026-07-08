@@ -36,13 +36,17 @@ export default function RevealBoard({ gameId, players: initialPlayers, onAllReve
 
   function closeModal() {
     setOpenPlayer(null);
-    if (finalGame) {
-      onAllRevealed(finalGame);
-      return;
-    }
     if (revealed && openPlayer) {
       const revealedId = openPlayer.id;
       setPlayers((prev) => prev.map((p) => (p.id === revealedId ? { ...p, hasRevealed: true } : p)));
+    }
+    // The mutation returns the current game on every reveal, not just the
+    // last one -- only hand off to the parent once the phase has actually
+    // moved past REVEAL, otherwise every reveal (not just the final one)
+    // would skip the update above and the box would never turn grey until
+    // a refresh re-fetched the game from scratch.
+    if (finalGame && finalGame.phase !== "REVEAL") {
+      onAllRevealed(finalGame);
     }
   }
 
