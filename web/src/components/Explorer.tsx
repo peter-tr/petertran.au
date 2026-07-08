@@ -55,10 +55,11 @@ mutation ReachOut {
 }`,
   },
   {
-    query: `query Skills {
-  skills(category: "Languages") {
-    category
-    items
+    query: `query Interests {
+  interests {
+    hobbies
+    favoriteFoods
+    favoriteShows
   }
 }`,
   },

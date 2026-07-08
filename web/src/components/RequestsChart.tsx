@@ -41,6 +41,7 @@ export default function RequestsChart({ data }: { data: DailyCount[] }) {
 
   return (
     <div className="requests-chart">
+      <p className="chart-title">requests by day</p>
       <div className="ops-toggle" role="tablist" aria-label="Chart time range">
         <button
           type="button"
@@ -61,7 +62,6 @@ export default function RequestsChart({ data }: { data: DailyCount[] }) {
           last 30 days
         </button>
       </div>
-      <p className="chart-title">requests by day, {rangeLabel}</p>
       <svg
         viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT + AXIS_BAND_HEIGHT}`}
         className="requests-chart-svg"

@@ -79,11 +79,11 @@ export const interests: Interests = {
 export const education: Education[] = [
   {
     institution: "University of Queensland",
-    degree: "Bachelor of Engineering (Honours) & Master of Engineering (Software)",
+    degree: "Bachelor of Software Engineering (Honours) & Master of Software Engineering",
     location: "Brisbane, Australia",
     startDate: "2020-02",
     endDate: "2024-12",
-    honors: "First Class Honours - GPA: 6.35/7",
+    honors: "First Class Honours - GPA: 6.35/7 - Graduated 2024",
   },
 ];
 
