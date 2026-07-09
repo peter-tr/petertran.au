@@ -39,6 +39,7 @@ export interface ShoppingListEntry {
 
 export interface PantrySettings {
   view: string;
+  sort: string;
   simple: boolean;
   optionsCollapsed: boolean;
   collapsedGroups: string[];
@@ -47,6 +48,7 @@ export interface PantrySettings {
 
 interface PantrySettingsInput {
   view?: string;
+  sort?: string;
   simple?: boolean;
   optionsCollapsed?: boolean;
   collapsedGroups?: string[];
@@ -58,6 +60,7 @@ interface PantrySettingsInput {
 // same as before this was moved server-side.
 const DEFAULT_SETTINGS: PantrySettings = {
   view: "location",
+  sort: "recent",
   simple: false,
   optionsCollapsed: false,
   collapsedGroups: [],
@@ -176,9 +179,13 @@ async function addToShoppingListIfMissing(name: string): Promise<ShoppingListEnt
   return entry;
 }
 
+// Merges with DEFAULT_SETTINGS rather than only falling back when nothing's
+// stored at all - a settings row saved before a new field (like `sort`) was
+// added would otherwise come back missing it, tripping the schema's
+// non-null check instead of just quietly defaulting.
 async function getSettings(): Promise<PantrySettings> {
   const res = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { pk: PK, sk: SETTINGS_SK } }));
-  return (res.Item?.data as PantrySettings | undefined) ?? DEFAULT_SETTINGS;
+  return { ...DEFAULT_SETTINGS, ...(res.Item?.data as Partial<PantrySettings> | undefined) };
 }
 
 async function putSettings(settings: PantrySettings): Promise<void> {

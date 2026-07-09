@@ -9,6 +9,7 @@ import type {
 } from "../lib/pantryGraphql";
 
 type ViewMode = "location" | "category" | "expiry" | "all";
+type SortMode = "recent" | "name" | "expiry" | "quantity";
 
 interface Group {
   key: string;
@@ -24,12 +25,38 @@ const LOCATIONS: { key: StorageLocation; label: string }[] = [
 
 const EXPIRY_SOON_DAYS = 7;
 
-function groupItems(items: InventoryItem[], view: ViewMode): Group[] {
+// Applied within every group regardless of view, so "sort by name" still
+// alphabetizes each location/category/expiry bucket rather than only
+// working in the flat "All" view.
+function sortItems(items: InventoryItem[], sort: SortMode): InventoryItem[] {
+  const copy = [...items];
+  switch (sort) {
+    case "name":
+      return copy.sort((a, b) => a.name.localeCompare(b.name));
+    case "expiry":
+      return copy.sort((a, b) => {
+        if (!a.expiresAt && !b.expiresAt) return 0;
+        if (!a.expiresAt) return 1;
+        if (!b.expiresAt) return -1;
+        return a.expiresAt.localeCompare(b.expiresAt);
+      });
+    case "quantity":
+      return copy.sort((a, b) => b.quantity - a.quantity);
+    case "recent":
+    default:
+      return copy.sort((a, b) => b.addedAt.localeCompare(a.addedAt));
+  }
+}
+
+function groupItems(items: InventoryItem[], view: ViewMode, sort: SortMode): Group[] {
   if (view === "location") {
     return LOCATIONS.map(({ key, label }) => ({
       key,
       label,
-      items: items.filter((i) => i.location === key),
+      items: sortItems(
+        items.filter((i) => i.location === key),
+        sort
+      ),
     })).filter((g) => g.items.length > 0);
   }
 
@@ -42,7 +69,7 @@ function groupItems(items: InventoryItem[], view: ViewMode): Group[] {
     }
     return [...byCategory.entries()]
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([key, groupItems]) => ({ key, label: key, items: groupItems }));
+      .map(([key, groupItems]) => ({ key, label: key, items: sortItems(groupItems, sort) }));
   }
 
   if (view === "expiry") {
@@ -54,19 +81,15 @@ function groupItems(items: InventoryItem[], view: ViewMode): Group[] {
       else if (daysBetween(item.expiresAt) <= EXPIRY_SOON_DAYS) soon.push(item);
       else later.push(item);
     }
-    const byExpiry = (a: InventoryItem, b: InventoryItem) =>
-      (a.expiresAt ?? "").localeCompare(b.expiresAt ?? "");
-    soon.sort(byExpiry);
-    later.sort(byExpiry);
     return [
-      { key: "soon", label: "Expiring soon", items: soon },
-      { key: "later", label: "Later", items: later },
-      { key: "none", label: "No expiry date", items: none },
+      { key: "soon", label: "Expiring soon", items: sortItems(soon, sort) },
+      { key: "later", label: "Later", items: sortItems(later, sort) },
+      { key: "none", label: "No expiry date", items: sortItems(none, sort) },
     ].filter((g) => g.items.length > 0);
   }
 
-  // "all" - one flat, alphabetical list.
-  return [{ key: "all", label: "All items", items: [...items].sort((a, b) => a.name.localeCompare(b.name)) }];
+  // "all" - one flat list.
+  return [{ key: "all", label: "All items", items: sortItems(items, sort) }];
 }
 
 const VIEW_LABELS: Record<ViewMode, string> = {
@@ -76,8 +99,19 @@ const VIEW_LABELS: Record<ViewMode, string> = {
   all: "All",
 };
 
+const SORT_LABELS: Record<SortMode, string> = {
+  recent: "Recent",
+  name: "Name",
+  expiry: "Expiry",
+  quantity: "Quantity",
+};
+
 function isViewMode(v: string): v is ViewMode {
   return v in VIEW_LABELS;
+}
+
+function isSortMode(v: string): v is SortMode {
+  return v in SORT_LABELS;
 }
 
 interface PantryInventorySectionProps {
@@ -96,6 +130,7 @@ export default function PantryInventorySection({
   const [error, setError] = useState<string | null>(null);
 
   const view: ViewMode = isViewMode(settings.view) ? settings.view : "location";
+  const sort: SortMode = isSortMode(settings.sort) ? settings.sort : "recent";
   const collapsed = new Set(settings.collapsedGroups);
 
   function toggleGroup(groupKey: string) {
@@ -106,7 +141,7 @@ export default function PantryInventorySection({
     onSettingsChange({ collapsedGroups: [...next] });
   }
 
-  const groups = groupItems(items, view);
+  const groups = groupItems(items, view, sort);
 
   return (
     <section className="pantry-panel">
@@ -134,6 +169,21 @@ export default function PantryInventorySection({
                   onClick={() => onSettingsChange({ view: v })}
                 >
                   {VIEW_LABELS[v]}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="pantry-control-group">
+            <span className="pantry-control-label">Sort by</span>
+            <div className="pantry-view-tabs">
+              {(Object.keys(SORT_LABELS) as SortMode[]).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  className={`pantry-view-tab ${sort === s ? "active" : ""}`}
+                  onClick={() => onSettingsChange({ sort: s })}
+                >
+                  {SORT_LABELS[s]}
                 </button>
               ))}
             </div>

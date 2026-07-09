@@ -178,6 +178,12 @@ type PantrySettings {
   """
   view: String!
   """
+  How items are ordered within each group: "recent" (most recently added
+  first, the default), "name" (A-Z), "expiry" (soonest first, no-expiry
+  items last), or "quantity" (highest first).
+  """
+  sort: String!
+  """
   True for the compact "Simple" item-row display, false for "Details".
   """
   simple: Boolean!
@@ -200,6 +206,7 @@ Input for updating shared pantry settings. Only provided fields are changed.
 """
 input PantrySettingsInput {
   view: String
+  sort: String
   simple: Boolean
   optionsCollapsed: Boolean
   collapsedGroups: [String!]
