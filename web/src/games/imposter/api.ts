@@ -36,6 +36,7 @@ export async function runImposterQuery<T = unknown>(
 
 export type ImposterPhase = "REVEAL" | "DISCUSSION" | "RESULTS";
 export type ImposterWordSource = "BUILTIN" | "AI";
+export type ImposterDifficulty = "NORMAL" | "HARD";
 
 export interface ImposterCategory {
   id: string;
@@ -50,7 +51,7 @@ export interface ImposterPlayer {
 
 export interface ImposterGame {
   gameId: string;
-  categoryLabel: string;
+  categoryLabel: string | null;
   hintEnabled: boolean;
   phase: ImposterPhase;
   players: ImposterPlayer[];
@@ -107,6 +108,8 @@ export const CREATE_IMPOSTER_GAME_MUTATION = /* GraphQL */ `
     $playerNames: [String!]!
     $imposterCount: Int
     $hintEnabled: Boolean
+    $difficulty: ImposterDifficulty
+    $hideCategory: Boolean
   ) {
     createImposterGame(
       wordSource: $wordSource
@@ -115,6 +118,8 @@ export const CREATE_IMPOSTER_GAME_MUTATION = /* GraphQL */ `
       playerNames: $playerNames
       imposterCount: $imposterCount
       hintEnabled: $hintEnabled
+      difficulty: $difficulty
+      hideCategory: $hideCategory
     ) {
       ${IMPOSTER_GAME_FIELDS}
     }
@@ -128,6 +133,8 @@ export interface CreateImposterGameVariables {
   playerNames: string[];
   imposterCount?: number;
   hintEnabled?: boolean;
+  difficulty?: ImposterDifficulty;
+  hideCategory?: boolean;
 }
 
 export interface CreateImposterGameResult {
@@ -160,4 +167,24 @@ export const REVEAL_IMPOSTER_MUTATION = /* GraphQL */ `
 
 export interface RevealImposterResult {
   revealImposter: ImposterGame;
+}
+
+export interface ImposterStats {
+  gamesPlayedTotal: number;
+  gamesCompletedTotal: number;
+  avgGameDurationMs: number;
+}
+
+export const IMPOSTER_STATS_QUERY = /* GraphQL */ `
+  query ImposterStatsQuery {
+    imposterStats {
+      gamesPlayedTotal
+      gamesCompletedTotal
+      avgGameDurationMs
+    }
+  }
+`;
+
+export interface ImposterStatsResult {
+  imposterStats: ImposterStats;
 }

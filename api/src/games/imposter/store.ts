@@ -3,10 +3,6 @@ import { ConditionalCheckFailedException } from "@aws-sdk/client-dynamodb";
 import { ddb, TABLE_NAME } from "../../lib/ddb";
 import { generateGameId, type GameRecord } from "./game";
 
-// Games are short-lived - this just keeps the table tidy rather than
-// supporting any real "resume tomorrow" use case.
-const GAME_TTL_SECONDS = 24 * 60 * 60;
-
 function gameKey(gameId: string) {
   return { pk: `GAME#${gameId}`, sk: "STATE" };
 }
@@ -17,12 +13,7 @@ export async function getGame(gameId: string): Promise<GameRecord | null> {
 }
 
 export async function putGame(game: GameRecord): Promise<void> {
-  await ddb.send(
-    new PutCommand({
-      TableName: TABLE_NAME,
-      Item: { ...gameKey(game.gameId), data: game, ttl: Math.floor(Date.now() / 1000) + GAME_TTL_SECONDS },
-    })
-  );
+  await ddb.send(new PutCommand({ TableName: TABLE_NAME, Item: { ...gameKey(game.gameId), data: game } }));
 }
 
 // Retries on the rare id collision. Takes a synchronous builder (rather than
@@ -35,11 +26,7 @@ export async function createGameWithUniqueId(build: (gameId: string) => GameReco
       await ddb.send(
         new PutCommand({
           TableName: TABLE_NAME,
-          Item: {
-            ...gameKey(game.gameId),
-            data: game,
-            ttl: Math.floor(Date.now() / 1000) + GAME_TTL_SECONDS,
-          },
+          Item: { ...gameKey(game.gameId), data: game },
           ConditionExpression: "attribute_not_exists(pk)",
         })
       );

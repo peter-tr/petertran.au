@@ -7,10 +7,12 @@ import {
   type ImposterCategory,
   type ImposterCategoriesResult,
   type ImposterWordSource,
+  type ImposterDifficulty,
   type CreateImposterGameResult,
 } from "./api";
 import { addRecentGame } from "./recentGamesStore";
 import RecentGames from "./RecentGames";
+import StatsPanel from "./StatsPanel";
 import "./imposter.css";
 
 const MIN_PLAYERS = 3;
@@ -38,8 +40,10 @@ export default function ImposterSetup() {
   const [names, setNames] = useState<string[]>(prefillNames?.length ? prefillNames : ["", "", ""]);
   const [imposterCount, setImposterCount] = useState(1);
   const [imposterCountNotice, setImposterCountNotice] = useState<string | null>(null);
-  const [removePlayerNotice, setRemovePlayerNotice] = useState<string | null>(null);
+  const [playerListNotice, setPlayerListNotice] = useState<string | null>(null);
   const [hintEnabled, setHintEnabled] = useState(true);
+  const [difficulty, setDifficulty] = useState<ImposterDifficulty>("NORMAL");
+  const [hideCategory, setHideCategory] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -66,28 +70,36 @@ export default function ImposterSetup() {
 
   function addPlayer() {
     setImposterCountNotice(null);
-    setRemovePlayerNotice(null);
-    setNames((prev) => (prev.length >= MAX_PLAYERS ? prev : [...prev, ""]));
+    if (names.length >= MAX_PLAYERS) {
+      setPlayerListNotice(`Imposter supports up to ${MAX_PLAYERS} players.`);
+      return;
+    }
+    setPlayerListNotice(null);
+    setNames((prev) => [...prev, ""]);
   }
 
   function removePlayer(index: number) {
     setImposterCountNotice(null);
     if (names.length <= MIN_PLAYERS) {
-      setRemovePlayerNotice(`Imposter needs at least ${MIN_PLAYERS} players.`);
+      setPlayerListNotice(`Imposter needs at least ${MIN_PLAYERS} players.`);
       return;
     }
-    setRemovePlayerNotice(null);
+    setPlayerListNotice(null);
     setNames((prev) => prev.filter((_, i) => i !== index));
   }
 
   function clearNames() {
     setImposterCountNotice(null);
-    setRemovePlayerNotice(null);
+    if (names.every((n) => n.trim() === "")) {
+      setPlayerListNotice("No player names to clear yet.");
+      return;
+    }
+    setPlayerListNotice(null);
     setNames((prev) => prev.map(() => ""));
   }
 
   function incrementImposterCount() {
-    setRemovePlayerNotice(null);
+    setPlayerListNotice(null);
     if (effectiveImposterCount >= maxImposters) {
       setImposterCountNotice(
         `Add more players to allow more imposters (up to ${maxImposters} with ${effectiveNames.length} players).`
@@ -116,6 +128,8 @@ export default function ImposterSetup() {
         playerNames: effectiveNames,
         imposterCount: effectiveImposterCount,
         hintEnabled,
+        difficulty,
+        hideCategory,
       });
       addRecentGame({
         gameId: res.createImposterGame.gameId,
@@ -216,6 +230,31 @@ export default function ImposterSetup() {
         )}
 
         <div className="imposter-field-group">
+          <p className="form-label">Category label</p>
+          <div className="imposter-category-grid">
+            <button
+              type="button"
+              className={`imposter-category-btn ${!hideCategory ? "active" : ""}`}
+              onClick={() => setHideCategory(false)}
+            >
+              Visible
+            </button>
+            <button
+              type="button"
+              className={`imposter-category-btn ${hideCategory ? "active" : ""}`}
+              onClick={() => setHideCategory(true)}
+            >
+              Hidden
+            </button>
+          </div>
+          <p className="imposter-hint">
+            {hideCategory
+              ? "Players won't know the category until results - harder to bluff or catch the imposter."
+              : "Players see the category throughout the game."}
+          </p>
+        </div>
+
+        <div className="imposter-field-group">
           <p className="form-label">
             Players{" "}
             <span className="imposter-hint">
@@ -223,12 +262,7 @@ export default function ImposterSetup() {
             </span>
           </p>
           <div className="imposter-player-actions">
-            <button
-              type="button"
-              className="imposter-add-btn"
-              onClick={addPlayer}
-              disabled={names.length >= MAX_PLAYERS}
-            >
+            <button type="button" className="imposter-add-btn" onClick={addPlayer}>
               + Add player
             </button>
             <button type="button" className="imposter-add-btn" onClick={clearNames}>
@@ -256,7 +290,7 @@ export default function ImposterSetup() {
               </div>
             ))}
           </div>
-          {removePlayerNotice && <p className="imposter-inline-notice">// {removePlayerNotice}</p>}
+          {playerListNotice && <p className="imposter-inline-notice">// {playerListNotice}</p>}
         </div>
 
         <div className="imposter-field-group">
@@ -305,7 +339,39 @@ export default function ImposterSetup() {
               Disabled
             </button>
           </div>
+          <p className="imposter-hint">
+            {hintEnabled
+              ? "The imposter gets a word of their own."
+              : "The imposter gets nothing and has to bluff blind."}
+          </p>
         </div>
+
+        {hintEnabled && (
+          <div className="imposter-field-group">
+            <p className="form-label">Difficulty</p>
+            <div className="imposter-category-grid">
+              <button
+                type="button"
+                className={`imposter-category-btn ${difficulty === "NORMAL" ? "active" : ""}`}
+                onClick={() => setDifficulty("NORMAL")}
+              >
+                Normal
+              </button>
+              <button
+                type="button"
+                className={`imposter-category-btn ${difficulty === "HARD" ? "active" : ""}`}
+                onClick={() => setDifficulty("HARD")}
+              >
+                Hard
+              </button>
+            </div>
+            <p className="imposter-hint">
+              {difficulty === "NORMAL"
+                ? "The imposter's word is closely related - easier to bluff."
+                : "The imposter's word is a bigger stretch - harder to bluff convincingly."}
+            </p>
+          </div>
+        )}
 
         {error && <p className="status-line">// {error}</p>}
 
@@ -313,6 +379,8 @@ export default function ImposterSetup() {
           {submitting ? "Starting…" : "Start game"}
         </button>
       </form>
+
+      <StatsPanel />
     </>
   );
 }

@@ -2,8 +2,10 @@
 // real (DynamoDB-backed) and dev (in-memory) resolvers can share it.
 
 import { randomUUID } from "node:crypto";
-import { WORD_CATEGORIES, findWordCategory, randomPair } from "./words";
+import { WORD_CATEGORIES, findWordCategory, randomPair, type WordDifficulty } from "./words";
 import { generateAiWordPair } from "./ai";
+
+export type { WordDifficulty };
 
 export type ImposterPhase = "REVEAL" | "DISCUSSION" | "RESULTS";
 export type WordSource = "BUILTIN" | "AI";
@@ -17,6 +19,7 @@ export interface GamePlayerRecord {
 export interface GameRecord {
   gameId: string;
   categoryLabel: string;
+  hideCategory: boolean;
   hintEnabled: boolean;
   phase: ImposterPhase;
   players: GamePlayerRecord[];
@@ -28,9 +31,17 @@ export interface GameRecord {
   createdAt: string;
 }
 
+// All-time, anonymized usage stats - see stats.ts (real, DynamoDB-backed) and
+// dev-resolvers.ts (in-memory) for the two implementations.
+export interface ImposterStats {
+  gamesPlayedTotal: number;
+  gamesCompletedTotal: number;
+  avgGameDurationMs: number;
+}
+
 export interface PublicGame {
   gameId: string;
-  categoryLabel: string;
+  categoryLabel: string | null;
   hintEnabled: boolean;
   phase: ImposterPhase;
   players: GamePlayerRecord[];
@@ -81,6 +92,8 @@ export interface NewGameOptions {
   playerNames: string[];
   imposterCount?: number;
   hintEnabled?: boolean;
+  difficulty?: WordDifficulty;
+  hideCategory?: boolean;
 }
 
 // Builds everything about a new game except its gameId, so the caller can
@@ -102,6 +115,7 @@ export async function buildNewGameContent(
   }
 
   const hintEnabled = options.hintEnabled ?? true;
+  const difficulty = options.difficulty ?? "NORMAL";
   const customCategory = options.customCategory?.trim();
   if (customCategory && customCategory.length > MAX_CUSTOM_CATEGORY_LENGTH) {
     throw new Error(`Keep the custom category under ${MAX_CUSTOM_CATEGORY_LENGTH} characters.`);
@@ -112,7 +126,7 @@ export async function buildNewGameContent(
   let categoryLabel: string;
 
   if (options.wordSource === "AI") {
-    const pair = await generateAiWordPair(customCategory, sourceIp);
+    const pair = await generateAiWordPair(customCategory, difficulty, sourceIp);
     civilianWord = pair.civilian;
     imposterWord = pair.imposter;
     // Named by the model itself rather than echoing the user's input verbatim
@@ -123,7 +137,7 @@ export async function buildNewGameContent(
     if (!options.categoryId) throw new Error("A category is required for built-in word pairs.");
     const category = findWordCategory(options.categoryId);
     if (!category) throw new Error(`Unknown category "${options.categoryId}".`);
-    const pair = randomPair(category);
+    const pair = randomPair(category, difficulty);
     civilianWord = pair.civilian;
     imposterWord = pair.imposter;
     categoryLabel = category.label;
@@ -139,18 +153,20 @@ export async function buildNewGameContent(
     civilianWord,
     imposterWord: hintEnabled ? imposterWord : null,
     hintEnabled,
+    hideCategory: options.hideCategory ?? false,
     categoryLabel,
     createdAt: new Date().toISOString(),
   };
 }
 
-// Withholds the word pair and imposter identity until RESULTS, so polling
-// this mid-game can't spoil it for anyone glancing at the network tab.
+// Withholds the word pair, imposter identity, and (if hideCategory is set)
+// the category itself until RESULTS, so polling this mid-game can't spoil
+// anything for anyone glancing at the network tab.
 export function toPublicGame(game: GameRecord): PublicGame {
   const revealed = game.phase === "RESULTS";
   return {
     gameId: game.gameId,
-    categoryLabel: game.categoryLabel,
+    categoryLabel: !game.hideCategory || revealed ? game.categoryLabel : null,
     hintEnabled: game.hintEnabled,
     phase: game.phase,
     players: game.players,

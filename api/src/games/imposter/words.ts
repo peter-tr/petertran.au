@@ -1,24 +1,29 @@
 // Word pairs for the Imposter party game. Every player but one gets
-// `civilian`; the odd one out gets `imposter` - close enough to the same
-// idea that a sharp imposter can bluff, distinct enough that a careless one
-// gets caught in discussion.
+// `civilian`; the odd one out gets `imposter`. Each category has two tiers:
+// `normalPairs` are close enough that a sharp imposter can bluff without much
+// effort (e.g. "Coffee" vs "Tea"); `hardPairs` still fit the same category
+// but are a genuine, lateral-thinking leap to connect (e.g. "Coffee" vs
+// "Popcorn") - not just "a different item from the same shelf".
 
 export interface WordPair {
   civilian: string;
   imposter: string;
 }
 
+export type WordDifficulty = "NORMAL" | "HARD";
+
 export interface WordCategory {
   id: string;
   label: string;
-  pairs: WordPair[];
+  normalPairs: WordPair[];
+  hardPairs: WordPair[];
 }
 
 export const WORD_CATEGORIES: WordCategory[] = [
   {
     id: "food-drink",
     label: "Food & Drink",
-    pairs: [
+    normalPairs: [
       { civilian: "Coffee", imposter: "Tea" },
       { civilian: "Pizza", imposter: "Burger" },
       { civilian: "Sushi", imposter: "Ramen" },
@@ -35,11 +40,23 @@ export const WORD_CATEGORIES: WordCategory[] = [
       { civilian: "Hot Dog", imposter: "Sausage Roll" },
       { civilian: "Cheese", imposter: "Butter" },
     ],
+    hardPairs: [
+      { civilian: "Coffee", imposter: "Popcorn" },
+      { civilian: "Pizza", imposter: "Ice Cream" },
+      { civilian: "Sushi", imposter: "Pancakes" },
+      { civilian: "Steak", imposter: "Donut" },
+      { civilian: "Wine", imposter: "Milkshake" },
+      { civilian: "Chocolate", imposter: "Salad" },
+      { civilian: "Bread", imposter: "Sushi" },
+      { civilian: "Cheese", imposter: "Smoothie" },
+      { civilian: "Taco", imposter: "Cake" },
+      { civilian: "Soup", imposter: "Donut" },
+    ],
   },
   {
     id: "animals",
     label: "Animals",
-    pairs: [
+    normalPairs: [
       { civilian: "Cat", imposter: "Dog" },
       { civilian: "Lion", imposter: "Tiger" },
       { civilian: "Horse", imposter: "Donkey" },
@@ -56,11 +73,23 @@ export const WORD_CATEGORIES: WordCategory[] = [
       { civilian: "Camel", imposter: "Llama" },
       { civilian: "Butterfly", imposter: "Moth" },
     ],
+    hardPairs: [
+      { civilian: "Elephant", imposter: "Butterfly" },
+      { civilian: "Shark", imposter: "Owl" },
+      { civilian: "Snake", imposter: "Peacock" },
+      { civilian: "Whale", imposter: "Bee" },
+      { civilian: "Kangaroo", imposter: "Penguin" },
+      { civilian: "Dolphin", imposter: "Spider" },
+      { civilian: "Tiger", imposter: "Turtle" },
+      { civilian: "Bee", imposter: "Camel" },
+      { civilian: "Horse", imposter: "Octopus" },
+      { civilian: "Fox", imposter: "Whale" },
+    ],
   },
   {
     id: "places",
     label: "Places",
-    pairs: [
+    normalPairs: [
       { civilian: "Beach", imposter: "Desert" },
       { civilian: "Mountain", imposter: "Hill" },
       { civilian: "City", imposter: "Town" },
@@ -77,11 +106,23 @@ export const WORD_CATEGORIES: WordCategory[] = [
       { civilian: "Cave", imposter: "Tunnel" },
       { civilian: "Village", imposter: "Suburb" },
     ],
+    hardPairs: [
+      { civilian: "Airport", imposter: "Cave" },
+      { civilian: "School", imposter: "Beach" },
+      { civilian: "City", imposter: "Farm" },
+      { civilian: "Hospital", imposter: "Forest" },
+      { civilian: "Castle", imposter: "Airport" },
+      { civilian: "Park", imposter: "Hospital" },
+      { civilian: "Village", imposter: "Museum" },
+      { civilian: "Mountain", imposter: "School" },
+      { civilian: "Farm", imposter: "Museum" },
+      { civilian: "Desert", imposter: "Park" },
+    ],
   },
   {
     id: "occupations",
     label: "Occupations",
-    pairs: [
+    normalPairs: [
       { civilian: "Doctor", imposter: "Nurse" },
       { civilian: "Teacher", imposter: "Professor" },
       { civilian: "Police Officer", imposter: "Security Guard" },
@@ -98,11 +139,23 @@ export const WORD_CATEGORIES: WordCategory[] = [
       { civilian: "Dentist", imposter: "Surgeon" },
       { civilian: "Journalist", imposter: "Blogger" },
     ],
+    hardPairs: [
+      { civilian: "Chef", imposter: "Judge" },
+      { civilian: "Teacher", imposter: "Sailor" },
+      { civilian: "Lawyer", imposter: "Photographer" },
+      { civilian: "Actor", imposter: "Firefighter" },
+      { civilian: "Photographer", imposter: "Farmer" },
+      { civilian: "Journalist", imposter: "Pilot" },
+      { civilian: "Police Officer", imposter: "Baker" },
+      { civilian: "Nurse", imposter: "Director" },
+      { civilian: "Judge", imposter: "Waiter" },
+      { civilian: "Waiter", imposter: "Soldier" },
+    ],
   },
   {
     id: "movies-tv",
     label: "Movies & TV",
-    pairs: [
+    normalPairs: [
       { civilian: "Superhero Movie", imposter: "Action Movie" },
       { civilian: "Comedy", imposter: "Sitcom" },
       { civilian: "Horror Movie", imposter: "Thriller" },
@@ -116,11 +169,23 @@ export const WORD_CATEGORIES: WordCategory[] = [
       { civilian: "Rom-Com", imposter: "Drama Film" },
       { civilian: "Western", imposter: "War Movie" },
     ],
+    hardPairs: [
+      { civilian: "Documentary", imposter: "Musical" },
+      { civilian: "Horror Movie", imposter: "Talk Show" },
+      { civilian: "Musical", imposter: "Cartoon" },
+      { civilian: "Sci-Fi Movie", imposter: "News" },
+      { civilian: "Western", imposter: "Game Show" },
+      { civilian: "Comedy", imposter: "War Movie" },
+      { civilian: "Reality Show", imposter: "Anime" },
+      { civilian: "Podcast", imposter: "Opera" },
+      { civilian: "Talk Show", imposter: "Thriller" },
+      { civilian: "Opera", imposter: "Western" },
+    ],
   },
   {
     id: "sports-games",
     label: "Sports & Games",
-    pairs: [
+    normalPairs: [
       { civilian: "Soccer", imposter: "Rugby" },
       { civilian: "Basketball", imposter: "Netball" },
       { civilian: "Tennis", imposter: "Badminton" },
@@ -137,11 +202,23 @@ export const WORD_CATEGORIES: WordCategory[] = [
       { civilian: "Surfing", imposter: "Skateboarding" },
       { civilian: "Marathon", imposter: "Triathlon" },
     ],
+    hardPairs: [
+      { civilian: "Chess", imposter: "Surfing" },
+      { civilian: "Golf", imposter: "Wrestling" },
+      { civilian: "Poker", imposter: "Skiing" },
+      { civilian: "Darts", imposter: "Marathon" },
+      { civilian: "Tennis", imposter: "Bowling" },
+      { civilian: "Skiing", imposter: "Chess" },
+      { civilian: "Basketball", imposter: "Darts" },
+      { civilian: "Cricket", imposter: "Volleyball" },
+      { civilian: "Bowling", imposter: "Cycling" },
+      { civilian: "Running", imposter: "Poker" },
+    ],
   },
   {
     id: "everyday-objects",
     label: "Everyday Objects",
-    pairs: [
+    normalPairs: [
       { civilian: "Phone", imposter: "Tablet" },
       { civilian: "Laptop", imposter: "Desktop" },
       { civilian: "Backpack", imposter: "Suitcase" },
@@ -158,6 +235,18 @@ export const WORD_CATEGORIES: WordCategory[] = [
       { civilian: "Keyboard", imposter: "Mouse" },
       { civilian: "Headphones", imposter: "Earphones" },
     ],
+    hardPairs: [
+      { civilian: "Umbrella", imposter: "Keyboard" },
+      { civilian: "Wallet", imposter: "Mirror" },
+      { civilian: "Mirror", imposter: "Blanket" },
+      { civilian: "Chair", imposter: "Wallet" },
+      { civilian: "Watch", imposter: "Sofa" },
+      { civilian: "Pen", imposter: "Umbrella" },
+      { civilian: "Laptop", imposter: "Candle" },
+      { civilian: "Sunglasses", imposter: "Chair" },
+      { civilian: "Suitcase", imposter: "Pen" },
+      { civilian: "Clock", imposter: "Mouse" },
+    ],
   },
 ];
 
@@ -165,6 +254,7 @@ export function findWordCategory(categoryId: string): WordCategory | undefined {
   return WORD_CATEGORIES.find((c) => c.id === categoryId);
 }
 
-export function randomPair(category: WordCategory): WordPair {
-  return category.pairs[Math.floor(Math.random() * category.pairs.length)];
+export function randomPair(category: WordCategory, difficulty: WordDifficulty): WordPair {
+  const pairs = difficulty === "HARD" ? category.hardPairs : category.normalPairs;
+  return pairs[Math.floor(Math.random() * pairs.length)];
 }

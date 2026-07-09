@@ -8,17 +8,15 @@
 
 export interface RecentGame {
   gameId: string;
-  categoryLabel: string;
+  categoryLabel: string | null;
   playerNames: string[];
   createdAt: string; // ISO
 }
 
 const STORAGE_KEY = "imposter:recent-games";
+// Games are kept forever server-side now, so there's no expiry to prune
+// against here - just cap how many of your own past games this list shows.
 const MAX_ENTRIES = 20;
-// Mirrors GAME_TTL_SECONDS in api/src/games/imposter/store.ts -- once a game
-// has aged past this, the server has already expired it via DynamoDB TTL, so
-// there's no point showing a "Continue" that can only 404.
-const GAME_TTL_MS = 24 * 60 * 60 * 1000;
 
 function readAll(): RecentGame[] {
   try {
@@ -42,9 +40,7 @@ function writeAll(games: RecentGame[]): void {
 }
 
 export function getRecentGames(): RecentGame[] {
-  const now = Date.now();
-  const fresh = readAll().filter((g) => now - new Date(g.createdAt).getTime() < GAME_TTL_MS);
-  return fresh.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  return readAll().sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
 export function addRecentGame(game: RecentGame): void {
