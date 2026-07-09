@@ -1144,6 +1144,570 @@ a {
   }
 }
 
+/* ---------- pantry ---------- */
+
+.pantry-head {
+  padding: 1.4rem 0 0.9rem;
+}
+
+.pantry-head h1 {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 1.4rem;
+  margin: 0;
+}
+
+.pantry-panel {
+  margin-bottom: 1.3rem;
+}
+
+.pantry-panel-title {
+  font-family: var(--font-sans);
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--paper);
+  margin-bottom: 0.5rem;
+}
+
+.pantry-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.8rem;
+  margin-bottom: 0.6rem;
+}
+
+.pantry-panel-header .pantry-panel-title {
+  margin-bottom: 0;
+}
+
+.pantry-panel-header-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 1.6rem;
+  margin-bottom: 0.6rem;
+}
+
+.pantry-control-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.pantry-control-label {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--muted-dim);
+  white-space: nowrap;
+}
+
+.pantry-view-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.pantry-view-tab {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--muted);
+  background: none;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  padding: 0.2rem 0.6rem;
+  cursor: pointer;
+}
+
+.pantry-view-tab:hover {
+  color: var(--type);
+  border-color: var(--type);
+}
+
+.pantry-view-tab.active {
+  color: var(--ink);
+  background: var(--type);
+  border-color: var(--type);
+}
+
+.pantry-quick-add {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 0.3rem;
+}
+
+.pantry-quick-add input,
+.pantry-quick-add select {
+  padding: 0.4rem 0.55rem;
+}
+
+.pantry-quick-add-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.pantry-quick-add-unit {
+  width: 4rem;
+}
+
+.pantry-quick-add-location {
+  width: 6rem;
+}
+
+.pantry-quick-add-price {
+  width: 4.5rem;
+}
+
+/* ---------- quantity stepper (add form, common-item picker, item rows) ---------- */
+
+.qty-stepper {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.qty-stepper-btn {
+  width: 1.5rem;
+  height: 1.5rem;
+  line-height: 1;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--muted);
+  background: var(--panel-2);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.qty-stepper-btn:hover {
+  color: var(--type);
+  border-color: var(--type);
+}
+
+.qty-stepper-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.qty-stepper-input {
+  width: 3.2rem;
+  padding: 0.2rem 0.2rem;
+  background: var(--panel-2);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  color: var(--paper);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  text-align: center;
+  /* Redundant with the −/+ buttons either side, and on some browsers made
+     the field narrower than it needs to be for typing multi-digit values. */
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.qty-stepper-input::-webkit-outer-spin-button,
+.qty-stepper-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* ---------- shopping list ---------- */
+
+.pantry-shopping-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.pantry-shopping-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--panel);
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  color: var(--paper);
+}
+
+/* ---------- common items ---------- */
+
+.pantry-common-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+
+.pantry-common-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.3rem;
+}
+
+.pantry-common-item-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  color: var(--muted);
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  padding: 0.3rem 0.5rem 0.3rem 0.7rem;
+  cursor: pointer;
+}
+
+.pantry-common-item-btn:hover {
+  color: var(--type);
+  border-color: var(--type);
+}
+
+.pantry-common-item-delete {
+  color: var(--muted-dim);
+  font-size: 0.9rem;
+  line-height: 1;
+  padding: 0 0.15rem;
+}
+
+.pantry-common-item-delete:hover {
+  color: var(--string);
+}
+
+.pantry-common-item-picker {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--panel-2);
+}
+
+.pantry-common-item-unit {
+  width: 4.5rem;
+  padding: 0.3rem 0.4rem;
+}
+
+.pantry-inline-add {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  max-width: 26rem;
+}
+
+.pantry-inline-add .form-input {
+  flex: 1;
+  min-width: 8rem;
+  padding: 0.35rem 0.55rem;
+}
+
+.pantry-details-toggle {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: var(--muted);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.pantry-details-toggle:hover {
+  color: var(--type);
+}
+
+.pantry-details-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem 0.7rem;
+  margin-top: 0.5rem;
+  max-width: 36rem;
+}
+
+.pantry-details-grid .form-row {
+  gap: 0.2rem;
+}
+
+.pantry-details-grid .form-input {
+  padding: 0.4rem 0.55rem;
+}
+
+.pantry-staple-row {
+  grid-column: 1 / -1;
+}
+
+.pantry-staple-row .form-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+}
+
+.pantry-location-group {
+  margin-bottom: 0.9rem;
+}
+
+.pantry-location-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--type);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.3rem;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.pantry-collapse-caret {
+  color: var(--muted-dim);
+  width: 0.7rem;
+}
+
+.pantry-group-count {
+  color: var(--muted-dim);
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.pantry-item-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+/* Fixed-width name column (not content-sized) so the meta text and controls
+   line up at the same x position on every row, regardless of how long any
+   given item's name is. */
+.pantry-item-row {
+  display: grid;
+  grid-template-columns: 9rem 1fr auto;
+  grid-template-areas: "info meta controls";
+  align-items: center;
+  column-gap: 1.1rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--panel);
+}
+
+.pantry-item-info {
+  grid-area: info;
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.pantry-item-name {
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  color: var(--paper);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  border-bottom: 1px dashed transparent;
+}
+
+.pantry-item-name:hover {
+  border-bottom-color: var(--muted-dim);
+}
+
+.pantry-item-name-input {
+  width: 100%;
+  background: var(--panel-2);
+  border: 1px solid var(--type);
+  border-radius: 4px;
+  padding: 0.1rem 0.3rem;
+  color: var(--paper);
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+}
+
+.pantry-item-category {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--muted-dim);
+  flex-shrink: 0;
+}
+
+.pantry-staple-toggle {
+  flex-shrink: 0;
+  font-size: 0.8rem;
+  line-height: 1;
+  color: var(--rule);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.pantry-staple-toggle:hover {
+  color: var(--signal-dim);
+}
+
+.pantry-staple-toggle.active {
+  color: var(--signal);
+}
+
+.pantry-item-meta {
+  grid-area: meta;
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pantry-item-meta:disabled {
+  cursor: default;
+}
+
+.pantry-item-meta:hover:not(:disabled) {
+  color: var(--type);
+}
+
+.pantry-purchase-history {
+  grid-column: 1 / -1;
+  margin: 0.3rem 0 0;
+  padding-left: 1.2rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--muted-dim);
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.pantry-item-controls {
+  grid-area: controls;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-self: end;
+}
+
+/* Simple density: flat name + controls row, no grid areas, nothing else. */
+.pantry-item-row.pantry-item-row-simple {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.pantry-item-row-simple .pantry-item-name {
+  cursor: default;
+  border-bottom: none;
+}
+
+.pantry-delete-btn {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--muted);
+  background: none;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 0.25rem 0.45rem;
+  cursor: pointer;
+}
+
+.pantry-delete-btn:hover {
+  color: var(--string);
+  border-color: var(--string);
+}
+
+.pantry-delete-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+@media (max-width: 640px) {
+  .pantry-head {
+    padding: 1rem 0 0.6rem;
+  }
+
+  .pantry-details-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  /* This got dropped in a later rewrite - without it, the whole quick-add
+     row (name, stepper, unit, location, price, button) was forced onto one
+     unreadably squashed line instead of wrapping. */
+  .pantry-quick-add {
+    flex-wrap: wrap;
+  }
+
+  .pantry-quick-add-name {
+    flex-basis: 100%;
+  }
+
+  .pantry-quick-add-unit {
+    width: 3.4rem;
+  }
+
+  .pantry-quick-add-location {
+    width: 5rem;
+  }
+
+  .pantry-quick-add-price {
+    width: 3.6rem;
+  }
+
+  .pantry-item-row {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "info"
+      "meta"
+      "controls";
+    row-gap: 0.35rem;
+    padding: 0.5rem 0.6rem;
+  }
+
+  .pantry-item-info {
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+
+  .pantry-item-name {
+    overflow: visible;
+    white-space: normal;
+    word-break: break-word;
+  }
+
+  .pantry-item-meta {
+    text-align: left;
+    white-space: normal;
+    overflow: visible;
+  }
+
+  .pantry-item-controls {
+    justify-self: stretch;
+    justify-content: space-between;
+  }
+
+  .pantry-common-item-picker {
+    flex-wrap: wrap;
+  }
+}
+
 /* ---------- states ---------- */
 
 .status-line {

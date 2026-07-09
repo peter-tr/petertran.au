@@ -4,10 +4,12 @@ import Nav from "./components/Nav";
 import { useResumeData } from "./hooks/useResumeData";
 
 // Lazy-loaded per route so each one only downloads what it needs - Home
-// alone pulls in GraphiQL/Monaco (several MB), which the Imposter game (and
-// every other route) has no reason to fetch just to render.
+// alone pulls in GraphiQL/Monaco (several MB), which side-projects like
+// Imposter and Pantry (and every other route) have no reason to fetch just
+// to render.
 const Home = lazy(() => import("./pages/Home"));
 const Resume = lazy(() => import("./pages/Resume"));
+const Pantry = lazy(() => import("./pages/Pantry"));
 const ImposterSetup = lazy(() => import("./games/imposter/Setup"));
 const ImposterGame = lazy(() => import("./games/imposter/Game"));
 
@@ -31,13 +33,16 @@ function ScrollManager() {
   return null;
 }
 
-// The Imposter game is a standalone side-project, not portfolio content -
-// it gets a bare wordmark instead of the full site nav (resume/query/contact
-// links) so it doesn't read as part of the resume site itself.
+// Standalone side-projects, not portfolio content - each gets a bare
+// wordmark instead of the full site nav (resume/query/contact links) so
+// they don't read as part of the resume site itself.
+const STANDALONE_ROUTE_PREFIXES = ["/imposter", "/pantry"];
+
 function AppNav() {
   const location = useLocation();
+  const isStandalone = STANDALONE_ROUTE_PREFIXES.some((prefix) => location.pathname.startsWith(prefix));
 
-  if (location.pathname.startsWith("/imposter")) {
+  if (isStandalone) {
     return (
       <nav className="nav">
         <div className="nav-inner">
@@ -64,6 +69,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Home data={data} error={error} />} />
             <Route path="/resume" element={<Resume data={data} error={error} />} />
+            <Route path="/pantry" element={<Pantry />} />
             <Route path="/imposter" element={<ImposterSetup />} />
             <Route path="/imposter/:gameId" element={<ImposterGame />} />
           </Routes>

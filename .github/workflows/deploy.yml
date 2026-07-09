@@ -29,12 +29,15 @@ jobs:
       - name: Build API
         run: npm run build --workspace=api
 
-      - name: Deploy infrastructure
-        working-directory: infra
-        run: npx cdk deploy --all --require-approval never
+      - name: Build Pantry API
+        run: npm run build --workspace=pantry-api
 
       - name: Build frontend
         run: npm run build --workspace=web
+
+      - name: Deploy infrastructure
+        working-directory: infra
+        run: npx cdk deploy --all --require-approval never
 
       - name: Sync frontend to S3
         run: |

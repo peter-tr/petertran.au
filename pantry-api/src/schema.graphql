@@ -1,0 +1,274 @@
+"""
+Where an inventory item is physically stored.
+"""
+enum StorageLocation {
+  FRIDGE
+  FREEZER
+  PANTRY
+}
+
+"""
+A single purchase batch logged against an inventory item. Kept even after
+the item's current quantity changes, so "bought 3 on the 1st, 2 more on the
+9th" is still visible even though the two batches are now one row.
+"""
+type Purchase {
+  """
+  Date this batch was purchased, formatted YYYY-MM-DD.
+  """
+  date: String!
+  """
+  Price paid for this batch, in AUD. Null if unknown.
+  """
+  price: Float
+  """
+  Quantity purchased in this batch.
+  """
+  quantity: Float!
+}
+
+"""
+A single item currently tracked in stock - fridge, freezer, or pantry.
+"""
+type InventoryItem {
+  """
+  Unique identifier.
+  """
+  id: ID!
+  """
+  Item name, e.g. "Milk" or "Chicken breast".
+  """
+  name: String!
+  """
+  Freeform grouping, e.g. "Dairy" or "Produce". Null if uncategorized.
+  """
+  category: String
+  """
+  Where this item is stored.
+  """
+  location: StorageLocation!
+  """
+  How much is currently on hand.
+  """
+  quantity: Float!
+  """
+  Unit the quantity is measured in, e.g. "g", "L", "pcs". Null if unspecified.
+  """
+  unit: String
+  """
+  Price paid on the most recent purchase, in AUD. Null if unknown.
+  """
+  price: Float
+  """
+  Date of the most recent purchase, formatted YYYY-MM-DD. Null if unknown.
+  """
+  purchasedAt: String
+  """
+  Date this item is expected to expire, formatted YYYY-MM-DD. Null if unknown.
+  """
+  expiresAt: String
+  """
+  True for staple items you always want to keep stocked (salt, oil, eggs,
+  milk...). When a staple runs out, it's added to the shopping list instead
+  of just disappearing.
+  """
+  isStaple: Boolean!
+  """
+  Every purchase batch logged for this item, oldest first. `quantity` /
+  `purchasedAt` / `price` above always reflect the current total and most
+  recent batch - this is the full history behind them.
+  """
+  purchases: [Purchase!]!
+  """
+  Timestamp this row was first created, ISO 8601.
+  """
+  addedAt: String!
+  """
+  Timestamp this row was last modified, ISO 8601.
+  """
+  updatedAt: String!
+}
+
+"""
+Input for adding a new inventory item.
+"""
+input AddInventoryItemInput {
+  """
+  Item name, e.g. "Milk" or "Chicken breast".
+  """
+  name: String!
+  """
+  Freeform grouping, e.g. "Dairy" or "Produce".
+  """
+  category: String
+  """
+  Where this item is stored.
+  """
+  location: StorageLocation!
+  """
+  How much is on hand.
+  """
+  quantity: Float!
+  """
+  Unit the quantity is measured in, e.g. "g", "L", "pcs".
+  """
+  unit: String
+  """
+  Price paid for this item, in AUD.
+  """
+  price: Float
+  """
+  Date this item was purchased, formatted YYYY-MM-DD.
+  """
+  purchasedAt: String
+  """
+  Date this item is expected to expire, formatted YYYY-MM-DD.
+  """
+  expiresAt: String
+  """
+  True to mark this a staple item you always want to keep stocked. Defaults
+  to false.
+  """
+  isStaple: Boolean
+}
+
+"""
+Input for updating an existing inventory item. Only provided fields are changed.
+"""
+input UpdateInventoryItemInput {
+  name: String
+  category: String
+  location: StorageLocation
+  quantity: Float
+  unit: String
+  price: Float
+  purchasedAt: String
+  expiresAt: String
+  isStaple: Boolean
+}
+
+"""
+An item that ran out and needs buying - added automatically when a staple
+item (see InventoryItem.isStaple) is fully removed from inventory.
+"""
+type ShoppingListEntry {
+  """
+  Unique identifier.
+  """
+  id: ID!
+  """
+  Name of the item that needs buying.
+  """
+  name: String!
+  """
+  Timestamp this entry was added, ISO 8601.
+  """
+  addedAt: String!
+}
+
+"""
+Shared display/view preferences for the pantry page. There's no per-user
+login here, so these are simply global - one setting shared by everyone who
+visits, so a change made on one device shows up everywhere.
+"""
+type PantrySettings {
+  """
+  Which grouping the Inventory list is currently viewed by: "location",
+  "category", "expiry", or "all".
+  """
+  view: String!
+  """
+  True for the compact "Simple" item-row display, false for "Details".
+  """
+  simple: Boolean!
+  """
+  True if the Inventory panel's Group-by/Show controls are collapsed.
+  """
+  optionsCollapsed: Boolean!
+  """
+  Which groups (formatted "<view>:<groupKey>") are currently collapsed.
+  """
+  collapsedGroups: [String!]!
+  """
+  The user-curated quick-add list shown in Common Items.
+  """
+  commonItems: [String!]!
+}
+
+"""
+Input for updating shared pantry settings. Only provided fields are changed.
+"""
+input PantrySettingsInput {
+  view: String
+  simple: Boolean
+  optionsCollapsed: Boolean
+  collapsedGroups: [String!]
+  commonItems: [String!]
+}
+
+"""
+Read-only entry point into pantry/fridge inventory.
+"""
+type Query {
+  """
+  Items currently in stock, most recently added first. Optionally filter to
+  a single storage location.
+  """
+  inventory(location: StorageLocation): [InventoryItem!]!
+  """
+  A single inventory item by ID. Null if it doesn't exist.
+  """
+  inventoryItem(id: ID!): InventoryItem
+  """
+  Staple items that have run out and need buying, oldest first.
+  """
+  shoppingList: [ShoppingListEntry!]!
+  """
+  Shared display/view preferences - see PantrySettings.
+  """
+  settings: PantrySettings!
+}
+
+"""
+Write operations for pantry/fridge inventory.
+"""
+type Mutation {
+  """
+  Add a new inventory item as its own row, even if one with a matching name
+  already exists. Most callers want `recordPurchase` instead.
+  """
+  addInventoryItem(input: AddInventoryItemInput!): InventoryItem!
+  """
+  Adds an item - or, if one with a matching name (case, whitespace, and
+  simple plurals normalized away, e.g. "egg"/"Eggs"/"EGG " all match) already
+  exists in the same location, folds the new quantity into it and logs this
+  as an additional purchase batch instead of creating a duplicate row.
+  """
+  recordPurchase(input: AddInventoryItemInput!): InventoryItem!
+  """
+  Update an existing inventory item. Only provided fields are changed.
+  """
+  updateInventoryItem(id: ID!, input: UpdateInventoryItemInput!): InventoryItem!
+  """
+  Remove an inventory item, e.g. once it's used up. If it's a staple
+  (isStaple: true), it's added to the shopping list first. Returns true if a
+  row was actually deleted.
+  """
+  removeInventoryItem(id: ID!): Boolean!
+  """
+  Manually add an item to the shopping list - e.g. something you remembered
+  you need that isn't a staple currently tracked in inventory. Matches by the
+  same normalized-name rule as recordPurchase, so it won't duplicate an
+  entry that's already on the list.
+  """
+  addToShoppingList(name: String!): ShoppingListEntry!
+  """
+  Remove an entry from the shopping list, e.g. once it's been bought.
+  Returns true if a row was actually deleted.
+  """
+  removeFromShoppingList(id: ID!): Boolean!
+  """
+  Update shared pantry settings. Only provided fields are changed.
+  """
+  updateSettings(input: PantrySettingsInput!): PantrySettings!
+}

@@ -4,6 +4,7 @@ import { App } from "aws-cdk-lib";
 import { CertStack } from "../lib/cert-stack";
 import { SiteStack } from "../lib/site-stack";
 import { GamesStack } from "../lib/games-stack";
+import { PantryStack } from "../lib/pantry-stack";
 
 const app = new App();
 
@@ -36,6 +37,13 @@ new SiteStack(app, "PetertranSiteStack", {
 // Games and other misc side-projects - deployed independently of the resume
 // site/API above, with their own Lambda(s) and table.
 new GamesStack(app, "PetertranGamesStack", {
+  domainName,
+  alternateDomainNames,
+  env: { account, region: "ap-southeast-2" },
+});
+// Separate service from the resume site above - own table, own Lambda, own
+// Function URL, own schema. See infra/lib/pantry-stack.ts for why.
+new PantryStack(app, "PetertranPantryStack", {
   domainName,
   alternateDomainNames,
   env: { account, region: "ap-southeast-2" },
