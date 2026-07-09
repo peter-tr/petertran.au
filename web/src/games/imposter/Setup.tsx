@@ -9,7 +9,7 @@ import {
   type ImposterWordSource,
   type CreateImposterGameResult,
 } from "./api";
-import { addRecentGame } from "./recentGames";
+import { addRecentGame } from "./recentGamesStore";
 import RecentGames from "./RecentGames";
 import "./imposter.css";
 
@@ -98,7 +98,8 @@ export default function ImposterSetup() {
     setImposterCount(effectiveImposterCount + 1);
   }
 
-  const canSubmit = !submitting && names.length >= MIN_PLAYERS && (wordSource === "AI" || categoryId !== null);
+  const canSubmit =
+    !submitting && names.length >= MIN_PLAYERS && (wordSource === "AI" || categoryId !== null);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -110,7 +111,8 @@ export default function ImposterSetup() {
       const res = await runImposterQuery<CreateImposterGameResult>(CREATE_IMPOSTER_GAME_MUTATION, {
         wordSource,
         categoryId: wordSource === "BUILTIN" ? categoryId : undefined,
-        customCategory: wordSource === "AI" && aiThemeMode === "custom" ? customCategory.trim() || undefined : undefined,
+        customCategory:
+          wordSource === "AI" && aiThemeMode === "custom" ? customCategory.trim() || undefined : undefined,
         playerNames: effectiveNames,
         imposterCount: effectiveImposterCount,
         hintEnabled,
@@ -134,8 +136,8 @@ export default function ImposterSetup() {
         <p className="eyebrow">one shared device, one word each</p>
         <h1>Imposter</h1>
         <p className="tagline">
-          Everyone gets the same secret word - except the imposter(s), who get something close but
-          different. Pass the device around, discuss out loud, and vote out whoever seems off.
+          Everyone gets the same secret word - except the imposter(s), who get something close but different.
+          Pass the device around, discuss out loud, and vote out whoever seems off.
         </p>
       </header>
 

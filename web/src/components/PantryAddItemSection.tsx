@@ -1,0 +1,190 @@
+import { useState, type FormEvent } from "react";
+import QuantityStepper from "./QuantityStepper";
+import { UNIT_OPTIONS } from "../lib/units";
+import {
+  runPantryQuery,
+  RECORD_PURCHASE_MUTATION,
+  type RecordPurchaseResult,
+  type StorageLocation,
+} from "../lib/pantryGraphql";
+
+type Status = "idle" | "saving" | "error";
+
+function today(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+interface PantryAddItemSectionProps {
+  onAdded: () => void;
+}
+
+export default function PantryAddItemSection({ onAdded }: PantryAddItemSectionProps) {
+  const [name, setName] = useState("");
+  const [quantity, setQuantity] = useState(1);
+  const [showDetails, setShowDetails] = useState(false);
+  const [category, setCategory] = useState("");
+  const [location, setLocation] = useState<StorageLocation>("FRIDGE");
+  const [unit, setUnit] = useState("pcs");
+  const [price, setPrice] = useState("");
+  // Defaults to today so a bare-minimum add (name + quantity only) still
+  // records a purchase date, without asking the user for one up front.
+  const [purchasedAt, setPurchasedAt] = useState(today());
+  const [expiresAt, setExpiresAt] = useState("");
+  const [isStaple, setIsStaple] = useState(false);
+  const [status, setStatus] = useState<Status>("idle");
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setStatus("saving");
+    setError(null);
+
+    try {
+      await runPantryQuery<RecordPurchaseResult>(RECORD_PURCHASE_MUTATION, {
+        input: {
+          name,
+          quantity,
+          location,
+          category: category || null,
+          unit: unit || null,
+          price: price ? Number(price) : null,
+          purchasedAt,
+          expiresAt: expiresAt || null,
+          isStaple,
+        },
+      });
+      setName("");
+      setQuantity(1);
+      setCategory("");
+      setLocation("FRIDGE");
+      setUnit("pcs");
+      setPrice("");
+      setPurchasedAt(today());
+      setExpiresAt("");
+      setIsStaple(false);
+      setShowDetails(false);
+      setStatus("idle");
+      onAdded();
+    } catch (err) {
+      setStatus("error");
+      setError(err instanceof Error ? err.message : "Something went wrong.");
+    }
+  }
+
+  return (
+    <section className="pantry-panel">
+      <h2 className="pantry-panel-title">Add item</h2>
+
+      <form onSubmit={handleSubmit}>
+        <div className="pantry-quick-add">
+          <input
+            className="form-input pantry-quick-add-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Item name"
+            required
+            maxLength={200}
+          />
+          <QuantityStepper value={quantity} onChange={setQuantity} min={1} />
+          <select
+            className="form-input pantry-quick-add-unit"
+            value={unit}
+            onChange={(e) => setUnit(e.target.value)}
+            aria-label="Unit"
+          >
+            {UNIT_OPTIONS.map((u) => (
+              <option key={u} value={u}>
+                {u}
+              </option>
+            ))}
+          </select>
+          <select
+            className="form-input pantry-quick-add-location"
+            value={location}
+            onChange={(e) => setLocation(e.target.value as StorageLocation)}
+            aria-label="Location"
+          >
+            <option value="FRIDGE">Fridge</option>
+            <option value="FREEZER">Freezer</option>
+            <option value="PANTRY">Pantry</option>
+          </select>
+          <input
+            className="form-input pantry-quick-add-price"
+            type="number"
+            min="0"
+            step="0.01"
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            placeholder="$"
+            aria-label="Price"
+          />
+          <button className="run-btn" type="submit" disabled={status === "saving"}>
+            {status === "saving" ? "Adding…" : "Add"}
+          </button>
+        </div>
+
+        <button type="button" className="pantry-details-toggle" onClick={() => setShowDetails((v) => !v)}>
+          {showDetails ? "− fewer details" : "+ more details"}
+        </button>
+
+        {showDetails && (
+          <div className="pantry-details-grid">
+            <div className="form-row">
+              <label className="form-label" htmlFor="pantry-category">
+                Category
+              </label>
+              <input
+                id="pantry-category"
+                className="form-input"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                placeholder="Dairy, Produce, Frozen..."
+                maxLength={100}
+              />
+            </div>
+
+            <div className="form-row">
+              <label className="form-label" htmlFor="pantry-purchased">
+                Purchased on
+              </label>
+              <input
+                id="pantry-purchased"
+                className="form-input"
+                type="date"
+                value={purchasedAt}
+                onChange={(e) => setPurchasedAt(e.target.value)}
+              />
+            </div>
+
+            <div className="form-row">
+              <label className="form-label" htmlFor="pantry-expires">
+                Expires on
+              </label>
+              <input
+                id="pantry-expires"
+                className="form-input"
+                type="date"
+                value={expiresAt}
+                onChange={(e) => setExpiresAt(e.target.value)}
+              />
+            </div>
+
+            <div className="form-row pantry-staple-row">
+              <label className="form-label" htmlFor="pantry-staple">
+                <input
+                  id="pantry-staple"
+                  type="checkbox"
+                  checked={isStaple}
+                  onChange={(e) => setIsStaple(e.target.checked)}
+                />{" "}
+                Staple - always keep stocked
+              </label>
+            </div>
+          </div>
+        )}
+
+        {error && <p className="status-line">// {error}</p>}
+      </form>
+    </section>
+  );
+}

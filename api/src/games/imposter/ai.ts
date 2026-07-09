@@ -25,7 +25,10 @@ export interface AiWordPair {
   imposter: string;
 }
 
-export async function generateAiWordPair(theme: string | undefined, sourceIp: string | undefined): Promise<AiWordPair> {
+export async function generateAiWordPair(
+  theme: string | undefined,
+  sourceIp: string | undefined
+): Promise<AiWordPair> {
   await assertNotRateLimited(sourceIp);
 
   const trimmedTheme = theme?.trim().slice(0, MAX_THEME_LENGTH);

@@ -28,10 +28,10 @@ export default function ResultsPanel({ game }: ResultsPanelProps) {
           <p className="imposter-word">{game.civilianWord}</p>
         </div>
         <div>
-          <p className="imposter-hint">
-            {imposters.length > 1 ? "The imposters got" : "The imposter got"}
+          <p className="imposter-hint">{imposters.length > 1 ? "The imposters got" : "The imposter got"}</p>
+          <p className="imposter-word imposter-word-alt">
+            {game.imposterWord ?? "nothing - no hint this game"}
           </p>
-          <p className="imposter-word imposter-word-alt">{game.imposterWord ?? "nothing - no hint this game"}</p>
         </div>
       </div>
       <button
@@ -39,7 +39,9 @@ export default function ResultsPanel({ game }: ResultsPanelProps) {
         type="button"
         onClick={() =>
           navigate("/imposter", {
-            state: { prefillNames: game.players.map((p) => (GENERIC_NAME_PATTERN.test(p.name) ? "" : p.name)) },
+            state: {
+              prefillNames: game.players.map((p) => (GENERIC_NAME_PATTERN.test(p.name) ? "" : p.name)),
+            },
           })
         }
       >

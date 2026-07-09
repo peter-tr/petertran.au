@@ -35,7 +35,11 @@ export async function createGameWithUniqueId(build: (gameId: string) => GameReco
       await ddb.send(
         new PutCommand({
           TableName: TABLE_NAME,
-          Item: { ...gameKey(game.gameId), data: game, ttl: Math.floor(Date.now() / 1000) + GAME_TTL_SECONDS },
+          Item: {
+            ...gameKey(game.gameId),
+            data: game,
+            ttl: Math.floor(Date.now() / 1000) + GAME_TTL_SECONDS,
+          },
           ConditionExpression: "attribute_not_exists(pk)",
         })
       );

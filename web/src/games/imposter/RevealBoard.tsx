@@ -95,7 +95,9 @@ export default function RevealBoard({ gameId, players: initialPlayers, onAllReve
               onClick={() => openModal(player)}
             >
               <span className="imposter-box-name">{player.name}</span>
-              <span className="imposter-box-status">{status === "done" ? "seen ✓ · view again" : "tap to view"}</span>
+              <span className="imposter-box-status">
+                {status === "done" ? "seen ✓ · view again" : "tap to view"}
+              </span>
             </button>
           );
         })}
