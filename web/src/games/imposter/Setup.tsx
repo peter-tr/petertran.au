@@ -290,23 +290,28 @@ export default function ImposterSetup() {
         </div>
 
         <div className="imposter-field-group">
-          <p className="form-label">Hint word</p>
+          <p className="form-label">Difficulty</p>
           <div className="imposter-category-grid">
             <button
               type="button"
               className={`imposter-category-btn ${hintEnabled ? "active" : ""}`}
               onClick={() => setHintEnabled(true)}
             >
-              Enabled
+              Easy
             </button>
             <button
               type="button"
               className={`imposter-category-btn ${!hintEnabled ? "active" : ""}`}
               onClick={() => setHintEnabled(false)}
             >
-              Disabled
+              Hard
             </button>
           </div>
+          <p className="imposter-hint">
+            {hintEnabled
+              ? "Easy - the imposter gets a related hint word."
+              : "Hard - the imposter gets nothing and has to bluff blind."}
+          </p>
         </div>
 
         {error && <p className="status-line">// {error}</p>}
