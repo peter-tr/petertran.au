@@ -25,11 +25,19 @@ interface HeroProps {
   person: Person | null;
 }
 
+const SECRET_CLICK_COUNT = 3;
+
 export default function Hero({ person }: HeroProps) {
   const [typed, setTyped] = useState(() => (prefersReducedMotion() ? FULL_QUERY : ""));
   const [typingDone, setTypingDone] = useState(prefersReducedMotion);
   const [result, setResult] = useState<{ name: string; role: string; company: string } | null>(null);
   const [errored, setErrored] = useState(false);
+  const [nameClicks, setNameClicks] = useState(0);
+  const secretRevealed = nameClicks >= SECRET_CLICK_COUNT;
+
+  function handleNameClick() {
+    if (!secretRevealed) setNameClicks((n) => n + 1);
+  }
 
   useEffect(() => {
     if (prefersReducedMotion()) return;
@@ -66,7 +74,12 @@ export default function Hero({ person }: HeroProps) {
   return (
     <header className="hero">
       <p className="eyebrow">backend software engineer · sydney, australia</p>
-      <h1>Peter Tran</h1>
+      <h1 onClick={handleNameClick}>Peter Tran</h1>
+      {secretRevealed && (
+        <p className="hero-secret">
+          // psst, also built <Link to="/imposter">imposter</Link> and <Link to="/pantry">pantry</Link>
+        </p>
+      )}
       <p className="tagline">
         I grew up in Brisbane, studied software engineering at the University of Queensland, and now work on
         GraphQL federation at Commonwealth Bank in Sydney — before that, Boeing and Services Australia. I
