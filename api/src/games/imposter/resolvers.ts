@@ -55,6 +55,7 @@ export function createImposterResolvers(store: ImposterStore, stats: ImposterSta
           imposterCount?: number;
           hintEnabled?: boolean;
           difficulty?: WordDifficulty;
+          hideCategory?: boolean;
         },
         context: Context
       ) => {
@@ -74,7 +75,9 @@ export function createImposterResolvers(store: ImposterStore, stats: ImposterSta
         const updated = applyRevealImposter(game);
         await store.saveGame(updated);
         const durationMs = Date.now() - new Date(game.createdAt).getTime();
-        stats.recordGameCompleted(durationMs).catch((err) => console.error("recordGameCompleted failed:", err));
+        stats
+          .recordGameCompleted(durationMs)
+          .catch((err) => console.error("recordGameCompleted failed:", err));
         return toPublicGame(updated);
       },
     },

@@ -76,7 +76,7 @@ export default function ImposterGamePage() {
   return (
     <>
       <header className="page-head">
-        <p className="eyebrow">{game?.categoryLabel ?? "…"}</p>
+        <p className="eyebrow">{!game ? "…" : (game.categoryLabel ?? "Category hidden 🤫")}</p>
         <h1>Imposter</h1>
         {!loading && game && (
           <button type="button" className="imposter-add-btn" onClick={handleShare}>

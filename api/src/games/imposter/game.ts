@@ -19,6 +19,7 @@ export interface GamePlayerRecord {
 export interface GameRecord {
   gameId: string;
   categoryLabel: string;
+  hideCategory: boolean;
   hintEnabled: boolean;
   phase: ImposterPhase;
   players: GamePlayerRecord[];
@@ -40,7 +41,7 @@ export interface ImposterStats {
 
 export interface PublicGame {
   gameId: string;
-  categoryLabel: string;
+  categoryLabel: string | null;
   hintEnabled: boolean;
   phase: ImposterPhase;
   players: GamePlayerRecord[];
@@ -92,6 +93,7 @@ export interface NewGameOptions {
   imposterCount?: number;
   hintEnabled?: boolean;
   difficulty?: WordDifficulty;
+  hideCategory?: boolean;
 }
 
 // Builds everything about a new game except its gameId, so the caller can
@@ -151,18 +153,20 @@ export async function buildNewGameContent(
     civilianWord,
     imposterWord: hintEnabled ? imposterWord : null,
     hintEnabled,
+    hideCategory: options.hideCategory ?? false,
     categoryLabel,
     createdAt: new Date().toISOString(),
   };
 }
 
-// Withholds the word pair and imposter identity until RESULTS, so polling
-// this mid-game can't spoil it for anyone glancing at the network tab.
+// Withholds the word pair, imposter identity, and (if hideCategory is set)
+// the category itself until RESULTS, so polling this mid-game can't spoil
+// anything for anyone glancing at the network tab.
 export function toPublicGame(game: GameRecord): PublicGame {
   const revealed = game.phase === "RESULTS";
   return {
     gameId: game.gameId,
-    categoryLabel: game.categoryLabel,
+    categoryLabel: !game.hideCategory || revealed ? game.categoryLabel : null,
     hintEnabled: game.hintEnabled,
     phase: game.phase,
     players: game.players,

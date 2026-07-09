@@ -43,6 +43,7 @@ export default function ImposterSetup() {
   const [playerListNotice, setPlayerListNotice] = useState<string | null>(null);
   const [hintEnabled, setHintEnabled] = useState(true);
   const [difficulty, setDifficulty] = useState<ImposterDifficulty>("NORMAL");
+  const [hideCategory, setHideCategory] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -109,7 +110,8 @@ export default function ImposterSetup() {
     setImposterCount(effectiveImposterCount + 1);
   }
 
-  const canSubmit = !submitting && names.length >= MIN_PLAYERS && (wordSource === "AI" || categoryId !== null);
+  const canSubmit =
+    !submitting && names.length >= MIN_PLAYERS && (wordSource === "AI" || categoryId !== null);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -121,11 +123,13 @@ export default function ImposterSetup() {
       const res = await runImposterQuery<CreateImposterGameResult>(CREATE_IMPOSTER_GAME_MUTATION, {
         wordSource,
         categoryId: wordSource === "BUILTIN" ? categoryId : undefined,
-        customCategory: wordSource === "AI" && aiThemeMode === "custom" ? customCategory.trim() || undefined : undefined,
+        customCategory:
+          wordSource === "AI" && aiThemeMode === "custom" ? customCategory.trim() || undefined : undefined,
         playerNames: effectiveNames,
         imposterCount: effectiveImposterCount,
         hintEnabled,
         difficulty,
+        hideCategory,
       });
       addRecentGame({
         gameId: res.createImposterGame.gameId,
@@ -146,8 +150,8 @@ export default function ImposterSetup() {
         <p className="eyebrow">one shared device, one word each</p>
         <h1>Imposter</h1>
         <p className="tagline">
-          Everyone gets the same secret word - except the imposter(s), who get something close but
-          different. Pass the device around, discuss out loud, and vote out whoever seems off.
+          Everyone gets the same secret word - except the imposter(s), who get something close but different.
+          Pass the device around, discuss out loud, and vote out whoever seems off.
         </p>
       </header>
 
@@ -224,6 +228,31 @@ export default function ImposterSetup() {
             )}
           </div>
         )}
+
+        <div className="imposter-field-group">
+          <p className="form-label">Category label</p>
+          <div className="imposter-category-grid">
+            <button
+              type="button"
+              className={`imposter-category-btn ${!hideCategory ? "active" : ""}`}
+              onClick={() => setHideCategory(false)}
+            >
+              Visible
+            </button>
+            <button
+              type="button"
+              className={`imposter-category-btn ${hideCategory ? "active" : ""}`}
+              onClick={() => setHideCategory(true)}
+            >
+              Hidden
+            </button>
+          </div>
+          <p className="imposter-hint">
+            {hideCategory
+              ? "Players won't know the category until results - harder to bluff or catch the imposter."
+              : "Players see the category throughout the game."}
+          </p>
+        </div>
 
         <div className="imposter-field-group">
           <p className="form-label">

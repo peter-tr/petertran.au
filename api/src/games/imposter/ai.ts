@@ -106,7 +106,8 @@ export async function generateAiWordPair(
     const result: AiWordPair = { category: parsed.category, civilian, imposter };
     const echoesTheme =
       !!trimmedTheme &&
-      (civilian.toLowerCase() === trimmedTheme.toLowerCase() || imposter.toLowerCase() === trimmedTheme.toLowerCase());
+      (civilian.toLowerCase() === trimmedTheme.toLowerCase() ||
+        imposter.toLowerCase() === trimmedTheme.toLowerCase());
 
     if (!echoesTheme) return result;
     acceptableFallback ??= result;

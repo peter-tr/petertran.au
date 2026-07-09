@@ -8,7 +8,7 @@
 
 export interface RecentGame {
   gameId: string;
-  categoryLabel: string;
+  categoryLabel: string | null;
   playerNames: string[];
   createdAt: string; // ISO
 }

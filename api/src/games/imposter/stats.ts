@@ -34,7 +34,9 @@ export async function recordGameCompleted(durationMs: number): Promise<void> {
 }
 
 async function getGamesTotal(): Promise<number> {
-  const res = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { pk: STATS_PK, sk: "GAMES_TOTAL" } }));
+  const res = await ddb.send(
+    new GetCommand({ TableName: TABLE_NAME, Key: { pk: STATS_PK, sk: "GAMES_TOTAL" } })
+  );
   return (res.Item?.count as number | undefined) ?? 0;
 }
 

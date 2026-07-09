@@ -58,6 +58,13 @@ type Mutation {
     otherwise. Defaults to NORMAL.
     """
     difficulty: ImposterDifficulty
+    """
+    Withhold the category/theme label from players until RESULTS, instead
+    of showing it throughout - knowing the category (even without the
+    built-in category's exact word) makes both bluffing and catching the
+    imposter easier. Defaults to false.
+    """
+    hideCategory: Boolean
   ): ImposterGame!
   """
   Reveal one player's word. Any not-yet-revealed player can go in any order
@@ -166,9 +173,10 @@ type ImposterGame {
   """
   gameId: String!
   """
-  Label of the category (or AI theme) the word pair was drawn from.
+  Label of the category (or AI theme) the word pair was drawn from. Null
+  until phase is RESULTS if this game's hideCategory was set to true.
   """
-  categoryLabel: String!
+  categoryLabel: String
   """
   Whether the imposter(s) were given a related hint word, or nothing.
   """

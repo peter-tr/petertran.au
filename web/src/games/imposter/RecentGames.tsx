@@ -32,7 +32,7 @@ export default function RecentGames() {
           <li key={game.gameId} className="imposter-recent-item">
             <Link to={`/imposter/${game.gameId}`} className="imposter-recent-link">
               <span className="imposter-recent-meta">
-                {game.categoryLabel} · {game.playerNames.join(", ")}
+                {game.categoryLabel ?? "Category hidden"} · {game.playerNames.join(", ")}
               </span>
               <span className="imposter-recent-time">{formatWhen(game.createdAt)}</span>
             </Link>

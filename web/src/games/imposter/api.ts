@@ -51,7 +51,7 @@ export interface ImposterPlayer {
 
 export interface ImposterGame {
   gameId: string;
-  categoryLabel: string;
+  categoryLabel: string | null;
   hintEnabled: boolean;
   phase: ImposterPhase;
   players: ImposterPlayer[];
@@ -109,6 +109,7 @@ export const CREATE_IMPOSTER_GAME_MUTATION = /* GraphQL */ `
     $imposterCount: Int
     $hintEnabled: Boolean
     $difficulty: ImposterDifficulty
+    $hideCategory: Boolean
   ) {
     createImposterGame(
       wordSource: $wordSource
@@ -118,6 +119,7 @@ export const CREATE_IMPOSTER_GAME_MUTATION = /* GraphQL */ `
       imposterCount: $imposterCount
       hintEnabled: $hintEnabled
       difficulty: $difficulty
+      hideCategory: $hideCategory
     ) {
       ${IMPOSTER_GAME_FIELDS}
     }
@@ -132,6 +134,7 @@ export interface CreateImposterGameVariables {
   imposterCount?: number;
   hintEnabled?: boolean;
   difficulty?: ImposterDifficulty;
+  hideCategory?: boolean;
 }
 
 export interface CreateImposterGameResult {

@@ -39,9 +39,8 @@ export default function DiscussionPanel({ gameId, players, onGameUpdate }: Discu
         <strong>{firstPlayer}</strong> goes first
       </p>
       <p className="project-desc">
-        Everyone&apos;s seen their word: <strong>{players.map((p) => p.name).join(", ")}</strong>. Discuss
-        out loud, take turns describing your word without saying it, and vote on who you think the
-        imposter is.
+        Everyone&apos;s seen their word: <strong>{players.map((p) => p.name).join(", ")}</strong>. Discuss out
+        loud, take turns describing your word without saying it, and vote on who you think the imposter is.
       </p>
 
       <div className="imposter-field-group">
