@@ -31,7 +31,6 @@ export default function RecentGames() {
         {games.map((game) => (
           <li key={game.gameId} className="imposter-recent-item">
             <Link to={`/imposter/${game.gameId}`} className="imposter-recent-link">
-              <span className="imposter-recent-code">{game.gameId}</span>
               <span className="imposter-recent-meta">
                 {game.categoryLabel} · {game.playerNames.join(", ")}
               </span>

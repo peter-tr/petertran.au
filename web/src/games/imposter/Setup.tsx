@@ -7,6 +7,7 @@ import {
   type ImposterCategory,
   type ImposterCategoriesResult,
   type ImposterWordSource,
+  type ImposterDifficulty,
   type CreateImposterGameResult,
 } from "./api";
 import { addRecentGame } from "./recentGamesStore";
@@ -41,6 +42,7 @@ export default function ImposterSetup() {
   const [imposterCountNotice, setImposterCountNotice] = useState<string | null>(null);
   const [playerListNotice, setPlayerListNotice] = useState<string | null>(null);
   const [hintEnabled, setHintEnabled] = useState(true);
+  const [difficulty, setDifficulty] = useState<ImposterDifficulty>("NORMAL");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -123,6 +125,7 @@ export default function ImposterSetup() {
         playerNames: effectiveNames,
         imposterCount: effectiveImposterCount,
         hintEnabled,
+        difficulty,
       });
       addRecentGame({
         gameId: res.createImposterGame.gameId,
@@ -290,29 +293,56 @@ export default function ImposterSetup() {
         </div>
 
         <div className="imposter-field-group">
-          <p className="form-label">Difficulty</p>
+          <p className="form-label">Hint word</p>
           <div className="imposter-category-grid">
             <button
               type="button"
               className={`imposter-category-btn ${hintEnabled ? "active" : ""}`}
               onClick={() => setHintEnabled(true)}
             >
-              Easy
+              Enabled
             </button>
             <button
               type="button"
               className={`imposter-category-btn ${!hintEnabled ? "active" : ""}`}
               onClick={() => setHintEnabled(false)}
             >
-              Hard
+              Disabled
             </button>
           </div>
           <p className="imposter-hint">
             {hintEnabled
-              ? "Easy - the imposter gets a related hint word."
-              : "Hard - the imposter gets nothing and has to bluff blind."}
+              ? "The imposter gets a word of their own."
+              : "The imposter gets nothing and has to bluff blind."}
           </p>
         </div>
+
+        {hintEnabled && (
+          <div className="imposter-field-group">
+            <p className="form-label">Difficulty</p>
+            <div className="imposter-category-grid">
+              <button
+                type="button"
+                className={`imposter-category-btn ${difficulty === "NORMAL" ? "active" : ""}`}
+                onClick={() => setDifficulty("NORMAL")}
+              >
+                Normal
+              </button>
+              <button
+                type="button"
+                className={`imposter-category-btn ${difficulty === "HARD" ? "active" : ""}`}
+                onClick={() => setDifficulty("HARD")}
+              >
+                Hard
+              </button>
+            </div>
+            <p className="imposter-hint">
+              {difficulty === "NORMAL"
+                ? "The imposter's word is closely related - easier to bluff."
+                : "The imposter's word is a bigger stretch - harder to bluff convincingly."}
+            </p>
+          </div>
+        )}
 
         {error && <p className="status-line">// {error}</p>}
 

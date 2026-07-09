@@ -7,6 +7,7 @@ import {
   toPublicGame,
   type GameRecord,
   type ImposterStats,
+  type WordDifficulty,
   type WordSource,
 } from "./game";
 
@@ -53,6 +54,7 @@ export function createImposterResolvers(store: ImposterStore, stats: ImposterSta
           playerNames: string[];
           imposterCount?: number;
           hintEnabled?: boolean;
+          difficulty?: WordDifficulty;
         },
         context: Context
       ) => {

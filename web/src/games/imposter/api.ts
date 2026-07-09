@@ -36,6 +36,7 @@ export async function runImposterQuery<T = unknown>(
 
 export type ImposterPhase = "REVEAL" | "DISCUSSION" | "RESULTS";
 export type ImposterWordSource = "BUILTIN" | "AI";
+export type ImposterDifficulty = "NORMAL" | "HARD";
 
 export interface ImposterCategory {
   id: string;
@@ -107,6 +108,7 @@ export const CREATE_IMPOSTER_GAME_MUTATION = /* GraphQL */ `
     $playerNames: [String!]!
     $imposterCount: Int
     $hintEnabled: Boolean
+    $difficulty: ImposterDifficulty
   ) {
     createImposterGame(
       wordSource: $wordSource
@@ -115,6 +117,7 @@ export const CREATE_IMPOSTER_GAME_MUTATION = /* GraphQL */ `
       playerNames: $playerNames
       imposterCount: $imposterCount
       hintEnabled: $hintEnabled
+      difficulty: $difficulty
     ) {
       ${IMPOSTER_GAME_FIELDS}
     }
@@ -128,6 +131,7 @@ export interface CreateImposterGameVariables {
   playerNames: string[];
   imposterCount?: number;
   hintEnabled?: boolean;
+  difficulty?: ImposterDifficulty;
 }
 
 export interface CreateImposterGameResult {

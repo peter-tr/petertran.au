@@ -2,8 +2,10 @@
 // real (DynamoDB-backed) and dev (in-memory) resolvers can share it.
 
 import { randomUUID } from "node:crypto";
-import { WORD_CATEGORIES, findWordCategory, randomPair } from "./words";
+import { WORD_CATEGORIES, findWordCategory, randomPair, type WordDifficulty } from "./words";
 import { generateAiWordPair } from "./ai";
+
+export type { WordDifficulty };
 
 export type ImposterPhase = "REVEAL" | "DISCUSSION" | "RESULTS";
 export type WordSource = "BUILTIN" | "AI";
@@ -89,6 +91,7 @@ export interface NewGameOptions {
   playerNames: string[];
   imposterCount?: number;
   hintEnabled?: boolean;
+  difficulty?: WordDifficulty;
 }
 
 // Builds everything about a new game except its gameId, so the caller can
@@ -110,6 +113,7 @@ export async function buildNewGameContent(
   }
 
   const hintEnabled = options.hintEnabled ?? true;
+  const difficulty = options.difficulty ?? "NORMAL";
   const customCategory = options.customCategory?.trim();
   if (customCategory && customCategory.length > MAX_CUSTOM_CATEGORY_LENGTH) {
     throw new Error(`Keep the custom category under ${MAX_CUSTOM_CATEGORY_LENGTH} characters.`);
@@ -120,7 +124,7 @@ export async function buildNewGameContent(
   let categoryLabel: string;
 
   if (options.wordSource === "AI") {
-    const pair = await generateAiWordPair(customCategory, sourceIp);
+    const pair = await generateAiWordPair(customCategory, difficulty, sourceIp);
     civilianWord = pair.civilian;
     imposterWord = pair.imposter;
     // Named by the model itself rather than echoing the user's input verbatim
@@ -131,7 +135,7 @@ export async function buildNewGameContent(
     if (!options.categoryId) throw new Error("A category is required for built-in word pairs.");
     const category = findWordCategory(options.categoryId);
     if (!category) throw new Error(`Unknown category "${options.categoryId}".`);
-    const pair = randomPair(category);
+    const pair = randomPair(category, difficulty);
     civilianWord = pair.civilian;
     imposterWord = pair.imposter;
     categoryLabel = category.label;

@@ -1,16 +1,25 @@
 import { getAnthropicClient } from "../../lib/anthropic-client";
 import { assertNotRateLimited } from "../../lib/rate-limit";
-import { WORD_CATEGORIES, randomPair } from "./words";
+import { WORD_CATEGORIES, randomPair, type WordDifficulty } from "./words";
 
 const MAX_THEME_LENGTH = 60;
 const MAX_ATTEMPTS = 3;
 
+const DIFFICULTY_INSTRUCTIONS: Record<WordDifficulty, string> = {
+  NORMAL: `The two words must be closely related - similar enough that the imposter can bluff their way
+through a discussion without much effort, e.g. "Coffee" vs "Tea", or "Basketball" vs "Netball".`,
+  HARD: `Think laterally - genuinely out of the box, not just "a different item from the same shelf".
+The two words must still both fit the theme, but connecting them should take real imagination, e.g.
+within "Coffee" as a theme, pair it with "Popcorn" rather than "Tea" or "Juice"; within "Sports", pair
+"Chess" with "Surfing" rather than "Checkers" or "Swimming". If your pair feels like an obvious or
+moderately-related choice, reject it and reach for something weirder that still technically fits.`,
+};
+
 const AI_PAIR_SYSTEM_PROMPT = `You invent word pairs for the party game "Imposter": every player but one
-gets the same "civilian" word, and the odd one out gets a different "imposter" word. The two words
-must be closely related (same general category, similar enough that the imposter can bluff their way
-through a discussion) but clearly distinct concepts, e.g. "Coffee" vs "Tea", or "Basketball" vs
-"Netball". Keep each word or short phrase under 3 words, appropriate for all ages, and never a proper
-noun or brand. Pick a fresh, unexpected pair each time - avoid the most obvious clichés.
+gets the same "civilian" word, and the odd one out gets a different "imposter" word. The two words must
+be clearly distinct concepts - never the same word. Keep each word or short phrase under 3 words,
+appropriate for all ages, and never a proper noun or brand. Pick a fresh, unexpected pair each time -
+avoid the most obvious clichés.
 
 Also name the shared category the pair belongs to, as a short 2-4 word label (e.g. "Coffee drinks",
 "Superheroes") - players are shown this label before discussion starts, the same way they'd see a
@@ -31,12 +40,12 @@ export interface AiWordPair {
   imposter: string;
 }
 
-async function callAnthropic(userMessage: string) {
+async function callAnthropic(userMessage: string, difficulty: WordDifficulty) {
   const client = await getAnthropicClient();
   const response = await client.messages.parse({
     model: "claude-haiku-4-5",
     max_tokens: 256,
-    system: AI_PAIR_SYSTEM_PROMPT,
+    system: `${AI_PAIR_SYSTEM_PROMPT}\n\n${DIFFICULTY_INSTRUCTIONS[difficulty]}`,
     messages: [{ role: "user", content: userMessage }],
     output_config: {
       format: {
@@ -60,13 +69,17 @@ async function callAnthropic(userMessage: string) {
 // Grabs a random built-in pair as a last resort - this function must always
 // return *something* playable, since failing here would otherwise block
 // game creation entirely just because Claude had an off response.
-function fallbackPair(): AiWordPair {
+function fallbackPair(difficulty: WordDifficulty): AiWordPair {
   const category = WORD_CATEGORIES[Math.floor(Math.random() * WORD_CATEGORIES.length)];
-  const pair = randomPair(category);
+  const pair = randomPair(category, difficulty);
   return { category: category.label, civilian: pair.civilian, imposter: pair.imposter };
 }
 
-export async function generateAiWordPair(theme: string | undefined, sourceIp: string | undefined): Promise<AiWordPair> {
+export async function generateAiWordPair(
+  theme: string | undefined,
+  difficulty: WordDifficulty,
+  sourceIp: string | undefined
+): Promise<AiWordPair> {
   await assertNotRateLimited(sourceIp);
 
   const trimmedTheme = theme?.trim().slice(0, MAX_THEME_LENGTH);
@@ -80,7 +93,7 @@ export async function generateAiWordPair(theme: string | undefined, sourceIp: st
   let acceptableFallback: AiWordPair | null = null;
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    const parsed = await callAnthropic(userMessage);
+    const parsed = await callAnthropic(userMessage, difficulty);
     if (!parsed?.category || !parsed?.civilian || !parsed?.imposter) continue;
 
     const civilian = parsed.civilian.trim();
@@ -99,5 +112,5 @@ export async function generateAiWordPair(theme: string | undefined, sourceIp: st
     acceptableFallback ??= result;
   }
 
-  return acceptableFallback ?? fallbackPair();
+  return acceptableFallback ?? fallbackPair(difficulty);
 }

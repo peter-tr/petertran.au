@@ -14,11 +14,16 @@ interface RevealBoardProps {
   onAllRevealed: (game: ImposterGame) => void;
 }
 
-export default function RevealBoard({ gameId, players: initialPlayers, onAllRevealed }: RevealBoardProps) {
-  // Owns its own copy of the player list so a mid-modal reveal (including the
-  // very last one) never causes the parent to swap this view out for the
-  // discussion screen before the player has actually seen their word.
-  const [players, setPlayers] = useState(initialPlayers);
+export default function RevealBoard({ gameId, players: playersProp, onAllRevealed }: RevealBoardProps) {
+  // Ids revealed by this device but not yet reflected in the server's props
+  // (the parent only polls every few seconds) - merged in below at render
+  // time so a mid-modal reveal, including the very last one, never causes
+  // the parent to swap this view out before the player has actually seen it.
+  const [locallyRevealedIds, setLocallyRevealedIds] = useState<Set<string>>(new Set());
+  const players = playersProp.map((p) =>
+    p.hasRevealed || locallyRevealedIds.has(p.id) ? { ...p, hasRevealed: true } : p
+  );
+
   const [openPlayer, setOpenPlayer] = useState<ImposterPlayer | null>(null);
   const [word, setWord] = useState<string | null>(null);
   const [isImposter, setIsImposter] = useState(false);
@@ -39,7 +44,7 @@ export default function RevealBoard({ gameId, players: initialPlayers, onAllReve
     setOpenPlayer(null);
     if (revealed && openPlayer) {
       const revealedId = openPlayer.id;
-      setPlayers((prev) => prev.map((p) => (p.id === revealedId ? { ...p, hasRevealed: true } : p)));
+      setLocallyRevealedIds((prev) => new Set(prev).add(revealedId));
     }
     // The mutation returns the current game on every reveal, not just the
     // last one -- only hand off to the parent once the phase has actually
