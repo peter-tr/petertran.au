@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import Nav from "./components/Nav";
 import Home from "./pages/Home";
 import Resume from "./pages/Resume";
+import Pantry from "./pages/Pantry";
 import { useResumeData } from "./hooks/useResumeData";
 
 function ScrollManager() {
@@ -36,6 +37,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Home data={data} error={error} />} />
           <Route path="/resume" element={<Resume data={data} error={error} />} />
+          <Route path="/pantry" element={<Pantry />} />
         </Routes>
       </main>
     </BrowserRouter>

@@ -29,6 +29,9 @@ jobs:
       - name: Build API
         run: npm run build --workspace=api
 
+      - name: Build Pantry API
+        run: npm run build --workspace=pantry-api
+
       - name: Deploy infrastructure
         working-directory: infra
         run: npx cdk deploy --all --require-approval never

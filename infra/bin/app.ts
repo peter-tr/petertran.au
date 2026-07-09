@@ -3,6 +3,7 @@ import "source-map-support/register";
 import { App } from "aws-cdk-lib";
 import { CertStack } from "../lib/cert-stack";
 import { SiteStack } from "../lib/site-stack";
+import { PantryStack } from "../lib/pantry-stack";
 
 const app = new App();
 
@@ -30,4 +31,12 @@ new SiteStack(app, "PetertranSiteStack", {
   hostedZoneName: "petertran.au",
   env: { account, region: "ap-southeast-2" },
   crossRegionReferences: true,
+});
+
+// Separate service from the resume site above - own table, own Lambda, own
+// Function URL, own schema. See infra/lib/pantry-stack.ts for why.
+new PantryStack(app, "PetertranPantryStack", {
+  domainName,
+  alternateDomainNames,
+  env: { account, region: "ap-southeast-2" },
 });
