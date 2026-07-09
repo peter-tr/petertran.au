@@ -5,6 +5,12 @@ interface ResultsPanelProps {
   game: ImposterGame;
 }
 
+// Names left blank at setup are stored as "Player 1", "Player 2", etc, not
+// as placeholders -- so a "Play again" prefill has to leave those blank
+// again rather than carrying the literal string over as real text a player
+// would have to delete before typing their own name.
+const GENERIC_NAME_PATTERN = /^Player \d+$/;
+
 export default function ResultsPanel({ game }: ResultsPanelProps) {
   const navigate = useNavigate();
   const imposterIds = new Set(game.imposterPlayerIds ?? []);
@@ -31,7 +37,11 @@ export default function ResultsPanel({ game }: ResultsPanelProps) {
       <button
         className="run-btn"
         type="button"
-        onClick={() => navigate("/imposter", { state: { prefillNames: game.players.map((p) => p.name) } })}
+        onClick={() =>
+          navigate("/imposter", {
+            state: { prefillNames: game.players.map((p) => (GENERIC_NAME_PATTERN.test(p.name) ? "" : p.name)) },
+          })
+        }
       >
         Play again
       </button>

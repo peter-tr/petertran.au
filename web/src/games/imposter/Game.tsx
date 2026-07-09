@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { runImposterQuery, IMPOSTER_GAME_QUERY, type ImposterGame, type ImposterGameResult } from "./api";
+import { removeRecentGame } from "./recentGames";
 import RevealBoard from "./RevealBoard";
 import DiscussionPanel from "./DiscussionPanel";
 import ResultsPanel from "./ResultsPanel";
@@ -26,6 +27,13 @@ export default function ImposterGamePage() {
       .finally(() => setLoading(false));
   }, [gameId]);
 
+  // A finished game has nothing left to continue -- drop it from this
+  // device's list as soon as it's seen reaching RESULTS, whether that's
+  // because it just finished or because it was already done when revisited.
+  useEffect(() => {
+    if (game?.phase === "RESULTS") removeRecentGame(game.gameId);
+  }, [game?.phase, game?.gameId]);
+
   return (
     <>
       <header className="page-head">
@@ -48,11 +56,7 @@ export default function ImposterGamePage() {
       )}
 
       {!loading && game && game.phase === "DISCUSSION" && (
-        <DiscussionPanel
-          gameId={game.gameId}
-          playerNames={game.players.map((p) => p.name)}
-          onGameUpdate={setGame}
-        />
+        <DiscussionPanel gameId={game.gameId} players={game.players} onGameUpdate={setGame} />
       )}
 
       {!loading && game && game.phase === "RESULTS" && <ResultsPanel game={game} />}
