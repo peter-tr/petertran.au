@@ -15,6 +15,11 @@ type Query {
   code doesn't exist or its game has expired.
   """
   imposterGame(gameId: String!): ImposterGame
+  """
+  All-time, anonymized usage stats for the game - total games played,
+  never any individual game's details or player names.
+  """
+  imposterStats: ImposterStats!
 }
 
 type Mutation {
@@ -185,4 +190,43 @@ type ImposterRevealResult {
   True if this player is one of the imposters.
   """
   isImposter: Boolean!
+}
+
+"""
+All-time, anonymized usage stats for the game.
+"""
+type ImposterStats {
+  """
+  Total number of games ever started - a single running counter, not a
+  window, so it never resets.
+  """
+  gamesPlayedTotal: Int!
+  """
+  Number of those games that were actually played through to the imposter
+  being revealed, rather than abandoned partway.
+  """
+  gamesCompletedTotal: Int!
+  """
+  Average time from a game starting to the imposter being revealed, in
+  milliseconds, across all completed games.
+  """
+  avgGameDurationMs: Float!
+  """
+  Games started per day, oldest first, for the last 30 days.
+  """
+  gamesByDay: [ImposterDailyCount!]!
+}
+
+"""
+Number of games started in a single daily bucket.
+"""
+type ImposterDailyCount {
+  """
+  ISO 8601 timestamp (UTC) for the start of this day.
+  """
+  timestamp: String!
+  """
+  Number of games started during this day.
+  """
+  count: Int!
 }

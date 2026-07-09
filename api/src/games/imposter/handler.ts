@@ -3,13 +3,13 @@ import { startServerAndCreateLambdaHandler, handlers } from "@as-integrations/aw
 import { typeDefs } from "./schema";
 import { createImposterResolvers } from "./resolvers";
 import { getGame, putGame, createGameWithUniqueId } from "./store";
+import { recordGameCreated, recordGameCompleted, getImposterStats } from "./stats";
 import type { Context } from "./context";
 
-const resolvers = createImposterResolvers({
-  getGame,
-  saveGame: putGame,
-  createGame: createGameWithUniqueId,
-});
+const resolvers = createImposterResolvers(
+  { getGame, saveGame: putGame, createGame: createGameWithUniqueId },
+  { recordGameCreated, recordGameCompleted, getStats: getImposterStats }
+);
 
 const server = new ApolloServer<Context>({
   typeDefs,

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { runImposterQuery, IMPOSTER_GAME_QUERY, type ImposterGame, type ImposterGameResult } from "./api";
-import { removeRecentGame } from "./recentGames";
+import { removeRecentGame } from "./recentGamesStore";
 import RevealBoard from "./RevealBoard";
 import DiscussionPanel from "./DiscussionPanel";
 import ResultsPanel from "./ResultsPanel";

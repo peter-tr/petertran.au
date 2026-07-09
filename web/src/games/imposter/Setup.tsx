@@ -9,8 +9,9 @@ import {
   type ImposterWordSource,
   type CreateImposterGameResult,
 } from "./api";
-import { addRecentGame } from "./recentGames";
+import { addRecentGame } from "./recentGamesStore";
 import RecentGames from "./RecentGames";
+import StatsPanel from "./StatsPanel";
 import "./imposter.css";
 
 const MIN_PLAYERS = 3;
@@ -311,6 +312,8 @@ export default function ImposterSetup() {
           {submitting ? "Starting…" : "Start game"}
         </button>
       </form>
+
+      <StatsPanel />
     </>
   );
 }

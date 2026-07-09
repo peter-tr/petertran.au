@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { getRecentGames, removeRecentGame, type RecentGame } from "./recentGames";
+import { getRecentGames, removeRecentGame, type RecentGame } from "./recentGamesStore";
 
 function formatWhen(iso: string): string {
   return new Date(iso).toLocaleString(undefined, {
