@@ -1,5 +1,6 @@
 import { getAnthropicClient } from "../../lib/anthropic-client";
 import { assertNotRateLimited } from "../../lib/rate-limit";
+import { WORD_CATEGORIES, randomPair } from "./words";
 
 const MAX_THEME_LENGTH = 60;
 const MAX_ATTEMPTS = 3;
@@ -56,6 +57,15 @@ async function callAnthropic(userMessage: string) {
   return response.parsed_output as AiWordPair | null;
 }
 
+// Grabs a random built-in pair as a last resort - this function must always
+// return *something* playable, since failing here would otherwise block
+// game creation entirely just because Claude had an off response.
+function fallbackPair(): AiWordPair {
+  const category = WORD_CATEGORIES[Math.floor(Math.random() * WORD_CATEGORIES.length)];
+  const pair = randomPair(category);
+  return { category: category.label, civilian: pair.civilian, imposter: pair.imposter };
+}
+
 export async function generateAiWordPair(theme: string | undefined, sourceIp: string | undefined): Promise<AiWordPair> {
   await assertNotRateLimited(sourceIp);
 
@@ -64,24 +74,30 @@ export async function generateAiWordPair(theme: string | undefined, sourceIp: st
     ? `Invent a new civilian/imposter word pair themed around: ${trimmedTheme}`
     : "Invent a new civilian/imposter word pair.";
 
-  // Retries if the model echoes the theme back as one of the words, or
-  // returns the same word for both - a broken pair either way, since the
-  // whole game hinges on civilian and imposter being different things.
+  // Best playable-but-imperfect result seen so far (e.g. it echoed the theme
+  // as one of the words) - used if no attempt comes back ideal, so a single
+  // rough response still beats failing the whole game outright.
+  let acceptableFallback: AiWordPair | null = null;
+
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const parsed = await callAnthropic(userMessage);
     if (!parsed?.category || !parsed?.civilian || !parsed?.imposter) continue;
 
     const civilian = parsed.civilian.trim();
     const imposter = parsed.imposter.trim();
-    const sameAsEachOther = civilian.toLowerCase() === imposter.toLowerCase();
+    // The one truly non-negotiable rule - identical words means the
+    // imposter isn't actually an imposter, so never accept this even as a
+    // fallback.
+    if (civilian.toLowerCase() === imposter.toLowerCase()) continue;
+
+    const result: AiWordPair = { category: parsed.category, civilian, imposter };
     const echoesTheme =
       !!trimmedTheme &&
       (civilian.toLowerCase() === trimmedTheme.toLowerCase() || imposter.toLowerCase() === trimmedTheme.toLowerCase());
 
-    if (!sameAsEachOther && !echoesTheme) {
-      return { category: parsed.category, civilian, imposter };
-    }
+    if (!echoesTheme) return result;
+    acceptableFallback ??= result;
   }
 
-  throw new Error("Couldn't come up with a valid word pair for that theme - try a different one.");
+  return acceptableFallback ?? fallbackPair();
 }

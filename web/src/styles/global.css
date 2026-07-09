@@ -706,6 +706,16 @@ a {
   border-color: var(--type);
 }
 
+@media (max-width: 640px) {
+  /* iOS Safari auto-zooms the page on focus for any input under 16px -
+     bumping just the mobile font-size avoids that without changing how
+     inputs look on desktop. */
+  .form-input,
+  .ask-ai-input {
+    font-size: 16px;
+  }
+}
+
 .form-textarea {
   resize: vertical;
   font-family: var(--font-sans);
