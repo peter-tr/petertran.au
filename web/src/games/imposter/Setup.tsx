@@ -39,7 +39,7 @@ export default function ImposterSetup() {
   const [names, setNames] = useState<string[]>(prefillNames?.length ? prefillNames : ["", "", ""]);
   const [imposterCount, setImposterCount] = useState(1);
   const [imposterCountNotice, setImposterCountNotice] = useState<string | null>(null);
-  const [removePlayerNotice, setRemovePlayerNotice] = useState<string | null>(null);
+  const [playerListNotice, setPlayerListNotice] = useState<string | null>(null);
   const [hintEnabled, setHintEnabled] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -67,28 +67,36 @@ export default function ImposterSetup() {
 
   function addPlayer() {
     setImposterCountNotice(null);
-    setRemovePlayerNotice(null);
-    setNames((prev) => (prev.length >= MAX_PLAYERS ? prev : [...prev, ""]));
+    if (names.length >= MAX_PLAYERS) {
+      setPlayerListNotice(`Imposter supports up to ${MAX_PLAYERS} players.`);
+      return;
+    }
+    setPlayerListNotice(null);
+    setNames((prev) => [...prev, ""]);
   }
 
   function removePlayer(index: number) {
     setImposterCountNotice(null);
     if (names.length <= MIN_PLAYERS) {
-      setRemovePlayerNotice(`Imposter needs at least ${MIN_PLAYERS} players.`);
+      setPlayerListNotice(`Imposter needs at least ${MIN_PLAYERS} players.`);
       return;
     }
-    setRemovePlayerNotice(null);
+    setPlayerListNotice(null);
     setNames((prev) => prev.filter((_, i) => i !== index));
   }
 
   function clearNames() {
     setImposterCountNotice(null);
-    setRemovePlayerNotice(null);
+    if (names.every((n) => n.trim() === "")) {
+      setPlayerListNotice("No player names to clear yet.");
+      return;
+    }
+    setPlayerListNotice(null);
     setNames((prev) => prev.map(() => ""));
   }
 
   function incrementImposterCount() {
-    setRemovePlayerNotice(null);
+    setPlayerListNotice(null);
     if (effectiveImposterCount >= maxImposters) {
       setImposterCountNotice(
         `Add more players to allow more imposters (up to ${maxImposters} with ${effectiveNames.length} players).`
@@ -222,12 +230,7 @@ export default function ImposterSetup() {
             </span>
           </p>
           <div className="imposter-player-actions">
-            <button
-              type="button"
-              className="imposter-add-btn"
-              onClick={addPlayer}
-              disabled={names.length >= MAX_PLAYERS}
-            >
+            <button type="button" className="imposter-add-btn" onClick={addPlayer}>
               + Add player
             </button>
             <button type="button" className="imposter-add-btn" onClick={clearNames}>
@@ -255,7 +258,7 @@ export default function ImposterSetup() {
               </div>
             ))}
           </div>
-          {removePlayerNotice && <p className="imposter-inline-notice">// {removePlayerNotice}</p>}
+          {playerListNotice && <p className="imposter-inline-notice">// {playerListNotice}</p>}
         </div>
 
         <div className="imposter-field-group">
