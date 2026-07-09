@@ -38,6 +38,7 @@ export default function ImposterSetup() {
   const [names, setNames] = useState<string[]>(prefillNames?.length ? prefillNames : ["", "", ""]);
   const [imposterCount, setImposterCount] = useState(1);
   const [imposterCountNotice, setImposterCountNotice] = useState<string | null>(null);
+  const [removePlayerNotice, setRemovePlayerNotice] = useState<string | null>(null);
   const [hintEnabled, setHintEnabled] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,19 +66,28 @@ export default function ImposterSetup() {
 
   function addPlayer() {
     setImposterCountNotice(null);
+    setRemovePlayerNotice(null);
     setNames((prev) => (prev.length >= MAX_PLAYERS ? prev : [...prev, ""]));
   }
 
   function removePlayer(index: number) {
     setImposterCountNotice(null);
-    setNames((prev) => (prev.length <= MIN_PLAYERS ? prev : prev.filter((_, i) => i !== index)));
+    if (names.length <= MIN_PLAYERS) {
+      setRemovePlayerNotice(`Imposter needs at least ${MIN_PLAYERS} players.`);
+      return;
+    }
+    setRemovePlayerNotice(null);
+    setNames((prev) => prev.filter((_, i) => i !== index));
   }
 
   function clearNames() {
+    setImposterCountNotice(null);
+    setRemovePlayerNotice(null);
     setNames((prev) => prev.map(() => ""));
   }
 
   function incrementImposterCount() {
+    setRemovePlayerNotice(null);
     if (effectiveImposterCount >= maxImposters) {
       setImposterCountNotice(
         `Add more players to allow more imposters (up to ${maxImposters} with ${effectiveNames.length} players).`
@@ -210,6 +220,19 @@ export default function ImposterSetup() {
               ({MIN_PLAYERS}–{MAX_PLAYERS}, names optional - blank ones become "Player N")
             </span>
           </p>
+          <div className="imposter-player-actions">
+            <button
+              type="button"
+              className="imposter-add-btn"
+              onClick={addPlayer}
+              disabled={names.length >= MAX_PLAYERS}
+            >
+              + Add player
+            </button>
+            <button type="button" className="imposter-add-btn" onClick={clearNames}>
+              Clear names
+            </button>
+          </div>
           <div className="imposter-player-list">
             {names.map((name, i) => (
               <div className="imposter-player-row" key={i}>
@@ -224,7 +247,6 @@ export default function ImposterSetup() {
                   type="button"
                   className="imposter-remove-btn"
                   onClick={() => removePlayer(i)}
-                  disabled={names.length <= MIN_PLAYERS}
                   aria-label={`Remove player ${i + 1}`}
                 >
                   &times;
@@ -232,19 +254,7 @@ export default function ImposterSetup() {
               </div>
             ))}
           </div>
-          <div className="imposter-player-actions">
-            <button
-              type="button"
-              className="imposter-add-btn"
-              onClick={addPlayer}
-              disabled={names.length >= MAX_PLAYERS}
-            >
-              + Add player
-            </button>
-            <button type="button" className="imposter-add-btn" onClick={clearNames}>
-              Clear names
-            </button>
-          </div>
+          {removePlayerNotice && <p className="imposter-inline-notice">// {removePlayerNotice}</p>}
         </div>
 
         <div className="imposter-field-group">
@@ -272,7 +282,7 @@ export default function ImposterSetup() {
               +
             </button>
           </div>
-          {imposterCountNotice && <p className="status-line">// {imposterCountNotice}</p>}
+          {imposterCountNotice && <p className="imposter-inline-notice">// {imposterCountNotice}</p>}
         </div>
 
         <div className="imposter-field-group">

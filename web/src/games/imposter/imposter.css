@@ -23,6 +23,13 @@
   margin: 0;
 }
 
+.imposter-inline-notice {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: var(--signal);
+  margin: 0.4rem 0 0;
+}
+
 .imposter-category-grid {
   display: flex;
   flex-wrap: wrap;
