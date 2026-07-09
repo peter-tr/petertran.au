@@ -30,16 +30,10 @@ export interface GameRecord {
 
 // All-time, anonymized usage stats - see stats.ts (real, DynamoDB-backed) and
 // dev-resolvers.ts (in-memory) for the two implementations.
-export interface ImposterDailyCount {
-  timestamp: string;
-  count: number;
-}
-
 export interface ImposterStats {
   gamesPlayedTotal: number;
   gamesCompletedTotal: number;
   avgGameDurationMs: number;
-  gamesByDay: ImposterDailyCount[];
 }
 
 export interface PublicGame {

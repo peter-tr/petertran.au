@@ -398,11 +398,3 @@
   margin: 0;
 }
 
-.imposter-stats-chart {
-  width: 100%;
-  height: 3.75rem;
-}
-
-.imposter-stats-chart rect {
-  fill: var(--signal-dim);
-}

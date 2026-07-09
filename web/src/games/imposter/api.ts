@@ -162,16 +162,10 @@ export interface RevealImposterResult {
   revealImposter: ImposterGame;
 }
 
-export interface ImposterDailyCount {
-  timestamp: string;
-  count: number;
-}
-
 export interface ImposterStats {
   gamesPlayedTotal: number;
   gamesCompletedTotal: number;
   avgGameDurationMs: number;
-  gamesByDay: ImposterDailyCount[];
 }
 
 export const IMPOSTER_STATS_QUERY = /* GraphQL */ `
@@ -180,10 +174,6 @@ export const IMPOSTER_STATS_QUERY = /* GraphQL */ `
       gamesPlayedTotal
       gamesCompletedTotal
       avgGameDurationMs
-      gamesByDay {
-        timestamp
-        count
-      }
     }
   }
 `;

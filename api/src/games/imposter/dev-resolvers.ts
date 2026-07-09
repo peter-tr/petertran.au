@@ -1,24 +1,15 @@
-import { generateGameId, type GameRecord, type ImposterDailyCount } from "./game";
+import { generateGameId, type GameRecord } from "./game";
 import { createImposterResolvers } from "./resolvers";
 
 // In-memory stand-in for the DynamoDB game store - fine for local dev, where
 // state doesn't need to survive a server restart.
 const devGames = new Map<string, GameRecord>();
 
-// Same for usage stats - a handful of counters plus one day's worth of
-// activity, just enough to see the panel populated during local dev.
+// Same for usage stats - a handful of counters, just enough to see the panel
+// populated during local dev.
 let devGamesTotal = 0;
 let devGamesCompleted = 0;
 let devTotalDurationMs = 0;
-
-function devGamesByDay(): ImposterDailyCount[] {
-  const days: ImposterDailyCount[] = [];
-  for (let i = 29; i >= 0; i--) {
-    const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
-    days.push({ timestamp: d.toISOString(), count: i === 0 ? devGamesTotal : 0 });
-  }
-  return days;
-}
 
 export const devResolvers = createImposterResolvers(
   {
@@ -46,7 +37,6 @@ export const devResolvers = createImposterResolvers(
       gamesPlayedTotal: devGamesTotal,
       gamesCompletedTotal: devGamesCompleted,
       avgGameDurationMs: devGamesCompleted > 0 ? devTotalDurationMs / devGamesCompleted : 0,
-      gamesByDay: devGamesByDay(),
     }),
   }
 );

@@ -211,22 +211,4 @@ type ImposterStats {
   milliseconds, across all completed games.
   """
   avgGameDurationMs: Float!
-  """
-  Games started per day, oldest first, for the last 30 days.
-  """
-  gamesByDay: [ImposterDailyCount!]!
-}
-
-"""
-Number of games started in a single daily bucket.
-"""
-type ImposterDailyCount {
-  """
-  ISO 8601 timestamp (UTC) for the start of this day.
-  """
-  timestamp: String!
-  """
-  Number of games started during this day.
-  """
-  count: Int!
 }
