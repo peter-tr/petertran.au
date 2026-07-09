@@ -18,7 +18,7 @@ export default function ImposterGamePage() {
     runImposterQuery<ImposterGameResult>(IMPOSTER_GAME_QUERY, { gameId })
       .then((res) => {
         if (!res.imposterGame) {
-          setError("That game code wasn't found - it may have expired.");
+          setError("That game code wasn't found - double check it and try again.");
         } else {
           setGame(res.imposterGame);
         }

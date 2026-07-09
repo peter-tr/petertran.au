@@ -27,7 +27,7 @@ export interface ImposterStatsTracker {
 
 async function requireGame(store: ImposterStore, gameId: string): Promise<GameRecord> {
   const game = await store.getGame(gameId);
-  if (!game) throw new Error("That game code wasn't found - it may have expired.");
+  if (!game) throw new Error("That game code wasn't found - double check it and try again.");
   return game;
 }
 
