@@ -1,5 +1,6 @@
 import { useState } from "react";
 import QuantityStepper from "./QuantityStepper";
+import PantryEditItemModal from "./PantryEditItemModal";
 import { formatExpiresAt, formatPurchasedAt } from "../lib/dates";
 import {
   runPantryQuery,
@@ -35,6 +36,7 @@ export default function PantryItemRow({ item, simple, onChanged, onError }: Pant
   const [editingName, setEditingName] = useState(false);
   const [draftName, setDraftName] = useState(item.name);
   const [showHistory, setShowHistory] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
 
   async function saveField(input: Record<string, unknown>) {
     if (busy) return;
@@ -168,6 +170,9 @@ export default function PantryItemRow({ item, simple, onChanged, onError }: Pant
       </button>
       <div className="pantry-item-controls">
         <QuantityStepper value={item.quantity} onChange={handleQuantityChange} min={0} disabled={busy} />
+        <button type="button" className="pantry-edit-btn" onClick={() => setShowEdit(true)} disabled={busy}>
+          edit
+        </button>
         <button type="button" className="pantry-delete-btn" onClick={handleDelete} disabled={busy}>
           delete
         </button>
@@ -183,6 +188,15 @@ export default function PantryItemRow({ item, simple, onChanged, onError }: Pant
             </li>
           ))}
         </ul>
+      )}
+
+      {showEdit && (
+        <PantryEditItemModal
+          item={item}
+          busy={busy}
+          onClose={() => setShowEdit(false)}
+          onSave={saveField}
+        />
       )}
     </li>
   );

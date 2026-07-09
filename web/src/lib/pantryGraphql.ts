@@ -195,6 +195,7 @@ export interface AddToShoppingListResult {
 
 export interface PantrySettings {
   view: string;
+  sort: string;
   simple: boolean;
   optionsCollapsed: boolean;
   collapsedGroups: string[];
@@ -205,6 +206,7 @@ export type PantrySettingsInput = Partial<PantrySettings>;
 
 const SETTINGS_FIELDS = /* GraphQL */ `
   view
+  sort
   simple
   optionsCollapsed
   collapsedGroups

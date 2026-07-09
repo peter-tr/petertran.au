@@ -9,6 +9,7 @@ const shoppingList = new Map<string, ShoppingListEntry>();
 
 let settings: PantrySettings = {
   view: "location",
+  sort: "recent",
   simple: false,
   optionsCollapsed: false,
   collapsedGroups: [],

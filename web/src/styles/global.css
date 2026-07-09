@@ -86,6 +86,10 @@ a {
   color: var(--paper);
 }
 
+.nav-links a.active {
+  color: var(--type);
+}
+
 @media (max-width: 640px) {
   .nav-inner {
     padding: 0.8rem 1rem;
@@ -146,6 +150,35 @@ a {
   color: var(--muted);
   max-width: 34rem;
   margin: 0 0 1.6rem;
+}
+
+@keyframes hero-secret-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.hero-secret {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--signal);
+  margin: -0.2rem 0 1rem;
+  animation: hero-secret-in 0.4s ease;
+}
+
+.hero-secret a {
+  color: var(--signal);
+  text-decoration: none;
+  border-bottom: 1px solid var(--signal-dim);
+}
+
+.hero-secret a:hover {
+  border-color: var(--signal);
 }
 
 .section-hint {
@@ -704,6 +737,16 @@ a {
 .form-input:focus {
   outline: none;
   border-color: var(--type);
+}
+
+@media (max-width: 640px) {
+  /* iOS Safari auto-zooms the page on focus for any input under 16px -
+     bumping just the mobile font-size avoids that without changing how
+     inputs look on desktop. */
+  .form-input,
+  .ask-ai-input {
+    font-size: 16px;
+  }
 }
 
 .form-textarea {
@@ -1627,6 +1670,78 @@ a {
 .pantry-delete-btn:disabled {
   opacity: 0.6;
   cursor: default;
+}
+
+.pantry-edit-btn {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--muted);
+  background: none;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 0.25rem 0.45rem;
+  cursor: pointer;
+}
+
+.pantry-edit-btn:hover {
+  color: var(--type);
+  border-color: var(--type);
+}
+
+.pantry-edit-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.pantry-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(11, 14, 20, 0.82);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  z-index: 50;
+}
+
+.pantry-modal {
+  width: 100%;
+  max-width: 28rem;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.pantry-modal-title {
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  color: var(--paper);
+  margin: 0;
+}
+
+.pantry-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.7rem 1rem;
+}
+
+.pantry-modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 1.2rem;
+}
+
+@media (max-width: 640px) {
+  .pantry-edit-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 640px) {

@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from "react";
-import { BrowserRouter, Routes, Route, Link, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Link, NavLink, useLocation } from "react-router-dom";
 import Nav from "./components/Nav";
 import { useResumeData } from "./hooks/useResumeData";
 
@@ -33,10 +33,15 @@ function ScrollManager() {
   return null;
 }
 
-// Standalone side-projects, not portfolio content - each gets a bare
-// wordmark instead of the full site nav (resume/query/contact links) so
-// they don't read as part of the resume site itself.
+// Standalone side-projects, not portfolio content - each gets a shared
+// switcher nav (between each other, and back to the portfolio) instead of
+// the full site nav (resume/query/contact links), so they don't read as
+// part of the resume site itself.
 const STANDALONE_ROUTE_PREFIXES = ["/imposter", "/pantry"];
+
+function activeNavLink({ isActive }: { isActive: boolean }): string {
+  return isActive ? "active" : "";
+}
 
 function AppNav() {
   const location = useLocation();
@@ -49,6 +54,18 @@ function AppNav() {
           <Link className="nav-mark" to="/">
             petertran.au
           </Link>
+          <ul className="nav-links">
+            <li>
+              <NavLink to="/imposter" className={activeNavLink}>
+                imposter
+              </NavLink>
+            </li>
+            <li>
+              <NavLink to="/pantry" className={activeNavLink}>
+                pantry
+              </NavLink>
+            </li>
+          </ul>
         </div>
       </nav>
     );
