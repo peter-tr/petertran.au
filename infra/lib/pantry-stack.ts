@@ -11,8 +11,10 @@ export interface PantryStackProps extends StackProps {
 
 /**
  * Fully separate service from SiteStack: own table, own Lambda, own
- * Function URL, own schema. Nothing here is shared with the resume API -
- * that's deliberate, so each can evolve (and be reasoned about) independently.
+ * Function URL, own schema - deliberately, so it can evolve (and be reasoned
+ * about) independently of the resume API. Source lives at api/src/pantry/,
+ * alongside the resume API and games in the same npm workspace - deployment
+ * separation doesn't require a separate workspace, same as GamesStack.
  */
 export class PantryStack extends Stack {
   constructor(scope: Construct, id: string, props: PantryStackProps) {
@@ -28,8 +30,8 @@ export class PantryStack extends Stack {
 
     const apiFn = new lambda.Function(this, "PantryGraphQLFunction", {
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: "handler.handler",
-      code: lambda.Code.fromAsset(path.join(__dirname, "../../pantry-api/dist")),
+      handler: "pantry/handler.handler",
+      code: lambda.Code.fromAsset(path.join(__dirname, "../../api/dist")),
       memorySize: 256,
       timeout: Duration.seconds(10),
       environment: {

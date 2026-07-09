@@ -89,7 +89,7 @@ export class SiteStack extends Stack {
     // --- GraphQL API (Lambda + Function URL, no API Gateway needed) ---
     const apiFn = new lambda.Function(this, "GraphQLFunction", {
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: "handler.handler",
+      handler: "portfolio/handler.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/dist")),
       memorySize: 256,
       // 30s (not the default 15s) to leave headroom for the all-time cost

@@ -24,17 +24,21 @@ Requires Node 20+.
 
 ```bash
 npm install
-
-# API: a local dev server with an in-memory mock of the resolvers
-npm run dev --workspace=api
-
-# Frontend: Vite dev server
-npm run dev --workspace=web
+npm run dev
 ```
 
-The frontend expects the API at a URL configured in `web/.env` (see
-`web/src/lib/graphql.ts` for the default). Local dev doesn't need real AWS
-credentials - `api`'s dev server runs against mock data, not DynamoDB.
+This starts all four dev servers together in one terminal (labeled, colored
+output; Ctrl+C stops all of them): the resume API, the Pantry API, the
+Imposter game API, and the Vite frontend. Each API is a separate service with
+its own in-memory mock resolvers - see `api/src/{portfolio,pantry,games/imposter}`.
+
+To run just one, use its workspace script directly, e.g.
+`npm run dev:portfolio --workspace=api` or `npm run dev --workspace=web`.
+
+The frontend expects each API at a URL configured in `web/.env` (see
+`web/src/lib/graphql.ts`, `pantryGraphql.ts`, and `games/imposter/api.ts` for
+the defaults). Local dev doesn't need real AWS credentials - every API's dev
+server runs against mock data, not DynamoDB.
 
 ## Other commands
 

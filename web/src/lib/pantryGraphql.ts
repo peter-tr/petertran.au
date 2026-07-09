@@ -1,7 +1,8 @@
 import { GraphQLRequestError } from "./graphql";
 
-// Separate endpoint, separate service - pantry-api is its own Lambda/Function
-// URL, not part of the resume API this site otherwise runs on.
+// Separate endpoint, separate service - the pantry API (api/src/pantry/) is
+// its own Lambda/Function URL, deployed independently of the resume API this
+// site otherwise runs on, even though its source lives in the same workspace.
 export const PANTRY_ENDPOINT = import.meta.env.VITE_PANTRY_GRAPHQL_ENDPOINT as string | undefined;
 
 export async function runPantryQuery<T = unknown>(

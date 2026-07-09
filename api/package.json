@@ -4,10 +4,11 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "build": "esbuild src/handler.ts --bundle --platform=node --target=node20 --format=esm --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url);\" --outfile=dist/handler.mjs --external:@aws-sdk/* && cp src/schema.graphql dist/schema.graphql && esbuild src/games/imposter/handler.ts --bundle --platform=node --target=node20 --format=esm --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url);\" --outfile=dist/games/imposter/handler.mjs --external:@aws-sdk/* && cp src/games/imposter/schema.graphql dist/games/imposter/schema.graphql",
-    "seed": "tsx src/dev/seed.ts",
-    "dev": "tsx src/dev/server.ts",
-    "dev:imposter": "tsx src/games/imposter/dev-server.ts",
+    "build": "esbuild src/portfolio/handler.ts --bundle --platform=node --target=node20 --format=esm --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url);\" --outfile=dist/portfolio/handler.mjs --external:@aws-sdk/* && cp src/portfolio/schema.graphql dist/portfolio/schema.graphql && esbuild src/games/imposter/handler.ts --bundle --platform=node --target=node20 --format=esm --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url);\" --outfile=dist/games/imposter/handler.mjs --external:@aws-sdk/* && cp src/games/imposter/schema.graphql dist/games/imposter/schema.graphql && esbuild src/pantry/handler.ts --bundle --platform=node --target=node20 --format=esm --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url);\" --outfile=dist/pantry/handler.mjs --external:@aws-sdk/* && cp src/pantry/schema.graphql dist/pantry/schema.graphql",
+    "seed": "tsx src/portfolio/dev/seed.ts",
+    "dev:portfolio": "tsx src/portfolio/dev/dev-server.ts",
+    "dev:imposter": "tsx src/games/imposter/dev/dev-server.ts",
+    "dev:pantry": "tsx src/pantry/dev/dev-server.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

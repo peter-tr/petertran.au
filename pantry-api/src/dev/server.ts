@@ -1,8 +1,0 @@
-import { ApolloServer } from "@apollo/server";
-import { startStandaloneServer } from "@apollo/server/standalone";
-import { typeDefs } from "../schema";
-import { devResolvers } from "../resolvers/dev-resolvers";
-
-const server = new ApolloServer({ typeDefs, resolvers: devResolvers });
-const { url } = await startStandaloneServer(server, { listen: { port: 4002 } });
-console.log(`Dev pantry GraphQL server (mock, no DynamoDB) ready at ${url}`);

@@ -4,12 +4,12 @@
   "workspaces": [
     "infra",
     "api",
-    "pantry-api",
     "web"
   ],
   "scripts": {
+    "dev": "concurrently -n portfolio,pantry,imposter,web -c blue,green,magenta,yellow \"npm run dev:portfolio --workspace=api\" \"npm run dev:pantry --workspace=api\" \"npm run dev:imposter --workspace=api\" \"npm run dev --workspace=web\"",
     "seed": "npm run seed --workspace=api",
-    "deploy": "npm run build --workspace=api && npm run build --workspace=pantry-api && npm run build --workspace=web && npm run cdk --workspace=infra -- deploy --all",
+    "deploy": "npm run build --workspace=api && npm run build --workspace=web && npm run cdk --workspace=infra -- deploy --all",
     "cdk": "npm run cdk --workspace=infra",
     "lint": "eslint .",
     "format": "prettier --write .",
@@ -17,6 +17,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "concurrently": "^10.0.3",
     "eslint": "^10.6.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react-hooks": "^7.1.1",
