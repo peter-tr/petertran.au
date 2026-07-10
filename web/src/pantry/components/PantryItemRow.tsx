@@ -174,37 +174,39 @@ export default function PantryItemRow({
           </span>
         )}
         {item.category && <span className="pantry-item-category">{item.category}</span>}
-        <button
-          type="button"
-          className={`pantry-staple-toggle ${item.isStaple ? "active" : ""}`}
-          title={item.isStaple ? "Staple - always keep stocked" : "Mark as a staple item"}
-          onClick={() => saveField({ isStaple: !item.isStaple })}
-          disabled={busy}
-        >
-          ★
-        </button>
-        <button
-          type="button"
-          className={`pantry-low-priority-toggle-btn ${item.lowPriority ? "active" : ""}`}
-          title={
-            item.lowPriority
-              ? "Low priority - hidden from the main list"
-              : "Mark as low priority (rarely needs checking)"
-          }
-          onClick={() => saveField({ lowPriority: !item.lowPriority })}
-          disabled={busy}
-        >
-          ↓
-        </button>
-        <button
-          type="button"
-          className={`pantry-nearly-empty-toggle ${item.nearlyEmpty ? "active" : ""}`}
-          title={item.nearlyEmpty ? "Nearly empty - running low" : "Mark as nearly empty"}
-          onClick={() => saveField({ nearlyEmpty: !item.nearlyEmpty })}
-          disabled={busy}
-        >
-          !
-        </button>
+        <div className="pantry-item-toggles">
+          <button
+            type="button"
+            className={`pantry-staple-toggle ${item.isStaple ? "active" : ""}`}
+            title={item.isStaple ? "Staple - always keep stocked" : "Mark as a staple item"}
+            onClick={() => saveField({ isStaple: !item.isStaple })}
+            disabled={busy}
+          >
+            ★
+          </button>
+          <button
+            type="button"
+            className={`pantry-low-priority-toggle-btn ${item.lowPriority ? "active" : ""}`}
+            title={
+              item.lowPriority
+                ? "Low priority - hidden from the main list"
+                : "Mark as low priority (rarely needs checking)"
+            }
+            onClick={() => saveField({ lowPriority: !item.lowPriority })}
+            disabled={busy}
+          >
+            ↓
+          </button>
+          <button
+            type="button"
+            className={`pantry-nearly-empty-toggle ${item.nearlyEmpty ? "active" : ""}`}
+            title={item.nearlyEmpty ? "Nearly empty - running low" : "Mark as nearly empty"}
+            onClick={() => saveField({ nearlyEmpty: !item.nearlyEmpty })}
+            disabled={busy}
+          >
+            !
+          </button>
+        </div>
       </div>
       <button
         type="button"

@@ -688,6 +688,13 @@
   color: var(--signal);
 }
 
+.pantry-item-toggles {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
 .pantry-low-priority-toggle-btn,
 .pantry-nearly-empty-toggle {
   flex-shrink: 0;
@@ -713,10 +720,20 @@
   color: var(--string);
 }
 
+/* A block-level chip on its own line, not inline text ahead of the meta
+   string - previously ran straight into it ("low stock1 · today") with
+   only a CSS margin (invisible to copy/paste and screen readers) as the
+   separator. */
 .pantry-nearly-empty-badge {
-  color: var(--string);
+  display: block;
+  width: fit-content;
+  color: var(--ink);
+  background: var(--string);
+  font-size: 0.68rem;
   font-weight: 600;
-  margin-right: 0.4rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  margin-bottom: 0.2rem;
 }
 
 .pantry-legend {
