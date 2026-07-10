@@ -1,10 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import {
-  runPantryQuery,
-  INVENTORY_QUERY,
-  type InventoryItem,
-  type InventoryQueryResult,
-} from "../api";
+import { runPantryQuery, INVENTORY_QUERY, type InventoryItem, type InventoryQueryResult } from "../api";
 
 export function usePantryInventory() {
   const [items, setItems] = useState<InventoryItem[] | null>(null);

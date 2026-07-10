@@ -495,7 +495,19 @@ type Mutation {
   provide). isStaple only ever gets set true this way, never back to
   false, so one staple-triggered add can't be undone by an unrelated call.
   """
-  addToShoppingList(name: String!, quantity: Float, unit: String, note: String, isStaple: Boolean): ShoppingListEntry!
+  addToShoppingList(
+    name: String!
+    quantity: Float
+    unit: String
+    note: String
+    isStaple: Boolean
+  ): ShoppingListEntry!
+  """
+  Update a specific shopping list entry by id - e.g. correcting its name
+  or quantity. Unlike addToShoppingList, this never merges into a
+  different entry, even if the new name would otherwise match one.
+  """
+  updateShoppingListEntry(id: ID!, input: UpdateShoppingListEntryInput!): ShoppingListEntry!
   """
   Update a specific shopping list entry by id - e.g. correcting its name
   or quantity. Unlike addToShoppingList, this never merges into a
