@@ -19,7 +19,7 @@ interface PantryShoppingListSectionProps {
   items: InventoryItem[];
   settings: PantrySettings;
   onSettingsChange: (input: PantrySettingsInput) => void;
-  onChanged: () => void;
+  onChanged: () => Promise<void>;
 }
 
 function today(): string {
@@ -53,10 +53,13 @@ export default function PantryShoppingListSection({
           quantity: entry.quantity ?? 1,
           unit: entry.unit,
           purchasedAt: today(),
+          // Carries the staple flag through the remove -> shopping list ->
+          // re-buy cycle instead of it silently resetting to false.
+          isStaple: entry.isStaple || matchingItem?.isStaple || false,
         },
       });
       await runPantryQuery<RemoveFromShoppingListResult>(REMOVE_FROM_SHOPPING_LIST_MUTATION, { id: entry.id });
-      onChanged();
+      await onChanged();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to record purchase.");
     } finally {
@@ -71,7 +74,7 @@ export default function PantryShoppingListSection({
     setError(null);
     try {
       await runPantryQuery<RemoveFromShoppingListResult>(REMOVE_FROM_SHOPPING_LIST_MUTATION, { id });
-      onChanged();
+      await onChanged();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update shopping list.");
     } finally {
@@ -83,7 +86,7 @@ export default function PantryShoppingListSection({
     setError(null);
     try {
       await runPantryQuery<AddToShoppingListResult>(ADD_TO_SHOPPING_LIST_MUTATION, { name });
-      onChanged();
+      await onChanged();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to add to shopping list.");
     }

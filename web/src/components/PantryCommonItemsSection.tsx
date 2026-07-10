@@ -11,7 +11,7 @@ function today(): string {
 interface PantryCommonItemsSectionProps {
   commonItems: string[];
   onCommonItemsChange: (next: string[]) => void;
-  onAdded: () => void;
+  onAdded: () => Promise<void>;
 }
 
 export default function PantryCommonItemsSection({
@@ -59,7 +59,7 @@ export default function PantryCommonItemsSection({
         },
       });
       setOpenName(null);
-      onAdded();
+      await onAdded();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to add item.");
     } finally {

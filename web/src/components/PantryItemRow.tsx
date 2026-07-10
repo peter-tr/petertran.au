@@ -14,7 +14,7 @@ import {
 interface PantryItemRowProps {
   item: InventoryItem;
   simple: boolean;
-  onChanged: () => void;
+  onChanged: () => Promise<void>;
   onError: (message: string) => void;
 }
 
@@ -43,7 +43,12 @@ export default function PantryItemRow({ item, simple, onChanged, onError }: Pant
     setBusy(true);
     try {
       await runPantryQuery<UpdateInventoryItemResult>(UPDATE_INVENTORY_ITEM_MUTATION, { id: item.id, input });
-      onChanged();
+      // Awaited so `busy` doesn't clear (re-enabling e.g. the staple star)
+      // until fresh data has actually landed in props - otherwise a quick
+      // second click computes its next value off the stale `item` still
+      // sitting in this render, which looked like the toggle getting stuck
+      // rather than flipping back.
+      await onChanged();
     } catch (err) {
       onError(err instanceof Error ? err.message : "Failed to update item.");
     } finally {
@@ -60,7 +65,7 @@ export default function PantryItemRow({ item, simple, onChanged, onError }: Pant
       setBusy(true);
       try {
         await runPantryQuery<RemoveInventoryItemResult>(REMOVE_INVENTORY_ITEM_MUTATION, { id: item.id });
-        onChanged();
+        await onChanged();
       } catch (err) {
         onError(err instanceof Error ? err.message : "Failed to update item.");
       } finally {
@@ -76,7 +81,7 @@ export default function PantryItemRow({ item, simple, onChanged, onError }: Pant
     setBusy(true);
     try {
       await runPantryQuery<RemoveInventoryItemResult>(REMOVE_INVENTORY_ITEM_MUTATION, { id: item.id });
-      onChanged();
+      await onChanged();
     } catch (err) {
       onError(err instanceof Error ? err.message : "Failed to remove item.");
     } finally {

@@ -118,7 +118,7 @@ interface PantryInventorySectionProps {
   items: InventoryItem[];
   settings: PantrySettings;
   onSettingsChange: (partial: PantrySettingsInput) => void;
-  onChanged: () => void;
+  onChanged: () => Promise<void>;
 }
 
 export default function PantryInventorySection({

@@ -12,9 +12,12 @@ export default function Pantry() {
   const { entries: shoppingList, refetch: refetchShoppingList } = usePantryShoppingList();
   const { settings, updateSettings } = usePantrySettings();
 
-  function refetchAll() {
-    refetch();
-    refetchShoppingList();
+  // Awaited by callers before re-enabling their own busy state (e.g. the
+  // staple star toggle) - without that, a quick second click computes its
+  // next value from stale props because the refetch hadn't landed yet,
+  // which looked like the toggle "getting stuck" instead of flipping back.
+  async function refetchAll() {
+    await Promise.all([refetch(), refetchShoppingList()]);
   }
 
   return (

@@ -38,6 +38,7 @@ export interface ShoppingListEntry {
   quantity: number | null;
   unit: string | null;
   note: string | null;
+  isStaple: boolean;
   addedAt: string;
 }
 
@@ -176,7 +177,8 @@ async function upsertShoppingListEntry(
   name: string,
   quantity: number | null,
   unit: string | null,
-  note: string | null = null
+  note: string | null = null,
+  isStaple = false
 ): Promise<ShoppingListEntry> {
   const normalizedUnit = unit ? normalizeUnit(unit) : null;
   const existing = await getShoppingList();
@@ -189,6 +191,9 @@ async function upsertShoppingListEntry(
         quantity: quantity ?? match.quantity,
         unit: normalizedUnit ?? match.unit,
         note: note ?? match.note,
+        // Only ever upgrades to true, never back to false - an unrelated
+        // manual add shouldn't undo an earlier staple-triggered one.
+        isStaple: isStaple || match.isStaple,
       }
     : {
         id: randomUUID(),
@@ -196,6 +201,7 @@ async function upsertShoppingListEntry(
         quantity,
         unit: normalizedUnit,
         note,
+        isStaple,
         addedAt: new Date().toISOString(),
       };
 
@@ -333,7 +339,7 @@ export const resolvers = {
 
       const existing = await getItem(args.id);
       if (existing?.isStaple) {
-        await upsertShoppingListEntry(existing.name, null, null);
+        await upsertShoppingListEntry(existing.name, null, null, null, true);
       }
 
       const res = await ddb.send(
@@ -348,11 +354,23 @@ export const resolvers = {
 
     addToShoppingList: async (
       _: unknown,
-      args: { name: string; quantity?: number | null; unit?: string | null; note?: string | null },
+      args: {
+        name: string;
+        quantity?: number | null;
+        unit?: string | null;
+        note?: string | null;
+        isStaple?: boolean | null;
+      },
       context: Context
     ): Promise<ShoppingListEntry> => {
       await assertNotRateLimited(context.sourceIp);
-      return upsertShoppingListEntry(args.name, args.quantity ?? null, args.unit ?? null, args.note ?? null);
+      return upsertShoppingListEntry(
+        args.name,
+        args.quantity ?? null,
+        args.unit ?? null,
+        args.note ?? null,
+        args.isStaple ?? false
+      );
     },
 
     removeFromShoppingList: async (_: unknown, args: { id: string }, context: Context): Promise<boolean> => {

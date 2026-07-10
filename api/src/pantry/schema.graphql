@@ -177,6 +177,13 @@ type ShoppingListEntry {
   """
   note: String
   """
+  True if this was added because a staple item ran out (or was manually
+  flagged as one) - so once it's bought and recorded back into inventory,
+  it can stay marked as a staple instead of that having to be re-set by
+  hand every time it cycles through the shopping list.
+  """
+  isStaple: Boolean!
+  """
   Timestamp this entry was added, ISO 8601.
   """
   addedAt: String!
@@ -423,9 +430,11 @@ type Mutation {
   isn't a staple currently tracked in inventory. Matches by the same
   normalized-name rule as recordPurchase, so it won't duplicate an entry
   that's already on the list - calling this again for an existing entry
-  updates its quantity/unit instead (only overwriting fields you provide).
+  updates its quantity/unit/note instead (only overwriting fields you
+  provide). isStaple only ever gets set true this way, never back to
+  false, so one staple-triggered add can't be undone by an unrelated call.
   """
-  addToShoppingList(name: String!, quantity: Float, unit: String, note: String): ShoppingListEntry!
+  addToShoppingList(name: String!, quantity: Float, unit: String, note: String, isStaple: Boolean): ShoppingListEntry!
   """
   Remove an entry from the shopping list, e.g. once it's been bought.
   Returns true if a row was actually deleted.

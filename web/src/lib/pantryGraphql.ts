@@ -155,6 +155,7 @@ export interface ShoppingListEntry {
   quantity: number | null;
   unit: string | null;
   note: string | null;
+  isStaple: boolean;
   addedAt: string;
 }
 
@@ -166,6 +167,7 @@ export const SHOPPING_LIST_QUERY = /* GraphQL */ `
       quantity
       unit
       note
+      isStaple
       addedAt
     }
   }
@@ -186,13 +188,20 @@ export interface RemoveFromShoppingListResult {
 }
 
 export const ADD_TO_SHOPPING_LIST_MUTATION = /* GraphQL */ `
-  mutation AddToShoppingList($name: String!, $quantity: Float, $unit: String, $note: String) {
-    addToShoppingList(name: $name, quantity: $quantity, unit: $unit, note: $note) {
+  mutation AddToShoppingList(
+    $name: String!
+    $quantity: Float
+    $unit: String
+    $note: String
+    $isStaple: Boolean
+  ) {
+    addToShoppingList(name: $name, quantity: $quantity, unit: $unit, note: $note, isStaple: $isStaple) {
       id
       name
       quantity
       unit
       note
+      isStaple
       addedAt
     }
   }

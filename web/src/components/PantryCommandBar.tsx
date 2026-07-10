@@ -28,7 +28,7 @@ interface AssistantTurn {
 type Turn = UserTurn | AssistantTurn;
 
 interface PantryCommandBarProps {
-  onChanged: () => void;
+  onChanged: () => Promise<void>;
 }
 
 // Only the last few turns are sent back as context on each call - a
@@ -222,7 +222,7 @@ export default function PantryCommandBar({ onChanged }: PantryCommandBarProps) {
       }
     }
 
-    onChanged();
+    await onChanged();
 
     if (failures.length) {
       updateAssistantTurn(turnIndex, { actionsStatus: "pending", actionsError: failures.join(" ") });

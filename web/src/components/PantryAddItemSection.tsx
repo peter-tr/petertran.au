@@ -15,7 +15,7 @@ function today(): string {
 }
 
 interface PantryAddItemSectionProps {
-  onAdded: () => void;
+  onAdded: () => Promise<void>;
 }
 
 export default function PantryAddItemSection({ onAdded }: PantryAddItemSectionProps) {
@@ -64,7 +64,7 @@ export default function PantryAddItemSection({ onAdded }: PantryAddItemSectionPr
       setIsStaple(false);
       setShowDetails(false);
       setStatus("idle");
-      onAdded();
+      await onAdded();
     } catch (err) {
       setStatus("error");
       setError(err instanceof Error ? err.message : "Something went wrong.");

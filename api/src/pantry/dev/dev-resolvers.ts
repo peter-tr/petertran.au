@@ -96,7 +96,8 @@ function upsertShoppingListEntry(
   name: string,
   quantity: number | null,
   unit: string | null,
-  note: string | null = null
+  note: string | null = null,
+  isStaple = false
 ): ShoppingListEntry {
   const normalizedUnit = unit ? normalizeUnit(unit) : null;
   const needle = normalizeItemName(name);
@@ -107,8 +108,17 @@ function upsertShoppingListEntry(
         quantity: quantity ?? match.quantity,
         unit: normalizedUnit ?? match.unit,
         note: note ?? match.note,
+        isStaple: isStaple || match.isStaple,
       }
-    : { id: randomUUID(), name, quantity, unit: normalizedUnit, note, addedAt: new Date().toISOString() };
+    : {
+        id: randomUUID(),
+        name,
+        quantity,
+        unit: normalizedUnit,
+        note,
+        isStaple,
+        addedAt: new Date().toISOString(),
+      };
   shoppingList.set(entry.id, entry);
   return entry;
 }
@@ -294,13 +304,26 @@ export const devResolvers = {
     },
     removeInventoryItem: (_: unknown, args: { id: string }) => {
       const existing = items.get(args.id);
-      if (existing?.isStaple) upsertShoppingListEntry(existing.name, null, null);
+      if (existing?.isStaple) upsertShoppingListEntry(existing.name, null, null, null, true);
       return items.delete(args.id);
     },
     addToShoppingList: (
       _: unknown,
-      args: { name: string; quantity?: number | null; unit?: string | null; note?: string | null }
-    ) => upsertShoppingListEntry(args.name, args.quantity ?? null, args.unit ?? null, args.note ?? null),
+      args: {
+        name: string;
+        quantity?: number | null;
+        unit?: string | null;
+        note?: string | null;
+        isStaple?: boolean | null;
+      }
+    ) =>
+      upsertShoppingListEntry(
+        args.name,
+        args.quantity ?? null,
+        args.unit ?? null,
+        args.note ?? null,
+        args.isStaple ?? false
+      ),
     removeFromShoppingList: (_: unknown, args: { id: string }) => shoppingList.delete(args.id),
     updateSettings: (_: unknown, args: { input: Partial<PantrySettings> }) => {
       settings = {
