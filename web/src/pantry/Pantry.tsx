@@ -31,7 +31,7 @@ export default function Pantry() {
         <p className="status-line">// couldn&apos;t load inventory from the API right now ({error}).</p>
       )}
 
-      <PantryCommandBar onChanged={refetchAll} />
+      <PantryCommandBar items={items ?? []} onChanged={refetchAll} />
 
       {shoppingList && items && settings && (
         <PantryShoppingListSection

@@ -4,12 +4,14 @@ import {
   PARSE_COMMAND_QUERY,
   PANTRY_ACTION_MUTATIONS,
   type ConversationMessage,
+  type InventoryItem,
   type ParseCommandResult,
   type ParsedCommand,
   type ProposedAction,
+  type RecipeIngredient,
   type RecipeSuggestion,
 } from "../api";
-import { scaleAmount, scalePrice } from "../lib/recipeScaling";
+import { scaleAmount, scalePrice, checkSufficiency } from "../lib/recipeScaling";
 
 type ActionsStatus = "pending" | "confirming" | "done" | "cancelled";
 
@@ -37,6 +39,7 @@ interface AssistantTurn {
 type Turn = UserTurn | AssistantTurn;
 
 interface PantryCommandBarProps {
+  items: InventoryItem[];
   onChanged: () => Promise<void>;
 }
 
@@ -78,21 +81,36 @@ function formatMutationPreview(mutationName: string, argsJson: string): string {
   }
 }
 
-// Turns a recipe's missing ingredients into the same {mutationName,
-// argsJson} shape parseCommand itself produces - no extra AI call, this is
-// just client-side synthesis feeding the exact same confirm/preview UI.
-// `excluded` holds "recipeIndex-ingredientIndex" keys the user clicked off.
-// `ratio` scales each ingredient's amount to whatever servings the recipe
-// card is currently showing, so the shopping-list note reflects what's
-// actually needed rather than always the recipe's base amount.
+// haveInInventory only ever means "this ingredient exists somewhere in
+// inventory", set once by the AI - it's never re-checked as the servings
+// stepper scales the required amount up, so a "have" ingredient can end up
+// silently short (28 servings needing 14 onions when you own 2). This
+// treats "have, but not enough at the current serving count" the same as
+// "missing" for both display and the shopping-list batch, falling back to
+// the AI's flag as-is whenever the comparison can't be made safely.
+function isEffectivelyMissing(ing: RecipeIngredient, ratio: number, items: InventoryItem[]): boolean {
+  if (!ing.haveInInventory) return true;
+  const matched = ing.itemId ? (items.find((i) => i.id === ing.itemId) ?? null) : null;
+  return checkSufficiency(ing.amount, ing.quantity, ratio, matched) === "insufficient";
+}
+
+// Turns a recipe's missing (or insufficient) ingredients into the same
+// {mutationName, argsJson} shape parseCommand itself produces - no extra AI
+// call, this is just client-side synthesis feeding the exact same
+// confirm/preview UI. `excluded` holds "recipeIndex-ingredientIndex" keys
+// the user clicked off. `ratio` scales each ingredient's amount to whatever
+// servings the recipe card is currently showing, so the shopping-list note
+// reflects what's actually needed rather than always the recipe's base
+// amount.
 function buildRecipeShoppingActions(
   recipe: RecipeSuggestion,
   recipeIndex: number,
   excluded: Set<string>,
-  ratio: number
+  ratio: number,
+  items: InventoryItem[]
 ): ProposedAction[] {
   return recipe.ingredients
-    .filter((ing, ii) => !ing.haveInInventory && !excluded.has(`${recipeIndex}-${ii}`))
+    .filter((ing, ii) => isEffectivelyMissing(ing, ratio, items) && !excluded.has(`${recipeIndex}-${ii}`))
     .map((ing) => {
       const amount = scaleAmount(ing.amount, ing.quantity, ratio);
       const note = amount ? `${amount} - for: ${recipe.name}` : `For: ${recipe.name}`;
@@ -111,7 +129,7 @@ function servingsFor(turn: AssistantTurn, recipeIndex: number, recipe: RecipeSug
   return turn.recipeServings[recipeIndex] ?? recipe.baseServings;
 }
 
-export default function PantryCommandBar({ onChanged }: PantryCommandBarProps) {
+export default function PantryCommandBar({ items, onChanged }: PantryCommandBarProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [input, setInput] = useState("");
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -264,7 +282,7 @@ export default function PantryCommandBar({ onChanged }: PantryCommandBarProps) {
     const turn = turns[turnIndex];
     if (turn.role !== "assistant") return;
     const ratio = servingsFor(turn, recipeIndex, recipe) / recipe.baseServings;
-    const actions = buildRecipeShoppingActions(recipe, recipeIndex, turn.excludedIngredients, ratio);
+    const actions = buildRecipeShoppingActions(recipe, recipeIndex, turn.excludedIngredients, ratio, items);
     if (actions.length === 0) return;
     updateAssistantTurn(turnIndex, {
       result: { ...turn.result, actions },
@@ -343,11 +361,11 @@ export default function PantryCommandBar({ onChanged }: PantryCommandBarProps) {
                 {i === lastRecipesTurnIndex && turn.result.recipes && turn.result.recipes.length > 0 && (
                   <div className="pantry-command-recipes">
                     {turn.result.recipes.map((recipe, ri) => {
-                      const missingCount = recipe.ingredients.filter(
-                        (ing, ii) => !ing.haveInInventory && !turn.excludedIngredients.has(`${ri}-${ii}`)
-                      ).length;
                       const servings = servingsFor(turn, ri, recipe);
                       const ratio = servings / recipe.baseServings;
+                      const missingCount = recipe.ingredients.filter(
+                        (ing, ii) => isEffectivelyMissing(ing, ratio, items) && !turn.excludedIngredients.has(`${ri}-${ii}`)
+                      ).length;
                       const totalPriceAud = recipe.ingredients.reduce(
                         (sum, ing) => sum + scalePrice(ing.estimatedPriceAud, ing.quantity, ratio),
                         0
@@ -388,9 +406,15 @@ export default function PantryCommandBar({ onChanged }: PantryCommandBarProps) {
                           <ul className="pantry-command-recipe-ingredients">
                             {recipe.ingredients.map((ing, ii) => {
                               const excluded = turn.excludedIngredients.has(`${ri}-${ii}`);
-                              const clickable = !ing.haveInInventory;
+                              const matched = ing.itemId ? (items.find((it) => it.id === ing.itemId) ?? null) : null;
+                              const sufficiency = ing.haveInInventory
+                                ? checkSufficiency(ing.amount, ing.quantity, ratio, matched)
+                                : "unknown";
+                              const insufficient = sufficiency === "insufficient";
+                              const clickable = !ing.haveInInventory || insufficient;
                               const amount = scaleAmount(ing.amount, ing.quantity, ratio);
                               const price = scalePrice(ing.estimatedPriceAud, ing.quantity, ratio);
+                              const icon = !ing.haveInInventory ? "+" : insufficient ? "△" : "✓";
                               return (
                                 <li
                                   key={ii}
@@ -398,6 +422,7 @@ export default function PantryCommandBar({ onChanged }: PantryCommandBarProps) {
                                     ing.haveInInventory
                                       ? "pantry-command-ingredient-have"
                                       : "pantry-command-ingredient-missing",
+                                    insufficient ? "pantry-command-ingredient-insufficient" : "",
                                     excluded ? "pantry-command-ingredient-excluded" : "",
                                     clickable ? "pantry-command-ingredient-clickable" : "",
                                   ]
@@ -405,7 +430,15 @@ export default function PantryCommandBar({ onChanged }: PantryCommandBarProps) {
                                     .join(" ")}
                                   role={clickable ? "button" : undefined}
                                   tabIndex={clickable ? 0 : undefined}
-                                  title={clickable ? (excluded ? "Click to include again" : "Click to skip") : undefined}
+                                  title={
+                                    clickable
+                                      ? excluded
+                                        ? "Click to include again"
+                                        : insufficient
+                                          ? "You don't have enough at this serving count - click to skip"
+                                          : "Click to skip"
+                                      : undefined
+                                  }
                                   onClick={clickable ? () => toggleExcludedIngredient(i, ri, ii) : undefined}
                                   onKeyDown={
                                     clickable
@@ -418,8 +451,15 @@ export default function PantryCommandBar({ onChanged }: PantryCommandBarProps) {
                                       : undefined
                                   }
                                 >
-                                  {ing.haveInInventory ? "✓" : "+"} {ing.name}
+                                  {icon} {ing.name}
                                   {amount && <span className="pantry-command-ingredient-amount"> ({amount})</span>}
+                                  {insufficient && matched && (
+                                    <span className="pantry-command-ingredient-amount">
+                                      {" "}
+                                      - have {matched.quantity}
+                                      {matched.unit ? ` ${matched.unit}` : ""}
+                                    </span>
+                                  )}
                                   {price > 0 && (
                                     <span className="pantry-command-ingredient-price"> ~${price.toFixed(2)}</span>
                                   )}

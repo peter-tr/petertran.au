@@ -589,6 +589,13 @@
   color: var(--paper);
 }
 
+/* "Have" some, but not enough at the current serving count - between
+   pantry-command-ingredient-have and -missing, not a replacement for
+   either (the base class from haveInInventory is still applied too). */
+.pantry-command-ingredient-insufficient {
+  color: var(--string);
+}
+
 .pantry-command-ingredient-amount {
   color: var(--muted-dim);
   font-size: 0.8rem;
