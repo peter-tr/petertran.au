@@ -91,13 +91,18 @@ function createItem(input: AddInput): InventoryItem {
   };
 }
 
-function addToShoppingListIfMissing(name: string): ShoppingListEntry {
+function upsertShoppingListEntry(
+  name: string,
+  quantity: number | null,
+  unit: string | null
+): ShoppingListEntry {
+  const normalizedUnit = unit ? normalizeUnit(unit) : null;
   const needle = normalizeItemName(name);
   const match = [...shoppingList.values()].find((e) => normalizeItemName(e.name) === needle);
-  if (match) return match;
-  const id = randomUUID();
-  const entry: ShoppingListEntry = { id, name, addedAt: new Date().toISOString() };
-  shoppingList.set(id, entry);
+  const entry: ShoppingListEntry = match
+    ? { ...match, quantity: quantity ?? match.quantity, unit: normalizedUnit ?? match.unit }
+    : { id: randomUUID(), name, quantity, unit: normalizedUnit, addedAt: new Date().toISOString() };
+  shoppingList.set(entry.id, entry);
   return entry;
 }
 
@@ -250,10 +255,11 @@ export const devResolvers = {
     },
     removeInventoryItem: (_: unknown, args: { id: string }) => {
       const existing = items.get(args.id);
-      if (existing?.isStaple) addToShoppingListIfMissing(existing.name);
+      if (existing?.isStaple) upsertShoppingListEntry(existing.name, null, null);
       return items.delete(args.id);
     },
-    addToShoppingList: (_: unknown, args: { name: string }) => addToShoppingListIfMissing(args.name),
+    addToShoppingList: (_: unknown, args: { name: string; quantity?: number | null; unit?: string | null }) =>
+      upsertShoppingListEntry(args.name, args.quantity ?? null, args.unit ?? null),
     removeFromShoppingList: (_: unknown, args: { id: string }) => shoppingList.delete(args.id),
     updateSettings: (_: unknown, args: { input: Partial<PantrySettings> }) => {
       settings = {

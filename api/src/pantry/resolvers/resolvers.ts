@@ -35,6 +35,8 @@ export interface InventoryItem {
 export interface ShoppingListEntry {
   id: string;
   name: string;
+  quantity: number | null;
+  unit: string | null;
   addedAt: string;
 }
 
@@ -162,15 +164,23 @@ async function getShoppingList(): Promise<ShoppingListEntry[]> {
 }
 
 // Used both automatically (a staple running out) and manually (the "add to
-// shopping list" form) - returns the existing entry rather than duplicating
-// one for the same normalized name.
-async function addToShoppingListIfMissing(name: string): Promise<ShoppingListEntry> {
+// shopping list" form, and the AI command bar) - updates the existing
+// entry's quantity/unit rather than duplicating one for the same
+// normalized name, if one's already there.
+async function upsertShoppingListEntry(
+  name: string,
+  quantity: number | null,
+  unit: string | null
+): Promise<ShoppingListEntry> {
+  const normalizedUnit = unit ? normalizeUnit(unit) : null;
   const existing = await getShoppingList();
   const needle = normalizeItemName(name);
   const match = existing.find((e) => normalizeItemName(e.name) === needle);
-  if (match) return match;
 
-  const entry: ShoppingListEntry = { id: randomUUID(), name, addedAt: new Date().toISOString() };
+  const entry: ShoppingListEntry = match
+    ? { ...match, quantity: quantity ?? match.quantity, unit: normalizedUnit ?? match.unit }
+    : { id: randomUUID(), name, quantity, unit: normalizedUnit, addedAt: new Date().toISOString() };
+
   await ddb.send(
     new PutCommand({
       TableName: TABLE_NAME,
@@ -305,7 +315,7 @@ export const resolvers = {
 
       const existing = await getItem(args.id);
       if (existing?.isStaple) {
-        await addToShoppingListIfMissing(existing.name);
+        await upsertShoppingListEntry(existing.name, null, null);
       }
 
       const res = await ddb.send(
@@ -320,11 +330,11 @@ export const resolvers = {
 
     addToShoppingList: async (
       _: unknown,
-      args: { name: string },
+      args: { name: string; quantity?: number | null; unit?: string | null },
       context: Context
     ): Promise<ShoppingListEntry> => {
       await assertNotRateLimited(context.sourceIp);
-      return addToShoppingListIfMissing(args.name);
+      return upsertShoppingListEntry(args.name, args.quantity ?? null, args.unit ?? null);
     },
 
     removeFromShoppingList: async (_: unknown, args: { id: string }, context: Context): Promise<boolean> => {

@@ -161,6 +161,16 @@ type ShoppingListEntry {
   """
   name: String!
   """
+  How much is needed, e.g. 1 for "1 kg of coffee beans". Null if no
+  particular amount was specified - just "buy this".
+  """
+  quantity: Float
+  """
+  Unit the quantity is measured in, e.g. "kg", "L", "pcs". Null if
+  quantity is null.
+  """
+  unit: String
+  """
   Timestamp this entry was added, ISO 8601.
   """
   addedAt: String!
@@ -329,12 +339,14 @@ type Mutation {
   """
   removeInventoryItem(id: ID!): Boolean!
   """
-  Manually add an item to the shopping list - e.g. something you remembered
-  you need that isn't a staple currently tracked in inventory. Matches by the
-  same normalized-name rule as recordPurchase, so it won't duplicate an
-  entry that's already on the list.
+  Manually add an item to the shopping list, or update the quantity needed
+  if it's already there - e.g. something you remembered you need that
+  isn't a staple currently tracked in inventory. Matches by the same
+  normalized-name rule as recordPurchase, so it won't duplicate an entry
+  that's already on the list - calling this again for an existing entry
+  updates its quantity/unit instead (only overwriting fields you provide).
   """
-  addToShoppingList(name: String!): ShoppingListEntry!
+  addToShoppingList(name: String!, quantity: Float, unit: String): ShoppingListEntry!
   """
   Remove an entry from the shopping list, e.g. once it's been bought.
   Returns true if a row was actually deleted.

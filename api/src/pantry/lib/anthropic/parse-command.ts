@@ -59,7 +59,12 @@ function formatInventoryForPrompt(inventory: InventoryItem[]): string {
 
 function formatShoppingListForPrompt(shoppingList: ShoppingListEntry[]): string {
   if (shoppingList.length === 0) return "(empty)";
-  return shoppingList.map((e) => `- id=${e.id} name="${e.name}"`).join("\n");
+  return shoppingList
+    .map(
+      (e) =>
+        `- id=${e.id} name="${e.name}"${e.quantity != null ? ` quantity=${e.quantity} unit=${e.unit ?? "none"}` : " (no quantity set)"}`
+    )
+    .join("\n");
 }
 
 function buildSystemPrompt(inventory: InventoryItem[], shoppingList: ShoppingListEntry[]): string {
@@ -79,13 +84,15 @@ Decide whether the input is a QUESTION (answerable from the data above) or an AC
   - RECORD_PURCHASE: adding or buying a new or existing item. Always use this (never UPDATE_INVENTORY_ITEM) for "add X" / "bought X" phrasing, even if a similar item already exists - the system merges duplicates itself. Requires name, location (guess FRIDGE/FREEZER/PANTRY sensibly if not stated), and quantity (default 1 if not stated). Set purchasedAt to today's date (${today}) unless the input implies no purchase actually happened.
   - UPDATE_INVENTORY_ITEM: correcting an EXISTING item's fields without it being a new purchase. Requires itemId matching one of the ids listed above exactly - never invent an id.
   - REMOVE_INVENTORY_ITEM: fully using up or getting rid of an existing item. Requires itemId matching one of the ids listed above exactly.
-  - ADD_TO_SHOPPING_LIST: noting something is needed without it being in stock right now (e.g. "we're out of eggs", "need to buy bread"). Requires name.
+  - ADD_TO_SHOPPING_LIST: noting something is needed without it being in stock right now (e.g. "we're out of eggs", "need to buy bread", "add 1 kg of coffee beans to my shopping list"). Requires name. Set quantity/unit only if the input actually states an amount (e.g. "1 kg of coffee beans" -> quantity=1, unit="kg"); leave both null for a plain "buy this" with no amount. If the name matches an item already on the shopping list (see the list above), this UPDATES that entry's quantity/unit rather than creating a duplicate - use it for that too, e.g. if the user gives an amount for something already listed.
   - REMOVE_FROM_SHOPPING_LIST: an item on the shopping list has been bought or is no longer needed. Requires itemId matching one of the shopping list ids listed above exactly.
   Always write a short, specific "summary" for each action describing exactly what will happen, e.g. "Add 2 L Milk to the fridge, bought today".
+  If the input names multiple distinct items - separated by commas, "and", or just listed one after another, e.g. "I bought pasta, pesto and cheese" - create one separate action per item, each with its own name. Never combine several item names into a single action's name field (e.g. never "pasta pesto cheese" as one name) - if you're about to write more than two or three words into a "name" field, that's a sign you're merging items that should be split.
   If part of the request is too vague to act on safely (e.g. "and whatever else I need for X" without saying what), don't invent items to fill the gap and don't drop the whole request either - propose actions for the clear part, and use "message" to say what you left out and why, so the user can just ask again for that part specifically.
 - "unclear": use this only when NONE of the input maps to a question or a safe action - it's empty, entirely unrelated to pantry/fridge inventory, or too ambiguous throughout to act on at all (e.g. it names an item that doesn't clearly match anything above, or could mean more than one existing item). Explain briefly in "message" why, or what's ambiguous - never guess at an itemId you're not sure about.
 
 Rules:
+- Never mention an id (the "id=..." values above) in "answer" or "message" text - those are internal, refer to items by name only when talking to the user.
 - Never invent an itemId that isn't listed above.
 - Never invent specific items the user didn't name, even when asked to guess what they "might need" - that's exactly the kind of gap "actions" mode's "message" field is for.
 - If ambiguous which existing item is meant, leave that part out (via "unclear" if it's the whole request, or "message" if it's part of one) and ask for clarification rather than guessing.
@@ -204,7 +211,7 @@ function toProposedAction(a: RawAction): ProposedAction | null {
         type: a.type,
         summary: a.summary,
         mutationName: "addToShoppingList",
-        argsJson: JSON.stringify({ name: a.name }),
+        argsJson: JSON.stringify({ name: a.name, quantity: a.quantity, unit: a.unit }),
       };
     }
     case "REMOVE_FROM_SHOPPING_LIST": {

@@ -51,7 +51,16 @@ export default function PantryShoppingListSection({ entries, onChanged }: Pantry
         <ul className="pantry-shopping-list">
           {entries.map((entry) => (
             <li key={entry.id} className="pantry-shopping-item">
-              <span>{entry.name}</span>
+              <span>
+                {entry.name}
+                {entry.quantity != null && (
+                  <span className="pantry-shopping-qty">
+                    {" "}
+                    ({entry.quantity}
+                    {entry.unit ? ` ${entry.unit}` : ""})
+                  </span>
+                )}
+              </span>
               <button
                 type="button"
                 className="pantry-delete-btn"

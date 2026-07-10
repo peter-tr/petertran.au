@@ -152,6 +152,8 @@ export interface RemoveInventoryItemResult {
 export interface ShoppingListEntry {
   id: string;
   name: string;
+  quantity: number | null;
+  unit: string | null;
   addedAt: string;
 }
 
@@ -160,6 +162,8 @@ export const SHOPPING_LIST_QUERY = /* GraphQL */ `
     shoppingList {
       id
       name
+      quantity
+      unit
       addedAt
     }
   }
@@ -180,10 +184,12 @@ export interface RemoveFromShoppingListResult {
 }
 
 export const ADD_TO_SHOPPING_LIST_MUTATION = /* GraphQL */ `
-  mutation AddToShoppingList($name: String!) {
-    addToShoppingList(name: $name) {
+  mutation AddToShoppingList($name: String!, $quantity: Float, $unit: String) {
+    addToShoppingList(name: $name, quantity: $quantity, unit: $unit) {
       id
       name
+      quantity
+      unit
       addedAt
     }
   }
