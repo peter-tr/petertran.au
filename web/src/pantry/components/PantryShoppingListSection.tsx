@@ -22,6 +22,7 @@ interface EditDraft {
   quantity: string;
   unit: string;
   note: string;
+  category: string;
 }
 
 interface PantryShoppingListSectionProps {
@@ -46,16 +47,33 @@ export default function PantryShoppingListSection({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editMode, setEditMode] = useState<"edit" | "bought">("edit");
   const [draft, setDraft] = useState<EditDraft | null>(null);
 
-  function startEdit(entry: ShoppingListEntry) {
-    setEditingId(entry.id);
-    setDraft({
+  function draftFrom(entry: ShoppingListEntry): EditDraft {
+    return {
       name: entry.name,
       quantity: entry.quantity != null ? String(entry.quantity) : "",
       unit: entry.unit ?? "",
       note: entry.note ?? "",
-    });
+      category: entry.category ?? "",
+    };
+  }
+
+  function startEdit(entry: ShoppingListEntry) {
+    setEditingId(entry.id);
+    setEditMode("edit");
+    setDraft(draftFrom(entry));
+  }
+
+  // Opens the same inline row as startEdit, but in "confirm what you
+  // actually bought" mode - quantity/unit are prefilled from the entry but
+  // editable before recordPurchase is called, instead of blindly trusting
+  // whatever was on the list.
+  function startBought(entry: ShoppingListEntry) {
+    setEditingId(entry.id);
+    setEditMode("bought");
+    setDraft(draftFrom(entry));
   }
 
   function cancelEdit() {
@@ -80,6 +98,7 @@ export default function PantryShoppingListSection({
           quantity: draft.quantity.trim() ? Number(draft.quantity) : null,
           unit: draft.unit || null,
           note: draft.note.trim() || null,
+          category: draft.category.trim() || null,
         },
       });
       cancelEdit();
@@ -95,7 +114,10 @@ export default function PantryShoppingListSection({
   // it shows up in inventory), then drop it off the shopping list. Reuses
   // an existing inventory item's location if the name matches one, so this
   // merges instead of creating a stray duplicate in the wrong place.
-  async function handleBought(entry: ShoppingListEntry) {
+  // Quantity/unit come from the (possibly edited) draft, not the entry's
+  // original values, so a confirm of "actually only got 2, not 3" sticks.
+  async function confirmBought(entry: ShoppingListEntry) {
+    if (!draft) return;
     setBusyId(entry.id);
     setError(null);
     try {
@@ -105,20 +127,40 @@ export default function PantryShoppingListSection({
         input: {
           name: entry.name,
           location: matchingItem?.location ?? "PANTRY",
-          quantity: entry.quantity ?? 1,
-          unit: entry.unit,
+          quantity: draft.quantity.trim() ? Number(draft.quantity) : (entry.quantity ?? 1),
+          unit: draft.unit || entry.unit,
           purchasedAt: today(),
-          // Carries the staple flag through the remove -> shopping list ->
-          // re-buy cycle instead of it silently resetting to false.
+          // Carries the staple flag and category through the remove ->
+          // shopping list -> re-buy cycle instead of them silently
+          // resetting.
           isStaple: entry.isStaple || matchingItem?.isStaple || false,
+          category: draft.category.trim() || entry.category || matchingItem?.category || null,
         },
       });
       await runPantryQuery<RemoveFromShoppingListResult>(REMOVE_FROM_SHOPPING_LIST_MUTATION, {
         id: entry.id,
       });
+      cancelEdit();
       await onChanged();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to record purchase.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function toggleUrgent(entry: ShoppingListEntry) {
+    if (busyId) return;
+    setBusyId(entry.id);
+    setError(null);
+    try {
+      await runPantryQuery<UpdateShoppingListEntryResult>(UPDATE_SHOPPING_LIST_ENTRY_MUTATION, {
+        id: entry.id,
+        input: { urgent: !entry.urgent },
+      });
+      await onChanged();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update shopping list entry.");
     } finally {
       setBusyId(null);
     }
@@ -151,6 +193,16 @@ export default function PantryShoppingListSection({
     }
   }
 
+  const categories = [...new Set(entries.map((e) => e.category).filter((c): c is string => !!c))].sort();
+  const recipeTags = [...new Set(entries.map((e) => e.recipeTag).filter((t): t is string => !!t))].sort();
+
+  const filteredEntries = entries.filter((e) => {
+    if (settings.shoppingCategoryFilter && e.category !== settings.shoppingCategoryFilter) return false;
+    if (settings.shoppingRecipeFilter && e.recipeTag !== settings.shoppingRecipeFilter) return false;
+    if (settings.shoppingUrgentOnly && !e.urgent) return false;
+    return true;
+  });
+
   return (
     <section className="pantry-panel">
       <div className="pantry-panel-header">
@@ -168,9 +220,62 @@ export default function PantryShoppingListSection({
 
       {!settings.shoppingListCollapsed && (
         <>
-          {entries.length > 0 && (
+          {(categories.length > 0 || recipeTags.length > 0) && (
+            <div className="pantry-panel-header-controls">
+              {categories.length > 0 && (
+                <div className="pantry-control-group">
+                  <span className="pantry-control-label">Category</span>
+                  <select
+                    className="pantry-category-filter"
+                    value={settings.shoppingCategoryFilter ?? ""}
+                    onChange={(e) => onSettingsChange({ shoppingCategoryFilter: e.target.value || null })}
+                  >
+                    <option value="">All categories</option>
+                    {categories.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {recipeTags.length > 0 && (
+                <div className="pantry-control-group">
+                  <span className="pantry-control-label">Recipe</span>
+                  <select
+                    className="pantry-category-filter"
+                    value={settings.shoppingRecipeFilter ?? ""}
+                    onChange={(e) => onSettingsChange({ shoppingRecipeFilter: e.target.value || null })}
+                  >
+                    <option value="">All recipes</option>
+                    {recipeTags.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div className="pantry-control-group">
+                <label className="pantry-control-label pantry-urgent-filter-label">
+                  <input
+                    type="checkbox"
+                    checked={settings.shoppingUrgentOnly}
+                    onChange={(e) => onSettingsChange({ shoppingUrgentOnly: e.target.checked })}
+                  />{" "}
+                  Urgent only
+                </label>
+              </div>
+            </div>
+          )}
+
+          {entries.length > 0 && filteredEntries.length === 0 && (
+            <p className="status-line">// no items match the current filters.</p>
+          )}
+
+          {filteredEntries.length > 0 && (
             <ul className="pantry-shopping-list">
-              {entries.map((entry) =>
+              {filteredEntries.map((entry) =>
                 editingId === entry.id && draft ? (
                   <li key={entry.id} className="pantry-shopping-item pantry-shopping-item-editing">
                     <div className="pantry-shopping-edit-row">
@@ -182,7 +287,10 @@ export default function PantryShoppingListSection({
                         disabled={busyId === entry.id}
                         autoFocus
                         onKeyDown={(e) => {
-                          if (e.key === "Enter") saveEdit(entry.id);
+                          if (e.key === "Enter") {
+                            if (editMode === "bought") confirmBought(entry);
+                            else saveEdit(entry.id);
+                          }
                           if (e.key === "Escape") cancelEdit();
                         }}
                       />
@@ -212,23 +320,43 @@ export default function PantryShoppingListSection({
                           </option>
                         ))}
                       </select>
-                      <input
-                        className="form-input"
-                        value={draft.note}
-                        onChange={(e) => setDraft({ ...draft, note: e.target.value })}
-                        placeholder="Note"
-                        maxLength={200}
-                        disabled={busyId === entry.id}
-                      />
+                      {editMode === "edit" && (
+                        <>
+                          <select
+                            className="form-input pantry-shopping-edit-category"
+                            value={draft.category}
+                            onChange={(e) => setDraft({ ...draft, category: e.target.value })}
+                            disabled={busyId === entry.id}
+                          >
+                            <option value="">No category</option>
+                            {(draft.category && !settings.categories.includes(draft.category)
+                              ? [draft.category, ...settings.categories]
+                              : settings.categories
+                            ).map((c) => (
+                              <option key={c} value={c}>
+                                {c}
+                              </option>
+                            ))}
+                          </select>
+                          <input
+                            className="form-input"
+                            value={draft.note}
+                            onChange={(e) => setDraft({ ...draft, note: e.target.value })}
+                            placeholder="Note"
+                            maxLength={200}
+                            disabled={busyId === entry.id}
+                          />
+                        </>
+                      )}
                     </div>
                     <span className="pantry-shopping-item-actions">
                       <button
                         type="button"
                         className="run-btn"
-                        onClick={() => saveEdit(entry.id)}
+                        onClick={() => (editMode === "bought" ? confirmBought(entry) : saveEdit(entry.id))}
                         disabled={busyId === entry.id}
                       >
-                        {busyId === entry.id ? "…" : "save"}
+                        {busyId === entry.id ? "…" : editMode === "bought" ? "Confirm bought" : "save"}
                       </button>
                       <button
                         type="button"
@@ -243,7 +371,7 @@ export default function PantryShoppingListSection({
                 ) : (
                   <li key={entry.id} className="pantry-shopping-item">
                     <span
-                      className="pantry-shopping-item-name"
+                      className={`pantry-shopping-item-name ${entry.urgent ? "pantry-shopping-item-urgent" : ""}`}
                       role="button"
                       tabIndex={0}
                       title="Click to edit"
@@ -264,12 +392,24 @@ export default function PantryShoppingListSection({
                         </span>
                       )}
                       {entry.note && <span className="pantry-shopping-note"> - {entry.note}</span>}
+                      {entry.category && <span className="pantry-item-category"> {entry.category}</span>}
+                      {entry.recipeTag && <span className="pantry-shopping-recipe-tag"> · {entry.recipeTag}</span>}
                     </span>
                     <span className="pantry-shopping-item-actions">
                       <button
                         type="button"
+                        className={`pantry-shopping-urgent-toggle ${entry.urgent ? "active" : ""}`}
+                        onClick={() => toggleUrgent(entry)}
+                        disabled={busyId === entry.id}
+                        title={entry.urgent ? "Urgent - needed ASAP" : "Mark as urgent"}
+                        aria-label={entry.urgent ? "Unmark as urgent" : "Mark as urgent"}
+                      >
+                        !
+                      </button>
+                      <button
+                        type="button"
                         className="pantry-delete-btn"
-                        onClick={() => handleBought(entry)}
+                        onClick={() => startBought(entry)}
                         disabled={busyId === entry.id}
                       >
                         {busyId === entry.id ? "…" : "bought"}

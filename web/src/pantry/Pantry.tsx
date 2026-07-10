@@ -54,9 +54,11 @@ export default function Pantry() {
           <PantryCommonItemsSection
             commonItems={settings.commonItems}
             onCommonItemsChange={(commonItems) => updateSettings({ commonItems })}
+            settings={settings}
+            onSettingsChange={updateSettings}
             onAdded={refetchAll}
           />
-          <PantryAddItemSection onAdded={refetchAll} />
+          <PantryAddItemSection settings={settings} onSettingsChange={updateSettings} onAdded={refetchAll} />
         </>
       )}
     </>

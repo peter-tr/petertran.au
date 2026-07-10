@@ -100,7 +100,7 @@ function buildRecipeShoppingActions(
         type: "ADD_TO_SHOPPING_LIST",
         summary: `Add "${ing.name}"${amount ? ` (${amount})` : ""} to the shopping list (for: ${recipe.name})`,
         mutationName: "addToShoppingList",
-        argsJson: JSON.stringify({ name: ing.name, quantity: null, unit: null, note }),
+        argsJson: JSON.stringify({ name: ing.name, quantity: null, unit: null, note, recipeTag: recipe.name }),
       };
     });
 }
@@ -454,62 +454,71 @@ export default function PantryCommandBar({ onChanged }: PantryCommandBarProps) {
 
                 {turn.result.actions && turn.result.actions.length > 0 && (
                   <div className="pantry-command-actions">
-                    {turn.result.message && <p className="status-line">// {turn.result.message}</p>}
-                    {turn.result.actions.map((action, ai) => (
-                      <div className="pantry-command-action" key={ai}>
-                        <div className="pantry-command-action-row">
-                          <p className="pantry-command-action-summary">{action.summary}</p>
-                          <span className="pantry-command-action-controls">
-                            <button
-                              type="button"
-                              className="pantry-details-toggle"
-                              onClick={() => toggleExpandedAction(i, ai)}
-                            >
-                              {turn.expandedActions.has(ai) ? "− hide mutation" : "+ view mutation"}
-                            </button>
-                            <button
-                              type="button"
-                              className="pantry-shopping-remove-btn"
-                              onClick={() => removeAction(i, ai)}
-                              disabled={turn.actionsStatus === "confirming"}
-                              aria-label={`Remove "${action.summary}" from this batch`}
-                              title="Remove this action"
-                            >
-                              ✕
-                            </button>
-                          </span>
-                        </div>
-                        {turn.expandedActions.has(ai) && (
-                          <pre className="pantry-command-mutation">
-                            {formatMutationPreview(action.mutationName, action.argsJson)}
-                          </pre>
-                        )}
-                      </div>
-                    ))}
-                    {turn.actionsError && <p className="status-line">// {turn.actionsError}</p>}
                     {turn.actionsStatus === "done" ? (
-                      <p className="pantry-command-turn-done">✓ Applied</p>
+                      // Collapsed to a single line once applied - the
+                      // per-action cards (view mutation, remove) were only
+                      // ever useful before confirming, and stayed expanded
+                      // afterward for no reason.
+                      <p className="pantry-command-turn-done">
+                        ✓ Added {turn.result.actions.length} item
+                        {turn.result.actions.length > 1 ? "s" : ""}
+                      </p>
                     ) : turn.actionsStatus === "cancelled" ? (
                       <p className="pantry-command-turn-done">Cancelled</p>
                     ) : (
-                      <div className="pantry-modal-actions">
-                        <button
-                          type="button"
-                          className="pantry-details-toggle"
-                          onClick={() => updateAssistantTurn(i, { actionsStatus: "cancelled" })}
-                          disabled={turn.actionsStatus === "confirming"}
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="button"
-                          className="run-btn"
-                          onClick={() => confirmActions(i, turn.result.actions!)}
-                          disabled={turn.actionsStatus === "confirming"}
-                        >
-                          {turn.actionsStatus === "confirming" ? "Applying…" : "Confirm"}
-                        </button>
-                      </div>
+                      <>
+                        {turn.result.message && <p className="status-line">// {turn.result.message}</p>}
+                        {turn.result.actions.map((action, ai) => (
+                          <div className="pantry-command-action" key={ai}>
+                            <div className="pantry-command-action-row">
+                              <p className="pantry-command-action-summary">{action.summary}</p>
+                              <span className="pantry-command-action-controls">
+                                <button
+                                  type="button"
+                                  className="pantry-details-toggle"
+                                  onClick={() => toggleExpandedAction(i, ai)}
+                                >
+                                  {turn.expandedActions.has(ai) ? "− hide mutation" : "+ view mutation"}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="pantry-shopping-remove-btn"
+                                  onClick={() => removeAction(i, ai)}
+                                  disabled={turn.actionsStatus === "confirming"}
+                                  aria-label={`Remove "${action.summary}" from this batch`}
+                                  title="Remove this action"
+                                >
+                                  ✕
+                                </button>
+                              </span>
+                            </div>
+                            {turn.expandedActions.has(ai) && (
+                              <pre className="pantry-command-mutation">
+                                {formatMutationPreview(action.mutationName, action.argsJson)}
+                              </pre>
+                            )}
+                          </div>
+                        ))}
+                        {turn.actionsError && <p className="status-line">// {turn.actionsError}</p>}
+                        <div className="pantry-modal-actions">
+                          <button
+                            type="button"
+                            className="pantry-details-toggle"
+                            onClick={() => updateAssistantTurn(i, { actionsStatus: "cancelled" })}
+                            disabled={turn.actionsStatus === "confirming"}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            className="run-btn"
+                            onClick={() => confirmActions(i, turn.result.actions!)}
+                            disabled={turn.actionsStatus === "confirming"}
+                          >
+                            {turn.actionsStatus === "confirming" ? "Applying…" : "Confirm"}
+                          </button>
+                        </div>
+                      </>
                     )}
                   </div>
                 )}

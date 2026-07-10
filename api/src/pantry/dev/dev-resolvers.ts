@@ -16,6 +16,12 @@ let settings: PantrySettings = {
   shoppingListCollapsed: false,
   showLowPriority: false,
   categoryFilter: null,
+  addItemDetailsShown: false,
+  addItemCollapsed: false,
+  commonItemsCollapsed: false,
+  shoppingCategoryFilter: null,
+  shoppingRecipeFilter: null,
+  shoppingUrgentOnly: false,
   commonItems: [
     "Milk",
     "Eggs",
@@ -136,7 +142,10 @@ function upsertShoppingListEntry(
   quantity: number | null,
   unit: string | null,
   note: string | null = null,
-  isStaple = false
+  isStaple = false,
+  category: string | null = null,
+  recipeTag: string | null = null,
+  urgent = false
 ): ShoppingListEntry {
   const normalizedUnit = unit ? normalizeUnit(unit) : null;
   const needle = normalizeItemName(name);
@@ -147,7 +156,10 @@ function upsertShoppingListEntry(
         quantity: quantity ?? match.quantity,
         unit: normalizedUnit ?? match.unit,
         note: note ?? match.note,
+        category: category ?? match.category,
+        recipeTag: recipeTag ?? match.recipeTag,
         isStaple: isStaple || match.isStaple,
+        urgent: urgent || match.urgent,
       }
     : {
         id: randomUUID(),
@@ -156,6 +168,9 @@ function upsertShoppingListEntry(
         unit: normalizedUnit,
         note,
         isStaple,
+        category,
+        recipeTag,
+        urgent,
         addedAt: new Date().toISOString(),
       };
   shoppingList.set(entry.id, entry);
@@ -399,7 +414,9 @@ export const devResolvers = {
     },
     removeInventoryItem: (_: unknown, args: { id: string }) => {
       const existing = items.get(args.id);
-      if (existing?.isStaple) upsertShoppingListEntry(existing.name, null, null, null, true);
+      if (existing?.isStaple) {
+        upsertShoppingListEntry(existing.name, null, null, null, true, existing.category);
+      }
       return items.delete(args.id);
     },
     addToShoppingList: (
@@ -410,6 +427,9 @@ export const devResolvers = {
         unit?: string | null;
         note?: string | null;
         isStaple?: boolean | null;
+        category?: string | null;
+        recipeTag?: string | null;
+        urgent?: boolean | null;
       }
     ) =>
       upsertShoppingListEntry(
@@ -417,7 +437,10 @@ export const devResolvers = {
         args.quantity ?? null,
         args.unit ?? null,
         args.note ?? null,
-        args.isStaple ?? false
+        args.isStaple ?? false,
+        args.category ?? null,
+        args.recipeTag ?? null,
+        args.urgent ?? false
       ),
     updateShoppingListEntry: (
       _: unknown,
@@ -429,6 +452,9 @@ export const devResolvers = {
           unit?: string | null;
           note?: string | null;
           isStaple?: boolean;
+          category?: string | null;
+          recipeTag?: string | null;
+          urgent?: boolean;
         };
       }
     ) => {

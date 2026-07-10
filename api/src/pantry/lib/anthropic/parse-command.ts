@@ -155,7 +155,7 @@ Decide what the input is and respond with exactly one of these four modes:
   - RECORD_PURCHASE: adding or buying a new or existing item. Always use this (never UPDATE_INVENTORY_ITEM) for "add X" / "bought X" phrasing, even if a similar item already exists - the system merges duplicates itself. Requires name, location (guess FRIDGE/FREEZER/PANTRY sensibly if not stated), and quantity (default 1 if not stated). Set purchasedAt to today's date (${today}) unless the input implies no purchase actually happened. Set "category" when you're confident of a good match - prefer reusing one of the categories already in use above if one fits (e.g. "garlic powder" -> "Spices" if that's already a category), otherwise invent a sensible new one; leave it null if genuinely unclear rather than guessing. "flagsSet"/"flagsClear" turn STAPLE/LOW_PRIORITY/NEARLY_EMPTY on or off - only include a flag in one of these two lists if the input actually says so (e.g. "add salt as low priority" -> flagsSet: ["LOW_PRIORITY"]); leave both lists empty otherwise.
   - UPDATE_INVENTORY_ITEM: correcting an EXISTING item's fields without it being a new purchase. Requires itemId matching one of the ids listed above exactly - never invent an id. Same category/flagsSet/flagsClear rules as RECORD_PURCHASE apply here too, only when the input actually asks to change them.
   - REMOVE_INVENTORY_ITEM: fully using up or getting rid of an existing item. Requires itemId matching one of the ids listed above exactly.
-  - ADD_TO_SHOPPING_LIST: noting something is needed without it being in stock right now (e.g. "we're out of eggs", "need to buy bread", "add 1 kg of coffee beans to my shopping list"). Requires name. Set quantity/unit only if the input actually states an amount (e.g. "1 kg of coffee beans" -> quantity=1, unit="kg"); leave both null for a plain "buy this" with no amount. Set "note" only when there's a specific reason worth remembering (e.g. a recipe it's for) - leave it null for a plain add. If the name matches an item already on the shopping list (see the list above), this UPDATES that entry's quantity/unit/note rather than creating a duplicate - use it for that too, e.g. if the user gives an amount for something already listed.
+  - ADD_TO_SHOPPING_LIST: noting something is needed without it being in stock right now (e.g. "we're out of eggs", "need to buy bread", "add 1 kg of coffee beans to my shopping list"). Requires name. Set quantity/unit only if the input actually states an amount (e.g. "1 kg of coffee beans" -> quantity=1, unit="kg"); leave both null for a plain "buy this" with no amount. Set "note" only when there's a specific reason worth remembering (e.g. a recipe it's for) - leave it null for a plain add. Same "category" rule as RECORD_PURCHASE - prefer an existing category, else invent one, else null if unclear. If the name matches an item already on the shopping list (see the list above), this UPDATES that entry's quantity/unit/note/category rather than creating a duplicate - use it for that too, e.g. if the user gives an amount for something already listed.
   - REMOVE_FROM_SHOPPING_LIST: an item on the shopping list has been bought or is no longer needed. Requires itemId matching one of the shopping list ids listed above exactly.
   Always write a short, specific "summary" for each action describing exactly what will happen, e.g. "Add 2 L Milk to the fridge, bought today".
   If the input names multiple distinct items - separated by commas, "and", or just listed one after another, e.g. "I bought pasta, pesto and cheese" - create one separate action per item, each with its own name. Never combine several item names into a single action's name field (e.g. never "pasta pesto cheese" as one name) - if you're about to write more than two or three words into a "name" field, that's a sign you're merging items that should be split.
@@ -362,7 +362,13 @@ function toProposedAction(a: RawAction): ProposedAction | null {
         type: a.type,
         summary: a.summary,
         mutationName: "addToShoppingList",
-        argsJson: JSON.stringify({ name: a.name, quantity: a.quantity, unit: a.unit, note: a.note }),
+        argsJson: JSON.stringify({
+          name: a.name,
+          quantity: a.quantity,
+          unit: a.unit,
+          note: a.note,
+          category: a.category,
+        }),
       };
     }
     case "REMOVE_FROM_SHOPPING_LIST": {

@@ -245,6 +245,46 @@
   width: 4.5rem;
 }
 
+.pantry-shopping-edit-category {
+  width: 8rem;
+}
+
+.pantry-shopping-item-urgent {
+  color: var(--string);
+  font-weight: 600;
+}
+
+.pantry-shopping-recipe-tag {
+  color: var(--muted-dim);
+  font-size: 0.8rem;
+}
+
+.pantry-shopping-urgent-toggle {
+  flex-shrink: 0;
+  font-size: 0.8rem;
+  line-height: 1;
+  color: var(--rule);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.pantry-shopping-urgent-toggle:hover {
+  color: var(--muted);
+}
+
+.pantry-shopping-urgent-toggle.active {
+  color: var(--string);
+}
+
+.pantry-urgent-filter-label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+}
+
 .pantry-shopping-remove-btn {
   font-family: var(--font-mono);
   font-size: 0.75rem;

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import QuantityStepper from "./QuantityStepper";
 import { UNIT_OPTIONS, stepForUnit } from "../lib/units";
+import { INVENTORY_FLAGS, type InventoryFlags } from "../lib/inventoryFlags";
 import type { InventoryItem, StorageLocation } from "../api";
 
 interface PantryEditItemModalProps {
@@ -38,9 +39,11 @@ export default function PantryEditItemModal({
   const [price, setPrice] = useState(item.price !== null ? String(item.price) : "");
   const [purchasedAt, setPurchasedAt] = useState(item.purchasedAt ?? "");
   const [expiresAt, setExpiresAt] = useState(item.expiresAt ?? "");
-  const [isStaple, setIsStaple] = useState(item.isStaple);
-  const [lowPriority, setLowPriority] = useState(item.lowPriority);
-  const [nearlyEmpty, setNearlyEmpty] = useState(item.nearlyEmpty);
+  const [flags, setFlags] = useState<InventoryFlags>({
+    isStaple: item.isStaple,
+    lowPriority: item.lowPriority,
+    nearlyEmpty: item.nearlyEmpty,
+  });
   const [error, setError] = useState<string | null>(null);
 
   // A category already on this item might not be one of the curated options
@@ -80,9 +83,7 @@ export default function PantryEditItemModal({
         price: price.trim() ? Number(price) : null,
         purchasedAt: purchasedAt || null,
         expiresAt: expiresAt || null,
-        isStaple,
-        lowPriority,
-        nearlyEmpty,
+        ...flags,
       });
       onClose();
     } catch (err) {
@@ -244,36 +245,18 @@ export default function PantryEditItemModal({
             />
           </div>
           <div className="form-row pantry-staple-row pantry-flags-row">
-            <label className="form-label" htmlFor="pantry-edit-staple">
-              <input
-                id="pantry-edit-staple"
-                type="checkbox"
-                checked={isStaple}
-                onChange={(e) => setIsStaple(e.target.checked)}
-                disabled={busy}
-              />{" "}
-              ★ Staple - always keep stocked
-            </label>
-            <label className="form-label" htmlFor="pantry-edit-low-priority">
-              <input
-                id="pantry-edit-low-priority"
-                type="checkbox"
-                checked={lowPriority}
-                onChange={(e) => setLowPriority(e.target.checked)}
-                disabled={busy}
-              />{" "}
-              ↓ Low priority - hide from main list
-            </label>
-            <label className="form-label" htmlFor="pantry-edit-nearly-empty">
-              <input
-                id="pantry-edit-nearly-empty"
-                type="checkbox"
-                checked={nearlyEmpty}
-                onChange={(e) => setNearlyEmpty(e.target.checked)}
-                disabled={busy}
-              />{" "}
-              ! Nearly empty
-            </label>
+            {INVENTORY_FLAGS.map(({ key, icon, label }) => (
+              <label className="form-label" htmlFor={`pantry-edit-${key}`} key={key}>
+                <input
+                  id={`pantry-edit-${key}`}
+                  type="checkbox"
+                  checked={flags[key]}
+                  onChange={(e) => setFlags({ ...flags, [key]: e.target.checked })}
+                  disabled={busy}
+                />{" "}
+                {icon} {label}
+              </label>
+            ))}
           </div>
         </div>
 

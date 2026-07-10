@@ -137,19 +137,32 @@ export interface ShoppingListEntry {
   unit: string | null;
   note: string | null;
   isStaple: boolean;
+  category: string | null;
+  recipeTag: string | null;
+  urgent: boolean;
   addedAt: string;
 }
+
+// Shared across the query and both mutations below so adding a field means
+// editing one list, not hunting down every place ShoppingListEntry is
+// selected - the same class of drift that bit the inventory add form.
+const SHOPPING_LIST_ENTRY_FIELDS = /* GraphQL */ `
+  id
+  name
+  quantity
+  unit
+  note
+  isStaple
+  category
+  recipeTag
+  urgent
+  addedAt
+`;
 
 export const SHOPPING_LIST_QUERY = /* GraphQL */ `
   query ShoppingList {
     shoppingList {
-      id
-      name
-      quantity
-      unit
-      note
-      isStaple
-      addedAt
+      ${SHOPPING_LIST_ENTRY_FIELDS}
     }
   }
 `;
@@ -175,15 +188,21 @@ export const ADD_TO_SHOPPING_LIST_MUTATION = /* GraphQL */ `
     $unit: String
     $note: String
     $isStaple: Boolean
+    $category: String
+    $recipeTag: String
+    $urgent: Boolean
   ) {
-    addToShoppingList(name: $name, quantity: $quantity, unit: $unit, note: $note, isStaple: $isStaple) {
-      id
-      name
-      quantity
-      unit
-      note
-      isStaple
-      addedAt
+    addToShoppingList(
+      name: $name
+      quantity: $quantity
+      unit: $unit
+      note: $note
+      isStaple: $isStaple
+      category: $category
+      recipeTag: $recipeTag
+      urgent: $urgent
+    ) {
+      ${SHOPPING_LIST_ENTRY_FIELDS}
     }
   }
 `;
@@ -198,18 +217,15 @@ export interface UpdateShoppingListEntryInput {
   unit?: string | null;
   note?: string | null;
   isStaple?: boolean;
+  category?: string | null;
+  recipeTag?: string | null;
+  urgent?: boolean;
 }
 
 export const UPDATE_SHOPPING_LIST_ENTRY_MUTATION = /* GraphQL */ `
   mutation UpdateShoppingListEntry($id: ID!, $input: UpdateShoppingListEntryInput!) {
     updateShoppingListEntry(id: $id, input: $input) {
-      id
-      name
-      quantity
-      unit
-      note
-      isStaple
-      addedAt
+      ${SHOPPING_LIST_ENTRY_FIELDS}
     }
   }
 `;
@@ -229,6 +245,12 @@ export interface PantrySettings {
   showLowPriority: boolean;
   categoryFilter: string | null;
   categories: string[];
+  addItemDetailsShown: boolean;
+  addItemCollapsed: boolean;
+  commonItemsCollapsed: boolean;
+  shoppingCategoryFilter: string | null;
+  shoppingRecipeFilter: string | null;
+  shoppingUrgentOnly: boolean;
 }
 
 export type PantrySettingsInput = Partial<PantrySettings>;
@@ -244,6 +266,12 @@ const SETTINGS_FIELDS = /* GraphQL */ `
   showLowPriority
   categoryFilter
   categories
+  addItemDetailsShown
+  addItemCollapsed
+  commonItemsCollapsed
+  shoppingCategoryFilter
+  shoppingRecipeFilter
+  shoppingUrgentOnly
 `;
 
 export const SETTINGS_QUERY = /* GraphQL */ `

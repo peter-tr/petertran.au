@@ -1,9 +1,12 @@
 import { useState, type FormEvent } from "react";
 import QuantityStepper from "./QuantityStepper";
 import { UNIT_OPTIONS } from "../lib/units";
+import { INVENTORY_FLAGS, type InventoryFlags } from "../lib/inventoryFlags";
 import {
   runPantryQuery,
   RECORD_PURCHASE_MUTATION,
+  type PantrySettings,
+  type PantrySettingsInput,
   type RecordPurchaseResult,
   type StorageLocation,
 } from "../api";
@@ -15,13 +18,14 @@ function today(): string {
 }
 
 interface PantryAddItemSectionProps {
+  settings: PantrySettings;
+  onSettingsChange: (partial: PantrySettingsInput) => void;
   onAdded: () => Promise<void>;
 }
 
-export default function PantryAddItemSection({ onAdded }: PantryAddItemSectionProps) {
+export default function PantryAddItemSection({ settings, onSettingsChange, onAdded }: PantryAddItemSectionProps) {
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState(1);
-  const [showDetails, setShowDetails] = useState(false);
   const [category, setCategory] = useState("");
   const [location, setLocation] = useState<StorageLocation>("FRIDGE");
   const [unit, setUnit] = useState("pcs");
@@ -30,7 +34,7 @@ export default function PantryAddItemSection({ onAdded }: PantryAddItemSectionPr
   // records a purchase date, without asking the user for one up front.
   const [purchasedAt, setPurchasedAt] = useState(today());
   const [expiresAt, setExpiresAt] = useState("");
-  const [isStaple, setIsStaple] = useState(false);
+  const [flags, setFlags] = useState<InventoryFlags>({ isStaple: false, lowPriority: false, nearlyEmpty: false });
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
 
@@ -50,7 +54,7 @@ export default function PantryAddItemSection({ onAdded }: PantryAddItemSectionPr
           price: price ? Number(price) : null,
           purchasedAt,
           expiresAt: expiresAt || null,
-          isStaple,
+          ...flags,
         },
       });
       setName("");
@@ -61,8 +65,7 @@ export default function PantryAddItemSection({ onAdded }: PantryAddItemSectionPr
       setPrice("");
       setPurchasedAt(today());
       setExpiresAt("");
-      setIsStaple(false);
-      setShowDetails(false);
+      setFlags({ isStaple: false, lowPriority: false, nearlyEmpty: false });
       setStatus("idle");
       // Not awaited - the mutation itself already succeeded (that's what
       // the form reset above is responding to), so there's no reason to
@@ -79,118 +82,135 @@ export default function PantryAddItemSection({ onAdded }: PantryAddItemSectionPr
 
   return (
     <section className="pantry-panel">
-      <h2 className="pantry-panel-title">Add item</h2>
-
-      <form onSubmit={handleSubmit}>
-        <div className="pantry-quick-add">
-          <input
-            className="form-input pantry-quick-add-name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Item name"
-            required
-            maxLength={200}
-          />
-          <QuantityStepper value={quantity} onChange={setQuantity} min={1} />
-          <select
-            className="form-input pantry-quick-add-unit"
-            value={unit}
-            onChange={(e) => setUnit(e.target.value)}
-            aria-label="Unit"
-          >
-            {UNIT_OPTIONS.map((u) => (
-              <option key={u} value={u}>
-                {u}
-              </option>
-            ))}
-          </select>
-          <select
-            className="form-input pantry-quick-add-location"
-            value={location}
-            onChange={(e) => setLocation(e.target.value as StorageLocation)}
-            aria-label="Location"
-          >
-            <option value="FRIDGE">Fridge</option>
-            <option value="FREEZER">Freezer</option>
-            <option value="PANTRY">Pantry</option>
-          </select>
-          <input
-            className="form-input pantry-quick-add-price"
-            type="number"
-            min="0"
-            step="0.01"
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-            placeholder="$"
-            aria-label="Price"
-          />
-          <button className="run-btn" type="submit" disabled={status === "saving"}>
-            {status === "saving" ? "Adding…" : "Add"}
-          </button>
-        </div>
-
-        <button type="button" className="pantry-details-toggle" onClick={() => setShowDetails((v) => !v)}>
-          {showDetails ? "− fewer details" : "+ more details"}
+      <div className="pantry-panel-header">
+        <h2 className="pantry-panel-title">Add item</h2>
+        <button
+          type="button"
+          className="pantry-details-toggle"
+          onClick={() => onSettingsChange({ addItemCollapsed: !settings.addItemCollapsed })}
+        >
+          {settings.addItemCollapsed ? "+ options" : "− options"}
         </button>
+      </div>
 
-        {showDetails && (
-          <div className="pantry-details-grid">
-            <div className="form-row">
-              <label className="form-label" htmlFor="pantry-category">
-                Category
-              </label>
-              <input
-                id="pantry-category"
-                className="form-input"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                placeholder="Dairy, Produce, Frozen..."
-                maxLength={100}
-              />
-            </div>
-
-            <div className="form-row">
-              <label className="form-label" htmlFor="pantry-purchased">
-                Purchased on
-              </label>
-              <input
-                id="pantry-purchased"
-                className="form-input"
-                type="date"
-                value={purchasedAt}
-                onChange={(e) => setPurchasedAt(e.target.value)}
-              />
-            </div>
-
-            <div className="form-row">
-              <label className="form-label" htmlFor="pantry-expires">
-                Expires on
-              </label>
-              <input
-                id="pantry-expires"
-                className="form-input"
-                type="date"
-                value={expiresAt}
-                onChange={(e) => setExpiresAt(e.target.value)}
-              />
-            </div>
-
-            <div className="form-row pantry-staple-row">
-              <label className="form-label" htmlFor="pantry-staple">
-                <input
-                  id="pantry-staple"
-                  type="checkbox"
-                  checked={isStaple}
-                  onChange={(e) => setIsStaple(e.target.checked)}
-                />{" "}
-                Staple - always keep stocked
-              </label>
-            </div>
+      {!settings.addItemCollapsed && (
+        <form onSubmit={handleSubmit}>
+          <div className="pantry-quick-add">
+            <input
+              className="form-input pantry-quick-add-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Item name"
+              required
+              maxLength={200}
+            />
+            <QuantityStepper value={quantity} onChange={setQuantity} min={1} />
+            <select
+              className="form-input pantry-quick-add-unit"
+              value={unit}
+              onChange={(e) => setUnit(e.target.value)}
+              aria-label="Unit"
+            >
+              {UNIT_OPTIONS.map((u) => (
+                <option key={u} value={u}>
+                  {u}
+                </option>
+              ))}
+            </select>
+            <select
+              className="form-input pantry-quick-add-location"
+              value={location}
+              onChange={(e) => setLocation(e.target.value as StorageLocation)}
+              aria-label="Location"
+            >
+              <option value="FRIDGE">Fridge</option>
+              <option value="FREEZER">Freezer</option>
+              <option value="PANTRY">Pantry</option>
+            </select>
+            <input
+              className="form-input pantry-quick-add-price"
+              type="number"
+              min="0"
+              step="0.01"
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              placeholder="$"
+              aria-label="Price"
+            />
+            <button className="run-btn" type="submit" disabled={status === "saving"}>
+              {status === "saving" ? "Adding…" : "Add"}
+            </button>
           </div>
-        )}
 
-        {error && <p className="status-line">// {error}</p>}
-      </form>
+          <button
+            type="button"
+            className="pantry-details-toggle"
+            onClick={() => onSettingsChange({ addItemDetailsShown: !settings.addItemDetailsShown })}
+          >
+            {settings.addItemDetailsShown ? "− fewer details" : "+ more details"}
+          </button>
+
+          {settings.addItemDetailsShown && (
+            <div className="pantry-details-grid">
+              <div className="form-row">
+                <label className="form-label" htmlFor="pantry-category">
+                  Category
+                </label>
+                <input
+                  id="pantry-category"
+                  className="form-input"
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  placeholder="Dairy, Produce, Frozen..."
+                  maxLength={100}
+                />
+              </div>
+
+              <div className="form-row">
+                <label className="form-label" htmlFor="pantry-purchased">
+                  Purchased on
+                </label>
+                <input
+                  id="pantry-purchased"
+                  className="form-input"
+                  type="date"
+                  value={purchasedAt}
+                  onChange={(e) => setPurchasedAt(e.target.value)}
+                />
+              </div>
+
+              <div className="form-row">
+                <label className="form-label" htmlFor="pantry-expires">
+                  Expires on
+                </label>
+                <input
+                  id="pantry-expires"
+                  className="form-input"
+                  type="date"
+                  value={expiresAt}
+                  onChange={(e) => setExpiresAt(e.target.value)}
+                />
+              </div>
+
+              <div className="form-row pantry-staple-row pantry-flags-row">
+                {INVENTORY_FLAGS.map(({ key, icon, label }) => (
+                  <label className="form-label" htmlFor={`pantry-add-${key}`} key={key}>
+                    <input
+                      id={`pantry-add-${key}`}
+                      type="checkbox"
+                      checked={flags[key]}
+                      onChange={(e) => setFlags({ ...flags, [key]: e.target.checked })}
+                    />{" "}
+                    {icon} {label}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {error && <p className="status-line">// {error}</p>}
+        </form>
+      )}
     </section>
   );
 }

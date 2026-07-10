@@ -41,6 +41,9 @@ export interface ShoppingListEntry {
   unit: string | null;
   note: string | null;
   isStaple: boolean;
+  category: string | null;
+  recipeTag: string | null;
+  urgent: boolean;
   addedAt: string;
 }
 
@@ -50,6 +53,9 @@ interface UpdateShoppingListEntryInput {
   unit?: string | null;
   note?: string | null;
   isStaple?: boolean;
+  category?: string | null;
+  recipeTag?: string | null;
+  urgent?: boolean;
 }
 
 export interface PantrySettings {
@@ -63,6 +69,12 @@ export interface PantrySettings {
   showLowPriority: boolean;
   categoryFilter: string | null;
   categories: string[];
+  addItemDetailsShown: boolean;
+  addItemCollapsed: boolean;
+  commonItemsCollapsed: boolean;
+  shoppingCategoryFilter: string | null;
+  shoppingRecipeFilter: string | null;
+  shoppingUrgentOnly: boolean;
 }
 
 interface PantrySettingsInput {
@@ -76,6 +88,12 @@ interface PantrySettingsInput {
   showLowPriority?: boolean;
   categoryFilter?: string | null;
   categories?: string[];
+  addItemDetailsShown?: boolean;
+  addItemCollapsed?: boolean;
+  commonItemsCollapsed?: boolean;
+  shoppingCategoryFilter?: string | null;
+  shoppingRecipeFilter?: string | null;
+  shoppingUrgentOnly?: boolean;
 }
 
 // Same starting list as the client used to seed localStorage with, so the
@@ -90,6 +108,12 @@ const DEFAULT_SETTINGS: PantrySettings = {
   shoppingListCollapsed: false,
   showLowPriority: false,
   categoryFilter: null,
+  addItemDetailsShown: false,
+  addItemCollapsed: false,
+  commonItemsCollapsed: false,
+  shoppingCategoryFilter: null,
+  shoppingRecipeFilter: null,
+  shoppingUrgentOnly: false,
   commonItems: [
     "Milk",
     "Eggs",
@@ -223,6 +247,9 @@ function withShoppingListDefaults(entry: ShoppingListEntry): ShoppingListEntry {
     unit: entry.unit ?? null,
     note: entry.note ?? null,
     isStaple: entry.isStaple ?? false,
+    category: entry.category ?? null,
+    recipeTag: entry.recipeTag ?? null,
+    urgent: entry.urgent ?? false,
   };
 }
 
@@ -264,7 +291,10 @@ async function upsertShoppingListEntry(
   quantity: number | null,
   unit: string | null,
   note: string | null = null,
-  isStaple = false
+  isStaple = false,
+  category: string | null = null,
+  recipeTag: string | null = null,
+  urgent = false
 ): Promise<ShoppingListEntry> {
   const normalizedUnit = unit ? normalizeUnit(unit) : null;
   const existing = await getShoppingList();
@@ -277,9 +307,12 @@ async function upsertShoppingListEntry(
         quantity: quantity ?? match.quantity,
         unit: normalizedUnit ?? match.unit,
         note: note ?? match.note,
+        category: category ?? match.category,
+        recipeTag: recipeTag ?? match.recipeTag,
         // Only ever upgrades to true, never back to false - an unrelated
-        // manual add shouldn't undo an earlier staple-triggered one.
+        // manual add shouldn't undo an earlier staple/urgent-triggered one.
         isStaple: isStaple || match.isStaple,
+        urgent: urgent || match.urgent,
       }
     : {
         id: randomUUID(),
@@ -288,6 +321,9 @@ async function upsertShoppingListEntry(
         unit: normalizedUnit,
         note,
         isStaple,
+        category,
+        recipeTag,
+        urgent,
         addedAt: new Date().toISOString(),
       };
 
@@ -431,7 +467,7 @@ export const resolvers = {
 
       const existing = await getItem(args.id);
       if (existing?.isStaple) {
-        await upsertShoppingListEntry(existing.name, null, null, null, true);
+        await upsertShoppingListEntry(existing.name, null, null, null, true, existing.category);
       }
 
       const res = await ddb.send(
@@ -452,6 +488,9 @@ export const resolvers = {
         unit?: string | null;
         note?: string | null;
         isStaple?: boolean | null;
+        category?: string | null;
+        recipeTag?: string | null;
+        urgent?: boolean | null;
       },
       context: Context
     ): Promise<ShoppingListEntry> => {
@@ -461,7 +500,10 @@ export const resolvers = {
         args.quantity ?? null,
         args.unit ?? null,
         args.note ?? null,
-        args.isStaple ?? false
+        args.isStaple ?? false,
+        args.category ?? null,
+        args.recipeTag ?? null,
+        args.urgent ?? false
       );
     },
 

@@ -206,6 +206,27 @@ type ShoppingListEntry {
   """
   isStaple: Boolean!
   """
+  Category, e.g. "Spices" - same free-form category concept as
+  InventoryItem.category, set by the AI when adding via the command bar or
+  carried over when an item cycles back onto the shopping list from
+  inventory (see InventoryItem.category's persistence note). Null if
+  unset.
+  """
+  category: String
+  """
+  The recipe this was added for, e.g. "Chicken Pesto Pasta" - set when
+  added via a recipe's "add missing ingredients" action. Distinct from
+  `note` (which stays freeform) so the shopping list can be filtered by
+  recipe. Null if not added from a recipe.
+  """
+  recipeTag: String
+  """
+  Manually flagged as needed as soon as possible - independent of
+  isStaple/category, purely a "get this today" signal shown and
+  filterable separately.
+  """
+  urgent: Boolean!
+  """
   Timestamp this entry was added, ISO 8601.
   """
   addedAt: String!
@@ -223,6 +244,9 @@ input UpdateShoppingListEntryInput {
   unit: String
   note: String
   isStaple: Boolean
+  category: String
+  recipeTag: String
+  urgent: Boolean
 }
 
 """
@@ -233,7 +257,7 @@ visits, so a change made on one device shows up everywhere.
 type PantrySettings {
   """
   Which grouping the Inventory list is currently viewed by: "location",
-  "category", "expiry", or "all".
+  "category", "priority" (needs attention vs. low priority), or "all".
   """
   view: String!
   """
@@ -277,6 +301,32 @@ type PantrySettings {
   dropdown - grows as new ones are added, same idea as commonItems.
   """
   categories: [String!]!
+  """
+  True if the Add item panel's "more details" fields are currently shown.
+  """
+  addItemDetailsShown: Boolean!
+  """
+  True if the Add item panel is collapsed.
+  """
+  addItemCollapsed: Boolean!
+  """
+  True if the Common items panel is collapsed.
+  """
+  commonItemsCollapsed: Boolean!
+  """
+  Narrows the Shopping list to a single category when set. Null shows
+  everything.
+  """
+  shoppingCategoryFilter: String
+  """
+  Narrows the Shopping list to entries tagged with a specific recipe
+  (ShoppingListEntry.recipeTag) when set. Null shows everything.
+  """
+  shoppingRecipeFilter: String
+  """
+  True to narrow the Shopping list to urgent entries only.
+  """
+  shoppingUrgentOnly: Boolean!
 }
 
 """
@@ -293,6 +343,12 @@ input PantrySettingsInput {
   showLowPriority: Boolean
   categoryFilter: String
   categories: [String!]
+  addItemDetailsShown: Boolean
+  addItemCollapsed: Boolean
+  commonItemsCollapsed: Boolean
+  shoppingCategoryFilter: String
+  shoppingRecipeFilter: String
+  shoppingUrgentOnly: Boolean
 }
 
 """
@@ -533,6 +589,9 @@ type Mutation {
     unit: String
     note: String
     isStaple: Boolean
+    category: String
+    recipeTag: String
+    urgent: Boolean
   ): ShoppingListEntry!
   """
   Update a specific shopping list entry by id - e.g. correcting its name
