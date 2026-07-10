@@ -6,6 +6,8 @@ import type { InventoryItem, StorageLocation } from "../api";
 interface PantryEditItemModalProps {
   item: InventoryItem;
   busy: boolean;
+  categories: string[];
+  onAddCategory: (name: string) => void;
   onClose: () => void;
   onSave: (input: Record<string, unknown>) => Promise<void>;
 }
@@ -16,17 +18,43 @@ const LOCATION_OPTIONS: { value: StorageLocation; label: string }[] = [
   { value: "PANTRY", label: "Pantry" },
 ];
 
-export default function PantryEditItemModal({ item, busy, onClose, onSave }: PantryEditItemModalProps) {
+const ADD_CATEGORY_VALUE = "__add_new__";
+
+export default function PantryEditItemModal({
+  item,
+  busy,
+  categories,
+  onAddCategory,
+  onClose,
+  onSave,
+}: PantryEditItemModalProps) {
   const [name, setName] = useState(item.name);
   const [quantity, setQuantity] = useState(item.quantity);
   const [unit, setUnit] = useState(item.unit ?? "");
   const [location, setLocation] = useState<StorageLocation>(item.location);
   const [category, setCategory] = useState(item.category ?? "");
+  const [addingCategory, setAddingCategory] = useState(false);
+  const [newCategory, setNewCategory] = useState("");
   const [price, setPrice] = useState(item.price !== null ? String(item.price) : "");
   const [purchasedAt, setPurchasedAt] = useState(item.purchasedAt ?? "");
   const [expiresAt, setExpiresAt] = useState(item.expiresAt ?? "");
   const [isStaple, setIsStaple] = useState(item.isStaple);
   const [error, setError] = useState<string | null>(null);
+
+  // A category already on this item might not be one of the curated options
+  // (e.g. set by the AI, or from before it was added to the list here) -
+  // include it so saving without touching this field doesn't silently drop it.
+  const categoryOptions = category && !categories.includes(category) ? [category, ...categories] : categories;
+
+  function commitNewCategory() {
+    const trimmed = newCategory.trim();
+    if (trimmed) {
+      onAddCategory(trimmed);
+      setCategory(trimmed);
+    }
+    setNewCategory("");
+    setAddingCategory(false);
+  }
 
   // A unit already on this item might not be one of the fixed dropdown
   // options (e.g. set directly through the API) - include it so saving
@@ -74,7 +102,6 @@ export default function PantryEditItemModal({ item, busy, onClose, onSave }: Pan
             onChange={(e) => setName(e.target.value)}
             maxLength={200}
             disabled={busy}
-            autoFocus
           />
         </div>
 
@@ -124,15 +151,44 @@ export default function PantryEditItemModal({ item, busy, onClose, onSave }: Pan
             <label className="form-label" htmlFor="pantry-edit-category">
               Category
             </label>
-            <input
-              id="pantry-edit-category"
-              className="form-input"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              placeholder="Dairy, Produce..."
-              maxLength={100}
-              disabled={busy}
-            />
+            {addingCategory ? (
+              <input
+                className="form-input"
+                value={newCategory}
+                onChange={(e) => setNewCategory(e.target.value)}
+                placeholder="New category name"
+                maxLength={100}
+                disabled={busy}
+                autoFocus
+                onBlur={commitNewCategory}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") commitNewCategory();
+                  if (e.key === "Escape") {
+                    setNewCategory("");
+                    setAddingCategory(false);
+                  }
+                }}
+              />
+            ) : (
+              <select
+                id="pantry-edit-category"
+                className="form-input"
+                value={category}
+                onChange={(e) => {
+                  if (e.target.value === ADD_CATEGORY_VALUE) setAddingCategory(true);
+                  else setCategory(e.target.value);
+                }}
+                disabled={busy}
+              >
+                <option value="">No category</option>
+                {categoryOptions.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+                <option value={ADD_CATEGORY_VALUE}>+ Add new category…</option>
+              </select>
+            )}
           </div>
           <div className="form-row">
             <label className="form-label" htmlFor="pantry-edit-price">
@@ -142,6 +198,7 @@ export default function PantryEditItemModal({ item, busy, onClose, onSave }: Pan
               id="pantry-edit-price"
               className="form-input"
               type="number"
+              inputMode="decimal"
               min="0"
               step="0.01"
               value={price}
