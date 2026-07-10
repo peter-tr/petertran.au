@@ -44,9 +44,11 @@ export class PantryStack extends Stack {
       handler: "pantry/handler.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/dist")),
       memorySize: 256,
-      // Longer than a plain DDB round trip needs, to give parseCommand's
-      // Anthropic call room - matches GamesStack's Anthropic-calling function.
-      timeout: Duration.seconds(15),
+      // Generous - "recipes" mode (esp. an open "what can I make?" request
+      // returning several full recipes) has been observed taking 6-8s warm,
+      // and a cold start (Secrets Manager fetch + Anthropic client init) on
+      // top of that was enough to blow through the previous 15s timeout.
+      timeout: Duration.seconds(30),
       environment: {
         TABLE_NAME: table.tableName,
         ANTHROPIC_SECRET_ARN: anthropicSecret.secretArn,
