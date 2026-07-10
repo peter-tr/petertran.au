@@ -48,6 +48,7 @@ export interface PublicGame {
   imposterPlayerIds: string[] | null;
   civilianWord: string | null;
   imposterWord: string | null;
+  createdAt: string;
 }
 
 const MIN_PLAYERS = 3;
@@ -173,6 +174,7 @@ export function toPublicGame(game: GameRecord): PublicGame {
     imposterPlayerIds: revealed ? game.imposterIndexes.map((i) => game.players[i].id) : null,
     civilianWord: revealed ? game.civilianWord : null,
     imposterWord: revealed ? game.imposterWord : null,
+    createdAt: game.createdAt,
   };
 }
 

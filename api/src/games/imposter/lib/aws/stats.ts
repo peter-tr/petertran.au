@@ -2,10 +2,10 @@ import { GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { ddb, TABLE_NAME } from "./ddb";
 import type { ImposterStats } from "../game";
 
-// All-time, anonymized usage stats for the game - running counters only,
-// never individual games/players (see recentGames.ts on the frontend for
-// why: a public "list of games" would expose other people's in-progress
-// sessions and player names).
+// All-time, anonymized usage stats for the game - running counters only.
+// Individual live games are listed separately via liveImposterGames (see
+// ../aws/store.ts's listLiveGames) - these counters stay aggregate-only
+// because they're all-time totals, not a way to browse specific sessions.
 
 const STATS_PK = "STATS";
 

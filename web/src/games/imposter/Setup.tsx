@@ -12,6 +12,7 @@ import {
 } from "./api";
 import { addRecentGame } from "./recentGamesStore";
 import RecentGames from "./RecentGames";
+import LiveGames from "./LiveGames";
 import StatsPanel from "./StatsPanel";
 import "./imposter.css";
 
@@ -156,6 +157,7 @@ export default function ImposterSetup() {
       </header>
 
       <RecentGames />
+      <LiveGames />
 
       <form className="imposter-setup" onSubmit={handleSubmit}>
         <div className="imposter-field-group">

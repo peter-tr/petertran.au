@@ -28,6 +28,15 @@ export class GamesStack extends Stack {
       timeToLiveAttribute: "ttl",
     });
 
+    // Sparse index for "list live games" - only games still in REVEAL or
+    // DISCUSSION carry gsi1pk/gsi1sk (see store.ts), so this stays small and
+    // self-cleaning instead of growing with the full games-kept-forever table.
+    table.addGlobalSecondaryIndex({
+      indexName: "GSI1",
+      partitionKey: { name: "gsi1pk", type: dynamodb.AttributeType.STRING },
+      sortKey: { name: "gsi1sk", type: dynamodb.AttributeType.STRING },
+    });
+
     // Reuses the same Anthropic key as the resume API's "Surprise Me" word
     // pairs - it's the same underlying account/budget either way.
     const anthropicSecret = secretsmanager.Secret.fromSecretNameV2(
