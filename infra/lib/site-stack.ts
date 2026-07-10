@@ -9,7 +9,6 @@ import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as route53 from "aws-cdk-lib/aws-route53";
-import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
 import * as ses from "aws-cdk-lib/aws-ses";
 import * as path from "path";
 
@@ -176,13 +175,6 @@ export class SiteStack extends Stack {
           ttl: Duration.seconds(0),
         },
       ],
-    });
-
-    new s3deploy.BucketDeployment(this, "SiteDeployment", {
-      sources: [s3deploy.Source.asset(path.join(__dirname, "../../web/dist"))],
-      destinationBucket: siteBucket,
-      distribution,
-      distributionPaths: ["/*"],
     });
 
     new CfnOutput(this, "CloudFrontDomainName", { value: distribution.distributionDomainName });
