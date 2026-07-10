@@ -58,6 +58,7 @@ export interface ImposterGame {
   imposterPlayerIds: string[] | null;
   civilianWord: string | null;
   imposterWord: string | null;
+  createdAt: string;
 }
 
 const IMPOSTER_GAME_FIELDS = /* GraphQL */ `
@@ -73,6 +74,7 @@ const IMPOSTER_GAME_FIELDS = /* GraphQL */ `
   imposterPlayerIds
   civilianWord
   imposterWord
+  createdAt
 `;
 
 export const IMPOSTER_CATEGORIES_QUERY = /* GraphQL */ `
@@ -98,6 +100,18 @@ export const IMPOSTER_GAME_QUERY = /* GraphQL */ `
 
 export interface ImposterGameResult {
   imposterGame: ImposterGame | null;
+}
+
+export const LIVE_IMPOSTER_GAMES_QUERY = /* GraphQL */ `
+  query LiveImposterGames {
+    liveImposterGames {
+      ${IMPOSTER_GAME_FIELDS}
+    }
+  }
+`;
+
+export interface LiveImposterGamesResult {
+  liveImposterGames: ImposterGame[];
 }
 
 export const CREATE_IMPOSTER_GAME_MUTATION = /* GraphQL */ `

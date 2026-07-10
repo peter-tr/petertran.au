@@ -13,6 +13,7 @@ import {
 
 export interface ImposterStore {
   getGame(gameId: string): Promise<GameRecord | null>;
+  listLiveGames(): Promise<GameRecord[]>;
   saveGame(game: GameRecord): Promise<void>;
   createGame(build: (gameId: string) => GameRecord): Promise<GameRecord>;
 }
@@ -41,6 +42,10 @@ export function createImposterResolvers(store: ImposterStore, stats: ImposterSta
       imposterGame: async (_: unknown, args: { gameId: string }) => {
         const game = await store.getGame(args.gameId.toUpperCase());
         return game ? toPublicGame(game) : null;
+      },
+      liveImposterGames: async () => {
+        const games = await store.listLiveGames();
+        return games.map(toPublicGame);
       },
       imposterStats: () => stats.getStats(),
     },

@@ -2,12 +2,12 @@ import { ApolloServer } from "@apollo/server";
 import { startServerAndCreateLambdaHandler, handlers } from "@as-integrations/aws-lambda";
 import { typeDefs } from "./schema";
 import { createImposterResolvers } from "./resolvers/resolvers";
-import { getGame, putGame, createGameWithUniqueId } from "./lib/aws/store";
+import { getGame, listLiveGames, putGame, createGameWithUniqueId } from "./lib/aws/store";
 import { recordGameCreated, recordGameCompleted, getImposterStats } from "./lib/aws/stats";
 import type { Context } from "./context";
 
 const resolvers = createImposterResolvers(
-  { getGame, saveGame: putGame, createGame: createGameWithUniqueId },
+  { getGame, listLiveGames, saveGame: putGame, createGame: createGameWithUniqueId },
   { recordGameCreated, recordGameCompleted, getStats: getImposterStats }
 );
 
