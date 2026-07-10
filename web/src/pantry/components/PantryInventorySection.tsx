@@ -1,9 +1,8 @@
 import { useState } from "react";
 import PantryItemRow from "./PantryItemRow";
-import { daysBetween } from "../../shared/lib/dates";
 import type { InventoryItem, PantrySettings, PantrySettingsInput, StorageLocation } from "../api";
 
-type ViewMode = "location" | "category" | "expiry" | "all";
+type ViewMode = "location" | "category" | "priority" | "all";
 type SortMode = "recent" | "name" | "expiry" | "quantity";
 
 interface Group {
@@ -17,8 +16,6 @@ const LOCATIONS: { key: StorageLocation; label: string }[] = [
   { key: "FREEZER", label: "Freezer" },
   { key: "PANTRY", label: "Pantry" },
 ];
-
-const EXPIRY_SOON_DAYS = 7;
 
 // Applied within every group regardless of view, so "sort by name" still
 // alphabetizes each location/category/expiry bucket rather than only
@@ -67,19 +64,16 @@ function groupItems(items: InventoryItem[], view: ViewMode, sort: SortMode): Gro
       .map(([key, groupItems]) => ({ key, label: key, items: sortItems(groupItems, sort) }));
   }
 
-  if (view === "expiry") {
-    const soon: InventoryItem[] = [];
-    const later: InventoryItem[] = [];
-    const none: InventoryItem[] = [];
-    for (const item of items) {
-      if (!item.expiresAt) none.push(item);
-      else if (daysBetween(item.expiresAt) <= EXPIRY_SOON_DAYS) soon.push(item);
-      else later.push(item);
-    }
+  if (view === "priority") {
+    // Only splits into two visible groups when low-priority items are
+    // actually being shown (the "+ show N low priority" toggle above the
+    // list) - with them hidden, everything remaining is inherently
+    // "needs attention" already, so a second empty group would be noise.
+    const attention = items.filter((i) => !i.lowPriority);
+    const low = items.filter((i) => i.lowPriority);
     return [
-      { key: "soon", label: "Expiring soon", items: sortItems(soon, sort) },
-      { key: "later", label: "Later", items: sortItems(later, sort) },
-      { key: "none", label: "No expiry date", items: sortItems(none, sort) },
+      { key: "attention", label: "Needs attention", items: sortItems(attention, sort) },
+      { key: "low", label: "Low priority", items: sortItems(low, sort) },
     ].filter((g) => g.items.length > 0);
   }
 
@@ -90,7 +84,7 @@ function groupItems(items: InventoryItem[], view: ViewMode, sort: SortMode): Gro
 const VIEW_LABELS: Record<ViewMode, string> = {
   location: "Location",
   category: "Category",
-  expiry: "Expiry",
+  priority: "Priority",
   all: "All",
 };
 

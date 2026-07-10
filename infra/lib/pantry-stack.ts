@@ -1,8 +1,11 @@
-import { Stack, StackProps, CfnOutput, Duration, RemovalPolicy } from "aws-cdk-lib";
+import { Stack, StackProps, CfnOutput, Duration, RemovalPolicy, TimeZone } from "aws-cdk-lib";
 import { Construct } from "constructs";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
+import * as ses from "aws-cdk-lib/aws-ses";
+import { Schedule, ScheduleExpression } from "aws-cdk-lib/aws-scheduler";
+import { LambdaInvoke } from "aws-cdk-lib/aws-scheduler-targets";
 import * as path from "path";
 
 export interface PantryStackProps extends StackProps {
@@ -74,5 +77,44 @@ export class PantryStack extends Stack {
 
     new CfnOutput(this, "PantryGraphQLEndpoint", { value: fnUrl.url });
     new CfnOutput(this, "PantryTableName", { value: table.tableName });
+
+    // --- Daily urgent-items digest email, 4pm Australia/Sydney ---
+    // Both SES identities already exist (created/verified by SiteStack -
+    // see its comment on why the recipient is imported rather than owned by
+    // that stack too) - SES identities are account-level resources, so
+    // re-importing them by name here and granting to this Lambda's own role
+    // works the same as if this stack had created them itself. The domain
+    // identity is the bare root domain ("petertran.au", matching
+    // SiteStack's hostedZoneName and the contact@petertran.au FROM address)
+    // - deliberately not props.domainName, which is "www.petertran.au" and
+    // would import a non-existent identity.
+    const emailIdentity = ses.EmailIdentity.fromEmailIdentityName(this, "SesDomainIdentity", "petertran.au");
+    const recipientIdentity = ses.EmailIdentity.fromEmailIdentityName(
+      this,
+      "SesRecipientIdentity",
+      "peter2002tran@outlook.com"
+    );
+
+    const digestFn = new lambda.Function(this, "PantryDigestFunction", {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: "pantry/digest-handler.handler",
+      code: lambda.Code.fromAsset(path.join(__dirname, "../../api/dist")),
+      memorySize: 256,
+      timeout: Duration.seconds(30),
+      environment: {
+        TABLE_NAME: table.tableName,
+        CONTACT_FROM_EMAIL: "contact@petertran.au",
+        CONTACT_TO_EMAIL: "peter2002tran@outlook.com",
+      },
+    });
+    table.grantReadData(digestFn);
+    emailIdentity.grantSendEmail(digestFn);
+    recipientIdentity.grantSendEmail(digestFn);
+
+    new Schedule(this, "PantryDigestSchedule", {
+      schedule: ScheduleExpression.cron({ minute: "0", hour: "16", timeZone: TimeZone.AUSTRALIA_SYDNEY }),
+      target: new LambdaInvoke(digestFn),
+      description: "Daily 4pm Sydney-time email of urgent pantry shopping list items",
+    });
   }
 }

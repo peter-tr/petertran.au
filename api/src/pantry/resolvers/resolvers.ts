@@ -261,7 +261,9 @@ async function getShoppingListEntry(id: string): Promise<ShoppingListEntry | nul
   return entry ? withShoppingListDefaults(entry) : null;
 }
 
-async function getShoppingList(): Promise<ShoppingListEntry[]> {
+// Exported for the 4pm digest Lambda (lib/aws/send-digest.ts), which needs
+// the same query outside of any GraphQL resolver context.
+export async function getShoppingList(): Promise<ShoppingListEntry[]> {
   const res = await ddb.send(
     new QueryCommand({
       TableName: TABLE_NAME,
