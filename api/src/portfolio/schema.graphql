@@ -391,6 +391,13 @@ type GeneratedQuery {
   Set when a query couldn't be generated, explaining why. Null on success.
   """
   message: String
+  """
+  A short natural-language answer to the original question, grounded in the
+  real data `query` returned - set only when `query` is a real (non-mutation)
+  query that ran successfully. Null for mutation drafts, unanswerable
+  prompts, or if running the generated query itself failed.
+  """
+  answer: String
 }
 
 """
