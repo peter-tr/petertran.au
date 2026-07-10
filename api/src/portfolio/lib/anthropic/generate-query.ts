@@ -5,6 +5,7 @@ import { typeDefs } from "../../schema";
 import { getAnthropicClient } from "@shared/anthropic-client";
 import { assertNotRateLimited } from "../util/rate-limit";
 import { ddb, TABLE_NAME } from "../aws/ddb";
+import type { Context } from "../../context";
 
 const MAX_PROMPT_LENGTH = 300;
 
@@ -39,9 +40,26 @@ Rules:
 - Only select fields and arguments that exist in the schema above.
 - Do not include any explanation, commentary, or markdown code fences.`;
 
-export interface GenerateQueryResult {
+const ANSWER_SYSTEM_PROMPT = `You answer a visitor's question about Peter Tran using ONLY the JSON data
+provided below - it's the real result of the GraphQL query written to answer
+this exact question.
+
+Rules:
+- Write 1-3 short, conversational sentences, third person ("Peter has...",
+  not "I have...").
+- Only state facts present in the data. Never invent or infer anything not
+  there - if the data doesn't actually answer the question, say so briefly.
+- No markdown, no field names, no code fences - just plain prose.`;
+
+const MUTATION_PATTERN = /^\s*mutation\b/i;
+
+interface RawGeneratedQuery {
   query: string | null;
   message: string | null;
+}
+
+export interface GenerateQueryResult extends RawGeneratedQuery {
+  answer: string | null;
 }
 
 // Best-effort usage counter for the "little dashboard" of live stats - skips
@@ -82,7 +100,43 @@ async function callAnthropic(client: Anthropic, trimmed: string) {
   });
 }
 
-export async function generateQuery(prompt: string, sourceIp?: string): Promise<GenerateQueryResult> {
+async function callAnswerAnthropic(
+  client: Anthropic,
+  prompt: string,
+  data: Record<string, unknown>
+): Promise<string | null> {
+  const response = await client.messages.create({
+    model: "claude-haiku-4-5",
+    max_tokens: 200,
+    system: ANSWER_SYSTEM_PROMPT,
+    messages: [{ role: "user", content: `Question: ${prompt}\n\nData:\n${JSON.stringify(data)}` }],
+  });
+  const textBlock = response.content.find((block) => block.type === "text");
+  return textBlock ? textBlock.text.trim() : null;
+}
+
+// Not an AWS SDK call, so X-Ray can't auto-instrument it - wrap it in its own
+// subsegment so the trace breakdown shows how much of the latency is actually
+// Anthropic vs. our own code.
+async function traced<T>(name: string, fn: () => Promise<T>): Promise<T> {
+  if (!process.env.AWS_LAMBDA_FUNCTION_NAME) return fn();
+  return AWSXRay.captureAsyncFunc(name, async (subsegment) => {
+    try {
+      const res = await fn();
+      subsegment?.close();
+      return res;
+    } catch (err) {
+      subsegment?.close(err instanceof Error ? err : undefined);
+      throw err;
+    }
+  });
+}
+
+export async function generateQuery(
+  prompt: string,
+  sourceIp: string | undefined,
+  runInternalQuery: Context["runInternalQuery"]
+): Promise<GenerateQueryResult> {
   const trimmed = prompt.trim();
   if (!trimmed) throw new Error("prompt is required.");
   if (trimmed.length > MAX_PROMPT_LENGTH) {
@@ -93,26 +147,27 @@ export async function generateQuery(prompt: string, sourceIp?: string): Promise<
 
   const client = await getAnthropicClient();
 
-  // Not an AWS SDK call, so X-Ray can't auto-instrument it - wrap it in its
-  // own subsegment so the trace breakdown shows how much of the latency is
-  // actually Anthropic vs. our own code.
-  const response = process.env.AWS_LAMBDA_FUNCTION_NAME
-    ? await AWSXRay.captureAsyncFunc("Anthropic API", async (subsegment) => {
-        try {
-          const res = await callAnthropic(client, trimmed);
-          subsegment?.close();
-          return res;
-        } catch (err) {
-          subsegment?.close(err instanceof Error ? err : undefined);
-          throw err;
-        }
-      })
-    : await callAnthropic(client, trimmed);
-
-  const parsed = response.parsed_output as GenerateQueryResult | null;
+  const response = await traced("Anthropic API", () => callAnthropic(client, trimmed));
+  const parsed = response.parsed_output as RawGeneratedQuery | null;
   if (!parsed) throw new Error("Claude didn't return a valid response - try rephrasing.");
 
   await recordAiQueryServed(sourceIp);
 
-  return parsed;
+  // Only a real (non-mutation) query gets a natural-language answer - a
+  // mutation draft or an unanswerable prompt already has a suitable
+  // `message`, and running a mutation on the visitor's behalf is never OK.
+  if (!parsed.query || MUTATION_PATTERN.test(parsed.query)) {
+    return { ...parsed, answer: null };
+  }
+
+  const { data, errors } = await runInternalQuery(parsed.query);
+  if (errors?.length || !data) {
+    // Fall back to the query/message as-is - the explorer still fills in
+    // and runs the query itself, so the visitor sees the same raw
+    // query/error they always would have.
+    return { ...parsed, answer: null };
+  }
+
+  const answer = await traced("Anthropic API (answer)", () => callAnswerAnthropic(client, trimmed, data));
+  return { ...parsed, answer };
 }

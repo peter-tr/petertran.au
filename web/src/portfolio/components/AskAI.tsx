@@ -14,6 +14,7 @@ export default function AskAI() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  const [answer, setAnswer] = useState<string | null>(null);
 
   // Tracks whether the in-flight (or just-finished) GraphQL request was one we
   // kicked off ourselves, so we only show the "running…" note for that request
@@ -41,16 +42,18 @@ export default function AskAI() {
     setLoading(true);
     setError(null);
     setNote(null);
+    setAnswer(null);
 
     try {
       const result = await runQuery<GenerateQueryResult>(GENERATE_QUERY_QUERY, { prompt });
-      const { query, message } = result.meta.generateQuery;
+      const { query, message, answer: reply } = result.meta.generateQuery;
 
       if (!query) {
         setNote(message ?? "I couldn't turn that into a query against this schema.");
         return;
       }
       if (!queryEditor) throw new Error("Editor isn't ready yet - try again in a moment.");
+      setAnswer(reply);
 
       // Setting the Monaco editor's value directly (not just the tab-state data)
       // is what actually updates the visible editor - GraphiQL only syncs
@@ -101,6 +104,7 @@ export default function AskAI() {
       <button className="run-btn" type="submit" disabled={loading}>
         {loading ? "Thinking…" : "Ask Claude ▸"}
       </button>
+      {answer && <p className="ask-ai-answer">{answer}</p>}
       {awaitingResult && <span className="ask-ai-note">// running the generated query…</span>}
       {note && <span className="ask-ai-note">// {note}</span>}
       {error && <span className="ask-ai-error">// {error}</span>}
