@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Section from "./Section";
 import RequestsChart from "./RequestsChart";
 import OperationRow from "./OperationRow";
@@ -17,12 +17,25 @@ const TILES: { key: NumericStatKey; label: string; format: (value: number) => st
 ];
 
 type OperationsRange = "recent" | "all";
+type OpsSortKey = "count" | "avgDurationMs";
+type OpsSort = { key: OpsSortKey; direction: "asc" | "desc" } | null;
 
 export default function SystemStatsSection() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [opsRange, setOpsRange] = useState<OperationsRange>("recent");
+  const [opsSort, setOpsSort] = useState<OpsSort>(null);
+
+  function toggleOpsSort(key: OpsSortKey) {
+    setOpsSort((current) =>
+      current?.key === key
+        ? current.direction === "desc"
+          ? { key, direction: "asc" }
+          : null
+        : { key, direction: "desc" },
+    );
+  }
 
   // Fetch once on mount, matching Hero.tsx's pattern: setState only happens
   // inside then/catch, never synchronously in the effect body itself.
@@ -66,6 +79,14 @@ export default function SystemStatsSection() {
       ? stats.operationsLast30Days
       : stats.operations
     : [];
+
+  const sortedOperations = useMemo(() => {
+    if (!opsSort) return activeOperations;
+    const { key, direction } = opsSort;
+    return [...activeOperations].sort((a, b) =>
+      direction === "desc" ? b[key] - a[key] : a[key] - b[key],
+    );
+  }, [activeOperations, opsSort]);
 
   return (
     <Section id="stats" typeName="SystemStats">
@@ -115,12 +136,17 @@ export default function SystemStatsSection() {
                 <thead>
                   <tr>
                     <th>operation</th>
-                    <th>count</th>
-                    <th>avg latency</th>
+                    <SortableOpsHeader label="count" sortKey="count" sort={opsSort} onToggle={toggleOpsSort} />
+                    <SortableOpsHeader
+                      label="avg latency"
+                      sortKey="avgDurationMs"
+                      sort={opsSort}
+                      onToggle={toggleOpsSort}
+                    />
                   </tr>
                 </thead>
                 <tbody>
-                  {activeOperations.map((op) => (
+                  {sortedOperations.map((op) => (
                     <OperationRow op={op} key={op.name} />
                   ))}
                 </tbody>
@@ -144,5 +170,27 @@ export default function SystemStatsSection() {
         {loading ? "Refreshing…" : "Refresh ▸"}
       </button>
     </Section>
+  );
+}
+
+function SortableOpsHeader({
+  label,
+  sortKey,
+  sort,
+  onToggle,
+}: {
+  label: string;
+  sortKey: OpsSortKey;
+  sort: OpsSort;
+  onToggle: (key: OpsSortKey) => void;
+}) {
+  const active = sort?.key === sortKey ? sort.direction : null;
+  return (
+    <th aria-sort={active === "desc" ? "descending" : active === "asc" ? "ascending" : "none"}>
+      <button type="button" className="ops-sort-btn" onClick={() => onToggle(sortKey)}>
+        {label}
+        <span className="ops-sort-arrow">{active ? (active === "desc" ? "▾" : "▴") : ""}</span>
+      </button>
+    </th>
   );
 }
