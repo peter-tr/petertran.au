@@ -74,6 +74,17 @@ type InventoryItem {
   """
   isStaple: Boolean!
   """
+  True for low-attention items (salt, pepper, oil, spices...) that don't
+  need frequent checking - hidden from the main inventory list by default.
+  """
+  lowPriority: Boolean!
+  """
+  True if manually flagged as running low. Independent of quantity - some
+  items (a spice jar, a bag of flour) don't have a quantity that maps
+  cleanly to "almost out".
+  """
+  nearlyEmpty: Boolean!
+  """
   Every purchase batch logged for this item, oldest first. `quantity` /
   `purchasedAt` / `price` above always reflect the current total and most
   recent batch - this is the full history behind them.
@@ -130,6 +141,15 @@ input AddInventoryItemInput {
   to false.
   """
   isStaple: Boolean
+  """
+  True to hide this from the main inventory list by default. Defaults to
+  false.
+  """
+  lowPriority: Boolean
+  """
+  True to flag this as running low. Defaults to false.
+  """
+  nearlyEmpty: Boolean
 }
 
 """
@@ -145,6 +165,8 @@ input UpdateInventoryItemInput {
   purchasedAt: String
   expiresAt: String
   isStaple: Boolean
+  lowPriority: Boolean
+  nearlyEmpty: Boolean
 }
 
 """
@@ -190,6 +212,20 @@ type ShoppingListEntry {
 }
 
 """
+Input for updating an existing shopping list entry. Only provided fields
+are changed. Distinct from addToShoppingList, which upserts by matching
+name - this updates a specific entry by id, so renaming it doesn't create
+a second row.
+"""
+input UpdateShoppingListEntryInput {
+  name: String
+  quantity: Float
+  unit: String
+  note: String
+  isStaple: Boolean
+}
+
+"""
 Shared display/view preferences for the pantry page. There's no per-user
 login here, so these are simply global - one setting shared by everyone who
 visits, so a change made on one device shows up everywhere.
@@ -226,6 +262,21 @@ type PantrySettings {
   True if the Shopping list panel is collapsed.
   """
   shoppingListCollapsed: Boolean!
+  """
+  True if lowPriority inventory items are currently shown - they're
+  hidden by default.
+  """
+  showLowPriority: Boolean!
+  """
+  Narrows the Inventory list to a single category when set. Null shows
+  everything, regardless of which `view` grouping is active.
+  """
+  categoryFilter: String
+  """
+  Curated list of category names offered in the item-edit category
+  dropdown - grows as new ones are added, same idea as commonItems.
+  """
+  categories: [String!]!
 }
 
 """
@@ -239,6 +290,9 @@ input PantrySettingsInput {
   collapsedGroups: [String!]
   commonItems: [String!]
   shoppingListCollapsed: Boolean
+  showLowPriority: Boolean
+  categoryFilter: String
+  categories: [String!]
 }
 
 """
@@ -347,6 +401,13 @@ type ParsedCommand {
   """
   answer: String
   """
+  Set alongside answer for a list-shaped question (e.g. "what spices do I
+  have?") - one line per item, rendered as an actual list rather than
+  packed into answer's prose. Null for an ordinary answer with no natural
+  list structure.
+  """
+  answerItems: [String!]
+  """
   Set when the input was interpreted as one or more inventory changes,
   proposed but not yet applied. Null otherwise.
   """
@@ -434,7 +495,19 @@ type Mutation {
   provide). isStaple only ever gets set true this way, never back to
   false, so one staple-triggered add can't be undone by an unrelated call.
   """
-  addToShoppingList(name: String!, quantity: Float, unit: String, note: String, isStaple: Boolean): ShoppingListEntry!
+  addToShoppingList(
+    name: String!
+    quantity: Float
+    unit: String
+    note: String
+    isStaple: Boolean
+  ): ShoppingListEntry!
+  """
+  Update a specific shopping list entry by id - e.g. correcting its name
+  or quantity. Unlike addToShoppingList, this never merges into a
+  different entry, even if the new name would otherwise match one.
+  """
+  updateShoppingListEntry(id: ID!, input: UpdateShoppingListEntryInput!): ShoppingListEntry!
   """
   Remove an entry from the shopping list, e.g. once it's been bought.
   Returns true if a row was actually deleted.

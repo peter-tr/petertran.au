@@ -23,12 +23,15 @@ interface RawAction {
   itemId: string | null;
   name: string | null;
   location: "FRIDGE" | "FREEZER" | "PANTRY" | null;
+  category: string | null;
   quantity: number | null;
   unit: string | null;
   price: number | null;
   purchasedAt: string | null;
   expiresAt: string | null;
   isStaple: boolean | null;
+  lowPriority: boolean | null;
+  nearlyEmpty: boolean | null;
   note: string | null;
 }
 
@@ -48,6 +51,7 @@ interface RawRecipe {
 interface RawParseResult {
   mode: "answer" | "actions" | "recipes" | "unclear";
   answer: string | null;
+  answerItems: string[];
   actions: RawAction[];
   recipes: RawRecipe[];
   message: string | null;
@@ -75,6 +79,7 @@ export interface RecipeSuggestion {
 
 export interface ParsedCommandResult {
   answer: string | null;
+  answerItems: string[] | null;
   actions: ProposedAction[] | null;
   recipes: RecipeSuggestion[] | null;
   message: string | null;
@@ -85,7 +90,7 @@ function formatInventoryForPrompt(inventory: InventoryItem[]): string {
   return inventory
     .map(
       (i) =>
-        `- id=${i.id} name="${i.name}" location=${i.location} quantity=${i.quantity} unit=${i.unit ?? "none"}${
+        `- id=${i.id} name="${i.name}" category=${i.category ?? "none"} location=${i.location} quantity=${i.quantity} unit=${i.unit ?? "none"}${
           i.expiresAt ? ` expiresAt=${i.expiresAt}` : ""
         }`
     )
@@ -102,7 +107,11 @@ function formatShoppingListForPrompt(shoppingList: ShoppingListEntry[]): string 
     .join("\n");
 }
 
-function buildSystemPrompt(inventory: InventoryItem[], shoppingList: ShoppingListEntry[]): string {
+function buildSystemPrompt(
+  inventory: InventoryItem[],
+  shoppingList: ShoppingListEntry[],
+  categories: string[]
+): string {
   const today = new Date().toISOString().slice(0, 10);
   return `You interpret natural-language commands for a household pantry/fridge inventory tracker. Today's date is ${today}. Earlier turns of this conversation, if any, are provided as prior messages - use them for context.
 
@@ -112,12 +121,14 @@ ${formatInventoryForPrompt(inventory)}
 Current shopping list:
 ${formatShoppingListForPrompt(shoppingList)}
 
+Categories already in use: ${categories.length ? categories.join(", ") : "(none yet)"}
+
 Decide what the input is and respond with exactly one of these four modes:
 
-- "answer": the input is a read-only question (e.g. "what's expiring soon?", "how much milk do I have?"). Answer directly and concisely from the data above in the "answer" field, in plain conversational text - never invent data not shown above.
+- "answer": the input is a read-only question (e.g. "what's expiring soon?", "how much milk do I have?"). Answer directly and concisely from the data above in the "answer" field, in plain conversational text - never invent data not shown above. If the answer is naturally a list of items (e.g. "what spices do I have?", "what's expiring soon?") - set "answer" to a short intro sentence (or leave it null if nothing more needs saying) and put one line per item in "answerItems", instead of writing the whole list out as prose in "answer".
 - "actions": use this mode whenever ANY part of the input is clear enough to act on - even if only part of it is. Fill "actions" with one entry per clear change:
-  - RECORD_PURCHASE: adding or buying a new or existing item. Always use this (never UPDATE_INVENTORY_ITEM) for "add X" / "bought X" phrasing, even if a similar item already exists - the system merges duplicates itself. Requires name, location (guess FRIDGE/FREEZER/PANTRY sensibly if not stated), and quantity (default 1 if not stated). Set purchasedAt to today's date (${today}) unless the input implies no purchase actually happened.
-  - UPDATE_INVENTORY_ITEM: correcting an EXISTING item's fields without it being a new purchase. Requires itemId matching one of the ids listed above exactly - never invent an id.
+  - RECORD_PURCHASE: adding or buying a new or existing item. Always use this (never UPDATE_INVENTORY_ITEM) for "add X" / "bought X" phrasing, even if a similar item already exists - the system merges duplicates itself. Requires name, location (guess FRIDGE/FREEZER/PANTRY sensibly if not stated), and quantity (default 1 if not stated). Set purchasedAt to today's date (${today}) unless the input implies no purchase actually happened. Set "category" when you're confident of a good match - prefer reusing one of the categories already in use above if one fits (e.g. "garlic powder" -> "Spices" if that's already a category), otherwise invent a sensible new one; leave it null if genuinely unclear rather than guessing. Set "lowPriority"/"nearlyEmpty" only if the input actually says so (e.g. "add salt as low priority") - otherwise leave both null.
+  - UPDATE_INVENTORY_ITEM: correcting an EXISTING item's fields without it being a new purchase. Requires itemId matching one of the ids listed above exactly - never invent an id. Same category/lowPriority/nearlyEmpty rules as RECORD_PURCHASE apply here too, only when the input actually asks to change them.
   - REMOVE_INVENTORY_ITEM: fully using up or getting rid of an existing item. Requires itemId matching one of the ids listed above exactly.
   - ADD_TO_SHOPPING_LIST: noting something is needed without it being in stock right now (e.g. "we're out of eggs", "need to buy bread", "add 1 kg of coffee beans to my shopping list"). Requires name. Set quantity/unit only if the input actually states an amount (e.g. "1 kg of coffee beans" -> quantity=1, unit="kg"); leave both null for a plain "buy this" with no amount. Set "note" only when there's a specific reason worth remembering (e.g. a recipe it's for) - leave it null for a plain add. If the name matches an item already on the shopping list (see the list above), this UPDATES that entry's quantity/unit/note rather than creating a duplicate - use it for that too, e.g. if the user gives an amount for something already listed.
   - REMOVE_FROM_SHOPPING_LIST: an item on the shopping list has been bought or is no longer needed. Requires itemId matching one of the shopping list ids listed above exactly.
@@ -145,6 +156,7 @@ const PARSE_COMMAND_SCHEMA = {
   properties: {
     mode: { type: "string", enum: ["answer", "actions", "recipes", "unclear"] },
     answer: { anyOf: [{ type: "string" }, { type: "null" }] },
+    answerItems: { type: "array", items: { type: "string" } },
     actions: {
       type: "array",
       items: {
@@ -164,12 +176,15 @@ const PARSE_COMMAND_SCHEMA = {
           itemId: { anyOf: [{ type: "string" }, { type: "null" }] },
           name: { anyOf: [{ type: "string" }, { type: "null" }] },
           location: { anyOf: [{ type: "string", enum: ["FRIDGE", "FREEZER", "PANTRY"] }, { type: "null" }] },
+          category: { anyOf: [{ type: "string" }, { type: "null" }] },
           quantity: { anyOf: [{ type: "number" }, { type: "null" }] },
           unit: { anyOf: [{ type: "string" }, { type: "null" }] },
           price: { anyOf: [{ type: "number" }, { type: "null" }] },
           purchasedAt: { anyOf: [{ type: "string" }, { type: "null" }] },
           expiresAt: { anyOf: [{ type: "string" }, { type: "null" }] },
           isStaple: { anyOf: [{ type: "boolean" }, { type: "null" }] },
+          lowPriority: { anyOf: [{ type: "boolean" }, { type: "null" }] },
+          nearlyEmpty: { anyOf: [{ type: "boolean" }, { type: "null" }] },
           note: { anyOf: [{ type: "string" }, { type: "null" }] },
         },
         required: [
@@ -178,12 +193,15 @@ const PARSE_COMMAND_SCHEMA = {
           "itemId",
           "name",
           "location",
+          "category",
           "quantity",
           "unit",
           "price",
           "purchasedAt",
           "expiresAt",
           "isStaple",
+          "lowPriority",
+          "nearlyEmpty",
           "note",
         ],
         additionalProperties: false,
@@ -217,7 +235,7 @@ const PARSE_COMMAND_SCHEMA = {
     },
     message: { anyOf: [{ type: "string" }, { type: "null" }] },
   },
-  required: ["mode", "answer", "actions", "recipes", "message"],
+  required: ["mode", "answer", "answerItems", "actions", "recipes", "message"],
   additionalProperties: false,
 } as const;
 
@@ -236,12 +254,15 @@ function toProposedAction(a: RawAction): ProposedAction | null {
           input: {
             name: a.name,
             location: a.location,
+            category: a.category,
             quantity: a.quantity,
             unit: a.unit,
             price: a.price,
             purchasedAt: a.purchasedAt,
             expiresAt: a.expiresAt,
             isStaple: a.isStaple,
+            lowPriority: a.lowPriority,
+            nearlyEmpty: a.nearlyEmpty,
           },
         }),
       };
@@ -251,12 +272,15 @@ function toProposedAction(a: RawAction): ProposedAction | null {
       const input: Record<string, unknown> = {};
       if (a.name != null) input.name = a.name;
       if (a.location != null) input.location = a.location;
+      if (a.category != null) input.category = a.category;
       if (a.quantity != null) input.quantity = a.quantity;
       if (a.unit != null) input.unit = a.unit;
       if (a.price != null) input.price = a.price;
       if (a.purchasedAt != null) input.purchasedAt = a.purchasedAt;
       if (a.expiresAt != null) input.expiresAt = a.expiresAt;
       if (a.isStaple != null) input.isStaple = a.isStaple;
+      if (a.lowPriority != null) input.lowPriority = a.lowPriority;
+      if (a.nearlyEmpty != null) input.nearlyEmpty = a.nearlyEmpty;
       return {
         type: a.type,
         summary: a.summary,
@@ -317,7 +341,12 @@ function sanitizeRecipes(recipes: RawRecipe[], inventoryIds: Set<string>): Recip
     description: r.description,
     ingredients: r.ingredients.map((ing) => {
       const valid = ing.haveInInventory && !!ing.itemId && inventoryIds.has(ing.itemId);
-      return { name: ing.name, amount: ing.amount, haveInInventory: valid, itemId: valid ? ing.itemId : null };
+      return {
+        name: ing.name,
+        amount: ing.amount,
+        haveInInventory: valid,
+        itemId: valid ? ing.itemId : null,
+      };
     }),
   }));
 }
@@ -327,6 +356,7 @@ export async function parseCommand(
   history: ConversationMessage[],
   inventory: InventoryItem[],
   shoppingList: ShoppingListEntry[],
+  categories: string[],
   sourceIp: string | undefined
 ): Promise<ParsedCommandResult> {
   const trimmed = input.trim();
@@ -345,7 +375,7 @@ export async function parseCommand(
   const response = await client.messages.parse({
     model: "claude-haiku-4-5",
     max_tokens: 1536,
-    system: buildSystemPrompt(inventory, shoppingList),
+    system: buildSystemPrompt(inventory, shoppingList, categories),
     messages: [...priorMessages, { role: "user", content: trimmed }],
     output_config: { format: { type: "json_schema", schema: PARSE_COMMAND_SCHEMA } },
   });
@@ -354,7 +384,13 @@ export async function parseCommand(
   if (!parsed) throw new Error("Claude didn't return a valid response - try rephrasing.");
 
   if (parsed.mode === "answer") {
-    return { answer: parsed.answer, actions: null, recipes: null, message: null };
+    return {
+      answer: parsed.answer,
+      answerItems: parsed.answerItems.length ? parsed.answerItems : null,
+      actions: null,
+      recipes: null,
+      message: null,
+    };
   }
 
   const inventoryIds = new Set(inventory.map((i) => i.id));
@@ -362,6 +398,7 @@ export async function parseCommand(
   if (parsed.mode === "recipes") {
     return {
       answer: null,
+      answerItems: null,
       actions: null,
       recipes: sanitizeRecipes(parsed.recipes, inventoryIds),
       message: parsed.message ?? null,
@@ -371,6 +408,7 @@ export async function parseCommand(
   if (parsed.mode === "unclear") {
     return {
       answer: null,
+      answerItems: null,
       actions: null,
       recipes: null,
       message: parsed.message ?? "I couldn't understand that - try rephrasing.",
@@ -387,6 +425,7 @@ export async function parseCommand(
   if (actions.length === 0) {
     return {
       answer: null,
+      answerItems: null,
       actions: null,
       recipes: null,
       message:
@@ -398,8 +437,10 @@ export async function parseCommand(
 
   return {
     answer: null,
+    answerItems: null,
     actions,
     recipes: null,
-    message: droppedCount > 0 ? "Some of what you asked couldn't be matched to a real item and was skipped." : null,
+    message:
+      droppedCount > 0 ? "Some of what you asked couldn't be matched to a real item and was skipped." : null,
   };
 }

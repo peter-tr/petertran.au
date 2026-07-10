@@ -15,10 +15,11 @@ npm workspaces monorepo: `infra` (AWS CDK), `api` (Apollo Server on Lambda), `we
 Three independent side-project backends live as peer directories under `api/src/`: `portfolio` (resume site), `pantry`, `games/imposter`. Each deploys as its own Lambda/Function URL/DynamoDB table via its own CDK stack - deliberately separate so they evolve independently.
 
 Each project follows the same internal layout:
+
 - `handler.ts`, `schema.ts`, `schema.graphql`, `context.ts` - flat, at the project root
 - `lib/anthropic/`, `lib/aws/`, `lib/util/` - supporting modules, grouped by what they wrap (Anthropic clients, AWS service clients, generic utilities). Pure domain logic (e.g. imposter's `game.ts`, `words.ts`) stays flat in `lib/`, not nested under a category.
 - `resolvers/resolvers.ts` - real, DB-backed resolvers. Only this is imported by `handler.ts`, so only this ships in the production Lambda bundle.
-- `dev/dev-resolvers.ts` + `dev/dev-server.ts` - in-memory mock resolvers and the local Apollo standalone server that runs them. Keep everything mock/dev-only under `dev/` (not mixed into `resolvers/`) *and* keep the `dev-` filename prefix even inside that folder - between the two, it's unambiguous at a glance, from the file tree alone, that these never ship to production.
+- `dev/dev-resolvers.ts` + `dev/dev-server.ts` - in-memory mock resolvers and the local Apollo standalone server that runs them. Keep everything mock/dev-only under `dev/` (not mixed into `resolvers/`) _and_ keep the `dev-` filename prefix even inside that folder - between the two, it's unambiguous at a glance, from the file tree alone, that these never ship to production.
 
 ### DRY - use `api/src/shared/`
 

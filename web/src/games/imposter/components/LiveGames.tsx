@@ -56,8 +56,8 @@ export default function LiveGames() {
             <Link to={`/imposter/${game.gameId}`} className="imposter-recent-link">
               <span className="imposter-recent-code">{game.gameId}</span>
               <span className="imposter-recent-meta">
-                {game.categoryLabel ?? "Category hidden"} ·{" "}
-                {game.players.map((p) => p.name).join(", ")} · {PHASE_LABEL[game.phase]}
+                {game.categoryLabel ?? "Category hidden"} · {game.players.map((p) => p.name).join(", ")} ·{" "}
+                {PHASE_LABEL[game.phase]}
               </span>
               <span className="imposter-recent-time">since {formatWhen(game.createdAt)}</span>
             </Link>

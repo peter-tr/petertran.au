@@ -163,9 +163,13 @@ export default function PantryCommandBar({ onChanged }: PantryCommandBarProps) {
     // side of the conversation, so a reply like "shopping list, 1 bottle"
     // can complete an earlier clarifying question instead of being parsed
     // alone as a new, likely-unclear input.
-    const history: ConversationMessage[] = turns.slice(-MAX_HISTORY_TURNS).map((t) =>
-      t.role === "user" ? { role: "user", content: t.text } : { role: "assistant", content: JSON.stringify(t.result) }
-    );
+    const history: ConversationMessage[] = turns
+      .slice(-MAX_HISTORY_TURNS)
+      .map((t) =>
+        t.role === "user"
+          ? { role: "user", content: t.text }
+          : { role: "assistant", content: JSON.stringify(t.result) }
+      );
 
     setTurns((prev) => [...prev, { role: "user", text: trimmed }]);
     setInput("");
@@ -296,8 +300,8 @@ export default function PantryCommandBar({ onChanged }: PantryCommandBarProps) {
                               className="pantry-details-toggle"
                               onClick={() => handleAddMissingIngredients(i, recipe)}
                             >
-                              + add {missing.length} missing ingredient{missing.length > 1 ? "s" : ""} to shopping
-                              list
+                              + add {missing.length} missing ingredient{missing.length > 1 ? "s" : ""} to
+                              shopping list
                             </button>
                           )}
                         </div>

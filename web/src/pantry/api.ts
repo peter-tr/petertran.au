@@ -26,6 +26,8 @@ export interface InventoryItem {
   purchasedAt: string | null;
   expiresAt: string | null;
   isStaple: boolean;
+  lowPriority: boolean;
+  nearlyEmpty: boolean;
   purchases: Purchase[];
   addedAt: string;
   updatedAt: string;
@@ -41,6 +43,8 @@ export interface AddInventoryItemInput {
   purchasedAt?: string | null;
   expiresAt?: string | null;
   isStaple?: boolean | null;
+  lowPriority?: boolean | null;
+  nearlyEmpty?: boolean | null;
 }
 
 const INVENTORY_ITEM_FIELDS = /* GraphQL */ `
@@ -54,6 +58,8 @@ const INVENTORY_ITEM_FIELDS = /* GraphQL */ `
   purchasedAt
   expiresAt
   isStaple
+  lowPriority
+  nearlyEmpty
   purchases {
     date
     price
@@ -186,6 +192,32 @@ export interface AddToShoppingListResult {
   addToShoppingList: ShoppingListEntry;
 }
 
+export interface UpdateShoppingListEntryInput {
+  name?: string;
+  quantity?: number | null;
+  unit?: string | null;
+  note?: string | null;
+  isStaple?: boolean;
+}
+
+export const UPDATE_SHOPPING_LIST_ENTRY_MUTATION = /* GraphQL */ `
+  mutation UpdateShoppingListEntry($id: ID!, $input: UpdateShoppingListEntryInput!) {
+    updateShoppingListEntry(id: $id, input: $input) {
+      id
+      name
+      quantity
+      unit
+      note
+      isStaple
+      addedAt
+    }
+  }
+`;
+
+export interface UpdateShoppingListEntryResult {
+  updateShoppingListEntry: ShoppingListEntry;
+}
+
 export interface PantrySettings {
   view: string;
   sort: string;
@@ -194,6 +226,9 @@ export interface PantrySettings {
   collapsedGroups: string[];
   commonItems: string[];
   shoppingListCollapsed: boolean;
+  showLowPriority: boolean;
+  categoryFilter: string | null;
+  categories: string[];
 }
 
 export type PantrySettingsInput = Partial<PantrySettings>;
@@ -206,6 +241,9 @@ const SETTINGS_FIELDS = /* GraphQL */ `
   collapsedGroups
   commonItems
   shoppingListCollapsed
+  showLowPriority
+  categoryFilter
+  categories
 `;
 
 export const SETTINGS_QUERY = /* GraphQL */ `
@@ -261,6 +299,7 @@ export interface RecipeSuggestion {
 
 export interface ParsedCommand {
   answer: string | null;
+  answerItems: string[] | null;
   actions: ProposedAction[] | null;
   recipes: RecipeSuggestion[] | null;
   message: string | null;
@@ -277,6 +316,7 @@ export const PARSE_COMMAND_QUERY = /* GraphQL */ `
   query ParseCommand($input: String!, $history: [ConversationMessage!]) {
     parseCommand(input: $input, history: $history) {
       answer
+      answerItems
       message
       actions {
         type

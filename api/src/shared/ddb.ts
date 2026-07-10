@@ -17,9 +17,8 @@ export interface DdbClient {
 // throw depending on mode, so only instrument when actually running there.
 export function createDdbClient({ defaultTableName, xray = false }: DdbClientConfig): DdbClient {
   const rawClient = new DynamoDBClient({});
-  const client = xray && process.env.AWS_LAMBDA_FUNCTION_NAME
-    ? AWSXRay.captureAWSv3Client(rawClient)
-    : rawClient;
+  const client =
+    xray && process.env.AWS_LAMBDA_FUNCTION_NAME ? AWSXRay.captureAWSv3Client(rawClient) : rawClient;
 
   return {
     ddb: DynamoDBDocumentClient.from(client),
