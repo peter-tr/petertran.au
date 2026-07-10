@@ -23,6 +23,11 @@ interface AssistantTurn {
   expandedActions: Set<number>;
   actionsStatus: ActionsStatus;
   actionsError: string | null;
+  // Missing ingredients the user has clicked off, keyed by
+  // "recipeIndex-ingredientIndex" - excluded from "+ add N missing
+  // ingredients to shopping list" without needing a whole extra AI turn
+  // just to say "skip the pesto".
+  excludedIngredients: Set<string>;
 }
 
 type Turn = UserTurn | AssistantTurn;
@@ -72,9 +77,14 @@ function formatMutationPreview(mutationName: string, argsJson: string): string {
 // Turns a recipe's missing ingredients into the same {mutationName,
 // argsJson} shape parseCommand itself produces - no extra AI call, this is
 // just client-side synthesis feeding the exact same confirm/preview UI.
-function buildRecipeShoppingActions(recipe: RecipeSuggestion): ProposedAction[] {
+// `excluded` holds "recipeIndex-ingredientIndex" keys the user clicked off.
+function buildRecipeShoppingActions(
+  recipe: RecipeSuggestion,
+  recipeIndex: number,
+  excluded: Set<string>
+): ProposedAction[] {
   return recipe.ingredients
-    .filter((ing) => !ing.haveInInventory)
+    .filter((ing, ii) => !ing.haveInInventory && !excluded.has(`${recipeIndex}-${ii}`))
     .map((ing) => {
       const note = ing.amount ? `${ing.amount} - for: ${recipe.name}` : `For: ${recipe.name}`;
       return {
@@ -187,6 +197,7 @@ export default function PantryCommandBar({ onChanged }: PantryCommandBarProps) {
           expandedActions: new Set(),
           actionsStatus: "pending",
           actionsError: null,
+          excludedIngredients: new Set(),
         },
       ]);
     } catch (err) {
@@ -196,10 +207,23 @@ export default function PantryCommandBar({ onChanged }: PantryCommandBarProps) {
     }
   }
 
-  function handleAddMissingIngredients(turnIndex: number, recipe: RecipeSuggestion) {
+  function toggleExcludedIngredient(turnIndex: number, recipeIndex: number, ingredientIndex: number) {
+    const key = `${recipeIndex}-${ingredientIndex}`;
+    setTurns((prev) =>
+      prev.map((t, i) => {
+        if (i !== turnIndex || t.role !== "assistant") return t;
+        const next = new Set(t.excludedIngredients);
+        if (next.has(key)) next.delete(key);
+        else next.add(key);
+        return { ...t, excludedIngredients: next };
+      })
+    );
+  }
+
+  function handleAddMissingIngredients(turnIndex: number, recipe: RecipeSuggestion, recipeIndex: number) {
     const turn = turns[turnIndex];
     if (turn.role !== "assistant") return;
-    const actions = buildRecipeShoppingActions(recipe);
+    const actions = buildRecipeShoppingActions(recipe, recipeIndex, turn.excludedIngredients);
     if (actions.length === 0) return;
     updateAssistantTurn(turnIndex, {
       result: { ...turn.result, actions },
@@ -278,7 +302,9 @@ export default function PantryCommandBar({ onChanged }: PantryCommandBarProps) {
                 {i === lastRecipesTurnIndex && turn.result.recipes && turn.result.recipes.length > 0 && (
                   <div className="pantry-command-recipes">
                     {turn.result.recipes.map((recipe, ri) => {
-                      const missing = recipe.ingredients.filter((ing) => !ing.haveInInventory);
+                      const missingCount = recipe.ingredients.filter(
+                        (ing, ii) => !ing.haveInInventory && !turn.excludedIngredients.has(`${ri}-${ii}`)
+                      ).length;
                       return (
                         <div className="pantry-command-recipe" key={ri}>
                           <p className="pantry-command-recipe-name">{recipe.name}</p>
@@ -286,30 +312,52 @@ export default function PantryCommandBar({ onChanged }: PantryCommandBarProps) {
                             <p className="pantry-command-recipe-desc">{recipe.description}</p>
                           )}
                           <ul className="pantry-command-recipe-ingredients">
-                            {recipe.ingredients.map((ing, ii) => (
-                              <li
-                                key={ii}
-                                className={
-                                  ing.haveInInventory
-                                    ? "pantry-command-ingredient-have"
-                                    : "pantry-command-ingredient-missing"
-                                }
-                              >
-                                {ing.haveInInventory ? "✓" : "+"} {ing.name}
-                                {ing.amount && (
-                                  <span className="pantry-command-ingredient-amount"> ({ing.amount})</span>
-                                )}
-                              </li>
-                            ))}
+                            {recipe.ingredients.map((ing, ii) => {
+                              const excluded = turn.excludedIngredients.has(`${ri}-${ii}`);
+                              const clickable = !ing.haveInInventory;
+                              return (
+                                <li
+                                  key={ii}
+                                  className={[
+                                    ing.haveInInventory
+                                      ? "pantry-command-ingredient-have"
+                                      : "pantry-command-ingredient-missing",
+                                    excluded ? "pantry-command-ingredient-excluded" : "",
+                                    clickable ? "pantry-command-ingredient-clickable" : "",
+                                  ]
+                                    .filter(Boolean)
+                                    .join(" ")}
+                                  role={clickable ? "button" : undefined}
+                                  tabIndex={clickable ? 0 : undefined}
+                                  title={clickable ? (excluded ? "Click to include again" : "Click to skip") : undefined}
+                                  onClick={clickable ? () => toggleExcludedIngredient(i, ri, ii) : undefined}
+                                  onKeyDown={
+                                    clickable
+                                      ? (e) => {
+                                          if (e.key === "Enter" || e.key === " ") {
+                                            e.preventDefault();
+                                            toggleExcludedIngredient(i, ri, ii);
+                                          }
+                                        }
+                                      : undefined
+                                  }
+                                >
+                                  {ing.haveInInventory ? "✓" : "+"} {ing.name}
+                                  {ing.amount && (
+                                    <span className="pantry-command-ingredient-amount"> ({ing.amount})</span>
+                                  )}
+                                </li>
+                              );
+                            })}
                           </ul>
-                          {missing.length > 0 && (
+                          {missingCount > 0 && (
                             <button
                               type="button"
                               className="pantry-details-toggle"
-                              onClick={() => handleAddMissingIngredients(i, recipe)}
+                              onClick={() => handleAddMissingIngredients(i, recipe, ri)}
                             >
-                              + add {missing.length} missing ingredient{missing.length > 1 ? "s" : ""} to
-                              shopping list
+                              + add {missingCount} missing ingredient{missingCount > 1 ? "s" : ""} to shopping
+                              list
                             </button>
                           )}
                         </div>

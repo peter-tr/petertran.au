@@ -345,6 +345,9 @@
   display: flex;
   align-items: flex-end;
   gap: 0.5rem;
+  /* Breathing room from whatever the last turn rendered (recipe card,
+     answer, actions...) - previously sat flush against it. */
+  margin-top: 1rem;
 }
 
 .pantry-command-input {
@@ -512,6 +515,23 @@
 .pantry-command-ingredient-amount {
   color: var(--muted-dim);
   font-size: 0.8rem;
+}
+
+.pantry-command-ingredient-clickable {
+  cursor: pointer;
+}
+
+.pantry-command-ingredient-clickable:hover {
+  color: var(--type);
+}
+
+.pantry-command-ingredient-excluded {
+  color: var(--muted-dim);
+  text-decoration: line-through;
+}
+
+.pantry-command-ingredient-excluded:hover {
+  color: var(--muted);
 }
 
 .pantry-details-toggle {
