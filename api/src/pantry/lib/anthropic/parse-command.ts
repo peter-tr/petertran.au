@@ -341,7 +341,12 @@ function sanitizeRecipes(recipes: RawRecipe[], inventoryIds: Set<string>): Recip
     description: r.description,
     ingredients: r.ingredients.map((ing) => {
       const valid = ing.haveInInventory && !!ing.itemId && inventoryIds.has(ing.itemId);
-      return { name: ing.name, amount: ing.amount, haveInInventory: valid, itemId: valid ? ing.itemId : null };
+      return {
+        name: ing.name,
+        amount: ing.amount,
+        haveInInventory: valid,
+        itemId: valid ? ing.itemId : null,
+      };
     }),
   }));
 }
@@ -435,6 +440,7 @@ export async function parseCommand(
     answerItems: null,
     actions,
     recipes: null,
-    message: droppedCount > 0 ? "Some of what you asked couldn't be matched to a real item and was skipped." : null,
+    message:
+      droppedCount > 0 ? "Some of what you asked couldn't be matched to a real item and was skipped." : null,
   };
 }

@@ -175,7 +175,11 @@ export default function PantryItemRow({
         <button
           type="button"
           className={`pantry-low-priority-toggle-btn ${item.lowPriority ? "active" : ""}`}
-          title={item.lowPriority ? "Low priority - hidden from the main list" : "Mark as low priority (rarely needs checking)"}
+          title={
+            item.lowPriority
+              ? "Low priority - hidden from the main list"
+              : "Mark as low priority (rarely needs checking)"
+          }
           onClick={() => saveField({ lowPriority: !item.lowPriority })}
           disabled={busy}
         >

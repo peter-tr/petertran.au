@@ -51,7 +51,10 @@ let settings: PantrySettings = {
 };
 
 function seed(
-  item: Omit<InventoryItem, "id" | "addedAt" | "updatedAt" | "isStaple" | "lowPriority" | "nearlyEmpty" | "purchases">
+  item: Omit<
+    InventoryItem,
+    "id" | "addedAt" | "updatedAt" | "isStaple" | "lowPriority" | "nearlyEmpty" | "purchases"
+  >
 ): void {
   const id = randomUUID();
   const now = new Date().toISOString();
@@ -189,7 +192,13 @@ function mockParseCommand(input: string): MockParsedCommand {
   const trimmed = input.trim();
   const text = trimmed.toLowerCase();
   if (!text) {
-    return { answer: null, answerItems: null, actions: null, recipes: null, message: "Type a command or question." };
+    return {
+      answer: null,
+      answerItems: null,
+      actions: null,
+      recipes: null,
+      message: "Type a command or question.",
+    };
   }
 
   if (text.includes("expir")) {
@@ -383,7 +392,13 @@ export const devResolvers = {
       _: unknown,
       args: {
         id: string;
-        input: { name?: string; quantity?: number | null; unit?: string | null; note?: string | null; isStaple?: boolean };
+        input: {
+          name?: string;
+          quantity?: number | null;
+          unit?: string | null;
+          note?: string | null;
+          isStaple?: boolean;
+        };
       }
     ) => {
       const existing = shoppingList.get(args.id);

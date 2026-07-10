@@ -11,7 +11,12 @@ export interface RateLimiterConfig {
 // Simple fixed-window counter keyed by source IP + minute bucket, stored in
 // the caller's own table under its own partition-key namespace. Skips the
 // check entirely when no IP is available (e.g. local dev).
-export function createRateLimiter({ ddb, tableName, limitPerMinute, windowSeconds = 120 }: RateLimiterConfig) {
+export function createRateLimiter({
+  ddb,
+  tableName,
+  limitPerMinute,
+  windowSeconds = 120,
+}: RateLimiterConfig) {
   return async function assertNotRateLimited(sourceIp: string | undefined): Promise<void> {
     if (!sourceIp) return;
 

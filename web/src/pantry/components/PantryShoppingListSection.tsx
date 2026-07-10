@@ -113,7 +113,9 @@ export default function PantryShoppingListSection({
           isStaple: entry.isStaple || matchingItem?.isStaple || false,
         },
       });
-      await runPantryQuery<RemoveFromShoppingListResult>(REMOVE_FROM_SHOPPING_LIST_MUTATION, { id: entry.id });
+      await runPantryQuery<RemoveFromShoppingListResult>(REMOVE_FROM_SHOPPING_LIST_MUTATION, {
+        id: entry.id,
+      });
       await onChanged();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to record purchase.");

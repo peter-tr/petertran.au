@@ -1,12 +1,7 @@
 import { useState } from "react";
 import PantryItemRow from "./PantryItemRow";
 import { daysBetween } from "../../shared/lib/dates";
-import type {
-  InventoryItem,
-  PantrySettings,
-  PantrySettingsInput,
-  StorageLocation,
-} from "../api";
+import type { InventoryItem, PantrySettings, PantrySettingsInput, StorageLocation } from "../api";
 
 type ViewMode = "location" | "category" | "expiry" | "all";
 type SortMode = "recent" | "name" | "expiry" | "quantity";
@@ -275,7 +270,9 @@ export default function PantryInventorySection({
                       item={item}
                       simple={settings.simple}
                       categories={settings.categories}
-                      onAddCategory={(name) => onSettingsChange({ categories: [...settings.categories, name] })}
+                      onAddCategory={(name) =>
+                        onSettingsChange({ categories: [...settings.categories, name] })
+                      }
                       onChanged={onChanged}
                       onError={setError}
                     />
