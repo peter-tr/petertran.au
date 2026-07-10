@@ -816,6 +816,35 @@
   padding: 0 0.8rem 0.5rem 0;
 }
 
+.ops-sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-family: inherit;
+  font-weight: inherit;
+  font-size: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.ops-sort-btn:hover {
+  color: var(--type);
+}
+
+.ops-table th[aria-sort="ascending"] .ops-sort-btn,
+.ops-table th[aria-sort="descending"] .ops-sort-btn {
+  color: var(--type);
+}
+
+.ops-sort-arrow {
+  width: 0.7em;
+  color: var(--signal);
+}
+
 .ops-table td {
   padding: 0.4rem 0.8rem 0.4rem 0;
   border-top: 1px solid var(--rule);
