@@ -14,6 +14,8 @@ import {
 interface PantryItemRowProps {
   item: InventoryItem;
   simple: boolean;
+  categories: string[];
+  onAddCategory: (name: string) => void;
   onChanged: () => Promise<void>;
   onError: (message: string) => void;
 }
@@ -31,7 +33,14 @@ function formatMeta(item: InventoryItem): string {
   return parts.join(" · ");
 }
 
-export default function PantryItemRow({ item, simple, onChanged, onError }: PantryItemRowProps) {
+export default function PantryItemRow({
+  item,
+  simple,
+  categories,
+  onAddCategory,
+  onChanged,
+  onError,
+}: PantryItemRowProps) {
   const [busy, setBusy] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [draftName, setDraftName] = useState(item.name);
@@ -163,6 +172,24 @@ export default function PantryItemRow({ item, simple, onChanged, onError }: Pant
         >
           ★
         </button>
+        <button
+          type="button"
+          className={`pantry-low-priority-toggle-btn ${item.lowPriority ? "active" : ""}`}
+          title={item.lowPriority ? "Low priority - hidden from the main list" : "Mark as low priority (rarely needs checking)"}
+          onClick={() => saveField({ lowPriority: !item.lowPriority })}
+          disabled={busy}
+        >
+          ↓
+        </button>
+        <button
+          type="button"
+          className={`pantry-nearly-empty-toggle ${item.nearlyEmpty ? "active" : ""}`}
+          title={item.nearlyEmpty ? "Nearly empty - running low" : "Mark as nearly empty"}
+          onClick={() => saveField({ nearlyEmpty: !item.nearlyEmpty })}
+          disabled={busy}
+        >
+          !
+        </button>
       </div>
       <button
         type="button"
@@ -171,6 +198,7 @@ export default function PantryItemRow({ item, simple, onChanged, onError }: Pant
         disabled={item.purchases.length === 0}
         title={item.purchases.length > 0 ? "Click for purchase history" : undefined}
       >
+        {item.nearlyEmpty && <span className="pantry-nearly-empty-badge">low stock</span>}
         {formatMeta(item)}
       </button>
       <div className="pantry-item-controls">
@@ -199,6 +227,8 @@ export default function PantryItemRow({ item, simple, onChanged, onError }: Pant
         <PantryEditItemModal
           item={item}
           busy={busy}
+          categories={categories}
+          onAddCategory={onAddCategory}
           onClose={() => setShowEdit(false)}
           onSave={saveField}
         />

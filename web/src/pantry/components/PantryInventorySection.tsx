@@ -141,7 +141,16 @@ export default function PantryInventorySection({
     onSettingsChange({ collapsedGroups: [...next] });
   }
 
-  const groups = groupItems(items, view, sort);
+  const categories = [...new Set(items.map((i) => i.category).filter((c): c is string => !!c))].sort();
+
+  const visibleItems = settings.showLowPriority ? items : items.filter((i) => !i.lowPriority);
+  const hiddenCount = items.length - visibleItems.length;
+
+  const filteredItems = settings.categoryFilter
+    ? visibleItems.filter((i) => i.category === settings.categoryFilter)
+    : visibleItems;
+
+  const groups = groupItems(filteredItems, view, sort);
 
   return (
     <section className="pantry-panel">
@@ -207,13 +216,42 @@ export default function PantryInventorySection({
               </button>
             </div>
           </div>
+          {categories.length > 0 && (
+            <div className="pantry-control-group">
+              <span className="pantry-control-label">Category</span>
+              <select
+                className="pantry-category-filter"
+                value={settings.categoryFilter ?? ""}
+                onChange={(e) => onSettingsChange({ categoryFilter: e.target.value || null })}
+              >
+                <option value="">All categories</option>
+                {categories.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
       )}
 
       {error && <p className="status-line">// {error}</p>}
 
+      {hiddenCount > 0 && (
+        <button
+          type="button"
+          className="pantry-details-toggle pantry-low-priority-toggle"
+          onClick={() => onSettingsChange({ showLowPriority: !settings.showLowPriority })}
+        >
+          {settings.showLowPriority ? "− hide low priority" : `+ show ${hiddenCount} low priority`}
+        </button>
+      )}
+
       {items.length === 0 ? (
         <p className="status-line">// nothing tracked yet - add your first item below.</p>
+      ) : filteredItems.length === 0 ? (
+        <p className="status-line">// no items match the current filters.</p>
       ) : (
         groups.map((group) => {
           const groupId = `${view}:${group.key}`;
@@ -236,6 +274,8 @@ export default function PantryInventorySection({
                       key={item.id}
                       item={item}
                       simple={settings.simple}
+                      categories={settings.categories}
+                      onAddCategory={(name) => onSettingsChange({ categories: [...settings.categories, name] })}
                       onChanged={onChanged}
                       onError={setError}
                     />
