@@ -59,7 +59,10 @@ export default function PantryCommonItemsSection({
         },
       });
       setOpenName(null);
-      await onAdded();
+      // Not awaited - see PantryAddItemSection for why this is safe for an
+      // "add" (not a toggle): closing the picker immediately after the
+      // mutation succeeds instead of after a second refetch round trip.
+      onAdded().catch(() => {});
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to add item.");
     } finally {

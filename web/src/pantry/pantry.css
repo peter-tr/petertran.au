@@ -699,11 +699,6 @@
   margin-right: 0.4rem;
 }
 
-/* The "+ show N low priority" reveal toggle, above the item list. */
-.pantry-low-priority-toggle {
-  margin-bottom: 0.6rem;
-}
-
 .pantry-legend {
   display: flex;
   flex-wrap: wrap;

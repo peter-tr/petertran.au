@@ -159,7 +159,11 @@ Rules:
 - Only respond about this pantry/fridge inventory and cooking with it - refuse (via "unclear") anything else entirely unrelated.`;
 }
 
-const PARSE_COMMAND_SCHEMA = {
+// Exported so scripts/validate-schemas.ts can check it stays under
+// Anthropic's limit on union/nullable-typed ("anyOf") parameters - see the
+// comment on RawAction.flagsSet for why this schema uses flag arrays
+// instead of one anyOf boolean per flag.
+export const PARSE_COMMAND_SCHEMA = {
   type: "object",
   properties: {
     mode: { type: "string", enum: ["answer", "actions", "recipes", "unclear"] },

@@ -231,6 +231,18 @@ export default function PantryInventorySection({
               </select>
             </div>
           )}
+          {lowPriorityCount > 0 && (
+            <div className="pantry-control-group">
+              <span className="pantry-control-label">Low priority</span>
+              <button
+                type="button"
+                className="pantry-details-toggle pantry-low-priority-toggle"
+                onClick={() => onSettingsChange({ showLowPriority: !settings.showLowPriority })}
+              >
+                {settings.showLowPriority ? "− hide" : `+ show ${lowPriorityCount}`}
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -242,16 +254,6 @@ export default function PantryInventorySection({
           <span className="pantry-low-priority-toggle-btn active">↓</span> low priority
           <span className="pantry-nearly-empty-toggle active">!</span> nearly empty
         </p>
-      )}
-
-      {lowPriorityCount > 0 && (
-        <button
-          type="button"
-          className="pantry-details-toggle pantry-low-priority-toggle"
-          onClick={() => onSettingsChange({ showLowPriority: !settings.showLowPriority })}
-        >
-          {settings.showLowPriority ? "− hide low priority" : `+ show ${lowPriorityCount} low priority`}
-        </button>
       )}
 
       {items.length === 0 ? (

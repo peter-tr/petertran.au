@@ -64,7 +64,13 @@ export default function PantryAddItemSection({ onAdded }: PantryAddItemSectionPr
       setIsStaple(false);
       setShowDetails(false);
       setStatus("idle");
-      await onAdded();
+      // Not awaited - the mutation itself already succeeded (that's what
+      // the form reset above is responding to), so there's no reason to
+      // keep the form busy/blocked for a second network round trip just to
+      // refresh the list in the background. Unlike a toggle button, "add"
+      // doesn't read current item state to decide what to send, so there's
+      // no stale-data race to guard against by waiting for this.
+      onAdded().catch(() => {});
     } catch (err) {
       setStatus("error");
       setError(err instanceof Error ? err.message : "Something went wrong.");

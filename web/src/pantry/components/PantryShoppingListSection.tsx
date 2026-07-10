@@ -143,7 +143,9 @@ export default function PantryShoppingListSection({
     setError(null);
     try {
       await runPantryQuery<AddToShoppingListResult>(ADD_TO_SHOPPING_LIST_MUTATION, { name });
-      await onChanged();
+      // Not awaited - see PantryAddItemSection for why "add" flows don't
+      // need to block on the follow-up refetch the way toggles do.
+      onChanged().catch(() => {});
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to add to shopping list.");
     }

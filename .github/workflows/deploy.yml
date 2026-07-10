@@ -9,7 +9,38 @@ permissions:
   contents: read
 
 jobs:
+  validate-schema:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Validate GraphQL schemas and Anthropic structured-output schemas
+        run: npm run validate-schemas --workspace=api
+
+  e2e-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Boot each service's dev server and smoke-test it
+        run: npm run test:e2e --workspace=api
+
   deploy:
+    needs: [validate-schema, e2e-smoke]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

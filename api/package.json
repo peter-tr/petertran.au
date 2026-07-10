@@ -9,7 +9,9 @@
     "dev:portfolio": "tsx src/portfolio/dev/dev-server.ts",
     "dev:imposter": "tsx src/games/imposter/dev/dev-server.ts",
     "dev:pantry": "tsx src/pantry/dev/dev-server.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "validate-schemas": "tsx scripts/validate-schemas.ts",
+    "test:e2e": "tsx scripts/e2e-smoke.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",
