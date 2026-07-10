@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { getRecentGames, removeRecentGame, type RecentGame } from "./recentGamesStore";
-import { formatWhen } from "./format";
+import { getRecentGames, removeRecentGame, type RecentGame } from "../lib/recentGamesStore";
+import { formatWhen } from "../lib/format";
 
 export default function RecentGames() {
   const [games, setGames] = useState<RecentGame[]>(() => getRecentGames());

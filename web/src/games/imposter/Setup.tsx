@@ -9,11 +9,11 @@ import {
   type ImposterWordSource,
   type ImposterDifficulty,
   type CreateImposterGameResult,
-} from "./api";
-import { addRecentGame } from "./recentGamesStore";
-import RecentGames from "./RecentGames";
-import LiveGames from "./LiveGames";
-import StatsPanel from "./StatsPanel";
+} from "./lib/api";
+import { addRecentGame } from "./lib/recentGamesStore";
+import RecentGames from "./components/RecentGames";
+import LiveGames from "./components/LiveGames";
+import StatsPanel from "./components/StatsPanel";
 import "./imposter.css";
 
 const MIN_PLAYERS = 3;
