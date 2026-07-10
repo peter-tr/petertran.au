@@ -17,6 +17,8 @@ type RawActionType =
   | "ADD_TO_SHOPPING_LIST"
   | "REMOVE_FROM_SHOPPING_LIST";
 
+type RawFlag = "STAPLE" | "LOW_PRIORITY" | "NEARLY_EMPTY";
+
 interface RawAction {
   type: RawActionType;
   summary: string;
@@ -29,9 +31,15 @@ interface RawAction {
   price: number | null;
   purchasedAt: string | null;
   expiresAt: string | null;
-  isStaple: boolean | null;
-  lowPriority: boolean | null;
-  nearlyEmpty: boolean | null;
+  // Booleans-to-set/clear are expressed as two plain (non-nullable) enum
+  // arrays rather than one anyOf-typed field per flag - Anthropic's
+  // structured-output schema caps the number of union/nullable-typed
+  // parameters at 16, and this app was already close to that limit before
+  // lowPriority/nearlyEmpty existed. A plain array isn't a union type, so
+  // this keeps 3 flags (staple/lowPriority/nearlyEmpty) at the cost of only
+  // 2 schema slots instead of 3, with room to add more flags later.
+  flagsSet: RawFlag[];
+  flagsClear: RawFlag[];
   note: string | null;
 }
 
@@ -127,8 +135,8 @@ Decide what the input is and respond with exactly one of these four modes:
 
 - "answer": the input is a read-only question (e.g. "what's expiring soon?", "how much milk do I have?"). Answer directly and concisely from the data above in the "answer" field, in plain conversational text - never invent data not shown above. If the answer is naturally a list of items (e.g. "what spices do I have?", "what's expiring soon?") - set "answer" to a short intro sentence (or leave it null if nothing more needs saying) and put one line per item in "answerItems", instead of writing the whole list out as prose in "answer".
 - "actions": use this mode whenever ANY part of the input is clear enough to act on - even if only part of it is. Fill "actions" with one entry per clear change:
-  - RECORD_PURCHASE: adding or buying a new or existing item. Always use this (never UPDATE_INVENTORY_ITEM) for "add X" / "bought X" phrasing, even if a similar item already exists - the system merges duplicates itself. Requires name, location (guess FRIDGE/FREEZER/PANTRY sensibly if not stated), and quantity (default 1 if not stated). Set purchasedAt to today's date (${today}) unless the input implies no purchase actually happened. Set "category" when you're confident of a good match - prefer reusing one of the categories already in use above if one fits (e.g. "garlic powder" -> "Spices" if that's already a category), otherwise invent a sensible new one; leave it null if genuinely unclear rather than guessing. Set "lowPriority"/"nearlyEmpty" only if the input actually says so (e.g. "add salt as low priority") - otherwise leave both null.
-  - UPDATE_INVENTORY_ITEM: correcting an EXISTING item's fields without it being a new purchase. Requires itemId matching one of the ids listed above exactly - never invent an id. Same category/lowPriority/nearlyEmpty rules as RECORD_PURCHASE apply here too, only when the input actually asks to change them.
+  - RECORD_PURCHASE: adding or buying a new or existing item. Always use this (never UPDATE_INVENTORY_ITEM) for "add X" / "bought X" phrasing, even if a similar item already exists - the system merges duplicates itself. Requires name, location (guess FRIDGE/FREEZER/PANTRY sensibly if not stated), and quantity (default 1 if not stated). Set purchasedAt to today's date (${today}) unless the input implies no purchase actually happened. Set "category" when you're confident of a good match - prefer reusing one of the categories already in use above if one fits (e.g. "garlic powder" -> "Spices" if that's already a category), otherwise invent a sensible new one; leave it null if genuinely unclear rather than guessing. "flagsSet"/"flagsClear" turn STAPLE/LOW_PRIORITY/NEARLY_EMPTY on or off - only include a flag in one of these two lists if the input actually says so (e.g. "add salt as low priority" -> flagsSet: ["LOW_PRIORITY"]); leave both lists empty otherwise.
+  - UPDATE_INVENTORY_ITEM: correcting an EXISTING item's fields without it being a new purchase. Requires itemId matching one of the ids listed above exactly - never invent an id. Same category/flagsSet/flagsClear rules as RECORD_PURCHASE apply here too, only when the input actually asks to change them.
   - REMOVE_INVENTORY_ITEM: fully using up or getting rid of an existing item. Requires itemId matching one of the ids listed above exactly.
   - ADD_TO_SHOPPING_LIST: noting something is needed without it being in stock right now (e.g. "we're out of eggs", "need to buy bread", "add 1 kg of coffee beans to my shopping list"). Requires name. Set quantity/unit only if the input actually states an amount (e.g. "1 kg of coffee beans" -> quantity=1, unit="kg"); leave both null for a plain "buy this" with no amount. Set "note" only when there's a specific reason worth remembering (e.g. a recipe it's for) - leave it null for a plain add. If the name matches an item already on the shopping list (see the list above), this UPDATES that entry's quantity/unit/note rather than creating a duplicate - use it for that too, e.g. if the user gives an amount for something already listed.
   - REMOVE_FROM_SHOPPING_LIST: an item on the shopping list has been bought or is no longer needed. Requires itemId matching one of the shopping list ids listed above exactly.
@@ -182,9 +190,8 @@ const PARSE_COMMAND_SCHEMA = {
           price: { anyOf: [{ type: "number" }, { type: "null" }] },
           purchasedAt: { anyOf: [{ type: "string" }, { type: "null" }] },
           expiresAt: { anyOf: [{ type: "string" }, { type: "null" }] },
-          isStaple: { anyOf: [{ type: "boolean" }, { type: "null" }] },
-          lowPriority: { anyOf: [{ type: "boolean" }, { type: "null" }] },
-          nearlyEmpty: { anyOf: [{ type: "boolean" }, { type: "null" }] },
+          flagsSet: { type: "array", items: { type: "string", enum: ["STAPLE", "LOW_PRIORITY", "NEARLY_EMPTY"] } },
+          flagsClear: { type: "array", items: { type: "string", enum: ["STAPLE", "LOW_PRIORITY", "NEARLY_EMPTY"] } },
           note: { anyOf: [{ type: "string" }, { type: "null" }] },
         },
         required: [
@@ -199,9 +206,8 @@ const PARSE_COMMAND_SCHEMA = {
           "price",
           "purchasedAt",
           "expiresAt",
-          "isStaple",
-          "lowPriority",
-          "nearlyEmpty",
+          "flagsSet",
+          "flagsClear",
           "note",
         ],
         additionalProperties: false,
@@ -242,6 +248,12 @@ const PARSE_COMMAND_SCHEMA = {
 // The trusted boundary: Claude only supplies typed fields, this switch is
 // the only code that decides which real mutation + args they become. The
 // client never executes anything Claude wrote directly as GraphQL.
+function flagValue(a: RawAction, flag: RawFlag): boolean | null {
+  if (a.flagsSet.includes(flag)) return true;
+  if (a.flagsClear.includes(flag)) return false;
+  return null;
+}
+
 function toProposedAction(a: RawAction): ProposedAction | null {
   switch (a.type) {
     case "RECORD_PURCHASE": {
@@ -260,9 +272,9 @@ function toProposedAction(a: RawAction): ProposedAction | null {
             price: a.price,
             purchasedAt: a.purchasedAt,
             expiresAt: a.expiresAt,
-            isStaple: a.isStaple,
-            lowPriority: a.lowPriority,
-            nearlyEmpty: a.nearlyEmpty,
+            isStaple: flagValue(a, "STAPLE"),
+            lowPriority: flagValue(a, "LOW_PRIORITY"),
+            nearlyEmpty: flagValue(a, "NEARLY_EMPTY"),
           },
         }),
       };
@@ -278,9 +290,12 @@ function toProposedAction(a: RawAction): ProposedAction | null {
       if (a.price != null) input.price = a.price;
       if (a.purchasedAt != null) input.purchasedAt = a.purchasedAt;
       if (a.expiresAt != null) input.expiresAt = a.expiresAt;
-      if (a.isStaple != null) input.isStaple = a.isStaple;
-      if (a.lowPriority != null) input.lowPriority = a.lowPriority;
-      if (a.nearlyEmpty != null) input.nearlyEmpty = a.nearlyEmpty;
+      const isStaple = flagValue(a, "STAPLE");
+      const lowPriority = flagValue(a, "LOW_PRIORITY");
+      const nearlyEmpty = flagValue(a, "NEARLY_EMPTY");
+      if (isStaple != null) input.isStaple = isStaple;
+      if (lowPriority != null) input.lowPriority = lowPriority;
+      if (nearlyEmpty != null) input.nearlyEmpty = nearlyEmpty;
       return {
         type: a.type,
         summary: a.summary,
@@ -341,7 +356,12 @@ function sanitizeRecipes(recipes: RawRecipe[], inventoryIds: Set<string>): Recip
     description: r.description,
     ingredients: r.ingredients.map((ing) => {
       const valid = ing.haveInInventory && !!ing.itemId && inventoryIds.has(ing.itemId);
-      return { name: ing.name, amount: ing.amount, haveInInventory: valid, itemId: valid ? ing.itemId : null };
+      return {
+        name: ing.name,
+        amount: ing.amount,
+        haveInInventory: valid,
+        itemId: valid ? ing.itemId : null,
+      };
     }),
   }));
 }
@@ -435,6 +455,7 @@ export async function parseCommand(
     answerItems: null,
     actions,
     recipes: null,
-    message: droppedCount > 0 ? "Some of what you asked couldn't be matched to a real item and was skipped." : null,
+    message:
+      droppedCount > 0 ? "Some of what you asked couldn't be matched to a real item and was skipped." : null,
   };
 }

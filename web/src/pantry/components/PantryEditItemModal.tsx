@@ -1,6 +1,6 @@
 import { useState } from "react";
 import QuantityStepper from "./QuantityStepper";
-import { UNIT_OPTIONS } from "../lib/units";
+import { UNIT_OPTIONS, stepForUnit } from "../lib/units";
 import type { InventoryItem, StorageLocation } from "../api";
 
 interface PantryEditItemModalProps {
@@ -39,6 +39,8 @@ export default function PantryEditItemModal({
   const [purchasedAt, setPurchasedAt] = useState(item.purchasedAt ?? "");
   const [expiresAt, setExpiresAt] = useState(item.expiresAt ?? "");
   const [isStaple, setIsStaple] = useState(item.isStaple);
+  const [lowPriority, setLowPriority] = useState(item.lowPriority);
+  const [nearlyEmpty, setNearlyEmpty] = useState(item.nearlyEmpty);
   const [error, setError] = useState<string | null>(null);
 
   // A category already on this item might not be one of the curated options
@@ -79,6 +81,8 @@ export default function PantryEditItemModal({
         purchasedAt: purchasedAt || null,
         expiresAt: expiresAt || null,
         isStaple,
+        lowPriority,
+        nearlyEmpty,
       });
       onClose();
     } catch (err) {
@@ -108,7 +112,13 @@ export default function PantryEditItemModal({
         <div className="pantry-edit-grid">
           <div className="form-row">
             <label className="form-label">Quantity</label>
-            <QuantityStepper value={quantity} onChange={setQuantity} min={0} disabled={busy} />
+            <QuantityStepper
+              value={quantity}
+              onChange={setQuantity}
+              min={0}
+              step={stepForUnit(unit || null)}
+              disabled={busy}
+            />
           </div>
           <div className="form-row">
             <label className="form-label" htmlFor="pantry-edit-unit">
@@ -233,7 +243,7 @@ export default function PantryEditItemModal({
               disabled={busy}
             />
           </div>
-          <div className="form-row pantry-staple-row">
+          <div className="form-row pantry-staple-row pantry-flags-row">
             <label className="form-label" htmlFor="pantry-edit-staple">
               <input
                 id="pantry-edit-staple"
@@ -242,7 +252,27 @@ export default function PantryEditItemModal({
                 onChange={(e) => setIsStaple(e.target.checked)}
                 disabled={busy}
               />{" "}
-              Staple - always keep stocked
+              ★ Staple - always keep stocked
+            </label>
+            <label className="form-label" htmlFor="pantry-edit-low-priority">
+              <input
+                id="pantry-edit-low-priority"
+                type="checkbox"
+                checked={lowPriority}
+                onChange={(e) => setLowPriority(e.target.checked)}
+                disabled={busy}
+              />{" "}
+              ↓ Low priority - hide from main list
+            </label>
+            <label className="form-label" htmlFor="pantry-edit-nearly-empty">
+              <input
+                id="pantry-edit-nearly-empty"
+                type="checkbox"
+                checked={nearlyEmpty}
+                onChange={(e) => setNearlyEmpty(e.target.checked)}
+                disabled={busy}
+              />{" "}
+              ! Nearly empty
             </label>
           </div>
         </div>

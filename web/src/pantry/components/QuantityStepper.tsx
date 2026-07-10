@@ -4,6 +4,7 @@ interface QuantityStepperProps {
   value: number;
   onChange: (value: number) => void;
   min?: number;
+  step?: number;
   disabled?: boolean;
 }
 
@@ -13,7 +14,7 @@ interface QuantityStepperProps {
 // burned through the pantry API's rate limit fast.
 const DEBOUNCE_MS = 400;
 
-export default function QuantityStepper({ value, onChange, min = 1, disabled }: QuantityStepperProps) {
+export default function QuantityStepper({ value, onChange, min = 1, step = 1, disabled }: QuantityStepperProps) {
   // Typing is tracked as free text and only clamped/committed on blur or
   // Enter - clamping on every keystroke made it impossible to clear the
   // field and type a new multi-digit number (it would snap back to `min`
@@ -61,7 +62,7 @@ export default function QuantityStepper({ value, onChange, min = 1, disabled }: 
   // (via the `disabled` prop reflecting the parent's in-flight state), so a
   // burst of clicks always collapses into a single trailing mutation rather
   // than racing several in flight at once.
-  function step(delta: number) {
+  function applyStep(delta: number) {
     const current = Number(draft) || value;
     const next = Math.max(min, current + delta);
     setDraft(String(next));
@@ -84,7 +85,7 @@ export default function QuantityStepper({ value, onChange, min = 1, disabled }: 
       <button
         type="button"
         className="qty-stepper-btn"
-        onClick={() => step(-1)}
+        onClick={() => applyStep(-step)}
         disabled={disabled || Number(draft) <= min}
       >
         −
@@ -102,7 +103,7 @@ export default function QuantityStepper({ value, onChange, min = 1, disabled }: 
           if (e.key === "Enter") e.currentTarget.blur();
         }}
       />
-      <button type="button" className="qty-stepper-btn" onClick={() => step(1)} disabled={disabled}>
+      <button type="button" className="qty-stepper-btn" onClick={() => applyStep(step)} disabled={disabled}>
         +
       </button>
     </div>

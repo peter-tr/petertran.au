@@ -704,6 +704,33 @@
   margin-bottom: 0.6rem;
 }
 
+.pantry-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--muted-dim);
+  margin: 0 0 0.5rem;
+}
+
+.pantry-legend span[class$="-toggle"],
+.pantry-legend span[class$="-toggle-btn"] {
+  cursor: default;
+  margin-right: 0.1rem;
+}
+
+.pantry-legend > *:not(:first-child) {
+  margin-left: 0.6rem;
+}
+
+.pantry-item-simple-unit {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--muted-dim);
+}
+
 .pantry-category-filter {
   font-family: var(--font-mono);
   font-size: 0.74rem;
@@ -932,4 +959,3 @@
     flex-wrap: wrap;
   }
 }
-

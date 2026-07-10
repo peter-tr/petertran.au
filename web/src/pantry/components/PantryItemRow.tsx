@@ -2,6 +2,7 @@ import { useState } from "react";
 import QuantityStepper from "./QuantityStepper";
 import PantryEditItemModal from "./PantryEditItemModal";
 import { formatExpiresAt, formatPurchasedAt } from "../../shared/lib/dates";
+import { stepForUnit } from "../lib/units";
 import {
   runPantryQuery,
   REMOVE_INVENTORY_ITEM_MUTATION,
@@ -111,12 +112,22 @@ export default function PantryItemRow({
   // Simple mode is deliberately name + stepper + delete only - no meta line,
   // category, staple toggle, or rename/history interactions - for keeping
   // the page scannable (especially on mobile) when you don't need the detail.
+  // The unit still shows (just the unit, not the full purchase/expiry meta
+  // line) since a bare number without it is ambiguous - "2" could be 2 pcs
+  // or 2 kg.
   if (simple) {
     return (
       <li className="pantry-item-row pantry-item-row-simple">
         <span className="pantry-item-name">{item.name}</span>
         <div className="pantry-item-controls">
-          <QuantityStepper value={item.quantity} onChange={handleQuantityChange} min={0} disabled={busy} />
+          {item.unit && <span className="pantry-item-simple-unit">{item.unit}</span>}
+          <QuantityStepper
+            value={item.quantity}
+            onChange={handleQuantityChange}
+            min={0}
+            step={stepForUnit(item.unit)}
+            disabled={busy}
+          />
           <button type="button" className="pantry-delete-btn" onClick={handleDelete} disabled={busy}>
             delete
           </button>
@@ -175,7 +186,11 @@ export default function PantryItemRow({
         <button
           type="button"
           className={`pantry-low-priority-toggle-btn ${item.lowPriority ? "active" : ""}`}
-          title={item.lowPriority ? "Low priority - hidden from the main list" : "Mark as low priority (rarely needs checking)"}
+          title={
+            item.lowPriority
+              ? "Low priority - hidden from the main list"
+              : "Mark as low priority (rarely needs checking)"
+          }
           onClick={() => saveField({ lowPriority: !item.lowPriority })}
           disabled={busy}
         >
@@ -202,7 +217,13 @@ export default function PantryItemRow({
         {formatMeta(item)}
       </button>
       <div className="pantry-item-controls">
-        <QuantityStepper value={item.quantity} onChange={handleQuantityChange} min={0} disabled={busy} />
+        <QuantityStepper
+          value={item.quantity}
+          onChange={handleQuantityChange}
+          min={0}
+          step={stepForUnit(item.unit)}
+          disabled={busy}
+        />
         <button type="button" className="pantry-edit-btn" onClick={() => setShowEdit(true)} disabled={busy}>
           edit
         </button>

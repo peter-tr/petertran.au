@@ -1,12 +1,7 @@
 import { useState } from "react";
 import PantryItemRow from "./PantryItemRow";
 import { daysBetween } from "../../shared/lib/dates";
-import type {
-  InventoryItem,
-  PantrySettings,
-  PantrySettingsInput,
-  StorageLocation,
-} from "../api";
+import type { InventoryItem, PantrySettings, PantrySettingsInput, StorageLocation } from "../api";
 
 type ViewMode = "location" | "category" | "expiry" | "all";
 type SortMode = "recent" | "name" | "expiry" | "quantity";
@@ -143,8 +138,11 @@ export default function PantryInventorySection({
 
   const categories = [...new Set(items.map((i) => i.category).filter((c): c is string => !!c))].sort();
 
+  // Keyed off the total count, not how many are *currently* hidden - the
+  // latter goes to 0 the moment showLowPriority flips on, which made the
+  // toggle button itself disappear with no way to turn it back off.
+  const lowPriorityCount = items.filter((i) => i.lowPriority).length;
   const visibleItems = settings.showLowPriority ? items : items.filter((i) => !i.lowPriority);
-  const hiddenCount = items.length - visibleItems.length;
 
   const filteredItems = settings.categoryFilter
     ? visibleItems.filter((i) => i.category === settings.categoryFilter)
@@ -238,13 +236,21 @@ export default function PantryInventorySection({
 
       {error && <p className="status-line">// {error}</p>}
 
-      {hiddenCount > 0 && (
+      {!settings.simple && (
+        <p className="pantry-legend">
+          <span className="pantry-staple-toggle active">★</span> staple
+          <span className="pantry-low-priority-toggle-btn active">↓</span> low priority
+          <span className="pantry-nearly-empty-toggle active">!</span> nearly empty
+        </p>
+      )}
+
+      {lowPriorityCount > 0 && (
         <button
           type="button"
           className="pantry-details-toggle pantry-low-priority-toggle"
           onClick={() => onSettingsChange({ showLowPriority: !settings.showLowPriority })}
         >
-          {settings.showLowPriority ? "− hide low priority" : `+ show ${hiddenCount} low priority`}
+          {settings.showLowPriority ? "− hide low priority" : `+ show ${lowPriorityCount} low priority`}
         </button>
       )}
 
@@ -275,7 +281,9 @@ export default function PantryInventorySection({
                       item={item}
                       simple={settings.simple}
                       categories={settings.categories}
-                      onAddCategory={(name) => onSettingsChange({ categories: [...settings.categories, name] })}
+                      onAddCategory={(name) =>
+                        onSettingsChange({ categories: [...settings.categories, name] })
+                      }
                       onChanged={onChanged}
                       onError={setError}
                     />
