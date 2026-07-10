@@ -1,15 +1,16 @@
 import { lazy, Suspense } from "react";
-import Hero from "../components/Hero";
-import ArchitectureSection from "../components/ArchitectureSection";
-import SystemStatsSection from "../components/SystemStatsSection";
-import ContactSection from "../components/ContactSection";
-import Footer from "../components/Footer";
-import type { ResumeData } from "../lib/types";
+import Hero from "./components/Hero";
+import ArchitectureSection from "./components/ArchitectureSection";
+import SystemStatsSection from "./components/SystemStatsSection";
+import ContactSection from "./components/ContactSection";
+import Footer from "./components/Footer";
+import type { ResumeData } from "./lib/types";
+import "./portfolio.css";
 
 // Lazy-loaded on its own, separate from the rest of Home - GraphiQL pulls in
 // monaco-editor (a multi-MB chunk), which the rest of the page has no reason
 // to wait on just to render Hero/Architecture/Contact/Stats/Footer.
-const Explorer = lazy(() => import("../components/Explorer"));
+const Explorer = lazy(() => import("./components/Explorer"));
 
 interface HomeProps {
   data: ResumeData | null;

@@ -1,38 +1,13 @@
 // GraphQL client for the Imposter game - talks to its own Lambda/endpoint,
-// entirely separate from the resume site's API (see ../../lib/graphql.ts).
+// entirely separate from the resume site's API (see ../../portfolio/lib/graphql.ts).
 // Kept in its own module so this game never shares a schema, endpoint, or
 // query surface with the portfolio.
 
+import { createGraphQLClient } from "../../shared/graphqlClient";
+
 const ENDPOINT = import.meta.env.VITE_IMPOSTER_GRAPHQL_ENDPOINT as string | undefined;
 
-export class ImposterRequestError extends Error {}
-
-export async function runImposterQuery<T = unknown>(
-  query: string,
-  variables?: Record<string, unknown>
-): Promise<T> {
-  if (!ENDPOINT) {
-    throw new ImposterRequestError("VITE_IMPOSTER_GRAPHQL_ENDPOINT is not configured.");
-  }
-
-  const res = await fetch(ENDPOINT, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ query, variables }),
-  });
-
-  if (!res.ok) {
-    throw new ImposterRequestError(`Request failed with status ${res.status}`);
-  }
-
-  const json = await res.json();
-
-  if (json.errors?.length) {
-    throw new ImposterRequestError(json.errors.map((e: { message: string }) => e.message).join("; "));
-  }
-
-  return json.data as T;
-}
+export const runImposterQuery = createGraphQLClient(ENDPOINT, "VITE_IMPOSTER_GRAPHQL_ENDPOINT");
 
 export type ImposterPhase = "REVEAL" | "DISCUSSION" | "RESULTS";
 export type ImposterWordSource = "BUILTIN" | "AI";

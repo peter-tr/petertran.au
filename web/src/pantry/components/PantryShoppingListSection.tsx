@@ -12,7 +12,7 @@ import {
   type RecordPurchaseResult,
   type RemoveFromShoppingListResult,
   type ShoppingListEntry,
-} from "../lib/pantryGraphql";
+} from "../api";
 
 interface PantryShoppingListSectionProps {
   entries: ShoppingListEntry[];

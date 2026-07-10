@@ -6,6 +6,7 @@ import {
   type ImposterGame,
   type LiveImposterGamesResult,
 } from "./api";
+import { formatWhen } from "./format";
 
 const POLL_INTERVAL_MS = 5000;
 
@@ -14,15 +15,6 @@ const PHASE_LABEL: Record<ImposterGame["phase"], string> = {
   DISCUSSION: "discussing",
   RESULTS: "finished",
 };
-
-function formatWhen(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
 
 // Every room currently in progress, anywhere - not just the ones started on
 // this device (see RecentGames, which is the localStorage-backed version of

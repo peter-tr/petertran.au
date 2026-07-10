@@ -1,10 +1,11 @@
-import ExperienceSection from "../components/ExperienceSection";
-import ProjectsSection from "../components/ProjectsSection";
-import SkillsSection from "../components/SkillsSection";
-import EducationSection from "../components/EducationSection";
-import InterestsSection from "../components/InterestsSection";
-import Footer from "../components/Footer";
-import type { ResumeData } from "../lib/types";
+import ExperienceSection from "./components/ExperienceSection";
+import ProjectsSection from "./components/ProjectsSection";
+import SkillsSection from "./components/SkillsSection";
+import EducationSection from "./components/EducationSection";
+import InterestsSection from "./components/InterestsSection";
+import Footer from "./components/Footer";
+import type { ResumeData } from "./lib/types";
+import "./portfolio.css";
 
 interface ResumeProps {
   data: ResumeData | null;

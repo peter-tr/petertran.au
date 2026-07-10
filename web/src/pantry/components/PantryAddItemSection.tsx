@@ -6,7 +6,7 @@ import {
   RECORD_PURCHASE_MUTATION,
   type RecordPurchaseResult,
   type StorageLocation,
-} from "../lib/pantryGraphql";
+} from "../api";
 
 type Status = "idle" | "saving" | "error";
 

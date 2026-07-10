@@ -1,6 +1,6 @@
 import Section from "./Section";
 import CompanyBadge from "./CompanyBadge";
-import { formatRange } from "../lib/format";
+import { formatRange } from "../../shared/lib/format";
 import type { Education, Program } from "../lib/types";
 
 export default function EducationSection({

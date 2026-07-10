@@ -7,7 +7,7 @@ import {
   type PantrySettingsInput,
   type SettingsQueryResult,
   type UpdateSettingsResult,
-} from "../lib/pantryGraphql";
+} from "../api";
 
 export function usePantrySettings() {
   const [settings, setSettings] = useState<PantrySettings | null>(null);

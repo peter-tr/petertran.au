@@ -1,15 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { getRecentGames, removeRecentGame, type RecentGame } from "./recentGamesStore";
-
-function formatWhen(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
+import { formatWhen } from "./format";
 
 export default function RecentGames() {
   const [games, setGames] = useState<RecentGame[]>(() => getRecentGames());

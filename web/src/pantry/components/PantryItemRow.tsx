@@ -1,7 +1,7 @@
 import { useState } from "react";
 import QuantityStepper from "./QuantityStepper";
 import PantryEditItemModal from "./PantryEditItemModal";
-import { formatExpiresAt, formatPurchasedAt } from "../lib/dates";
+import { formatExpiresAt, formatPurchasedAt } from "../../shared/lib/dates";
 import {
   runPantryQuery,
   REMOVE_INVENTORY_ITEM_MUTATION,
@@ -9,7 +9,7 @@ import {
   type InventoryItem,
   type RemoveInventoryItemResult,
   type UpdateInventoryItemResult,
-} from "../lib/pantryGraphql";
+} from "../api";
 
 interface PantryItemRowProps {
   item: InventoryItem;
