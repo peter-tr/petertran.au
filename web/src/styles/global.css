@@ -1443,6 +1443,7 @@ a {
 
 .pantry-command-form {
   display: flex;
+  align-items: flex-end;
   gap: 0.5rem;
 }
 
@@ -1450,6 +1451,12 @@ a {
   flex: 1;
   min-width: 0;
   padding: 0.5rem 0.7rem;
+  font-family: inherit;
+  line-height: 1.4;
+  resize: none;
+  overflow-x: hidden;
+  overflow-y: auto;
+  max-height: 12rem;
 }
 
 .pantry-command-answer {

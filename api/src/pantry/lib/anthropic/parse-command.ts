@@ -75,18 +75,20 @@ ${formatShoppingListForPrompt(shoppingList)}
 Decide whether the input is a QUESTION (answerable from the data above) or an ACTION (a change to make), and respond with exactly one of these three modes:
 
 - "answer": the input is a read-only question (e.g. "what's expiring soon?", "how much milk do I have?"). Answer directly and concisely from the data above in the "answer" field, in plain conversational text - never invent data not shown above.
-- "actions": the input describes one or more changes to make. Fill "actions" with one entry per change:
+- "actions": use this mode whenever ANY part of the input is clear enough to act on - even if only part of it is. Fill "actions" with one entry per clear change:
   - RECORD_PURCHASE: adding or buying a new or existing item. Always use this (never UPDATE_INVENTORY_ITEM) for "add X" / "bought X" phrasing, even if a similar item already exists - the system merges duplicates itself. Requires name, location (guess FRIDGE/FREEZER/PANTRY sensibly if not stated), and quantity (default 1 if not stated). Set purchasedAt to today's date (${today}) unless the input implies no purchase actually happened.
   - UPDATE_INVENTORY_ITEM: correcting an EXISTING item's fields without it being a new purchase. Requires itemId matching one of the ids listed above exactly - never invent an id.
   - REMOVE_INVENTORY_ITEM: fully using up or getting rid of an existing item. Requires itemId matching one of the ids listed above exactly.
   - ADD_TO_SHOPPING_LIST: noting something is needed without it being in stock right now (e.g. "we're out of eggs", "need to buy bread"). Requires name.
   - REMOVE_FROM_SHOPPING_LIST: an item on the shopping list has been bought or is no longer needed. Requires itemId matching one of the shopping list ids listed above exactly.
   Always write a short, specific "summary" for each action describing exactly what will happen, e.g. "Add 2 L Milk to the fridge, bought today".
-- "unclear": the input is empty, unrelated to pantry/fridge inventory, or too ambiguous to map to a specific item/action safely (e.g. it names an item that doesn't clearly match anything above, or could mean more than one existing item). Explain briefly in "message" why, or what's ambiguous - never guess at an itemId you're not sure about.
+  If part of the request is too vague to act on safely (e.g. "and whatever else I need for X" without saying what), don't invent items to fill the gap and don't drop the whole request either - propose actions for the clear part, and use "message" to say what you left out and why, so the user can just ask again for that part specifically.
+- "unclear": use this only when NONE of the input maps to a question or a safe action - it's empty, entirely unrelated to pantry/fridge inventory, or too ambiguous throughout to act on at all (e.g. it names an item that doesn't clearly match anything above, or could mean more than one existing item). Explain briefly in "message" why, or what's ambiguous - never guess at an itemId you're not sure about.
 
 Rules:
 - Never invent an itemId that isn't listed above.
-- If ambiguous which existing item is meant, use "unclear" and ask for clarification in "message" rather than guessing.
+- Never invent specific items the user didn't name, even when asked to guess what they "might need" - that's exactly the kind of gap "actions" mode's "message" field is for.
+- If ambiguous which existing item is meant, leave that part out (via "unclear" if it's the whole request, or "message" if it's part of one) and ask for clarification rather than guessing.
 - Quantities are plain numbers, dates are formatted YYYY-MM-DD.
 - Only respond about this pantry/fridge inventory - refuse (via "unclear") anything else, even food-adjacent requests like recipes or nutrition advice.`;
 }

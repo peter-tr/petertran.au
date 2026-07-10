@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type ChangeEvent, type FormEvent, type KeyboardEvent } from "react";
 import {
   runPantryQuery,
   PARSE_COMMAND_QUERY,
@@ -47,6 +47,7 @@ function formatMutationPreview(mutationName: string, argsJson: string): string {
 }
 
 export default function PantryCommandBar({ onChanged }: PantryCommandBarProps) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [input, setInput] = useState("");
   const [status, setStatus] = useState<Status>("idle");
   const [result, setResult] = useState<ParsedCommand | null>(null);
@@ -68,6 +69,24 @@ export default function PantryCommandBar({ onChanged }: PantryCommandBarProps) {
     setError(null);
     setExpanded(new Set());
     setStatus("idle");
+    if (textareaRef.current) textareaRef.current.style.height = "auto";
+  }
+
+  // Grows the box to fit what's typed - stays single-line at rest, expands
+  // as text wraps instead of scrolling horizontally inside a fixed box.
+  function handleInputChange(e: ChangeEvent<HTMLTextAreaElement>) {
+    setInput(e.target.value);
+    e.target.style.height = "auto";
+    e.target.style.height = `${e.target.scrollHeight}px`;
+  }
+
+  // Enter submits like a chat/command input; Shift+Enter still inserts a
+  // literal newline for a genuinely multi-line command.
+  function handleKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      e.currentTarget.form?.requestSubmit();
+    }
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -127,13 +146,16 @@ export default function PantryCommandBar({ onChanged }: PantryCommandBarProps) {
       <h2 className="pantry-panel-title">Ask or tell it what to do</h2>
 
       <form onSubmit={handleSubmit} className="pantry-command-form">
-        <input
+        <textarea
+          ref={textareaRef}
           className="form-input pantry-command-input"
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={handleInputChange}
+          onKeyDown={handleKeyDown}
           placeholder='"Add 2L milk to the fridge" or "what&apos;s expiring soon?"'
           disabled={busy}
           maxLength={200}
+          rows={1}
         />
         <button className="run-btn" type="submit" disabled={busy || !input.trim()}>
           {status === "thinking" ? "Thinking…" : "Ask"}
