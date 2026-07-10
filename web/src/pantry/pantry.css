@@ -205,6 +205,46 @@
   flex-shrink: 0;
 }
 
+.pantry-shopping-item-name {
+  cursor: pointer;
+  border-bottom: 1px dashed transparent;
+}
+
+.pantry-shopping-item-name:hover {
+  border-bottom-color: var(--muted-dim);
+}
+
+.pantry-shopping-item-editing {
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.pantry-shopping-edit-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.pantry-shopping-edit-row .form-input {
+  padding: 0.3rem 0.5rem;
+}
+
+.pantry-shopping-edit-row input:not(.pantry-shopping-edit-qty) {
+  flex: 1;
+  min-width: 6rem;
+}
+
+.pantry-shopping-edit-qty {
+  width: 4rem;
+}
+
+.pantry-shopping-edit-unit {
+  width: 4.5rem;
+}
+
 .pantry-shopping-remove-btn {
   font-family: var(--font-mono);
   font-size: 0.75rem;
@@ -328,6 +368,17 @@
   border-radius: var(--radius);
   padding: 0.7rem 0.9rem;
   margin-top: 0.6rem;
+}
+
+.pantry-command-answer-items {
+  font-family: var(--font-sans);
+  font-size: 0.88rem;
+  color: var(--paper);
+  background: var(--panel-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.9rem 0.6rem 1.6rem;
+  margin: 0.4rem 0 0;
 }
 
 .pantry-command-actions {
@@ -617,6 +668,52 @@
   color: var(--signal);
 }
 
+.pantry-low-priority-toggle-btn,
+.pantry-nearly-empty-toggle {
+  flex-shrink: 0;
+  font-size: 0.8rem;
+  line-height: 1;
+  color: var(--rule);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.pantry-low-priority-toggle-btn:hover,
+.pantry-nearly-empty-toggle:hover {
+  color: var(--muted);
+}
+
+.pantry-low-priority-toggle-btn.active {
+  color: var(--muted);
+}
+
+.pantry-nearly-empty-toggle.active {
+  color: var(--string);
+}
+
+.pantry-nearly-empty-badge {
+  color: var(--string);
+  font-weight: 600;
+  margin-right: 0.4rem;
+}
+
+/* The "+ show N low priority" reveal toggle, above the item list. */
+.pantry-low-priority-toggle {
+  margin-bottom: 0.6rem;
+}
+
+.pantry-category-filter {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: var(--muted);
+  background: var(--panel-2);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 0.2rem 0.4rem;
+}
+
 .pantry-item-meta {
   grid-area: meta;
   font-family: var(--font-mono);
@@ -762,7 +859,8 @@
 
 @media (max-width: 640px) {
   .pantry-edit-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem 0.6rem;
   }
 }
 
