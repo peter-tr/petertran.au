@@ -1,10 +1,8 @@
 // Client-side "continue a game" list. There's no login/account system here
 // (games are joined purely by a shared 5-character code on one shared
-// device), so this is deliberately per-browser via localStorage rather than
-// a server-side "list games" query -- a public "list all active games"
-// endpoint would let any visitor browse other people's in-progress sessions
-// and player names, which this game's isolated schema is specifically
-// designed to avoid.
+// device), so this is per-browser via localStorage - distinct from
+// LiveGames.tsx's server-side liveImposterGames query, which lists every
+// room in progress rather than just the ones started on this device.
 
 export interface RecentGame {
   gameId: string;

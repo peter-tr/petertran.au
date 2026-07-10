@@ -16,6 +16,13 @@ type Query {
   """
   imposterGame(gameId: String!): ImposterGame
   """
+  Every game currently in REVEAL or DISCUSSION, newest first - lets the
+  landing page show all rooms in progress so anyone can jump into one
+  without knowing its join code. Word pair and imposter identity are still
+  withheld per the usual ImposterGame rules, same as imposterGame(gameId:).
+  """
+  liveImposterGames: [ImposterGame!]!
+  """
   All-time, anonymized usage stats for the game - total games played,
   never any individual game's details or player names.
   """
@@ -202,6 +209,10 @@ type ImposterGame {
   (even at RESULTS) if hintEnabled was false.
   """
   imposterWord: String
+  """
+  When this game was started, as an ISO 8601 timestamp.
+  """
+  createdAt: String!
 }
 
 """

@@ -14,6 +14,10 @@ let devTotalDurationMs = 0;
 export const devResolvers = createImposterResolvers(
   {
     getGame: async (gameId) => devGames.get(gameId) ?? null,
+    listLiveGames: async () =>
+      Array.from(devGames.values())
+        .filter((g) => g.phase !== "RESULTS")
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
     saveGame: async (game) => {
       devGames.set(game.gameId, game);
     },
