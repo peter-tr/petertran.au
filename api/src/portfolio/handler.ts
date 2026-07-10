@@ -3,6 +3,7 @@ import { startServerAndCreateLambdaHandler, handlers } from "@as-integrations/aw
 import { typeDefs } from "./schema";
 import { resolvers } from "./resolvers/resolvers";
 import { operationStatsPlugin } from "./lib/util/operation-stats-plugin";
+import { createResumePartitionLoader } from "./lib/aws/resume-data";
 import type { Context } from "./context";
 
 const server = new ApolloServer<Context>({
@@ -20,6 +21,7 @@ export const handler = startServerAndCreateLambdaHandler(
       sourceIp: event.requestContext?.http?.sourceIp,
       userAgent: event.headers?.["user-agent"],
       functionName: context.functionName,
+      getResumePartition: createResumePartitionLoader(),
     }),
   }
 );
