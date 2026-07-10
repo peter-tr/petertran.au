@@ -14,6 +14,8 @@ let settings: PantrySettings = {
   optionsCollapsed: false,
   collapsedGroups: [],
   shoppingListCollapsed: false,
+  showLowPriority: false,
+  categoryFilter: null,
   commonItems: [
     "Milk",
     "Eggs",
@@ -30,15 +32,42 @@ let settings: PantrySettings = {
     "Yoghurt",
     "Coffee",
   ],
+  categories: [
+    "Dairy",
+    "Produce",
+    "Meat",
+    "Seafood",
+    "Grains",
+    "Spices",
+    "Condiments",
+    "Frozen",
+    "Beverages",
+    "Snacks",
+    "Baking",
+    "Canned Goods",
+    "Bread",
+    "Household",
+  ],
 };
 
-function seed(item: Omit<InventoryItem, "id" | "addedAt" | "updatedAt" | "isStaple" | "purchases">): void {
+function seed(
+  item: Omit<InventoryItem, "id" | "addedAt" | "updatedAt" | "isStaple" | "lowPriority" | "nearlyEmpty" | "purchases">
+): void {
   const id = randomUUID();
   const now = new Date().toISOString();
   const purchases = item.purchasedAt
     ? [{ date: item.purchasedAt, price: item.price, quantity: item.quantity }]
     : [];
-  items.set(id, { ...item, id, addedAt: now, updatedAt: now, isStaple: false, purchases });
+  items.set(id, {
+    ...item,
+    id,
+    addedAt: now,
+    updatedAt: now,
+    isStaple: false,
+    lowPriority: false,
+    nearlyEmpty: false,
+    purchases,
+  });
 }
 
 seed({
@@ -72,8 +101,13 @@ seed({
   expiresAt: null,
 });
 
-type AddInput = Omit<InventoryItem, "id" | "addedAt" | "updatedAt" | "purchases" | "isStaple"> & {
+type AddInput = Omit<
+  InventoryItem,
+  "id" | "addedAt" | "updatedAt" | "purchases" | "isStaple" | "lowPriority" | "nearlyEmpty"
+> & {
   isStaple?: boolean | null;
+  lowPriority?: boolean | null;
+  nearlyEmpty?: boolean | null;
 };
 
 function createItem(input: AddInput): InventoryItem {
@@ -86,6 +120,8 @@ function createItem(input: AddInput): InventoryItem {
     addedAt: now,
     updatedAt: now,
     isStaple: input.isStaple ?? false,
+    lowPriority: input.lowPriority ?? false,
+    nearlyEmpty: input.nearlyEmpty ?? false,
     purchases: input.purchasedAt
       ? [{ date: input.purchasedAt, price: input.price, quantity: input.quantity }]
       : [],
@@ -138,6 +174,7 @@ interface MockRecipeSuggestion {
 
 interface MockParsedCommand {
   answer: string | null;
+  answerItems: string[] | null;
   actions: MockProposedAction[] | null;
   recipes: MockRecipeSuggestion[] | null;
   message: string | null;
@@ -151,23 +188,29 @@ interface MockParsedCommand {
 function mockParseCommand(input: string): MockParsedCommand {
   const trimmed = input.trim();
   const text = trimmed.toLowerCase();
-  if (!text) return { answer: null, actions: null, recipes: null, message: "Type a command or question." };
+  if (!text) {
+    return { answer: null, answerItems: null, actions: null, recipes: null, message: "Type a command or question." };
+  }
 
   if (text.includes("expir")) {
     const soon = [...items.values()]
       .filter((i): i is InventoryItem & { expiresAt: string } => !!i.expiresAt)
       .sort((a, b) => a.expiresAt.localeCompare(b.expiresAt))
       .slice(0, 5);
-    const answer = soon.length
-      ? `Expiring soonest: ${soon.map((i) => `${i.name} (${i.expiresAt})`).join(", ")}.`
-      : "Nothing in your inventory has an expiry date set.";
-    return { answer, actions: null, recipes: null, message: null };
+    return {
+      answer: soon.length ? "Expiring soonest:" : "Nothing in your inventory has an expiry date set.",
+      answerItems: soon.length ? soon.map((i) => `${i.name} (${i.expiresAt})`) : null,
+      actions: null,
+      recipes: null,
+      message: null,
+    };
   }
 
   if (text.includes("recipe") || text.includes("make") || text.includes("cook")) {
     const have = [...items.values()].slice(0, 3);
     return {
       answer: null,
+      answerItems: null,
       actions: null,
       recipes: [
         {
@@ -187,6 +230,7 @@ function mockParseCommand(input: string): MockParsedCommand {
     const name = trimmed.replace(/^(add|buy|bought)\s+/i, "").trim() || "New item";
     return {
       answer: null,
+      answerItems: null,
       actions: [
         {
           type: "RECORD_PURCHASE",
@@ -196,12 +240,15 @@ function mockParseCommand(input: string): MockParsedCommand {
             input: {
               name,
               location: "PANTRY",
+              category: null,
               quantity: 1,
               unit: null,
               price: null,
               purchasedAt: new Date().toISOString().slice(0, 10),
               expiresAt: null,
               isStaple: null,
+              lowPriority: null,
+              nearlyEmpty: null,
             },
           }),
         },
@@ -214,10 +261,17 @@ function mockParseCommand(input: string): MockParsedCommand {
   if (text.includes("remove") || text.includes("out of") || text.includes("used")) {
     const match = [...items.values()].find((i) => text.includes(i.name.toLowerCase()));
     if (!match) {
-      return { answer: null, actions: null, recipes: null, message: "Couldn't find an item matching that name." };
+      return {
+        answer: null,
+        answerItems: null,
+        actions: null,
+        recipes: null,
+        message: "Couldn't find an item matching that name.",
+      };
     }
     return {
       answer: null,
+      answerItems: null,
       actions: [
         {
           type: "REMOVE_INVENTORY_ITEM",
@@ -233,6 +287,7 @@ function mockParseCommand(input: string): MockParsedCommand {
 
   return {
     answer: null,
+    answerItems: null,
     actions: null,
     recipes: null,
     message:
@@ -324,6 +379,24 @@ export const devResolvers = {
         args.note ?? null,
         args.isStaple ?? false
       ),
+    updateShoppingListEntry: (
+      _: unknown,
+      args: {
+        id: string;
+        input: { name?: string; quantity?: number | null; unit?: string | null; note?: string | null; isStaple?: boolean };
+      }
+    ) => {
+      const existing = shoppingList.get(args.id);
+      if (!existing) throw new Error(`No shopping list entry found with id "${args.id}".`);
+      const input = { ...args.input };
+      if (input.unit !== undefined) input.unit = normalizeUnit(input.unit);
+      const updated: ShoppingListEntry = {
+        ...existing,
+        ...Object.fromEntries(Object.entries(input).filter(([, v]) => v !== undefined)),
+      };
+      shoppingList.set(args.id, updated);
+      return updated;
+    },
     removeFromShoppingList: (_: unknown, args: { id: string }) => shoppingList.delete(args.id),
     updateSettings: (_: unknown, args: { input: Partial<PantrySettings> }) => {
       settings = {

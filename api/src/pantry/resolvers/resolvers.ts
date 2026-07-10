@@ -27,6 +27,8 @@ export interface InventoryItem {
   purchasedAt: string | null;
   expiresAt: string | null;
   isStaple: boolean;
+  lowPriority: boolean;
+  nearlyEmpty: boolean;
   purchases: Purchase[];
   addedAt: string;
   updatedAt: string;
@@ -42,6 +44,14 @@ export interface ShoppingListEntry {
   addedAt: string;
 }
 
+interface UpdateShoppingListEntryInput {
+  name?: string;
+  quantity?: number | null;
+  unit?: string | null;
+  note?: string | null;
+  isStaple?: boolean;
+}
+
 export interface PantrySettings {
   view: string;
   sort: string;
@@ -50,6 +60,9 @@ export interface PantrySettings {
   collapsedGroups: string[];
   commonItems: string[];
   shoppingListCollapsed: boolean;
+  showLowPriority: boolean;
+  categoryFilter: string | null;
+  categories: string[];
 }
 
 interface PantrySettingsInput {
@@ -60,6 +73,9 @@ interface PantrySettingsInput {
   collapsedGroups?: string[];
   commonItems?: string[];
   shoppingListCollapsed?: boolean;
+  showLowPriority?: boolean;
+  categoryFilter?: string | null;
+  categories?: string[];
 }
 
 // Same starting list as the client used to seed localStorage with, so the
@@ -72,6 +88,8 @@ const DEFAULT_SETTINGS: PantrySettings = {
   optionsCollapsed: false,
   collapsedGroups: [],
   shoppingListCollapsed: false,
+  showLowPriority: false,
+  categoryFilter: null,
   commonItems: [
     "Milk",
     "Eggs",
@@ -88,6 +106,22 @@ const DEFAULT_SETTINGS: PantrySettings = {
     "Yoghurt",
     "Coffee",
   ],
+  categories: [
+    "Dairy",
+    "Produce",
+    "Meat",
+    "Seafood",
+    "Grains",
+    "Spices",
+    "Condiments",
+    "Frozen",
+    "Beverages",
+    "Snacks",
+    "Baking",
+    "Canned Goods",
+    "Bread",
+    "Household",
+  ],
 };
 
 interface AddInventoryItemInput {
@@ -100,17 +134,35 @@ interface AddInventoryItemInput {
   purchasedAt?: string | null;
   expiresAt?: string | null;
   isStaple?: boolean | null;
+  lowPriority?: boolean | null;
+  nearlyEmpty?: boolean | null;
 }
 
 type UpdateInventoryItemInput = Partial<Omit<AddInventoryItemInput, "location">> & {
   location?: InventoryItem["location"];
 };
 
+// Backfills fields added after some rows were already written - critical
+// for lowPriority/isStaple/nearlyEmpty specifically, since they're
+// non-nullable: a missing value on even one row would fail the whole
+// inventory query, not just that row (see getShoppingList's identical
+// comment - this is the same class of bug, on the more heavily-populated
+// type).
+function withInventoryDefaults(item: InventoryItem): InventoryItem {
+  return {
+    ...item,
+    isStaple: item.isStaple ?? false,
+    lowPriority: item.lowPriority ?? false,
+    nearlyEmpty: item.nearlyEmpty ?? false,
+  };
+}
+
 async function getItem(id: string): Promise<InventoryItem | null> {
   const res = await ddb.send(
     new GetCommand({ TableName: TABLE_NAME, Key: { pk: PK, sk: `${ITEM_PREFIX}${id}` } })
   );
-  return (res.Item?.data as InventoryItem | undefined) ?? null;
+  const item = res.Item?.data as InventoryItem | undefined;
+  return item ? withInventoryDefaults(item) : null;
 }
 
 async function getAllItems(): Promise<InventoryItem[]> {
@@ -121,7 +173,7 @@ async function getAllItems(): Promise<InventoryItem[]> {
       ExpressionAttributeValues: { ":pk": PK, ":prefix": ITEM_PREFIX },
     })
   );
-  return (res.Items ?? []).map((i) => i.data as InventoryItem);
+  return (res.Items ?? []).map((i) => withInventoryDefaults(i.data as InventoryItem));
 }
 
 async function putItem(item: InventoryItem): Promise<void> {
@@ -147,6 +199,8 @@ function createItem(input: AddInventoryItemInput): InventoryItem {
     purchasedAt,
     expiresAt: input.expiresAt ?? null,
     isStaple: input.isStaple ?? false,
+    lowPriority: input.lowPriority ?? false,
+    nearlyEmpty: input.nearlyEmpty ?? false,
     // Only log an initial purchase batch if a date was actually given - no
     // point fabricating one for a bare-minimum add.
     purchases: purchasedAt
@@ -157,6 +211,29 @@ function createItem(input: AddInventoryItemInput): InventoryItem {
   };
 }
 
+// Backfills fields added after some rows were already written. Critical
+// for isStaple specifically - a missing non-nullable field fails the
+// whole containing list, not just that one row, since GraphQL
+// null-propagates a non-null violation up to the nearest nullable
+// ancestor (see withInventoryDefaults's identical situation).
+function withShoppingListDefaults(entry: ShoppingListEntry): ShoppingListEntry {
+  return {
+    ...entry,
+    quantity: entry.quantity ?? null,
+    unit: entry.unit ?? null,
+    note: entry.note ?? null,
+    isStaple: entry.isStaple ?? false,
+  };
+}
+
+async function getShoppingListEntry(id: string): Promise<ShoppingListEntry | null> {
+  const res = await ddb.send(
+    new GetCommand({ TableName: TABLE_NAME, Key: { pk: PK, sk: `${SHOPLIST_PREFIX}${id}` } })
+  );
+  const entry = res.Item?.data as ShoppingListEntry | undefined;
+  return entry ? withShoppingListDefaults(entry) : null;
+}
+
 async function getShoppingList(): Promise<ShoppingListEntry[]> {
   const res = await ddb.send(
     new QueryCommand({
@@ -165,20 +242,16 @@ async function getShoppingList(): Promise<ShoppingListEntry[]> {
       ExpressionAttributeValues: { ":pk": PK, ":prefix": SHOPLIST_PREFIX },
     })
   );
-  // Backfills fields added after some rows were already written. Critical
-  // for isStaple specifically - a missing non-nullable field fails the
-  // whole list, not just that one row, since GraphQL null-propagates a
-  // non-null violation up to the nearest nullable ancestor (the array).
-  return (res.Items ?? []).map((i) => {
-    const entry = i.data as ShoppingListEntry;
-    return {
-      ...entry,
-      quantity: entry.quantity ?? null,
-      unit: entry.unit ?? null,
-      note: entry.note ?? null,
-      isStaple: entry.isStaple ?? false,
-    };
-  });
+  return (res.Items ?? []).map((i) => withShoppingListDefaults(i.data as ShoppingListEntry));
+}
+
+async function putShoppingListEntry(entry: ShoppingListEntry): Promise<void> {
+  await ddb.send(
+    new PutCommand({
+      TableName: TABLE_NAME,
+      Item: { pk: PK, sk: `${SHOPLIST_PREFIX}${entry.id}`, type: "SHOPLIST", data: entry },
+    })
+  );
 }
 
 // Used both automatically (a staple running out), manually (the "add to
@@ -218,12 +291,7 @@ async function upsertShoppingListEntry(
         addedAt: new Date().toISOString(),
       };
 
-  await ddb.send(
-    new PutCommand({
-      TableName: TABLE_NAME,
-      Item: { pk: PK, sk: `${SHOPLIST_PREFIX}${entry.id}`, type: "SHOPLIST", data: entry },
-    })
-  );
+  await putShoppingListEntry(entry);
   return entry;
 }
 
@@ -268,8 +336,19 @@ export const resolvers = {
       args: { input: string; history?: { role: string; content: string }[] },
       context: Context
     ): Promise<ParsedCommandResult> => {
-      const [inventory, shoppingList] = await Promise.all([getAllItems(), getShoppingList()]);
-      return parseCommand(args.input, args.history ?? [], inventory, shoppingList, context.sourceIp);
+      const [inventory, shoppingList, settings] = await Promise.all([
+        getAllItems(),
+        getShoppingList(),
+        getSettings(),
+      ]);
+      return parseCommand(
+        args.input,
+        args.history ?? [],
+        inventory,
+        shoppingList,
+        settings.categories,
+        context.sourceIp
+      );
     },
   },
   Mutation: {
@@ -384,6 +463,28 @@ export const resolvers = {
         args.note ?? null,
         args.isStaple ?? false
       );
+    },
+
+    updateShoppingListEntry: async (
+      _: unknown,
+      args: { id: string; input: UpdateShoppingListEntryInput },
+      context: Context
+    ): Promise<ShoppingListEntry> => {
+      await assertNotRateLimited(context.sourceIp);
+
+      const existing = await getShoppingListEntry(args.id);
+      if (!existing) throw new Error(`No shopping list entry found with id "${args.id}".`);
+
+      const input = { ...args.input };
+      if (input.unit !== undefined) input.unit = normalizeUnit(input.unit);
+
+      const updated: ShoppingListEntry = {
+        ...existing,
+        ...Object.fromEntries(Object.entries(input).filter(([, v]) => v !== undefined)),
+      };
+
+      await putShoppingListEntry(updated);
+      return updated;
     },
 
     removeFromShoppingList: async (_: unknown, args: { id: string }, context: Context): Promise<boolean> => {
