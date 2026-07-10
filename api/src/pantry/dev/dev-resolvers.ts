@@ -13,6 +13,7 @@ let settings: PantrySettings = {
   simple: false,
   optionsCollapsed: false,
   collapsedGroups: [],
+  shoppingListCollapsed: false,
   commonItems: [
     "Milk",
     "Eggs",
@@ -94,14 +95,20 @@ function createItem(input: AddInput): InventoryItem {
 function upsertShoppingListEntry(
   name: string,
   quantity: number | null,
-  unit: string | null
+  unit: string | null,
+  note: string | null = null
 ): ShoppingListEntry {
   const normalizedUnit = unit ? normalizeUnit(unit) : null;
   const needle = normalizeItemName(name);
   const match = [...shoppingList.values()].find((e) => normalizeItemName(e.name) === needle);
   const entry: ShoppingListEntry = match
-    ? { ...match, quantity: quantity ?? match.quantity, unit: normalizedUnit ?? match.unit }
-    : { id: randomUUID(), name, quantity, unit: normalizedUnit, addedAt: new Date().toISOString() };
+    ? {
+        ...match,
+        quantity: quantity ?? match.quantity,
+        unit: normalizedUnit ?? match.unit,
+        note: note ?? match.note,
+      }
+    : { id: randomUUID(), name, quantity, unit: normalizedUnit, note, addedAt: new Date().toISOString() };
   shoppingList.set(entry.id, entry);
   return entry;
 }
@@ -113,19 +120,28 @@ interface MockProposedAction {
   argsJson: string;
 }
 
+interface MockRecipeSuggestion {
+  name: string;
+  description: string | null;
+  ingredients: { name: string; haveInInventory: boolean; itemId: string | null }[];
+}
+
 interface MockParsedCommand {
   answer: string | null;
   actions: MockProposedAction[] | null;
+  recipes: MockRecipeSuggestion[] | null;
   message: string | null;
 }
 
-// Crude local keyword matching, no Anthropic call - just enough to exercise
-// the frontend's preview/confirm flow in local dev. The real implementation
-// (api/src/pantry/lib/anthropic/parse-command.ts) is what actually ships.
+// Crude local keyword matching, no Anthropic call, no conversation history
+// awareness - just enough to exercise the frontend's preview/confirm flow
+// in local dev. The real implementation (api/src/pantry/lib/anthropic/
+// parse-command.ts) is what actually ships and is what history/recipes are
+// really tested against, live.
 function mockParseCommand(input: string): MockParsedCommand {
   const trimmed = input.trim();
   const text = trimmed.toLowerCase();
-  if (!text) return { answer: null, actions: null, message: "Type a command or question." };
+  if (!text) return { answer: null, actions: null, recipes: null, message: "Type a command or question." };
 
   if (text.includes("expir")) {
     const soon = [...items.values()]
@@ -135,7 +151,26 @@ function mockParseCommand(input: string): MockParsedCommand {
     const answer = soon.length
       ? `Expiring soonest: ${soon.map((i) => `${i.name} (${i.expiresAt})`).join(", ")}.`
       : "Nothing in your inventory has an expiry date set.";
-    return { answer, actions: null, message: null };
+    return { answer, actions: null, recipes: null, message: null };
+  }
+
+  if (text.includes("recipe") || text.includes("make") || text.includes("cook")) {
+    const have = [...items.values()].slice(0, 3);
+    return {
+      answer: null,
+      actions: null,
+      recipes: [
+        {
+          name: "Mock Recipe (dev server only)",
+          description: "A placeholder suggestion - the real recipe engine only runs against the live API.",
+          ingredients: [
+            ...have.map((i) => ({ name: i.name, haveInInventory: true, itemId: i.id })),
+            { name: "Something you don't have", haveInInventory: false, itemId: null },
+          ],
+        },
+      ],
+      message: null,
+    };
   }
 
   if (text.startsWith("add") || text.includes("buy") || text.includes("bought")) {
@@ -161,6 +196,7 @@ function mockParseCommand(input: string): MockParsedCommand {
           }),
         },
       ],
+      recipes: null,
       message: null,
     };
   }
@@ -168,7 +204,7 @@ function mockParseCommand(input: string): MockParsedCommand {
   if (text.includes("remove") || text.includes("out of") || text.includes("used")) {
     const match = [...items.values()].find((i) => text.includes(i.name.toLowerCase()));
     if (!match) {
-      return { answer: null, actions: null, message: "Couldn't find an item matching that name." };
+      return { answer: null, actions: null, recipes: null, message: "Couldn't find an item matching that name." };
     }
     return {
       answer: null,
@@ -180,6 +216,7 @@ function mockParseCommand(input: string): MockParsedCommand {
           argsJson: JSON.stringify({ id: match.id }),
         },
       ],
+      recipes: null,
       message: null,
     };
   }
@@ -187,7 +224,9 @@ function mockParseCommand(input: string): MockParsedCommand {
   return {
     answer: null,
     actions: null,
-    message: 'This is a local mock - only "add X", "remove X", and "what\'s expiring" are recognized.',
+    recipes: null,
+    message:
+      'This is a local mock - only "add X", "remove X", "what\'s expiring", and "recipe" are recognized.',
   };
 }
 
@@ -200,7 +239,7 @@ export const devResolvers = {
     inventoryItem: (_: unknown, args: { id: string }) => items.get(args.id) ?? null,
     shoppingList: () => [...shoppingList.values()].sort((a, b) => a.addedAt.localeCompare(b.addedAt)),
     settings: () => settings,
-    parseCommand: (_: unknown, args: { input: string }) => mockParseCommand(args.input),
+    parseCommand: (_: unknown, args: { input: string; history?: unknown }) => mockParseCommand(args.input),
   },
   Mutation: {
     addInventoryItem: (_: unknown, args: { input: AddInput }) => {
@@ -258,8 +297,10 @@ export const devResolvers = {
       if (existing?.isStaple) upsertShoppingListEntry(existing.name, null, null);
       return items.delete(args.id);
     },
-    addToShoppingList: (_: unknown, args: { name: string; quantity?: number | null; unit?: string | null }) =>
-      upsertShoppingListEntry(args.name, args.quantity ?? null, args.unit ?? null),
+    addToShoppingList: (
+      _: unknown,
+      args: { name: string; quantity?: number | null; unit?: string | null; note?: string | null }
+    ) => upsertShoppingListEntry(args.name, args.quantity ?? null, args.unit ?? null, args.note ?? null),
     removeFromShoppingList: (_: unknown, args: { id: string }) => shoppingList.delete(args.id),
     updateSettings: (_: unknown, args: { input: Partial<PantrySettings> }) => {
       settings = {

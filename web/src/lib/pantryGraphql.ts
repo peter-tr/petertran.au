@@ -154,6 +154,7 @@ export interface ShoppingListEntry {
   name: string;
   quantity: number | null;
   unit: string | null;
+  note: string | null;
   addedAt: string;
 }
 
@@ -164,6 +165,7 @@ export const SHOPPING_LIST_QUERY = /* GraphQL */ `
       name
       quantity
       unit
+      note
       addedAt
     }
   }
@@ -184,12 +186,13 @@ export interface RemoveFromShoppingListResult {
 }
 
 export const ADD_TO_SHOPPING_LIST_MUTATION = /* GraphQL */ `
-  mutation AddToShoppingList($name: String!, $quantity: Float, $unit: String) {
-    addToShoppingList(name: $name, quantity: $quantity, unit: $unit) {
+  mutation AddToShoppingList($name: String!, $quantity: Float, $unit: String, $note: String) {
+    addToShoppingList(name: $name, quantity: $quantity, unit: $unit, note: $note) {
       id
       name
       quantity
       unit
+      note
       addedAt
     }
   }
@@ -206,6 +209,7 @@ export interface PantrySettings {
   optionsCollapsed: boolean;
   collapsedGroups: string[];
   commonItems: string[];
+  shoppingListCollapsed: boolean;
 }
 
 export type PantrySettingsInput = Partial<PantrySettings>;
@@ -217,6 +221,7 @@ const SETTINGS_FIELDS = /* GraphQL */ `
   optionsCollapsed
   collapsedGroups
   commonItems
+  shoppingListCollapsed
 `;
 
 export const SETTINGS_QUERY = /* GraphQL */ `
@@ -257,15 +262,35 @@ export interface ProposedAction {
   argsJson: string;
 }
 
+export interface RecipeIngredient {
+  name: string;
+  haveInInventory: boolean;
+  itemId: string | null;
+}
+
+export interface RecipeSuggestion {
+  name: string;
+  description: string | null;
+  ingredients: RecipeIngredient[];
+}
+
 export interface ParsedCommand {
   answer: string | null;
   actions: ProposedAction[] | null;
+  recipes: RecipeSuggestion[] | null;
   message: string | null;
 }
 
+// Mirrors Claude's own {role, content} chat message shape - see
+// api/src/pantry/lib/anthropic/parse-command.ts.
+export interface ConversationMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
 export const PARSE_COMMAND_QUERY = /* GraphQL */ `
-  query ParseCommand($input: String!) {
-    parseCommand(input: $input) {
+  query ParseCommand($input: String!, $history: [ConversationMessage!]) {
+    parseCommand(input: $input, history: $history) {
       answer
       message
       actions {
@@ -273,6 +298,15 @@ export const PARSE_COMMAND_QUERY = /* GraphQL */ `
         summary
         mutationName
         argsJson
+      }
+      recipes {
+        name
+        description
+        ingredients {
+          name
+          haveInInventory
+          itemId
+        }
       }
     }
   }

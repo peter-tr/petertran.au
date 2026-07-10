@@ -171,6 +171,12 @@ type ShoppingListEntry {
   """
   unit: String
   """
+  Freeform note on why this was added, e.g. "For: Hotdogs" when added as a
+  missing recipe ingredient. Null if there's no particular reason beyond
+  "need to buy this".
+  """
+  note: String
+  """
   Timestamp this entry was added, ISO 8601.
   """
   addedAt: String!
@@ -209,6 +215,10 @@ type PantrySettings {
   The user-curated quick-add list shown in Common Items.
   """
   commonItems: [String!]!
+  """
+  True if the Shopping list panel is collapsed.
+  """
+  shoppingListCollapsed: Boolean!
 }
 
 """
@@ -221,6 +231,7 @@ input PantrySettingsInput {
   optionsCollapsed: Boolean
   collapsedGroups: [String!]
   commonItems: [String!]
+  shoppingListCollapsed: Boolean
 }
 
 """
@@ -261,22 +272,82 @@ type ProposedAction {
 }
 
 """
+A single ingredient within a RecipeSuggestion.
+"""
+type RecipeIngredient {
+  """
+  Ingredient name, e.g. "Hot dog buns".
+  """
+  name: String!
+  """
+  True if this is already covered by something in current inventory.
+  """
+  haveInInventory: Boolean!
+  """
+  The matching inventory item, if haveInInventory is true. Null otherwise.
+  """
+  itemId: ID
+}
+
+"""
+A recipe proposed by parseCommand, with its ingredients checked against
+current inventory - not a change to anything, just a suggestion. The
+client decides whether to turn any missing ingredients into shopping-list
+actions (via addToShoppingList), the same way it confirms any other
+proposed action.
+"""
+type RecipeSuggestion {
+  """
+  Recipe name, e.g. "Classic Hot Dogs".
+  """
+  name: String!
+  """
+  Short description of the dish. Null if not needed.
+  """
+  description: String
+  """
+  Every ingredient the recipe calls for, each flagged with whether it's
+  already in stock.
+  """
+  ingredients: [RecipeIngredient!]!
+}
+
+"""
+One message in a parseCommand conversation, in the same shape Claude's own
+chat history uses - "user" for what was typed, "assistant" for what a
+prior parseCommand call returned (JSON-encoded), so a follow-up input like
+"shopping list, 1 bottle" can be understood as completing an earlier
+request instead of being a new, standalone, likely-unclear one.
+"""
+input ConversationMessage {
+  role: String!
+  content: String!
+}
+
+"""
 Result of interpreting a natural-language pantry command.
 """
 type ParsedCommand {
   """
   Set when the input was a read-only question, answered directly from
-  current inventory/shopping-list data. Null if interpreted as actions.
+  current inventory/shopping-list data. Null otherwise.
   """
   answer: String
   """
   Set when the input was interpreted as one or more inventory changes,
-  proposed but not yet applied. Null if answered as a question instead.
+  proposed but not yet applied. Null otherwise.
   """
   actions: [ProposedAction!]
   """
+  Set when the input asked for a recipe or a recommendation based on
+  what's in stock. Null otherwise.
+  """
+  recipes: [RecipeSuggestion!]
+  """
   Set when the command couldn't be understood or mapped to anything -
-  explains why. Null on success (whether answer or actions).
+  explains why, or asks a clarifying question. Null on success (answer,
+  actions, or recipes) unless there's still something worth flagging
+  alongside them (e.g. part of a multi-item request was skipped).
   """
   message: String
 }
@@ -304,12 +375,14 @@ type Query {
   settings: PantrySettings!
   """
   Interpret a natural-language command (typed or dictated) against current
-  inventory/shopping-list state - e.g. "add 2L milk to the fridge" or
-  "what's expiring this week?". Never mutates anything itself; returns
-  either a direct answer, or proposed actions for the client to confirm and
-  apply via their normal mutations.
+  inventory/shopping-list state - e.g. "add 2L milk to the fridge",
+  "what's expiring this week?", or "what can I make for dinner?". Never
+  mutates anything itself; returns a direct answer, proposed actions, or
+  recipe suggestions for the client to confirm/apply via their normal
+  mutations. Pass prior turns as `history` to continue a conversation -
+  e.g. answering a clarifying question this returned last time.
   """
-  parseCommand(input: String!): ParsedCommand!
+  parseCommand(input: String!, history: [ConversationMessage!]): ParsedCommand!
 }
 
 """
@@ -346,7 +419,7 @@ type Mutation {
   that's already on the list - calling this again for an existing entry
   updates its quantity/unit instead (only overwriting fields you provide).
   """
-  addToShoppingList(name: String!, quantity: Float, unit: String): ShoppingListEntry!
+  addToShoppingList(name: String!, quantity: Float, unit: String, note: String): ShoppingListEntry!
   """
   Remove an entry from the shopping list, e.g. once it's been bought.
   Returns true if a row was actually deleted.

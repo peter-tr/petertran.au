@@ -3,15 +3,38 @@ import {
   runPantryQuery,
   PARSE_COMMAND_QUERY,
   PANTRY_ACTION_MUTATIONS,
+  type ConversationMessage,
   type ParseCommandResult,
   type ParsedCommand,
+  type ProposedAction,
+  type RecipeSuggestion,
 } from "../lib/pantryGraphql";
 
-type Status = "idle" | "thinking" | "confirming" | "error";
+type ActionsStatus = "pending" | "confirming" | "done" | "cancelled";
+
+interface UserTurn {
+  role: "user";
+  text: string;
+}
+
+interface AssistantTurn {
+  role: "assistant";
+  result: ParsedCommand;
+  expandedActions: Set<number>;
+  actionsStatus: ActionsStatus;
+  actionsError: string | null;
+}
+
+type Turn = UserTurn | AssistantTurn;
 
 interface PantryCommandBarProps {
   onChanged: () => void;
 }
+
+// Only the last few turns are sent back as context on each call - a
+// personal pantry's inventory/shopping-list state is small, but there's no
+// reason to let token cost grow unbounded across a very long conversation.
+const MAX_HISTORY_TURNS = 10;
 
 // Enum-valued fields render unquoted in GraphQL (e.g. FRIDGE, not "FRIDGE") -
 // everything else follows normal JSON-ish literal formatting.
@@ -46,30 +69,37 @@ function formatMutationPreview(mutationName: string, argsJson: string): string {
   }
 }
 
+// Turns a recipe's missing ingredients into the same {mutationName,
+// argsJson} shape parseCommand itself produces - no extra AI call, this is
+// just client-side synthesis feeding the exact same confirm/preview UI.
+function buildRecipeShoppingActions(recipe: RecipeSuggestion): ProposedAction[] {
+  return recipe.ingredients
+    .filter((ing) => !ing.haveInInventory)
+    .map((ing) => ({
+      type: "ADD_TO_SHOPPING_LIST",
+      summary: `Add "${ing.name}" to the shopping list (for: ${recipe.name})`,
+      mutationName: "addToShoppingList",
+      argsJson: JSON.stringify({ name: ing.name, quantity: null, unit: null, note: `For: ${recipe.name}` }),
+    }));
+}
+
 export default function PantryCommandBar({ onChanged }: PantryCommandBarProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [input, setInput] = useState("");
-  const [status, setStatus] = useState<Status>("idle");
-  const [result, setResult] = useState<ParsedCommand | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  const [turns, setTurns] = useState<Turn[]>([]);
+  const [thinking, setThinking] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
-  function toggleExpanded(i: number) {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(i)) next.delete(i);
-      else next.add(i);
-      return next;
-    });
+  function resetTextareaHeight() {
+    if (textareaRef.current) textareaRef.current.style.height = "auto";
   }
 
-  function reset() {
+  function clearConversation() {
+    setTurns([]);
     setInput("");
-    setResult(null);
-    setError(null);
-    setExpanded(new Set());
-    setStatus("idle");
-    if (textareaRef.current) textareaRef.current.style.height = "auto";
+    setSubmitError(null);
+    setThinking(false);
+    resetTextareaHeight();
   }
 
   // Grows the box to fit what's typed - stays single-line at rest, expands
@@ -89,32 +119,77 @@ export default function PantryCommandBar({ onChanged }: PantryCommandBarProps) {
     }
   }
 
+  function updateAssistantTurn(index: number, patch: Partial<AssistantTurn>) {
+    setTurns((prev) => prev.map((t, i) => (i === index && t.role === "assistant" ? { ...t, ...patch } : t)));
+  }
+
+  function toggleExpandedAction(turnIndex: number, actionIndex: number) {
+    setTurns((prev) =>
+      prev.map((t, i) => {
+        if (i !== turnIndex || t.role !== "assistant") return t;
+        const next = new Set(t.expandedActions);
+        if (next.has(actionIndex)) next.delete(actionIndex);
+        else next.add(actionIndex);
+        return { ...t, expandedActions: next };
+      })
+    );
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     const trimmed = input.trim();
-    if (!trimmed) return;
+    if (!trimmed || thinking) return;
 
-    setStatus("thinking");
-    setError(null);
-    setResult(null);
-    setExpanded(new Set());
+    // Feeds Claude back its own prior structured output as the assistant's
+    // side of the conversation, so a reply like "shopping list, 1 bottle"
+    // can complete an earlier clarifying question instead of being parsed
+    // alone as a new, likely-unclear input.
+    const history: ConversationMessage[] = turns.slice(-MAX_HISTORY_TURNS).map((t) =>
+      t.role === "user" ? { role: "user", content: t.text } : { role: "assistant", content: JSON.stringify(t.result) }
+    );
+
+    setTurns((prev) => [...prev, { role: "user", text: trimmed }]);
+    setInput("");
+    resetTextareaHeight();
+    setThinking(true);
+    setSubmitError(null);
 
     try {
-      const data = await runPantryQuery<ParseCommandResult>(PARSE_COMMAND_QUERY, { input: trimmed });
-      setResult(data.parseCommand);
-      setStatus("idle");
+      const data = await runPantryQuery<ParseCommandResult>(PARSE_COMMAND_QUERY, { input: trimmed, history });
+      setTurns((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          result: data.parseCommand,
+          expandedActions: new Set(),
+          actionsStatus: "pending",
+          actionsError: null,
+        },
+      ]);
     } catch (err) {
-      setStatus("error");
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+      setSubmitError(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setThinking(false);
     }
   }
 
-  async function handleConfirm() {
-    if (!result?.actions?.length) return;
-    setStatus("confirming");
+  function handleAddMissingIngredients(turnIndex: number, recipe: RecipeSuggestion) {
+    const turn = turns[turnIndex];
+    if (turn.role !== "assistant") return;
+    const actions = buildRecipeShoppingActions(recipe);
+    if (actions.length === 0) return;
+    updateAssistantTurn(turnIndex, {
+      result: { ...turn.result, actions },
+      actionsStatus: "pending",
+      actionsError: null,
+    });
+  }
+
+  async function confirmActions(turnIndex: number, actions: ProposedAction[]) {
+    updateAssistantTurn(turnIndex, { actionsStatus: "confirming", actionsError: null });
 
     const failures: string[] = [];
-    for (const action of result.actions) {
+    for (const action of actions) {
       const mutation = PANTRY_ACTION_MUTATIONS[action.mutationName];
       if (!mutation) {
         failures.push(`Unknown action "${action.mutationName}" - skipped.`);
@@ -131,19 +206,22 @@ export default function PantryCommandBar({ onChanged }: PantryCommandBarProps) {
     onChanged();
 
     if (failures.length) {
-      setStatus("error");
-      setError(failures.join(" "));
-      setResult(null);
+      updateAssistantTurn(turnIndex, { actionsStatus: "pending", actionsError: failures.join(" ") });
     } else {
-      reset();
+      updateAssistantTurn(turnIndex, { actionsStatus: "done", actionsError: null });
     }
   }
 
-  const busy = status === "thinking" || status === "confirming";
-
   return (
     <section className="pantry-panel pantry-command-bar">
-      <h2 className="pantry-panel-title">Ask or tell it what to do</h2>
+      <div className="pantry-panel-header">
+        <h2 className="pantry-panel-title">Ask or tell it what to do</h2>
+        {turns.length > 0 && (
+          <button type="button" className="pantry-details-toggle" onClick={clearConversation}>
+            Clear
+          </button>
+        )}
+      </div>
 
       <form onSubmit={handleSubmit} className="pantry-command-form">
         <textarea
@@ -153,53 +231,126 @@ export default function PantryCommandBar({ onChanged }: PantryCommandBarProps) {
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
           placeholder='"Add 2L milk to the fridge" or "what&apos;s expiring soon?"'
-          disabled={busy}
+          disabled={thinking}
           maxLength={200}
           rows={1}
         />
-        <button className="run-btn" type="submit" disabled={busy || !input.trim()}>
-          {status === "thinking" ? "Thinking…" : "Ask"}
+        <button className="run-btn" type="submit" disabled={thinking || !input.trim()}>
+          {thinking ? "Thinking…" : "Ask"}
         </button>
       </form>
 
-      {error && <p className="status-line">// {error}</p>}
+      {submitError && <p className="status-line">// {submitError}</p>}
 
-      {result?.answer && <p className="pantry-command-answer">{result.answer}</p>}
+      {turns.length > 0 && (
+        <div className="pantry-command-turns">
+          {turns.map((turn, i) =>
+            turn.role === "user" ? (
+              <p className="pantry-command-turn-user" key={i}>
+                {turn.text}
+              </p>
+            ) : (
+              <div className="pantry-command-turn-assistant" key={i}>
+                {turn.result.answer && <p className="pantry-command-answer">{turn.result.answer}</p>}
 
-      {result?.message && !result.answer && !result.actions && (
-        <p className="status-line">// {result.message}</p>
-      )}
+                {turn.result.recipes && turn.result.recipes.length > 0 && (
+                  <div className="pantry-command-recipes">
+                    {turn.result.recipes.map((recipe, ri) => {
+                      const missing = recipe.ingredients.filter((ing) => !ing.haveInInventory);
+                      return (
+                        <div className="pantry-command-recipe" key={ri}>
+                          <p className="pantry-command-recipe-name">{recipe.name}</p>
+                          {recipe.description && (
+                            <p className="pantry-command-recipe-desc">{recipe.description}</p>
+                          )}
+                          <ul className="pantry-command-recipe-ingredients">
+                            {recipe.ingredients.map((ing, ii) => (
+                              <li
+                                key={ii}
+                                className={
+                                  ing.haveInInventory
+                                    ? "pantry-command-ingredient-have"
+                                    : "pantry-command-ingredient-missing"
+                                }
+                              >
+                                {ing.haveInInventory ? "✓" : "+"} {ing.name}
+                              </li>
+                            ))}
+                          </ul>
+                          {missing.length > 0 && (
+                            <button
+                              type="button"
+                              className="pantry-details-toggle"
+                              onClick={() => handleAddMissingIngredients(i, recipe)}
+                            >
+                              + add {missing.length} missing ingredient{missing.length > 1 ? "s" : ""} to shopping
+                              list
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
 
-      {result?.actions && result.actions.length > 0 && (
-        <div className="pantry-command-actions">
-          {result.message && <p className="status-line">// {result.message}</p>}
-          {result.actions.map((action, i) => (
-            <div className="pantry-command-action" key={i}>
-              <div className="pantry-command-action-row">
-                <p className="pantry-command-action-summary">{action.summary}</p>
-                <button
-                  type="button"
-                  className="pantry-details-toggle"
-                  onClick={() => toggleExpanded(i)}
-                >
-                  {expanded.has(i) ? "− hide mutation" : "+ view mutation"}
-                </button>
+                {turn.result.message &&
+                  !turn.result.answer &&
+                  !(turn.result.actions && turn.result.actions.length > 0) && (
+                    <p className="status-line">// {turn.result.message}</p>
+                  )}
+
+                {turn.result.actions && turn.result.actions.length > 0 && (
+                  <div className="pantry-command-actions">
+                    {turn.result.message && <p className="status-line">// {turn.result.message}</p>}
+                    {turn.result.actions.map((action, ai) => (
+                      <div className="pantry-command-action" key={ai}>
+                        <div className="pantry-command-action-row">
+                          <p className="pantry-command-action-summary">{action.summary}</p>
+                          <button
+                            type="button"
+                            className="pantry-details-toggle"
+                            onClick={() => toggleExpandedAction(i, ai)}
+                          >
+                            {turn.expandedActions.has(ai) ? "− hide mutation" : "+ view mutation"}
+                          </button>
+                        </div>
+                        {turn.expandedActions.has(ai) && (
+                          <pre className="pantry-command-mutation">
+                            {formatMutationPreview(action.mutationName, action.argsJson)}
+                          </pre>
+                        )}
+                      </div>
+                    ))}
+                    {turn.actionsError && <p className="status-line">// {turn.actionsError}</p>}
+                    {turn.actionsStatus === "done" ? (
+                      <p className="pantry-command-turn-done">✓ Applied</p>
+                    ) : turn.actionsStatus === "cancelled" ? (
+                      <p className="pantry-command-turn-done">Cancelled</p>
+                    ) : (
+                      <div className="pantry-modal-actions">
+                        <button
+                          type="button"
+                          className="pantry-details-toggle"
+                          onClick={() => updateAssistantTurn(i, { actionsStatus: "cancelled" })}
+                          disabled={turn.actionsStatus === "confirming"}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          className="run-btn"
+                          onClick={() => confirmActions(i, turn.result.actions!)}
+                          disabled={turn.actionsStatus === "confirming"}
+                        >
+                          {turn.actionsStatus === "confirming" ? "Applying…" : "Confirm"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-              {expanded.has(i) && (
-                <pre className="pantry-command-mutation">
-                  {formatMutationPreview(action.mutationName, action.argsJson)}
-                </pre>
-              )}
-            </div>
-          ))}
-          <div className="pantry-modal-actions">
-            <button type="button" className="pantry-details-toggle" onClick={reset} disabled={busy}>
-              Cancel
-            </button>
-            <button type="button" className="run-btn" onClick={handleConfirm} disabled={busy}>
-              {status === "confirming" ? "Applying…" : "Confirm"}
-            </button>
-          </div>
+            )
+          )}
         </div>
       )}
     </section>

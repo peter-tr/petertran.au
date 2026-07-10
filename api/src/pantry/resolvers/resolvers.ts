@@ -37,6 +37,7 @@ export interface ShoppingListEntry {
   name: string;
   quantity: number | null;
   unit: string | null;
+  note: string | null;
   addedAt: string;
 }
 
@@ -47,6 +48,7 @@ export interface PantrySettings {
   optionsCollapsed: boolean;
   collapsedGroups: string[];
   commonItems: string[];
+  shoppingListCollapsed: boolean;
 }
 
 interface PantrySettingsInput {
@@ -56,6 +58,7 @@ interface PantrySettingsInput {
   optionsCollapsed?: boolean;
   collapsedGroups?: string[];
   commonItems?: string[];
+  shoppingListCollapsed?: boolean;
 }
 
 // Same starting list as the client used to seed localStorage with, so the
@@ -67,6 +70,7 @@ const DEFAULT_SETTINGS: PantrySettings = {
   simple: false,
   optionsCollapsed: false,
   collapsedGroups: [],
+  shoppingListCollapsed: false,
   commonItems: [
     "Milk",
     "Eggs",
@@ -163,14 +167,16 @@ async function getShoppingList(): Promise<ShoppingListEntry[]> {
   return (res.Items ?? []).map((i) => i.data as ShoppingListEntry);
 }
 
-// Used both automatically (a staple running out) and manually (the "add to
-// shopping list" form, and the AI command bar) - updates the existing
-// entry's quantity/unit rather than duplicating one for the same
-// normalized name, if one's already there.
+// Used both automatically (a staple running out), manually (the "add to
+// shopping list" form), and by the AI command bar (plain commands and
+// missing recipe ingredients) - updates the existing entry's
+// quantity/unit/note rather than duplicating one for the same normalized
+// name, if one's already there.
 async function upsertShoppingListEntry(
   name: string,
   quantity: number | null,
-  unit: string | null
+  unit: string | null,
+  note: string | null = null
 ): Promise<ShoppingListEntry> {
   const normalizedUnit = unit ? normalizeUnit(unit) : null;
   const existing = await getShoppingList();
@@ -178,8 +184,20 @@ async function upsertShoppingListEntry(
   const match = existing.find((e) => normalizeItemName(e.name) === needle);
 
   const entry: ShoppingListEntry = match
-    ? { ...match, quantity: quantity ?? match.quantity, unit: normalizedUnit ?? match.unit }
-    : { id: randomUUID(), name, quantity, unit: normalizedUnit, addedAt: new Date().toISOString() };
+    ? {
+        ...match,
+        quantity: quantity ?? match.quantity,
+        unit: normalizedUnit ?? match.unit,
+        note: note ?? match.note,
+      }
+    : {
+        id: randomUUID(),
+        name,
+        quantity,
+        unit: normalizedUnit,
+        note,
+        addedAt: new Date().toISOString(),
+      };
 
   await ddb.send(
     new PutCommand({
@@ -228,11 +246,11 @@ export const resolvers = {
     settings: (): Promise<PantrySettings> => getSettings(),
     parseCommand: async (
       _: unknown,
-      args: { input: string },
+      args: { input: string; history?: { role: string; content: string }[] },
       context: Context
     ): Promise<ParsedCommandResult> => {
       const [inventory, shoppingList] = await Promise.all([getAllItems(), getShoppingList()]);
-      return parseCommand(args.input, inventory, shoppingList, context.sourceIp);
+      return parseCommand(args.input, args.history ?? [], inventory, shoppingList, context.sourceIp);
     },
   },
   Mutation: {
@@ -330,11 +348,11 @@ export const resolvers = {
 
     addToShoppingList: async (
       _: unknown,
-      args: { name: string; quantity?: number | null; unit?: string | null },
+      args: { name: string; quantity?: number | null; unit?: string | null; note?: string | null },
       context: Context
     ): Promise<ShoppingListEntry> => {
       await assertNotRateLimited(context.sourceIp);
-      return upsertShoppingListEntry(args.name, args.quantity ?? null, args.unit ?? null);
+      return upsertShoppingListEntry(args.name, args.quantity ?? null, args.unit ?? null, args.note ?? null);
     },
 
     removeFromShoppingList: async (_: unknown, args: { id: string }, context: Context): Promise<boolean> => {

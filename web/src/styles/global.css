@@ -1371,6 +1371,40 @@ a {
   font-size: 0.85rem;
 }
 
+.pantry-shopping-note {
+  color: var(--muted-dim);
+  font-size: 0.82rem;
+  font-style: italic;
+}
+
+.pantry-shopping-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.pantry-shopping-remove-btn {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--muted-dim);
+  background: none;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 0.2rem 0.4rem;
+  cursor: pointer;
+}
+
+.pantry-shopping-remove-btn:hover {
+  color: var(--string);
+  border-color: var(--string);
+}
+
+.pantry-shopping-remove-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 /* ---------- common items ---------- */
 
 .pantry-common-items {
@@ -1514,6 +1548,86 @@ a {
   margin-top: 0.5rem;
   overflow-x: auto;
   white-space: pre;
+}
+
+.pantry-command-turns {
+  margin-top: 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.pantry-command-turn-user {
+  align-self: flex-end;
+  max-width: 85%;
+  background: var(--signal-dim);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.8rem;
+  font-family: var(--font-sans);
+  font-size: 0.88rem;
+  color: var(--paper);
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.pantry-command-turn-assistant {
+  display: flex;
+  flex-direction: column;
+}
+
+.pantry-command-turn-done {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--muted-dim);
+  margin: 0.4rem 0 0;
+}
+
+.pantry-command-recipes {
+  margin-top: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.pantry-command-recipe {
+  background: var(--panel-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 0.7rem 0.9rem;
+}
+
+.pantry-command-recipe-name {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: var(--paper);
+  margin: 0 0 0.2rem;
+}
+
+.pantry-command-recipe-desc {
+  font-family: var(--font-sans);
+  font-size: 0.84rem;
+  color: var(--muted);
+  margin: 0 0 0.5rem;
+}
+
+.pantry-command-recipe-ingredients {
+  list-style: none;
+  margin: 0 0 0.5rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+}
+
+.pantry-command-ingredient-have {
+  color: var(--muted);
+}
+
+.pantry-command-ingredient-missing {
+  color: var(--paper);
 }
 
 .pantry-details-toggle {

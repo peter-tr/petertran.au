@@ -29,7 +29,15 @@ export default function Pantry() {
 
       <PantryCommandBar onChanged={refetchAll} />
 
-      {shoppingList && <PantryShoppingListSection entries={shoppingList} onChanged={refetchShoppingList} />}
+      {shoppingList && items && settings && (
+        <PantryShoppingListSection
+          entries={shoppingList}
+          items={items}
+          settings={settings}
+          onSettingsChange={updateSettings}
+          onChanged={refetchAll}
+        />
+      )}
 
       {items && settings && (
         <>
