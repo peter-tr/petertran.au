@@ -267,6 +267,14 @@ export default function PantryCommandBar({ onChanged }: PantryCommandBarProps) {
               <div className="pantry-command-turn-assistant" key={i}>
                 {turn.result.answer && <p className="pantry-command-answer">{turn.result.answer}</p>}
 
+                {turn.result.answerItems && turn.result.answerItems.length > 0 && (
+                  <ul className="pantry-command-answer-items">
+                    {turn.result.answerItems.map((item, ii) => (
+                      <li key={ii}>{item}</li>
+                    ))}
+                  </ul>
+                )}
+
                 {i === lastRecipesTurnIndex && turn.result.recipes && turn.result.recipes.length > 0 && (
                   <div className="pantry-command-recipes">
                     {turn.result.recipes.map((recipe, ri) => {

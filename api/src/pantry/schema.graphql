@@ -509,6 +509,12 @@ type Mutation {
   """
   updateShoppingListEntry(id: ID!, input: UpdateShoppingListEntryInput!): ShoppingListEntry!
   """
+  Update a specific shopping list entry by id - e.g. correcting its name
+  or quantity. Unlike addToShoppingList, this never merges into a
+  different entry, even if the new name would otherwise match one.
+  """
+  updateShoppingListEntry(id: ID!, input: UpdateShoppingListEntryInput!): ShoppingListEntry!
+  """
   Remove an entry from the shopping list, e.g. once it's been bought.
   Returns true if a row was actually deleted.
   """
