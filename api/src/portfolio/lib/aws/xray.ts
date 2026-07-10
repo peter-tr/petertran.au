@@ -31,19 +31,7 @@ function displayName(node: RawSegment): string {
   return node.origin?.startsWith("AWS::Lambda") ? "Lambda" : node.name;
 }
 
-// Fetches a specific trace by ID (captured alongside each operation's stats
-// row) and flattens its segment tree into a list ready for a waterfall chart.
-// This only reflects what actually happened inside the Lambda invocation --
-// X-Ray has no visibility into the browser or CloudFront/S3, which aren't
-// part of the same trace.
-//
-// BatchGetTraces returns a flat array of segment documents, not a clean
-// tree: our own SDK-created "work" segment nests its DynamoDB/Anthropic
-// subsegments inline, but the Lambda platform's own wrapper segment is a
-// separate top-level entry, and each downstream AWS call additionally gets
-// an `inferred: true` twin (X-Ray's service-map bookkeeping) duplicating a
-// subsegment that's already captured elsewhere in the same trace.
-export async function getTraceBreakdown(traceId: string): Promise<TraceSegment[]> {
+async function fetchBreakdown(traceId: string): Promise<TraceSegment[]> {
   const res = await xray.send(new BatchGetTracesCommand({ TraceIds: [traceId] }));
   const trace = res.Traces?.[0];
   if (!trace?.Segments?.length) return [];
@@ -78,4 +66,50 @@ export async function getTraceBreakdown(traceId: string): Promise<TraceSegment[]
   }
 
   return out;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// X-Ray's own platform-level "Lambda" wrapper segment for an invocation
+// typically becomes queryable via BatchGetTraces within milliseconds, but
+// the segment our own SDK instrumentation creates (nesting the DynamoDB/
+// Anthropic subsegments) can lag behind by a second or more before it's
+// indexed. A request that finishes quickly leaves little real-world gap
+// between "the response reached the browser" and "the dashboard asks for
+// this trace", so it's easy to land in that window and see only the
+// platform segment.
+//
+// Measured against the live table, propagation is highly variable -- some
+// invocations resolved within ~3s, others took ~10s+. A single blocking
+// call can't reasonably cover that whole range without making the reader
+// stare at a spinner for 10+ seconds, so this only makes two quick, cheap
+// attempts (catching the fast end of the distribution for free); the
+// frontend (OperationRow.tsx) polls further on its own so a slow-to-index
+// trace upgrades in place instead of blocking one long request.
+const RETRY_DELAYS_MS = [700, 1500];
+
+// Fetches a specific trace by ID (captured alongside each operation's stats
+// row) and flattens its segment tree into a list ready for a waterfall chart.
+// This only reflects what actually happened inside the Lambda invocation --
+// X-Ray has no visibility into the browser or CloudFront/S3, which aren't
+// part of the same trace.
+//
+// BatchGetTraces returns a flat array of segment documents, not a clean
+// tree: our own SDK-created "work" segment nests its DynamoDB/Anthropic
+// subsegments inline, but the Lambda platform's own wrapper segment is a
+// separate top-level entry, and each downstream AWS call additionally gets
+// an `inferred: true` twin (X-Ray's service-map bookkeeping) duplicating a
+// subsegment that's already captured elsewhere in the same trace.
+export async function getTraceBreakdown(traceId: string): Promise<TraceSegment[]> {
+  let result = await fetchBreakdown(traceId);
+  for (const delay of RETRY_DELAYS_MS) {
+    // More than one segment means the "work" segment (with its DynamoDB/
+    // Anthropic children) has landed, not just the bare platform wrapper.
+    if (result.length > 1) break;
+    await sleep(delay);
+    result = await fetchBreakdown(traceId);
+  }
+  return result;
 }
