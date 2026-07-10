@@ -1,7 +1,7 @@
 import { useState } from "react";
 import QuantityStepper from "./QuantityStepper";
 import { UNIT_OPTIONS } from "../lib/units";
-import type { InventoryItem, StorageLocation } from "../lib/pantryGraphql";
+import type { InventoryItem, StorageLocation } from "../api";
 
 interface PantryEditItemModalProps {
   item: InventoryItem;

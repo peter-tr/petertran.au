@@ -8,7 +8,7 @@ import {
   type ParsedCommand,
   type ProposedAction,
   type RecipeSuggestion,
-} from "../lib/pantryGraphql";
+} from "../api";
 
 type ActionsStatus = "pending" | "confirming" | "done" | "cancelled";
 

@@ -1,19 +1,19 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   runPantryQuery,
-  SHOPPING_LIST_QUERY,
-  type ShoppingListEntry,
-  type ShoppingListQueryResult,
-} from "../lib/pantryGraphql";
+  INVENTORY_QUERY,
+  type InventoryItem,
+  type InventoryQueryResult,
+} from "../api";
 
-export function usePantryShoppingList() {
-  const [entries, setEntries] = useState<ShoppingListEntry[] | null>(null);
+export function usePantryInventory() {
+  const [items, setItems] = useState<InventoryItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const refetch = useCallback(() => {
-    return runPantryQuery<ShoppingListQueryResult>(SHOPPING_LIST_QUERY)
+    return runPantryQuery<InventoryQueryResult>(INVENTORY_QUERY)
       .then((res) => {
-        setEntries(res.shoppingList);
+        setItems(res.inventory);
         setError(null);
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load"));
@@ -23,5 +23,5 @@ export function usePantryShoppingList() {
     refetch();
   }, [refetch]);
 
-  return { entries, error, refetch };
+  return { items, error, refetch };
 }

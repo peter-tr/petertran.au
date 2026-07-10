@@ -1,15 +1,15 @@
 import { lazy, Suspense, useEffect } from "react";
 import { BrowserRouter, Routes, Route, Link, NavLink, useLocation } from "react-router-dom";
-import Nav from "./components/Nav";
-import { useResumeData } from "./hooks/useResumeData";
+import Nav from "./portfolio/components/Nav";
+import { useResumeData } from "./portfolio/hooks/useResumeData";
 
 // Lazy-loaded per route so each one only downloads what it needs - Home
 // alone pulls in GraphiQL/Monaco (several MB), which side-projects like
 // Imposter and Pantry (and every other route) have no reason to fetch just
 // to render.
-const Home = lazy(() => import("./pages/Home"));
-const Resume = lazy(() => import("./pages/Resume"));
-const Pantry = lazy(() => import("./pages/Pantry"));
+const Home = lazy(() => import("./portfolio/Home"));
+const Resume = lazy(() => import("./portfolio/Resume"));
+const Pantry = lazy(() => import("./pantry/Pantry"));
 const ImposterSetup = lazy(() => import("./games/imposter/Setup"));
 const ImposterGame = lazy(() => import("./games/imposter/Game"));
 

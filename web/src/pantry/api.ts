@@ -1,36 +1,11 @@
-import { GraphQLRequestError } from "./graphql";
+import { createGraphQLClient } from "../shared/graphqlClient";
 
 // Separate endpoint, separate service - the pantry API (api/src/pantry/) is
 // its own Lambda/Function URL, deployed independently of the resume API this
 // site otherwise runs on, even though its source lives in the same workspace.
 export const PANTRY_ENDPOINT = import.meta.env.VITE_PANTRY_GRAPHQL_ENDPOINT as string | undefined;
 
-export async function runPantryQuery<T = unknown>(
-  query: string,
-  variables?: Record<string, unknown>
-): Promise<T> {
-  if (!PANTRY_ENDPOINT) {
-    throw new GraphQLRequestError("VITE_PANTRY_GRAPHQL_ENDPOINT is not configured.");
-  }
-
-  const res = await fetch(PANTRY_ENDPOINT, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ query, variables }),
-  });
-
-  if (!res.ok) {
-    throw new GraphQLRequestError(`Request failed with status ${res.status}`);
-  }
-
-  const json = await res.json();
-
-  if (json.errors?.length) {
-    throw new GraphQLRequestError(json.errors.map((e: { message: string }) => e.message).join("; "));
-  }
-
-  return json.data as T;
-}
+export const runPantryQuery = createGraphQLClient(PANTRY_ENDPOINT, "VITE_PANTRY_GRAPHQL_ENDPOINT");
 
 export type StorageLocation = "FRIDGE" | "FREEZER" | "PANTRY";
 

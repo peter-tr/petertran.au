@@ -1,12 +1,12 @@
 import { useState } from "react";
 import PantryItemRow from "./PantryItemRow";
-import { daysBetween } from "../lib/dates";
+import { daysBetween } from "../../shared/lib/dates";
 import type {
   InventoryItem,
   PantrySettings,
   PantrySettingsInput,
   StorageLocation,
-} from "../lib/pantryGraphql";
+} from "../api";
 
 type ViewMode = "location" | "category" | "expiry" | "all";
 type SortMode = "recent" | "name" | "expiry" | "quantity";

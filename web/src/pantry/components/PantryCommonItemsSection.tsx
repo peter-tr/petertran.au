@@ -2,7 +2,7 @@ import { useState } from "react";
 import QuantityStepper from "./QuantityStepper";
 import PantryInlineAddToggle from "./PantryInlineAddToggle";
 import { UNIT_OPTIONS } from "../lib/units";
-import { runPantryQuery, RECORD_PURCHASE_MUTATION, type RecordPurchaseResult } from "../lib/pantryGraphql";
+import { runPantryQuery, RECORD_PURCHASE_MUTATION, type RecordPurchaseResult } from "../api";
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);

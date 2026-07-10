@@ -1,11 +1,12 @@
-import PantryAddItemSection from "../components/PantryAddItemSection";
-import PantryCommandBar from "../components/PantryCommandBar";
-import PantryCommonItemsSection from "../components/PantryCommonItemsSection";
-import PantryInventorySection from "../components/PantryInventorySection";
-import PantryShoppingListSection from "../components/PantryShoppingListSection";
-import { usePantryInventory } from "../hooks/usePantryInventory";
-import { usePantryShoppingList } from "../hooks/usePantryShoppingList";
-import { usePantrySettings } from "../hooks/usePantrySettings";
+import PantryAddItemSection from "./components/PantryAddItemSection";
+import PantryCommandBar from "./components/PantryCommandBar";
+import PantryCommonItemsSection from "./components/PantryCommonItemsSection";
+import PantryInventorySection from "./components/PantryInventorySection";
+import PantryShoppingListSection from "./components/PantryShoppingListSection";
+import { usePantryInventory } from "./hooks/usePantryInventory";
+import { usePantryShoppingList } from "./hooks/usePantryShoppingList";
+import { usePantrySettings } from "./hooks/usePantrySettings";
+import "./pantry.css";
 
 export default function Pantry() {
   const { items, error, refetch } = usePantryInventory();

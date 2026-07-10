@@ -1,6 +1,6 @@
 import Section from "./Section";
 import CompanyBadge from "./CompanyBadge";
-import { formatRange } from "../lib/format";
+import { formatRange } from "../../shared/lib/format";
 import type { Experience } from "../lib/types";
 
 export default function ExperienceSection({ experience }: { experience: Experience[] }) {
