@@ -1,4 +1,5 @@
 import { createGraphQLClient } from "../../shared/graphqlClient";
+import type { Link } from "./types";
 
 export const ENDPOINT = import.meta.env.VITE_GRAPHQL_ENDPOINT as string | undefined;
 
@@ -63,6 +64,10 @@ export const HERO_QUERY = /* GraphQL */ `
   query Hero {
     person {
       name
+      links {
+        label
+        url
+      }
     }
     experience(currentOnly: true) {
       role
@@ -72,7 +77,7 @@ export const HERO_QUERY = /* GraphQL */ `
 `;
 
 export interface HeroQueryResult {
-  person: { name: string };
+  person: { name: string; links: Link[] };
   experience: { role: string; company: string }[];
 }
 
@@ -175,6 +180,9 @@ export interface TraceBreakdownResult {
 // they're kept as their own top-level Meta fields, not members of SystemStats.
 export const FOOTER_QUERY = /* GraphQL */ `
   query Footer {
+    person {
+      email
+    }
     meta {
       awsCostUsd
       anthropicCostUsd
@@ -184,6 +192,7 @@ export const FOOTER_QUERY = /* GraphQL */ `
 `;
 
 export interface FooterQueryResult {
+  person: { email: string };
   meta: { awsCostUsd: number; anthropicCostUsd: number; totalCostUsd: number };
 }
 

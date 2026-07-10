@@ -4,15 +4,11 @@ import SkillsSection from "./components/SkillsSection";
 import EducationSection from "./components/EducationSection";
 import InterestsSection from "./components/InterestsSection";
 import Footer from "./components/Footer";
-import type { ResumeData } from "./lib/types";
+import { useResumeData } from "./hooks/useResumeData";
 import "./portfolio.css";
 
-interface ResumeProps {
-  data: ResumeData | null;
-  error: string | null;
-}
-
-export default function Resume({ data, error }: ResumeProps) {
+export default function Resume() {
+  const { data, error } = useResumeData();
   return (
     <>
       <header className="page-head">

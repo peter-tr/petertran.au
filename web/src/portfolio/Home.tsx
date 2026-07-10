@@ -4,7 +4,6 @@ import ArchitectureSection from "./components/ArchitectureSection";
 import SystemStatsSection from "./components/SystemStatsSection";
 import ContactSection from "./components/ContactSection";
 import Footer from "./components/Footer";
-import type { ResumeData } from "./lib/types";
 import "./portfolio.css";
 
 // Lazy-loaded on its own, separate from the rest of Home - GraphiQL pulls in
@@ -12,30 +11,17 @@ import "./portfolio.css";
 // to wait on just to render Hero/Architecture/Contact/Stats/Footer.
 const Explorer = lazy(() => import("./components/Explorer"));
 
-interface HomeProps {
-  data: ResumeData | null;
-  error: string | null;
-}
-
-export default function Home({ data, error }: HomeProps) {
+export default function Home() {
   return (
     <>
-      <Hero person={data?.person ?? null} />
-
-      {error && (
-        <p className="status-line">
-          // couldn&apos;t load data from the API right now ({error}). The query explorer below will retry on
-          its own.
-        </p>
-      )}
-
+      <Hero />
       <ArchitectureSection />
       <Suspense fallback={<p className="status-line">// loading query explorer…</p>}>
         <Explorer />
       </Suspense>
       <ContactSection />
       <SystemStatsSection />
-      <Footer email={data?.person.email} />
+      <Footer />
     </>
   );
 }

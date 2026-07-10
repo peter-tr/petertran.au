@@ -4,44 +4,12 @@
   padding: 4rem 0 3rem;
 }
 
-.page-head {
-  padding: 4rem 0 2.5rem;
-}
-
-.page-head h1 {
-  font-family: var(--font-mono);
-  font-weight: 600;
-  font-size: clamp(1.8rem, 5vw, 2.6rem);
-  margin: 0 0 1.2rem;
-  letter-spacing: -0.01em;
-}
-
-.eyebrow {
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-  color: var(--type);
-  margin: 0 0 0.9rem;
-  letter-spacing: 0.01em;
-}
-
-.eyebrow::before {
-  content: "// ";
-  color: var(--muted-dim);
-}
-
 .hero h1 {
   font-family: var(--font-mono);
   font-weight: 600;
   font-size: clamp(2.2rem, 6vw, 3.4rem);
   margin: 0 0 0.6rem;
   letter-spacing: -0.01em;
-}
-
-.tagline {
-  font-size: 1.05rem;
-  color: var(--muted);
-  max-width: 34rem;
-  margin: 0 0 1.6rem;
 }
 
 @keyframes hero-secret-in {
@@ -71,24 +39,6 @@
 
 .hero-secret a:hover {
   border-color: var(--signal);
-}
-
-.section-hint {
-  font-family: var(--font-mono);
-  font-size: 0.85rem;
-  color: var(--muted);
-  margin: 1rem 0 0;
-}
-
-.section-hint a {
-  color: var(--type);
-  text-decoration: none;
-  border-bottom: 1px solid var(--rule);
-  padding-bottom: 1px;
-}
-
-.section-hint a:hover {
-  border-color: var(--type);
 }
 
 .hero-links {
@@ -431,12 +381,6 @@
   background: rgba(242, 169, 59, 0.16);
 }
 
-.project-desc {
-  color: var(--muted);
-  font-size: 0.95rem;
-  margin: 0;
-}
-
 /* ---------- skills ---------- */
 
 .skill-row {
@@ -604,68 +548,13 @@
   max-width: 32rem;
 }
 
-.form-row {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-
-.form-label {
-  font-family: var(--font-mono);
-  font-size: 0.76rem;
-  color: var(--muted);
-}
-
-.form-input {
-  background: var(--panel);
-  border: 1px solid var(--rule);
-  border-radius: 6px;
-  color: var(--paper);
-  font-family: var(--font-sans);
-  font-size: 0.95rem;
-  padding: 0.6rem 0.75rem;
-}
-
-.form-input:focus {
-  outline: none;
-  border-color: var(--type);
-}
-
 @media (max-width: 640px) {
   /* iOS Safari auto-zooms the page on focus for any input under 16px -
      bumping just the mobile font-size avoids that without changing how
      inputs look on desktop. */
-  .form-input,
   .ask-ai-input {
     font-size: 16px;
   }
-}
-
-.form-textarea {
-  resize: vertical;
-  font-family: var(--font-sans);
-}
-
-.run-btn {
-  align-self: flex-start;
-  font-family: var(--font-mono);
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: var(--ink);
-  background: var(--signal);
-  border: none;
-  border-radius: 6px;
-  padding: 0.55rem 1.3rem;
-  cursor: pointer;
-}
-
-.run-btn:hover {
-  filter: brightness(1.08);
-}
-
-.run-btn:disabled {
-  opacity: 0.6;
-  cursor: default;
 }
 
 /* ---------- footer ---------- */
