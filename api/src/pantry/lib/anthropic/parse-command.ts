@@ -48,12 +48,22 @@ interface RawRecipeIngredient {
   amount: string | null;
   haveInInventory: boolean;
   itemId: string | null;
+  // Non-nullable (0 = "not cleanly scalable"), not anyOf - see the comment
+  // on RawAction.flagsSet for why this schema stays clear of Anthropic's
+  // union-typed-parameter budget wherever a sentinel value works instead.
+  quantity: number;
+  estimatedPriceAud: number;
 }
 
 interface RawRecipe {
   name: string;
   description: string | null;
   ingredients: RawRecipeIngredient[];
+  baseServings: number;
+  caloriesPerServing: number;
+  proteinGPerServing: number;
+  carbsGPerServing: number;
+  fatGPerServing: number;
 }
 
 interface RawParseResult {
@@ -77,12 +87,19 @@ export interface RecipeIngredient {
   amount: string | null;
   haveInInventory: boolean;
   itemId: string | null;
+  quantity: number;
+  estimatedPriceAud: number;
 }
 
 export interface RecipeSuggestion {
   name: string;
   description: string | null;
   ingredients: RecipeIngredient[];
+  baseServings: number;
+  caloriesPerServing: number;
+  proteinGPerServing: number;
+  carbsGPerServing: number;
+  fatGPerServing: number;
 }
 
 export interface ParsedCommandResult {
@@ -143,7 +160,14 @@ Decide what the input is and respond with exactly one of these four modes:
   Always write a short, specific "summary" for each action describing exactly what will happen, e.g. "Add 2 L Milk to the fridge, bought today".
   If the input names multiple distinct items - separated by commas, "and", or just listed one after another, e.g. "I bought pasta, pesto and cheese" - create one separate action per item, each with its own name. Never combine several item names into a single action's name field (e.g. never "pasta pesto cheese" as one name) - if you're about to write more than two or three words into a "name" field, that's a sign you're merging items that should be split.
   If part of the request is too vague to act on safely (e.g. "and whatever else I need for X" without saying what), don't invent items to fill the gap and don't drop the whole request either - propose actions for the clear part, and use "message" to say what you left out and why, so the user can just ask again for that part specifically.
-- "recipes": the input asks for a recipe or dish's ingredients (e.g. "ingredients for hotdog", "how do I make carbonara"), an open recommendation based on what's in stock (e.g. "what can I make?", "recommend something for dinner"), or a change to a recipe YOU already suggested earlier in this conversation (e.g. "can you incorporate mushrooms", "remove the salt and pepper", "make it vegetarian"). Fill "recipes" with 1-3 suggestions, each listing its typical ingredients with "amount" set to a realistic freeform quantity for that dish (e.g. "500g", "2 cloves", "to taste" - null only if genuinely not applicable) and "haveInInventory" set by matching against the current inventory above (set "itemId" to the matching id when true, else null). For a NAMED dish, use your own general food knowledge for its usual ingredients/amounts regardless of what's in stock - this is the one case where listing specific items the user didn't explicitly name is correct, not a guess to avoid. For an OPEN recommendation with no dish named, prefer recipes that lean on what's already in inventory. For a REFINEMENT of an earlier recipe, return that same recipe's name and updated ingredient list with the change applied (added/removed/swapped ingredients) rather than a new, unrelated suggestion - the earlier recipe is in your own previous turn, look for it there. This never proposes any action itself - the client decides separately whether to shop for anything missing.
+- "recipes": the input asks for a recipe or dish's ingredients (e.g. "ingredients for hotdog", "how do I make carbonara"), an open recommendation based on what's in stock (e.g. "what can I make?", "recommend something for dinner"), or a change to a recipe YOU already suggested earlier in this conversation (e.g. "can you incorporate mushrooms", "remove the salt and pepper", "make it vegetarian", "I have cinnamon already"). Fill "recipes" with 1-3 suggestions:
+  - "amount": a realistic freeform quantity for that dish (e.g. "500g", "2 cloves", "to taste" - null only if genuinely not applicable).
+  - "quantity": the leading number in "amount" ONLY when it's a single clean number (e.g. "2.5 cups" -> 2.5, "400g" -> 400, "2 cloves" -> 2) - the client uses this to scale amounts when the user changes serving count. Set it to 0 when "amount" is a range, "to taste", or otherwise not a single clean leading number (e.g. "6-8 medium" -> 0, "to taste" -> 0, "a pinch" -> 0) - never guess a number for these, 0 means "leave this one as-is when scaling."
+  - "estimatedPriceAud": your best-effort estimate of current Australian grocery price, in AUD, for this ingredient at the "amount" listed - 0 only for genuinely negligible items (a pinch of salt).
+  - "haveInInventory": set by matching against the current inventory above (set "itemId" to the matching id when true, else null) - UNLESS you're also proposing (in "actions" of this same response) to add this exact ingredient, in which case set it true anyway, anticipating that action succeeding rather than waiting for the next turn.
+  For a NAMED dish, use your own general food knowledge for its usual ingredients/amounts regardless of what's in stock - this is the one case where listing specific items the user didn't explicitly name is correct, not a guess to avoid. For an OPEN recommendation with no dish named, prefer recipes that lean on what's already in inventory. For a REFINEMENT of an earlier recipe, return that same recipe's name and updated ingredient list with the change applied (added/removed/swapped ingredients) rather than a new, unrelated suggestion - the earlier recipe is in your own previous turn, look for it there; that prior turn's JSON may also include "currentServings"/"excludedIngredientIndexes" for it - keep the serving count as-is and don't re-suggest an excluded ingredient unless the input re-includes it.
+  Also set "baseServings" (the serving count the amounts/nutrition below apply to - 1 unless the input asks for a specific number of people/servings) and per-serving "caloriesPerServing"/"proteinGPerServing"/"carbsGPerServing"/"fatGPerServing" (always your best-effort estimate from general nutritional knowledge, never a placeholder).
+  If the input ALSO implies a real inventory change beyond just refining the recipe (e.g. "I have cinnamon already" - the user is telling you they own it, not just asking you to assume it) - ALSO fill "actions" in this same response with that change (typically RECORD_PURCHASE), exactly like "actions" mode would, in addition to "recipes". Recipes mode is not mutually exclusive with actions when the input does both.
 - "unclear": use this only when NONE of the input maps to a question, a safe action, or a recipe request - it's empty, entirely unrelated to pantry/fridge/cooking, or too ambiguous throughout to act on at all (e.g. it names an item that doesn't clearly match anything above, or could mean more than one existing item). Explain briefly in "message" why, or what's ambiguous, or ask the specific clarifying question needed to proceed - never guess at an itemId you're not sure about.
 
 Conversation rules:
@@ -233,13 +257,29 @@ export const PARSE_COMMAND_SCHEMA = {
                 amount: { anyOf: [{ type: "string" }, { type: "null" }] },
                 haveInInventory: { type: "boolean" },
                 itemId: { anyOf: [{ type: "string" }, { type: "null" }] },
+                quantity: { type: "number" },
+                estimatedPriceAud: { type: "number" },
               },
-              required: ["name", "amount", "haveInInventory", "itemId"],
+              required: ["name", "amount", "haveInInventory", "itemId", "quantity", "estimatedPriceAud"],
               additionalProperties: false,
             },
           },
+          baseServings: { type: "integer" },
+          caloriesPerServing: { type: "number" },
+          proteinGPerServing: { type: "number" },
+          carbsGPerServing: { type: "number" },
+          fatGPerServing: { type: "number" },
         },
-        required: ["name", "description", "ingredients"],
+        required: [
+          "name",
+          "description",
+          "ingredients",
+          "baseServings",
+          "caloriesPerServing",
+          "proteinGPerServing",
+          "carbsGPerServing",
+          "fatGPerServing",
+        ],
         additionalProperties: false,
       },
     },
@@ -352,19 +392,45 @@ function hasValidItemId(a: RawAction, inventoryIds: Set<string>, shoppingListIds
   }
 }
 
+// Shared by "actions" mode and the recipes-can-also-propose-actions case
+// (see the "I have cinnamon already" rule) - both need the exact same
+// hallucination guard + argsJson construction.
+function buildActions(
+  rawActions: RawAction[],
+  inventoryIds: Set<string>,
+  shoppingListIds: Set<string>
+): { actions: ProposedAction[] | null; droppedCount: number } {
+  const validRaw = rawActions.filter((a) => hasValidItemId(a, inventoryIds, shoppingListIds));
+  const droppedCount = rawActions.length - validRaw.length;
+  const actions = validRaw.map(toProposedAction).filter((a): a is ProposedAction => a !== null);
+  return { actions: actions.length ? actions : null, droppedCount };
+}
+
 // Same hallucination guard as actions, applied to recipe ingredients: a
 // "haveInInventory: true" claim only survives if it points at a real id.
 function sanitizeRecipes(recipes: RawRecipe[], inventoryIds: Set<string>): RecipeSuggestion[] {
   return recipes.map((r) => ({
     name: r.name,
     description: r.description,
+    baseServings: r.baseServings > 0 ? r.baseServings : 1,
+    caloriesPerServing: r.caloriesPerServing,
+    proteinGPerServing: r.proteinGPerServing,
+    carbsGPerServing: r.carbsGPerServing,
+    fatGPerServing: r.fatGPerServing,
     ingredients: r.ingredients.map((ing) => {
-      const valid = ing.haveInInventory && !!ing.itemId && inventoryIds.has(ing.itemId);
+      // haveInInventory can be legitimately true here even without a
+      // matching itemId, when the model is anticipating an action in this
+      // same response succeeding (see the "I have cinnamon already" rule
+      // in the prompt) - only an itemId claim needs the hallucination
+      // guard, not the flag itself.
+      const validId = !!ing.itemId && inventoryIds.has(ing.itemId);
       return {
         name: ing.name,
         amount: ing.amount,
-        haveInInventory: valid,
-        itemId: valid ? ing.itemId : null,
+        haveInInventory: ing.haveInInventory,
+        itemId: validId ? ing.itemId : null,
+        quantity: ing.quantity,
+        estimatedPriceAud: ing.estimatedPriceAud,
       };
     }),
   }));
@@ -413,14 +479,21 @@ export async function parseCommand(
   }
 
   const inventoryIds = new Set(inventory.map((i) => i.id));
+  const shoppingListIds = new Set(shoppingList.map((e) => e.id));
 
   if (parsed.mode === "recipes") {
+    // Recipes mode isn't mutually exclusive with actions - a follow-up like
+    // "I have cinnamon already" both updates the recipe and needs a real
+    // inventory action, so any actions the model included ride along too.
+    const { actions, droppedCount } = buildActions(parsed.actions, inventoryIds, shoppingListIds);
     return {
       answer: null,
       answerItems: null,
-      actions: null,
+      actions,
       recipes: sanitizeRecipes(parsed.recipes, inventoryIds),
-      message: parsed.message ?? null,
+      message:
+        parsed.message ??
+        (droppedCount > 0 ? "Some of what you asked couldn't be matched to a real item and was skipped." : null),
     };
   }
 
@@ -434,14 +507,9 @@ export async function parseCommand(
     };
   }
 
-  const shoppingListIds = new Set(shoppingList.map((e) => e.id));
+  const { actions, droppedCount } = buildActions(parsed.actions, inventoryIds, shoppingListIds);
 
-  const validRaw = parsed.actions.filter((a) => hasValidItemId(a, inventoryIds, shoppingListIds));
-  const droppedCount = parsed.actions.length - validRaw.length;
-
-  const actions = validRaw.map(toProposedAction).filter((a): a is ProposedAction => a !== null);
-
-  if (actions.length === 0) {
+  if (!actions) {
     return {
       answer: null,
       answerItems: null,

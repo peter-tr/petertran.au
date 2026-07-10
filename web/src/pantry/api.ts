@@ -289,12 +289,21 @@ export interface RecipeIngredient {
   amount: string | null;
   haveInInventory: boolean;
   itemId: string | null;
+  // Leading numeric amount when cleanly scalable, 0 otherwise (a range,
+  // "to taste", etc.) - see recipeScaling.ts.
+  quantity: number;
+  estimatedPriceAud: number;
 }
 
 export interface RecipeSuggestion {
   name: string;
   description: string | null;
   ingredients: RecipeIngredient[];
+  baseServings: number;
+  caloriesPerServing: number;
+  proteinGPerServing: number;
+  carbsGPerServing: number;
+  fatGPerServing: number;
 }
 
 export interface ParsedCommand {
@@ -327,11 +336,18 @@ export const PARSE_COMMAND_QUERY = /* GraphQL */ `
       recipes {
         name
         description
+        baseServings
+        caloriesPerServing
+        proteinGPerServing
+        carbsGPerServing
+        fatGPerServing
         ingredients {
           name
           amount
           haveInInventory
           itemId
+          quantity
+          estimatedPriceAud
         }
       }
     }

@@ -172,7 +172,19 @@ interface MockProposedAction {
 interface MockRecipeSuggestion {
   name: string;
   description: string | null;
-  ingredients: { name: string; amount: string | null; haveInInventory: boolean; itemId: string | null }[];
+  ingredients: {
+    name: string;
+    amount: string | null;
+    haveInInventory: boolean;
+    itemId: string | null;
+    quantity: number;
+    estimatedPriceAud: number;
+  }[];
+  baseServings: number;
+  caloriesPerServing: number;
+  proteinGPerServing: number;
+  carbsGPerServing: number;
+  fatGPerServing: number;
 }
 
 interface MockParsedCommand {
@@ -226,9 +238,28 @@ function mockParseCommand(input: string): MockParsedCommand {
           name: "Mock Recipe (dev server only)",
           description: "A placeholder suggestion - the real recipe engine only runs against the live API.",
           ingredients: [
-            ...have.map((i) => ({ name: i.name, amount: null, haveInInventory: true, itemId: i.id })),
-            { name: "Something you don't have", amount: "2 cups", haveInInventory: false, itemId: null },
+            ...have.map((i) => ({
+              name: i.name,
+              amount: null,
+              haveInInventory: true,
+              itemId: i.id,
+              quantity: 0,
+              estimatedPriceAud: 0,
+            })),
+            {
+              name: "Something you don't have",
+              amount: "2 cups",
+              haveInInventory: false,
+              itemId: null,
+              quantity: 2,
+              estimatedPriceAud: 3.5,
+            },
           ],
+          baseServings: 2,
+          caloriesPerServing: 450,
+          proteinGPerServing: 20,
+          carbsGPerServing: 55,
+          fatGPerServing: 12,
         },
       ],
       message: null,

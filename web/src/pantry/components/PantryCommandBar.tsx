@@ -9,6 +9,7 @@ import {
   type ProposedAction,
   type RecipeSuggestion,
 } from "../api";
+import { scaleAmount, scalePrice } from "../lib/recipeScaling";
 
 type ActionsStatus = "pending" | "confirming" | "done" | "cancelled";
 
@@ -28,6 +29,9 @@ interface AssistantTurn {
   // ingredients to shopping list" without needing a whole extra AI turn
   // just to say "skip the pesto".
   excludedIngredients: Set<string>;
+  // Current servings per recipe index - defaults to that recipe's
+  // baseServings when absent (see servingsFor below).
+  recipeServings: Record<number, number>;
 }
 
 type Turn = UserTurn | AssistantTurn;
@@ -78,22 +82,33 @@ function formatMutationPreview(mutationName: string, argsJson: string): string {
 // argsJson} shape parseCommand itself produces - no extra AI call, this is
 // just client-side synthesis feeding the exact same confirm/preview UI.
 // `excluded` holds "recipeIndex-ingredientIndex" keys the user clicked off.
+// `ratio` scales each ingredient's amount to whatever servings the recipe
+// card is currently showing, so the shopping-list note reflects what's
+// actually needed rather than always the recipe's base amount.
 function buildRecipeShoppingActions(
   recipe: RecipeSuggestion,
   recipeIndex: number,
-  excluded: Set<string>
+  excluded: Set<string>,
+  ratio: number
 ): ProposedAction[] {
   return recipe.ingredients
     .filter((ing, ii) => !ing.haveInInventory && !excluded.has(`${recipeIndex}-${ii}`))
     .map((ing) => {
-      const note = ing.amount ? `${ing.amount} - for: ${recipe.name}` : `For: ${recipe.name}`;
+      const amount = scaleAmount(ing.amount, ing.quantity, ratio);
+      const note = amount ? `${amount} - for: ${recipe.name}` : `For: ${recipe.name}`;
       return {
         type: "ADD_TO_SHOPPING_LIST",
-        summary: `Add "${ing.name}"${ing.amount ? ` (${ing.amount})` : ""} to the shopping list (for: ${recipe.name})`,
+        summary: `Add "${ing.name}"${amount ? ` (${amount})` : ""} to the shopping list (for: ${recipe.name})`,
         mutationName: "addToShoppingList",
         argsJson: JSON.stringify({ name: ing.name, quantity: null, unit: null, note }),
       };
     });
+}
+
+// Recipe amounts/nutrition are calibrated to `baseServings` - this looks up
+// whatever the user has set the stepper to (default: baseServings itself).
+function servingsFor(turn: AssistantTurn, recipeIndex: number, recipe: RecipeSuggestion): number {
+  return turn.recipeServings[recipeIndex] ?? recipe.baseServings;
 }
 
 export default function PantryCommandBar({ onChanged }: PantryCommandBarProps) {
@@ -172,14 +187,27 @@ export default function PantryCommandBar({ onChanged }: PantryCommandBarProps) {
     // Feeds Claude back its own prior structured output as the assistant's
     // side of the conversation, so a reply like "shopping list, 1 bottle"
     // can complete an earlier clarifying question instead of being parsed
-    // alone as a new, likely-unclear input.
-    const history: ConversationMessage[] = turns
-      .slice(-MAX_HISTORY_TURNS)
-      .map((t) =>
-        t.role === "user"
-          ? { role: "user", content: t.text }
-          : { role: "assistant", content: JSON.stringify(t.result) }
-      );
+    // alone as a new, likely-unclear input. Recipe turns get client-only
+    // state (servings, excluded ingredients) merged in first - the server
+    // never saw those, so without this the AI has no way to know a
+    // follow-up like "remove the salt" already happened, or what serving
+    // count is currently showing.
+    const history: ConversationMessage[] = turns.slice(-MAX_HISTORY_TURNS).map((t) => {
+      if (t.role === "user") return { role: "user", content: t.text };
+      const content = t.result.recipes
+        ? {
+            ...t.result,
+            recipes: t.result.recipes.map((r, ri) => ({
+              ...r,
+              currentServings: servingsFor(t, ri, r),
+              excludedIngredientIndexes: r.ingredients
+                .map((_, ii) => ii)
+                .filter((ii) => t.excludedIngredients.has(`${ri}-${ii}`)),
+            })),
+          }
+        : t.result;
+      return { role: "assistant", content: JSON.stringify(content) };
+    });
 
     setTurns((prev) => [...prev, { role: "user", text: trimmed }]);
     setInput("");
@@ -198,6 +226,7 @@ export default function PantryCommandBar({ onChanged }: PantryCommandBarProps) {
           actionsStatus: "pending",
           actionsError: null,
           excludedIngredients: new Set(),
+          recipeServings: {},
         },
       ]);
     } catch (err) {
@@ -220,10 +249,22 @@ export default function PantryCommandBar({ onChanged }: PantryCommandBarProps) {
     );
   }
 
+  function setServings(turnIndex: number, recipeIndex: number, next: number) {
+    if (next < 1) return;
+    setTurns((prev) =>
+      prev.map((t, i) =>
+        i === turnIndex && t.role === "assistant"
+          ? { ...t, recipeServings: { ...t.recipeServings, [recipeIndex]: next } }
+          : t
+      )
+    );
+  }
+
   function handleAddMissingIngredients(turnIndex: number, recipe: RecipeSuggestion, recipeIndex: number) {
     const turn = turns[turnIndex];
     if (turn.role !== "assistant") return;
-    const actions = buildRecipeShoppingActions(recipe, recipeIndex, turn.excludedIngredients);
+    const ratio = servingsFor(turn, recipeIndex, recipe) / recipe.baseServings;
+    const actions = buildRecipeShoppingActions(recipe, recipeIndex, turn.excludedIngredients, ratio);
     if (actions.length === 0) return;
     updateAssistantTurn(turnIndex, {
       result: { ...turn.result, actions },
@@ -305,16 +346,51 @@ export default function PantryCommandBar({ onChanged }: PantryCommandBarProps) {
                       const missingCount = recipe.ingredients.filter(
                         (ing, ii) => !ing.haveInInventory && !turn.excludedIngredients.has(`${ri}-${ii}`)
                       ).length;
+                      const servings = servingsFor(turn, ri, recipe);
+                      const ratio = servings / recipe.baseServings;
+                      const totalPriceAud = recipe.ingredients.reduce(
+                        (sum, ing) => sum + scalePrice(ing.estimatedPriceAud, ing.quantity, ratio),
+                        0
+                      );
                       return (
                         <div className="pantry-command-recipe" key={ri}>
-                          <p className="pantry-command-recipe-name">{recipe.name}</p>
+                          <div className="pantry-command-recipe-header">
+                            <p className="pantry-command-recipe-name">{recipe.name}</p>
+                            <div className="pantry-command-servings">
+                              <button
+                                type="button"
+                                className="qty-stepper-btn"
+                                onClick={() => setServings(i, ri, servings - 1)}
+                                disabled={servings <= 1}
+                              >
+                                −
+                              </button>
+                              <span className="pantry-command-servings-count">
+                                {servings} serving{servings > 1 ? "s" : ""}
+                              </span>
+                              <button
+                                type="button"
+                                className="qty-stepper-btn"
+                                onClick={() => setServings(i, ri, servings + 1)}
+                              >
+                                +
+                              </button>
+                            </div>
+                          </div>
                           {recipe.description && (
                             <p className="pantry-command-recipe-desc">{recipe.description}</p>
                           )}
+                          <p className="pantry-command-recipe-nutrition">
+                            {Math.round(recipe.caloriesPerServing)} kcal · {Math.round(recipe.proteinGPerServing)}g
+                            protein · {Math.round(recipe.carbsGPerServing)}g carbs ·{" "}
+                            {Math.round(recipe.fatGPerServing)}g fat <span className="status-line">(per serving, AI estimate)</span>
+                          </p>
                           <ul className="pantry-command-recipe-ingredients">
                             {recipe.ingredients.map((ing, ii) => {
                               const excluded = turn.excludedIngredients.has(`${ri}-${ii}`);
                               const clickable = !ing.haveInInventory;
+                              const amount = scaleAmount(ing.amount, ing.quantity, ratio);
+                              const price = scalePrice(ing.estimatedPriceAud, ing.quantity, ratio);
                               return (
                                 <li
                                   key={ii}
@@ -343,13 +419,17 @@ export default function PantryCommandBar({ onChanged }: PantryCommandBarProps) {
                                   }
                                 >
                                   {ing.haveInInventory ? "✓" : "+"} {ing.name}
-                                  {ing.amount && (
-                                    <span className="pantry-command-ingredient-amount"> ({ing.amount})</span>
+                                  {amount && <span className="pantry-command-ingredient-amount"> ({amount})</span>}
+                                  {price > 0 && (
+                                    <span className="pantry-command-ingredient-price"> ~${price.toFixed(2)}</span>
                                   )}
                                 </li>
                               );
                             })}
                           </ul>
+                          <p className="pantry-command-recipe-total">
+                            Estimated total: ~${totalPriceAud.toFixed(2)} AUD
+                          </p>
                           {missingCount > 0 && (
                             <button
                               type="button"

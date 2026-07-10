@@ -354,6 +354,21 @@ type RecipeIngredient {
   The matching inventory item, if haveInInventory is true. Null otherwise.
   """
   itemId: ID
+  """
+  The leading number in `amount` when it's a single clean numeric quantity
+  (e.g. "2.5 cups" -> 2.5, "400g" -> 400) - used client-side to scale the
+  displayed amount when servings change. 0 when `amount` isn't cleanly
+  scalable (a range, "to taste", etc.) - the client leaves those unchanged
+  rather than guessing. Deliberately not nullable, unlike `amount` itself -
+  see the comment on ParsedCommand's schema-budget constraint.
+  """
+  quantity: Float!
+  """
+  Best-effort estimated price in AUD for this ingredient at its amount
+  above (current Australian grocery prices), before any servings scaling.
+  0 only for genuinely negligible items (a pinch of salt).
+  """
+  estimatedPriceAud: Float!
 }
 
 """
@@ -377,6 +392,23 @@ type RecipeSuggestion {
   already in stock.
   """
   ingredients: [RecipeIngredient!]!
+  """
+  The serving count `ingredients[].quantity` and the nutrition fields below
+  are calibrated to - 1 unless the input specifies otherwise. The client
+  scales ingredient quantities from this baseline when the servings
+  stepper changes; nutrition figures are already per-serving and don't
+  need scaling.
+  """
+  baseServings: Int!
+  """
+  Best-effort estimated nutrition per serving (not per whole recipe) -
+  always a real estimate from general nutritional knowledge, never 0
+  standing in for "unknown".
+  """
+  caloriesPerServing: Float!
+  proteinGPerServing: Float!
+  carbsGPerServing: Float!
+  fatGPerServing: Float!
 }
 
 """
