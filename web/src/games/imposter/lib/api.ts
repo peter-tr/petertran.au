@@ -1,9 +1,9 @@
 // GraphQL client for the Imposter game - talks to its own Lambda/endpoint,
-// entirely separate from the resume site's API (see ../../portfolio/lib/graphql.ts).
+// entirely separate from the resume site's API (see ../../../portfolio/lib/graphql.ts).
 // Kept in its own module so this game never shares a schema, endpoint, or
 // query surface with the portfolio.
 
-import { createGraphQLClient } from "../../shared/graphqlClient";
+import { createGraphQLClient } from "../../../shared/graphqlClient";
 
 const ENDPOINT = import.meta.env.VITE_IMPOSTER_GRAPHQL_ENDPOINT as string | undefined;
 

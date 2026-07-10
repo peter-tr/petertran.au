@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import type { ImposterGame } from "./api";
+import type { ImposterGame } from "../lib/api";
 
 interface ResultsPanelProps {
   game: ImposterGame;

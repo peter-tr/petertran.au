@@ -5,8 +5,8 @@ import {
   LIVE_IMPOSTER_GAMES_QUERY,
   type ImposterGame,
   type LiveImposterGamesResult,
-} from "./api";
-import { formatWhen } from "./format";
+} from "../lib/api";
+import { formatWhen } from "../lib/format";
 
 const POLL_INTERVAL_MS = 5000;
 

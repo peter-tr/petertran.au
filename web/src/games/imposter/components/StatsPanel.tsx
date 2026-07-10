@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { runImposterQuery, IMPOSTER_STATS_QUERY, type ImposterStatsResult } from "./api";
+import { runImposterQuery, IMPOSTER_STATS_QUERY, type ImposterStatsResult } from "../lib/api";
 
 function formatDuration(ms: number): string {
   if (ms <= 0) return "—";

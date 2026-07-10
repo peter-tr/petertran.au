@@ -5,7 +5,7 @@ import {
   type ImposterGame,
   type ImposterPlayer,
   type RevealImposterResult,
-} from "./api";
+} from "../lib/api";
 import WordPeekModal from "./WordPeekModal";
 
 interface DiscussionPanelProps {

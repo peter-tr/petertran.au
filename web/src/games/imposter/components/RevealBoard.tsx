@@ -6,7 +6,7 @@ import {
   type ImposterGame,
   type ImposterPlayer,
   type RevealImposterWordResult,
-} from "./api";
+} from "../lib/api";
 
 interface RevealBoardProps {
   gameId: string;

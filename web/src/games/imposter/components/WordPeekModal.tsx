@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { runImposterQuery, REVEAL_IMPOSTER_WORD_MUTATION, type RevealImposterWordResult } from "./api";
+import { runImposterQuery, REVEAL_IMPOSTER_WORD_MUTATION, type RevealImposterWordResult } from "../lib/api";
 
 interface WordPeekModalProps {
   gameId: string;
