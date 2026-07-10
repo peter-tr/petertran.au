@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   runQuery,
   TRACE_BREAKDOWN_QUERY,
@@ -18,11 +18,56 @@ function formatVariables(raw: string | null): string | null {
   }
 }
 
+// A trace with just X-Ray's own platform "Lambda" wrapper segment (nothing
+// from our own SDK instrumentation nested inside it) almost always means
+// X-Ray hasn't finished indexing this invocation yet, not that it truly
+// only did one thing - the server already retries a couple of times for
+// this, but propagation is variable enough (seconds, sometimes 10+) that
+// it's worth polling here too rather than blocking one long request.
+const MAX_CLIENT_POLL_ATTEMPTS = 5;
+const CLIENT_POLL_DELAY_MS = 2200;
+
 export default function OperationRow({ op }: { op: OperationStat }) {
   const [expanded, setExpanded] = useState(false);
   const [trace, setTrace] = useState<TraceSegment[] | null>(null);
   const [traceLoading, setTraceLoading] = useState(false);
+  const [traceIndexing, setTraceIndexing] = useState(false);
   const [traceError, setTraceError] = useState<string | null>(null);
+  const pollAttempt = useRef(0);
+  const unmounted = useRef(false);
+
+  useEffect(
+    () => () => {
+      unmounted.current = true;
+    },
+    [],
+  );
+
+  function fetchTrace(traceId: string) {
+    runQuery<TraceBreakdownResult>(TRACE_BREAKDOWN_QUERY, { traceId })
+      .then((result) => {
+        if (unmounted.current) return;
+        const segments = result.meta.traceBreakdown;
+        setTrace(segments);
+        if (segments.length <= 1 && pollAttempt.current < MAX_CLIENT_POLL_ATTEMPTS) {
+          pollAttempt.current += 1;
+          setTraceIndexing(true);
+          setTimeout(() => {
+            if (!unmounted.current) fetchTrace(traceId);
+          }, CLIENT_POLL_DELAY_MS);
+        } else {
+          setTraceIndexing(false);
+        }
+      })
+      .catch((err) => {
+        if (unmounted.current) return;
+        setTraceError(err instanceof Error ? err.message : "Couldn't load trace.");
+        setTraceIndexing(false);
+      })
+      .finally(() => {
+        if (!unmounted.current) setTraceLoading(false);
+      });
+  }
 
   function toggle() {
     const next = !expanded;
@@ -30,10 +75,8 @@ export default function OperationRow({ op }: { op: OperationStat }) {
     if (next && op.lastTraceId && trace === null && !traceLoading) {
       setTraceLoading(true);
       setTraceError(null);
-      runQuery<TraceBreakdownResult>(TRACE_BREAKDOWN_QUERY, { traceId: op.lastTraceId })
-        .then((result) => setTrace(result.meta.traceBreakdown))
-        .catch((err) => setTraceError(err instanceof Error ? err.message : "Couldn't load trace."))
-        .finally(() => setTraceLoading(false));
+      pollAttempt.current = 0;
+      fetchTrace(op.lastTraceId);
     }
   }
 
@@ -74,7 +117,10 @@ export default function OperationRow({ op }: { op: OperationStat }) {
                   {traceLoading && <p className="status-line">// loading trace…</p>}
                   {traceError && <p className="status-line">// {traceError}</p>}
                   {trace && trace.length > 0 && <TraceWaterfall segments={trace} />}
-                  {trace && trace.length === 0 && (
+                  {traceIndexing && (
+                    <p className="status-line">// still finishing up the trace - refreshing…</p>
+                  )}
+                  {trace && trace.length === 0 && !traceIndexing && (
                     <p className="op-no-sample">// trace has expired or wasn&apos;t found.</p>
                   )}
                 </>
