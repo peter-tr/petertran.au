@@ -3,6 +3,7 @@ import { QueryCommand, GetCommand, PutCommand, DeleteCommand } from "@aws-sdk/li
 import { ddb, TABLE_NAME, PK } from "../lib/aws/ddb";
 import { assertNotRateLimited } from "../lib/util/rate-limit";
 import { normalizeItemName, normalizeUnit } from "../lib/util/normalize";
+import { parseCommand, type ParsedCommandResult } from "../lib/anthropic/parse-command";
 import type { Context } from "../context";
 
 const ITEM_PREFIX = "ITEM#";
@@ -215,6 +216,14 @@ export const resolvers = {
       return entries.sort((a, b) => a.addedAt.localeCompare(b.addedAt));
     },
     settings: (): Promise<PantrySettings> => getSettings(),
+    parseCommand: async (
+      _: unknown,
+      args: { input: string },
+      context: Context
+    ): Promise<ParsedCommandResult> => {
+      const [inventory, shoppingList] = await Promise.all([getAllItems(), getShoppingList()]);
+      return parseCommand(args.input, inventory, shoppingList, context.sourceIp);
+    },
   },
   Mutation: {
     addInventoryItem: async (

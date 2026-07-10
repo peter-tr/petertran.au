@@ -1441,6 +1441,69 @@ a {
   padding: 0.35rem 0.55rem;
 }
 
+.pantry-command-form {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.pantry-command-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.5rem 0.7rem;
+}
+
+.pantry-command-answer {
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  color: var(--paper);
+  background: var(--panel-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 0.7rem 0.9rem;
+  margin-top: 0.6rem;
+}
+
+.pantry-command-actions {
+  margin-top: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.pantry-command-action {
+  background: var(--panel-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.8rem;
+}
+
+.pantry-command-action-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.pantry-command-action-summary {
+  font-family: var(--font-sans);
+  font-size: 0.88rem;
+  color: var(--paper);
+  margin: 0;
+}
+
+.pantry-command-mutation {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--muted-dim);
+  background: var(--ink);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 0.6rem 0.7rem;
+  margin-top: 0.5rem;
+  overflow-x: auto;
+  white-space: pre;
+}
+
 .pantry-details-toggle {
   font-family: var(--font-mono);
   font-size: 0.74rem;

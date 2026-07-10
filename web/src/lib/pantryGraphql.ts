@@ -236,3 +236,53 @@ export const UPDATE_SETTINGS_MUTATION = /* GraphQL */ `
 export interface UpdateSettingsResult {
   updateSettings: PantrySettings;
 }
+
+export type PantryActionType =
+  | "RECORD_PURCHASE"
+  | "UPDATE_INVENTORY_ITEM"
+  | "REMOVE_INVENTORY_ITEM"
+  | "ADD_TO_SHOPPING_LIST"
+  | "REMOVE_FROM_SHOPPING_LIST";
+
+export interface ProposedAction {
+  type: PantryActionType;
+  summary: string;
+  mutationName: string;
+  argsJson: string;
+}
+
+export interface ParsedCommand {
+  answer: string | null;
+  actions: ProposedAction[] | null;
+  message: string | null;
+}
+
+export const PARSE_COMMAND_QUERY = /* GraphQL */ `
+  query ParseCommand($input: String!) {
+    parseCommand(input: $input) {
+      answer
+      message
+      actions {
+        type
+        summary
+        mutationName
+        argsJson
+      }
+    }
+  }
+`;
+
+export interface ParseCommandResult {
+  parseCommand: ParsedCommand;
+}
+
+// Confirming a proposed action just calls the same mutation the rest of the
+// UI already uses - parseCommand never executes anything itself, it only
+// names which of these to call and with what arguments (argsJson).
+export const PANTRY_ACTION_MUTATIONS: Record<string, string> = {
+  recordPurchase: RECORD_PURCHASE_MUTATION,
+  updateInventoryItem: UPDATE_INVENTORY_ITEM_MUTATION,
+  removeInventoryItem: REMOVE_INVENTORY_ITEM_MUTATION,
+  addToShoppingList: ADD_TO_SHOPPING_LIST_MUTATION,
+  removeFromShoppingList: REMOVE_FROM_SHOPPING_LIST_MUTATION,
+};

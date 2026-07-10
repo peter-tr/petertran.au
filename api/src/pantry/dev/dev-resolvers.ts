@@ -101,6 +101,91 @@ function addToShoppingListIfMissing(name: string): ShoppingListEntry {
   return entry;
 }
 
+interface MockProposedAction {
+  type: string;
+  summary: string;
+  mutationName: string;
+  argsJson: string;
+}
+
+interface MockParsedCommand {
+  answer: string | null;
+  actions: MockProposedAction[] | null;
+  message: string | null;
+}
+
+// Crude local keyword matching, no Anthropic call - just enough to exercise
+// the frontend's preview/confirm flow in local dev. The real implementation
+// (api/src/pantry/lib/anthropic/parse-command.ts) is what actually ships.
+function mockParseCommand(input: string): MockParsedCommand {
+  const trimmed = input.trim();
+  const text = trimmed.toLowerCase();
+  if (!text) return { answer: null, actions: null, message: "Type a command or question." };
+
+  if (text.includes("expir")) {
+    const soon = [...items.values()]
+      .filter((i): i is InventoryItem & { expiresAt: string } => !!i.expiresAt)
+      .sort((a, b) => a.expiresAt.localeCompare(b.expiresAt))
+      .slice(0, 5);
+    const answer = soon.length
+      ? `Expiring soonest: ${soon.map((i) => `${i.name} (${i.expiresAt})`).join(", ")}.`
+      : "Nothing in your inventory has an expiry date set.";
+    return { answer, actions: null, message: null };
+  }
+
+  if (text.startsWith("add") || text.includes("buy") || text.includes("bought")) {
+    const name = trimmed.replace(/^(add|buy|bought)\s+/i, "").trim() || "New item";
+    return {
+      answer: null,
+      actions: [
+        {
+          type: "RECORD_PURCHASE",
+          summary: `Add "${name}" to the pantry (mock preview - dev server only)`,
+          mutationName: "recordPurchase",
+          argsJson: JSON.stringify({
+            input: {
+              name,
+              location: "PANTRY",
+              quantity: 1,
+              unit: null,
+              price: null,
+              purchasedAt: new Date().toISOString().slice(0, 10),
+              expiresAt: null,
+              isStaple: null,
+            },
+          }),
+        },
+      ],
+      message: null,
+    };
+  }
+
+  if (text.includes("remove") || text.includes("out of") || text.includes("used")) {
+    const match = [...items.values()].find((i) => text.includes(i.name.toLowerCase()));
+    if (!match) {
+      return { answer: null, actions: null, message: "Couldn't find an item matching that name." };
+    }
+    return {
+      answer: null,
+      actions: [
+        {
+          type: "REMOVE_INVENTORY_ITEM",
+          summary: `Remove "${match.name}" from inventory (mock preview - dev server only)`,
+          mutationName: "removeInventoryItem",
+          argsJson: JSON.stringify({ id: match.id }),
+        },
+      ],
+      message: null,
+    };
+  }
+
+  return {
+    answer: null,
+    actions: null,
+    message: 'This is a local mock - only "add X", "remove X", and "what\'s expiring" are recognized.',
+  };
+}
+
 export const devResolvers = {
   Query: {
     inventory: (_: unknown, args: { location?: InventoryItem["location"] }) => {
@@ -110,6 +195,7 @@ export const devResolvers = {
     inventoryItem: (_: unknown, args: { id: string }) => items.get(args.id) ?? null,
     shoppingList: () => [...shoppingList.values()].sort((a, b) => a.addedAt.localeCompare(b.addedAt)),
     settings: () => settings,
+    parseCommand: (_: unknown, args: { input: string }) => mockParseCommand(args.input),
   },
   Mutation: {
     addInventoryItem: (_: unknown, args: { input: AddInput }) => {

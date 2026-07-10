@@ -1,4 +1,5 @@
 import PantryAddItemSection from "../components/PantryAddItemSection";
+import PantryCommandBar from "../components/PantryCommandBar";
 import PantryCommonItemsSection from "../components/PantryCommonItemsSection";
 import PantryInventorySection from "../components/PantryInventorySection";
 import PantryShoppingListSection from "../components/PantryShoppingListSection";
@@ -25,6 +26,8 @@ export default function Pantry() {
       {error && (
         <p className="status-line">// couldn&apos;t load inventory from the API right now ({error}).</p>
       )}
+
+      <PantryCommandBar onChanged={refetchAll} />
 
       {shoppingList && <PantryShoppingListSection entries={shoppingList} onChanged={refetchShoppingList} />}
 

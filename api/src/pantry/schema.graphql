@@ -214,6 +214,64 @@ input PantrySettingsInput {
 }
 
 """
+Which existing mutation a proposed command action maps to.
+"""
+enum PantryActionType {
+  RECORD_PURCHASE
+  UPDATE_INVENTORY_ITEM
+  REMOVE_INVENTORY_ITEM
+  ADD_TO_SHOPPING_LIST
+  REMOVE_FROM_SHOPPING_LIST
+}
+
+"""
+A single change proposed by parseCommand, not yet executed. The client
+confirms it by calling the named mutation with the given arguments -
+parseCommand itself never touches inventory data.
+"""
+type ProposedAction {
+  """
+  Which mutation this maps to.
+  """
+  type: PantryActionType!
+  """
+  Human-readable one-line description of what this action will do, e.g.
+  "Add 2 L Milk to the fridge, bought today for $4.50".
+  """
+  summary: String!
+  """
+  The exact Mutation field name to call to apply this, e.g. "recordPurchase".
+  """
+  mutationName: String!
+  """
+  JSON-encoded variables to call that mutation with, e.g.
+  {"input":{"name":"Milk","location":"FRIDGE","quantity":2}}.
+  """
+  argsJson: String!
+}
+
+"""
+Result of interpreting a natural-language pantry command.
+"""
+type ParsedCommand {
+  """
+  Set when the input was a read-only question, answered directly from
+  current inventory/shopping-list data. Null if interpreted as actions.
+  """
+  answer: String
+  """
+  Set when the input was interpreted as one or more inventory changes,
+  proposed but not yet applied. Null if answered as a question instead.
+  """
+  actions: [ProposedAction!]
+  """
+  Set when the command couldn't be understood or mapped to anything -
+  explains why. Null on success (whether answer or actions).
+  """
+  message: String
+}
+
+"""
 Read-only entry point into pantry/fridge inventory.
 """
 type Query {
@@ -234,6 +292,14 @@ type Query {
   Shared display/view preferences - see PantrySettings.
   """
   settings: PantrySettings!
+  """
+  Interpret a natural-language command (typed or dictated) against current
+  inventory/shopping-list state - e.g. "add 2L milk to the fridge" or
+  "what's expiring this week?". Never mutates anything itself; returns
+  either a direct answer, or proposed actions for the client to confirm and
+  apply via their normal mutations.
+  """
+  parseCommand(input: String!): ParsedCommand!
 }
 
 """
