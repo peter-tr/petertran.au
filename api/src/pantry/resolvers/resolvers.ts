@@ -165,7 +165,20 @@ async function getShoppingList(): Promise<ShoppingListEntry[]> {
       ExpressionAttributeValues: { ":pk": PK, ":prefix": SHOPLIST_PREFIX },
     })
   );
-  return (res.Items ?? []).map((i) => i.data as ShoppingListEntry);
+  // Backfills fields added after some rows were already written. Critical
+  // for isStaple specifically - a missing non-nullable field fails the
+  // whole list, not just that one row, since GraphQL null-propagates a
+  // non-null violation up to the nearest nullable ancestor (the array).
+  return (res.Items ?? []).map((i) => {
+    const entry = i.data as ShoppingListEntry;
+    return {
+      ...entry,
+      quantity: entry.quantity ?? null,
+      unit: entry.unit ?? null,
+      note: entry.note ?? null,
+      isStaple: entry.isStaple ?? false,
+    };
+  });
 }
 
 // Used both automatically (a staple running out), manually (the "add to
