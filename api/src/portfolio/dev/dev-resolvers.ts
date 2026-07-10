@@ -1,5 +1,6 @@
 import { generateQuery } from "../lib/anthropic/generate-query";
 import { validateContactInput, CONTACT_CONFIRMATION_MESSAGE, type ContactInput } from "../lib/util/contact";
+import type { Context } from "../context";
 import {
   person,
   interests,
@@ -66,7 +67,8 @@ export const devResolvers = {
     meta: () => ({}),
   },
   Meta: {
-    generateQuery: (_: unknown, args: { prompt: string }) => generateQuery(args.prompt),
+    generateQuery: (_: unknown, args: { prompt: string }, context: Context) =>
+      generateQuery(args.prompt, context.sourceIp, context.runInternalQuery),
     systemStats: () => ({
       requestsTotal: 128,
       avgDurationMs: 42.5,

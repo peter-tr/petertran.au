@@ -100,13 +100,14 @@ export const GENERATE_QUERY_QUERY = /* GraphQL */ `
       generateQuery(prompt: $prompt) {
         query
         message
+        answer
       }
     }
   }
 `;
 
 export interface GenerateQueryResult {
-  meta: { generateQuery: { query: string | null; message: string | null } };
+  meta: { generateQuery: { query: string | null; message: string | null; answer: string | null } };
 }
 
 export const SYSTEM_STATS_QUERY = /* GraphQL */ `

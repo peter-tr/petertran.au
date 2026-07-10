@@ -114,10 +114,7 @@ export default function Explorer() {
       ) : (
         <p className="status-line">// endpoint not configured</p>
       )}
-      <p className="endpoint-hint" style={{ marginTop: "0.8rem" }}>
-        POST {ENDPOINT ?? "endpoint not configured"}
-      </p>
-      <p className="section-hint">
+      <p className="section-hint" style={{ marginTop: "0.8rem" }}>
         Curious how this API is actually holding up?{" "}
         <Link to="/#stats">See live request counts and latency →</Link>
       </p>

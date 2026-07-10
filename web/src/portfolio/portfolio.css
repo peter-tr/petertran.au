@@ -510,6 +510,18 @@
   color: var(--muted);
 }
 
+.ask-ai-answer {
+  flex-basis: 100%;
+  margin: 0;
+  padding: 0.6rem 0.8rem;
+  border-left: 2px solid var(--signal-dim);
+  background: var(--panel-2);
+  border-radius: 0 6px 6px 0;
+  color: var(--paper);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
 .graphiql-mount {
   flex: 1 1 auto;
   position: relative;
@@ -556,12 +568,6 @@
   }
 }
 
-.endpoint-hint {
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  color: var(--muted-dim);
-  word-break: break-all;
-}
 
 /* ---------- contact form ---------- */
 
