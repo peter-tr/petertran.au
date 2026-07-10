@@ -1530,6 +1530,13 @@ a {
   gap: 0.8rem;
 }
 
+.pantry-command-action-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
 .pantry-command-action-summary {
   font-family: var(--font-sans);
   font-size: 0.88rem;
@@ -1628,6 +1635,11 @@ a {
 
 .pantry-command-ingredient-missing {
   color: var(--paper);
+}
+
+.pantry-command-ingredient-amount {
+  color: var(--muted-dim);
+  font-size: 0.8rem;
 }
 
 .pantry-details-toggle {

@@ -75,12 +75,15 @@ function formatMutationPreview(mutationName: string, argsJson: string): string {
 function buildRecipeShoppingActions(recipe: RecipeSuggestion): ProposedAction[] {
   return recipe.ingredients
     .filter((ing) => !ing.haveInInventory)
-    .map((ing) => ({
-      type: "ADD_TO_SHOPPING_LIST",
-      summary: `Add "${ing.name}" to the shopping list (for: ${recipe.name})`,
-      mutationName: "addToShoppingList",
-      argsJson: JSON.stringify({ name: ing.name, quantity: null, unit: null, note: `For: ${recipe.name}` }),
-    }));
+    .map((ing) => {
+      const note = ing.amount ? `${ing.amount} - for: ${recipe.name}` : `For: ${recipe.name}`;
+      return {
+        type: "ADD_TO_SHOPPING_LIST",
+        summary: `Add "${ing.name}"${ing.amount ? ` (${ing.amount})` : ""} to the shopping list (for: ${recipe.name})`,
+        mutationName: "addToShoppingList",
+        argsJson: JSON.stringify({ name: ing.name, quantity: null, unit: null, note }),
+      };
+    });
 }
 
 export default function PantryCommandBar({ onChanged }: PantryCommandBarProps) {
@@ -131,6 +134,22 @@ export default function PantryCommandBar({ onChanged }: PantryCommandBarProps) {
         if (next.has(actionIndex)) next.delete(actionIndex);
         else next.add(actionIndex);
         return { ...t, expandedActions: next };
+      })
+    );
+  }
+
+  // Fine-grained control: drop a single proposed action from the batch
+  // without cancelling the whole thing. Resets expandedActions since
+  // indices shift once an entry is removed.
+  function removeAction(turnIndex: number, actionIndex: number) {
+    setTurns((prev) =>
+      prev.map((t, i) => {
+        if (i !== turnIndex || t.role !== "assistant" || !t.result.actions) return t;
+        return {
+          ...t,
+          result: { ...t.result, actions: t.result.actions.filter((_, ai) => ai !== actionIndex) },
+          expandedActions: new Set(),
+        };
       })
     );
   }
@@ -212,6 +231,16 @@ export default function PantryCommandBar({ onChanged }: PantryCommandBarProps) {
     }
   }
 
+  // Recipes represent "the current suggestion we're iterating on" - only
+  // the latest one should render as a live card, or a refinement like
+  // "remove garlic" would appear to duplicate the card instead of updating
+  // it. Older turns' answer/message/actions still render normally; this
+  // only suppresses stale recipe cards.
+  const lastRecipesTurnIndex = turns.reduce(
+    (acc, t, i) => (t.role === "assistant" && t.result.recipes && t.result.recipes.length > 0 ? i : acc),
+    -1
+  );
+
   return (
     <section className="pantry-panel pantry-command-bar">
       <div className="pantry-panel-header">
@@ -222,25 +251,6 @@ export default function PantryCommandBar({ onChanged }: PantryCommandBarProps) {
           </button>
         )}
       </div>
-
-      <form onSubmit={handleSubmit} className="pantry-command-form">
-        <textarea
-          ref={textareaRef}
-          className="form-input pantry-command-input"
-          value={input}
-          onChange={handleInputChange}
-          onKeyDown={handleKeyDown}
-          placeholder='"Add 2L milk to the fridge" or "what&apos;s expiring soon?"'
-          disabled={thinking}
-          maxLength={200}
-          rows={1}
-        />
-        <button className="run-btn" type="submit" disabled={thinking || !input.trim()}>
-          {thinking ? "Thinking…" : "Ask"}
-        </button>
-      </form>
-
-      {submitError && <p className="status-line">// {submitError}</p>}
 
       {turns.length > 0 && (
         <div className="pantry-command-turns">
@@ -253,7 +263,7 @@ export default function PantryCommandBar({ onChanged }: PantryCommandBarProps) {
               <div className="pantry-command-turn-assistant" key={i}>
                 {turn.result.answer && <p className="pantry-command-answer">{turn.result.answer}</p>}
 
-                {turn.result.recipes && turn.result.recipes.length > 0 && (
+                {i === lastRecipesTurnIndex && turn.result.recipes && turn.result.recipes.length > 0 && (
                   <div className="pantry-command-recipes">
                     {turn.result.recipes.map((recipe, ri) => {
                       const missing = recipe.ingredients.filter((ing) => !ing.haveInInventory);
@@ -274,6 +284,9 @@ export default function PantryCommandBar({ onChanged }: PantryCommandBarProps) {
                                 }
                               >
                                 {ing.haveInInventory ? "✓" : "+"} {ing.name}
+                                {ing.amount && (
+                                  <span className="pantry-command-ingredient-amount"> ({ing.amount})</span>
+                                )}
                               </li>
                             ))}
                           </ul>
@@ -306,13 +319,25 @@ export default function PantryCommandBar({ onChanged }: PantryCommandBarProps) {
                       <div className="pantry-command-action" key={ai}>
                         <div className="pantry-command-action-row">
                           <p className="pantry-command-action-summary">{action.summary}</p>
-                          <button
-                            type="button"
-                            className="pantry-details-toggle"
-                            onClick={() => toggleExpandedAction(i, ai)}
-                          >
-                            {turn.expandedActions.has(ai) ? "− hide mutation" : "+ view mutation"}
-                          </button>
+                          <span className="pantry-command-action-controls">
+                            <button
+                              type="button"
+                              className="pantry-details-toggle"
+                              onClick={() => toggleExpandedAction(i, ai)}
+                            >
+                              {turn.expandedActions.has(ai) ? "− hide mutation" : "+ view mutation"}
+                            </button>
+                            <button
+                              type="button"
+                              className="pantry-shopping-remove-btn"
+                              onClick={() => removeAction(i, ai)}
+                              disabled={turn.actionsStatus === "confirming"}
+                              aria-label={`Remove "${action.summary}" from this batch`}
+                              title="Remove this action"
+                            >
+                              ✕
+                            </button>
+                          </span>
                         </div>
                         {turn.expandedActions.has(ai) && (
                           <pre className="pantry-command-mutation">
@@ -353,6 +378,25 @@ export default function PantryCommandBar({ onChanged }: PantryCommandBarProps) {
           )}
         </div>
       )}
+
+      <form onSubmit={handleSubmit} className="pantry-command-form">
+        <textarea
+          ref={textareaRef}
+          className="form-input pantry-command-input"
+          value={input}
+          onChange={handleInputChange}
+          onKeyDown={handleKeyDown}
+          placeholder='"Add 2L milk to the fridge" or "what&apos;s expiring soon?"'
+          disabled={thinking}
+          maxLength={200}
+          rows={1}
+        />
+        <button className="run-btn" type="submit" disabled={thinking || !input.trim()}>
+          {thinking ? "Thinking…" : "Ask"}
+        </button>
+      </form>
+
+      {submitError && <p className="status-line">// {submitError}</p>}
     </section>
   );
 }

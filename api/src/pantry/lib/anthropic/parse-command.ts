@@ -34,6 +34,7 @@ interface RawAction {
 
 interface RawRecipeIngredient {
   name: string;
+  amount: string | null;
   haveInInventory: boolean;
   itemId: string | null;
 }
@@ -61,6 +62,7 @@ export interface ProposedAction {
 
 export interface RecipeIngredient {
   name: string;
+  amount: string | null;
   haveInInventory: boolean;
   itemId: string | null;
 }
@@ -122,7 +124,7 @@ Decide what the input is and respond with exactly one of these four modes:
   Always write a short, specific "summary" for each action describing exactly what will happen, e.g. "Add 2 L Milk to the fridge, bought today".
   If the input names multiple distinct items - separated by commas, "and", or just listed one after another, e.g. "I bought pasta, pesto and cheese" - create one separate action per item, each with its own name. Never combine several item names into a single action's name field (e.g. never "pasta pesto cheese" as one name) - if you're about to write more than two or three words into a "name" field, that's a sign you're merging items that should be split.
   If part of the request is too vague to act on safely (e.g. "and whatever else I need for X" without saying what), don't invent items to fill the gap and don't drop the whole request either - propose actions for the clear part, and use "message" to say what you left out and why, so the user can just ask again for that part specifically.
-- "recipes": the input asks for a recipe or dish's ingredients (e.g. "ingredients for hotdog", "how do I make carbonara"), an open recommendation based on what's in stock (e.g. "what can I make?", "recommend something for dinner"), or a change to a recipe YOU already suggested earlier in this conversation (e.g. "can you incorporate mushrooms", "remove the salt and pepper", "make it vegetarian"). Fill "recipes" with 1-3 suggestions, each listing its typical ingredients with "haveInInventory" set by matching against the current inventory above (set "itemId" to the matching id when true, else null). For a NAMED dish, use your own general food knowledge for its usual ingredients regardless of what's in stock - this is the one case where listing specific items the user didn't explicitly name is correct, not a guess to avoid. For an OPEN recommendation with no dish named, prefer recipes that lean on what's already in inventory. For a REFINEMENT of an earlier recipe, return that same recipe's name and updated ingredient list with the change applied (added/removed/swapped ingredients) rather than a new, unrelated suggestion - the earlier recipe is in your own previous turn, look for it there. This never proposes any action itself - the client decides separately whether to shop for anything missing.
+- "recipes": the input asks for a recipe or dish's ingredients (e.g. "ingredients for hotdog", "how do I make carbonara"), an open recommendation based on what's in stock (e.g. "what can I make?", "recommend something for dinner"), or a change to a recipe YOU already suggested earlier in this conversation (e.g. "can you incorporate mushrooms", "remove the salt and pepper", "make it vegetarian"). Fill "recipes" with 1-3 suggestions, each listing its typical ingredients with "amount" set to a realistic freeform quantity for that dish (e.g. "500g", "2 cloves", "to taste" - null only if genuinely not applicable) and "haveInInventory" set by matching against the current inventory above (set "itemId" to the matching id when true, else null). For a NAMED dish, use your own general food knowledge for its usual ingredients/amounts regardless of what's in stock - this is the one case where listing specific items the user didn't explicitly name is correct, not a guess to avoid. For an OPEN recommendation with no dish named, prefer recipes that lean on what's already in inventory. For a REFINEMENT of an earlier recipe, return that same recipe's name and updated ingredient list with the change applied (added/removed/swapped ingredients) rather than a new, unrelated suggestion - the earlier recipe is in your own previous turn, look for it there. This never proposes any action itself - the client decides separately whether to shop for anything missing.
 - "unclear": use this only when NONE of the input maps to a question, a safe action, or a recipe request - it's empty, entirely unrelated to pantry/fridge/cooking, or too ambiguous throughout to act on at all (e.g. it names an item that doesn't clearly match anything above, or could mean more than one existing item). Explain briefly in "message" why, or what's ambiguous, or ask the specific clarifying question needed to proceed - never guess at an itemId you're not sure about.
 
 Conversation rules:
@@ -200,10 +202,11 @@ const PARSE_COMMAND_SCHEMA = {
               type: "object",
               properties: {
                 name: { type: "string" },
+                amount: { anyOf: [{ type: "string" }, { type: "null" }] },
                 haveInInventory: { type: "boolean" },
                 itemId: { anyOf: [{ type: "string" }, { type: "null" }] },
               },
-              required: ["name", "haveInInventory", "itemId"],
+              required: ["name", "amount", "haveInInventory", "itemId"],
               additionalProperties: false,
             },
           },
@@ -314,7 +317,7 @@ function sanitizeRecipes(recipes: RawRecipe[], inventoryIds: Set<string>): Recip
     description: r.description,
     ingredients: r.ingredients.map((ing) => {
       const valid = ing.haveInInventory && !!ing.itemId && inventoryIds.has(ing.itemId);
-      return { name: ing.name, haveInInventory: valid, itemId: valid ? ing.itemId : null };
+      return { name: ing.name, amount: ing.amount, haveInInventory: valid, itemId: valid ? ing.itemId : null };
     }),
   }));
 }

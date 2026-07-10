@@ -264,6 +264,7 @@ export interface ProposedAction {
 
 export interface RecipeIngredient {
   name: string;
+  amount: string | null;
   haveInInventory: boolean;
   itemId: string | null;
 }
@@ -304,6 +305,7 @@ export const PARSE_COMMAND_QUERY = /* GraphQL */ `
         description
         ingredients {
           name
+          amount
           haveInInventory
           itemId
         }

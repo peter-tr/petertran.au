@@ -280,6 +280,12 @@ type RecipeIngredient {
   """
   name: String!
   """
+  Freeform suggested amount, e.g. "500g", "2 cloves", "to taste". Null if
+  not applicable. Not a structured quantity/unit - recipe amounts don't
+  fit the numeric fields used for actual inventory tracking.
+  """
+  amount: String
+  """
   True if this is already covered by something in current inventory.
   """
   haveInInventory: Boolean!
