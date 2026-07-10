@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { FaLinkedin, FaGithub, FaFilePdf } from "react-icons/fa6";
 import { runQuery, HERO_QUERY, type HeroQueryResult } from "../lib/graphql";
-import type { Person } from "../lib/types";
+import type { Link as PersonLink } from "../lib/types";
 
 const LINK_ICONS: Record<string, typeof FaLinkedin> = {
   LinkedIn: FaLinkedin,
@@ -21,16 +21,19 @@ function prefersReducedMotion() {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-interface HeroProps {
-  person: Person | null;
-}
-
 const SECRET_CLICK_COUNT = 3;
 
-export default function Hero({ person }: HeroProps) {
+interface HeroResult {
+  name: string;
+  role: string;
+  company: string;
+  links: PersonLink[];
+}
+
+export default function Hero() {
   const [typed, setTyped] = useState(() => (prefersReducedMotion() ? FULL_QUERY : ""));
   const [typingDone, setTypingDone] = useState(prefersReducedMotion);
-  const [result, setResult] = useState<{ name: string; role: string; company: string } | null>(null);
+  const [result, setResult] = useState<HeroResult | null>(null);
   const [errored, setErrored] = useState(false);
   const [nameClicks, setNameClicks] = useState(0);
   const secretRevealed = nameClicks >= SECRET_CLICK_COUNT;
@@ -61,13 +64,14 @@ export default function Hero({ person }: HeroProps) {
           name: data.person.name,
           role: data.experience[0]?.role ?? "Software Engineer",
           company: data.experience[0]?.company ?? "",
+          links: data.person.links,
         });
       })
       .catch(() => setErrored(true));
   }, []);
 
   const showResponse = typingDone && (result !== null || errored);
-  const displayName = result?.name ?? person?.name ?? "Peter Tran";
+  const displayName = result?.name ?? "Peter Tran";
   const displayRole = result?.role ?? "Backend Software Engineer";
   const displayCompany = result?.company ?? "Commonwealth Bank of Australia";
 
@@ -129,9 +133,9 @@ export default function Hero({ person }: HeroProps) {
         <Link to="/#query">Try the query explorer →</Link>
       </p>
 
-      {person && (
+      {result && (
         <div className="hero-links" style={{ marginTop: "1.6rem" }}>
-          {person.links.map((link) => {
+          {result.links.map((link) => {
             const Icon = LINK_ICONS[link.label];
             return (
               <a key={link.url} href={link.url} target="_blank" rel="noreferrer">

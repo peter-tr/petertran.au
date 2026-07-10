@@ -1,7 +1,6 @@
 import { lazy, Suspense, useEffect } from "react";
 import { BrowserRouter, Routes, Route, Link, NavLink, useLocation } from "react-router-dom";
 import Nav from "./portfolio/components/Nav";
-import { useResumeData } from "./portfolio/hooks/useResumeData";
 
 // Lazy-loaded per route so each one only downloads what it needs - Home
 // alone pulls in GraphiQL/Monaco (several MB), which side-projects like
@@ -75,8 +74,6 @@ function AppNav() {
 }
 
 export default function App() {
-  const { data, error } = useResumeData();
-
   return (
     <BrowserRouter>
       <ScrollManager />
@@ -84,8 +81,8 @@ export default function App() {
       <main className="wrap" id="top">
         <Suspense fallback={<p className="status-line">// loading…</p>}>
           <Routes>
-            <Route path="/" element={<Home data={data} error={error} />} />
-            <Route path="/resume" element={<Resume data={data} error={error} />} />
+            <Route path="/" element={<Home />} />
+            <Route path="/resume" element={<Resume />} />
             <Route path="/pantry" element={<Pantry />} />
             <Route path="/imposter" element={<ImposterSetup />} />
             <Route path="/imposter/:gameId" element={<ImposterGame />} />
