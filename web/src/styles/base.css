@@ -241,3 +241,75 @@ a {
   opacity: 0.6;
   cursor: default;
 }
+
+/* ---------- architecture diagram ----------
+   Used by portfolio's ArchitectureDiagram and pantry's
+   PantryArchitectureDiagram - purely theme-token-based with no
+   project-specific content, so it's shared here rather than duplicated. */
+
+.arch-diagram {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 0 auto;
+  font-family: var(--font-mono);
+}
+
+.arch-node {
+  fill: var(--panel);
+  stroke-width: 1.5;
+}
+
+.arch-node-edge {
+  stroke: var(--type);
+}
+
+.arch-node-compute {
+  stroke: var(--signal);
+}
+
+.arch-node-storage {
+  stroke: var(--string);
+}
+
+.arch-node-infra {
+  stroke: var(--muted-dim);
+  stroke-dasharray: 4 3;
+}
+
+.arch-node-label {
+  fill: var(--paper);
+  font-size: 15px;
+  font-weight: 600;
+  text-anchor: middle;
+}
+
+.arch-node-sublabel {
+  fill: var(--muted);
+  font-size: 11px;
+  text-anchor: middle;
+}
+
+.arch-edge {
+  stroke: var(--rule);
+  stroke-width: 1.5;
+  fill: none;
+}
+
+.arch-edge-dashed {
+  stroke-dasharray: 5 4;
+}
+
+.arch-arrowhead {
+  fill: var(--rule);
+}
+
+.arch-edge-label {
+  fill: var(--muted-dim);
+  font-size: 11px;
+}
+
+.arch-node-icon {
+  color: var(--muted);
+  opacity: 0.85;
+}

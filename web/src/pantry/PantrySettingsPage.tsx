@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import PantryArchitectureDiagram from "./components/PantryArchitectureDiagram";
 import { usePantrySettings } from "./hooks/usePantrySettings";
 import "./pantry.css";
 
@@ -67,6 +68,17 @@ export default function PantrySettingsPage() {
           </div>
         </section>
       )}
+
+      <section className="pantry-panel">
+        <div className="pantry-panel-header">
+          <h2 className="pantry-panel-title">Architecture</h2>
+        </div>
+        <p className="project-desc" style={{ marginBottom: "1rem" }}>
+          Pantry is its own Lambda, DynamoDB table, and CDK stack, separate from the resume site - the AI
+          command bar and this digest email are the two paths through it.
+        </p>
+        <PantryArchitectureDiagram />
+      </section>
     </>
   );
 }
