@@ -465,8 +465,6 @@
   border: 1px solid var(--rule);
   border-radius: var(--radius);
   overflow: hidden;
-  height: 65vh;
-  min-height: 480px;
 }
 
 .ask-ai {
@@ -520,13 +518,16 @@
   color: var(--paper);
   font-size: 0.92rem;
   line-height: 1.5;
+  max-height: 8rem;
+  overflow-y: auto;
 }
 
 .graphiql-mount {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
+  height: 65vh;
+  min-height: 480px;
   position: relative;
   overflow: hidden;
-  min-height: 0;
 }
 
 .sandbox-frame :is(.graphiql-container, .graphiql-dialog, .graphiql-dialog-overlay, .graphiql-tooltip),
@@ -554,7 +555,7 @@
 }
 
 @media (max-width: 640px) {
-  .sandbox-frame {
+  .graphiql-mount {
     height: 55vh;
     min-height: 315px;
   }

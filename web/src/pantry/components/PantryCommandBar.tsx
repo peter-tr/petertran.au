@@ -112,6 +112,7 @@ export default function PantryCommandBar({ items, onChanged }: PantryCommandBarP
   const [turns, setTurns] = useState<Turn[]>([]);
   const [thinking, setThinking] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [showInfo, setShowInfo] = useState(false);
 
   function resetTextareaHeight() {
     if (textareaRef.current) textareaRef.current.style.height = "auto";
@@ -307,13 +308,34 @@ export default function PantryCommandBar({ items, onChanged }: PantryCommandBarP
   return (
     <section className="pantry-panel pantry-command-bar">
       <div className="pantry-panel-header">
-        <h2 className="pantry-panel-title">Ask or tell it what to do</h2>
+        <h2 className="pantry-panel-title">
+          Ask or tell it what to do
+          <button
+            type="button"
+            className="pantry-info-btn"
+            onClick={() => setShowInfo((v) => !v)}
+            aria-label="What can I ask it to do?"
+            aria-expanded={showInfo}
+          >
+            i
+          </button>
+        </h2>
         {turns.length > 0 && (
           <button type="button" className="pantry-details-toggle" onClick={clearConversation}>
             Clear
           </button>
         )}
       </div>
+
+      {showInfo && (
+        <ul className="pantry-info-list">
+          <li>Ask for a recipe — “what can I make with chicken?”, “how do I make carbonara”</li>
+          <li>Add, update, or remove inventory — “add 2L milk to the fridge”, “used up the eggs”</li>
+          <li>Add to the shopping list — food or household items, e.g. “add toothbrush”</li>
+          <li>Flag items — staple, low priority, or nearly empty, e.g. “mark rice as low priority”</li>
+          <li>Follow up naturally — “make it vegetarian”, “remove the salt” — it remembers the conversation</li>
+        </ul>
+      )}
 
       {(turns.length > 0 || thinking) && (
         <div className="pantry-command-turns">
@@ -562,7 +584,7 @@ export default function PantryCommandBar({ items, onChanged }: PantryCommandBarP
           value={input}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
-          placeholder='"What can I make with chicken?" or "Add toothbrush to my shopping list"'
+          placeholder="What items do I have?"
           disabled={thinking}
           maxLength={200}
           rows={1}

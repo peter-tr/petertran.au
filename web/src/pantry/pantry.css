@@ -19,17 +19,26 @@
 }
 
 .pantry-settings-cog {
-  font-size: 1.2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  font-family: var(--font-mono);
+  font-size: 1rem;
   line-height: 1;
   color: var(--muted);
   text-decoration: none;
-  padding: 0.3rem;
-  border-radius: 6px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease;
 }
 
 .pantry-settings-cog:hover {
-  color: var(--paper);
-  background: var(--panel-2);
+  color: var(--type);
+  border-color: var(--type);
 }
 
 .pantry-settings-back {
@@ -85,6 +94,49 @@
 
 .pantry-panel-header .pantry-panel-title {
   margin-bottom: 0;
+}
+
+.pantry-info-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.3rem;
+  height: 1.3rem;
+  margin-left: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-style: italic;
+  font-weight: 700;
+  color: var(--muted-dim);
+  background: none;
+  border: 1px solid var(--rule);
+  border-radius: 50%;
+  cursor: pointer;
+  vertical-align: middle;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.pantry-info-btn:hover,
+.pantry-info-btn[aria-expanded="true"] {
+  color: var(--type);
+  border-color: var(--type);
+}
+
+.pantry-info-list {
+  list-style: none;
+  margin: 0 0 0.8rem;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--panel-2);
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
 }
 
 .pantry-panel-header-controls {
