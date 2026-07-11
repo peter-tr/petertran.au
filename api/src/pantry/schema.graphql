@@ -28,6 +28,36 @@ type Purchase {
 }
 
 """
+The most recent automated price lookup for an item flagged with `trackPrice`.
+Written only by the scheduled price-check Lambda, never by a user mutation
+directly - `note` carries caveats the lookup itself surfaces (e.g. "Woolworths
+not checked" or "multiple pack sizes found") rather than a hard guarantee the
+numbers are exact.
+"""
+type LastKnownPrice {
+  """
+  Most recently found Coles price, in AUD. Null if unconfirmed.
+  """
+  colesPrice: Float
+  """
+  Most recently found Woolworths price, in AUD. Null if unconfirmed - in
+  practice this stays null most of the time, since Woolworths' pages don't
+  reliably surface a price through search/fetch (see `note`).
+  """
+  woolworthsPrice: Float
+  """
+  Freeform caveat from the lookup, e.g. "Woolworths not checked - dynamic
+  pricing" or "multiple pack sizes found, showing loose/per-kg". Null if
+  nothing noteworthy.
+  """
+  note: String
+  """
+  Timestamp of this lookup, ISO 8601.
+  """
+  checkedAt: String!
+}
+
+"""
 A single item currently tracked in stock - fridge, freezer, or pantry.
 """
 type InventoryItem {
@@ -84,6 +114,17 @@ type InventoryItem {
   cleanly to "almost out".
   """
   nearlyEmpty: Boolean!
+  """
+  True to include this item in the daily automated price-check job. Setting
+  this doesn't itself look anything up - it's a flag the scheduled job reads;
+  `lastKnownPrice` is populated asynchronously, not on the same request.
+  """
+  trackPrice: Boolean!
+  """
+  Most recent automated price lookup, if `trackPrice` is true and the job has
+  run at least once for this item. Null if never checked yet.
+  """
+  lastKnownPrice: LastKnownPrice
   """
   Every purchase batch logged for this item, oldest first. `quantity` /
   `purchasedAt` / `price` above always reflect the current total and most
@@ -150,6 +191,11 @@ input AddInventoryItemInput {
   True to flag this as running low. Defaults to false.
   """
   nearlyEmpty: Boolean
+  """
+  True to include this item in the daily automated price-check job. Defaults
+  to false.
+  """
+  trackPrice: Boolean
 }
 
 """
@@ -167,6 +213,7 @@ input UpdateInventoryItemInput {
   isStaple: Boolean
   lowPriority: Boolean
   nearlyEmpty: Boolean
+  trackPrice: Boolean
 }
 
 """

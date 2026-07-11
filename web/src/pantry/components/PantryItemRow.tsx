@@ -8,6 +8,7 @@ import {
   REMOVE_INVENTORY_ITEM_MUTATION,
   UPDATE_INVENTORY_ITEM_MUTATION,
   type InventoryItem,
+  type LastKnownPrice,
   type RemoveInventoryItemResult,
   type UpdateInventoryItemResult,
 } from "../api";
@@ -31,6 +32,17 @@ function formatMeta(item: InventoryItem): string {
   if (item.price !== null) parts.push(`$${item.price.toFixed(2)}`);
   if (item.purchasedAt) parts.push(formatPurchasedAt(item.purchasedAt));
   return parts.join(" · ");
+}
+
+// Written asynchronously by the daily price-check Lambda, not on this
+// request - "pending" and "unconfirmed" are both real, expected states, not
+// errors, so they get plain text rather than looking broken.
+function formatLastKnownPrice(price: LastKnownPrice | null): string {
+  if (!price) return "price check pending";
+  const parts: string[] = [];
+  if (price.colesPrice !== null) parts.push(`Coles $${price.colesPrice.toFixed(2)}`);
+  if (price.woolworthsPrice !== null) parts.push(`Woolworths $${price.woolworthsPrice.toFixed(2)}`);
+  return parts.length > 0 ? parts.join(", ") : "price unconfirmed";
 }
 
 // Separated from the rest of the meta line so expired/soon-to-expire dates
@@ -215,6 +227,19 @@ export default function PantryItemRow({
           >
             !
           </button>
+          <button
+            type="button"
+            className={`pantry-track-price-toggle ${item.trackPrice ? "active" : ""}`}
+            title={
+              item.trackPrice
+                ? "Tracking price - checked daily against Coles/Woolworths"
+                : "Track price (checked daily against Coles/Woolworths)"
+            }
+            onClick={() => saveField({ trackPrice: !item.trackPrice })}
+            disabled={busy}
+          >
+            $
+          </button>
         </div>
       </div>
       <button
@@ -230,6 +255,14 @@ export default function PantryItemRow({
           <>
             {" · "}
             <span className={expiryClass(item.expiresAt)}>{formatExpiresAt(item.expiresAt)}</span>
+          </>
+        )}
+        {item.trackPrice && (
+          <>
+            {" · "}
+            <span className="pantry-item-last-known-price" title={item.lastKnownPrice?.note ?? undefined}>
+              {formatLastKnownPrice(item.lastKnownPrice)}
+            </span>
           </>
         )}
       </button>

@@ -43,6 +43,7 @@ export default function PantryEditItemModal({
     isStaple: item.isStaple,
     lowPriority: item.lowPriority,
     nearlyEmpty: item.nearlyEmpty,
+    trackPrice: item.trackPrice,
   });
   const [error, setError] = useState<string | null>(null);
 

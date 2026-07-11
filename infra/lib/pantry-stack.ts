@@ -121,5 +121,37 @@ export class PantryStack extends Stack {
       target: new LambdaInvoke(digestFn),
       description: "Hourly check for the pantry urgent-shopping-list digest email (settings-gated)",
     });
+
+    // --- Daily price check for InventoryItem.trackPrice items ---
+    // Unlike the digest Lambda, this one writes back to the table
+    // (lastKnownPrice), so it needs read+write, and it calls Anthropic's
+    // web_search/web_fetch tools, so it needs the same secret as the main
+    // API Lambda.
+    const priceCheckFn = new lambda.Function(this, "PantryPriceCheckFunction", {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: "pantry/price-check-handler.handler",
+      code: lambda.Code.fromAsset(path.join(__dirname, "../../api/dist")),
+      memorySize: 256,
+      // Generous per-item ceiling (web_search + web_fetch round trips), but
+      // each individual Anthropic call is itself capped at 30s client-side
+      // (see check-prices.ts) - this is a backstop for the whole batch, not
+      // the primary safeguard against a single call running away.
+      timeout: Duration.minutes(10),
+      environment: {
+        TABLE_NAME: table.tableName,
+        ANTHROPIC_SECRET_ARN: anthropicSecret.secretArn,
+      },
+    });
+    table.grantReadWriteData(priceCheckFn);
+    anthropicSecret.grantRead(priceCheckFn);
+
+    // Once daily, early morning Sydney-local - prices don't need to be
+    // fresher than that, and this keeps the (still capped, but non-zero)
+    // Anthropic spend from this job as low as it can be while still useful.
+    new Schedule(this, "PantryPriceCheckSchedule", {
+      schedule: ScheduleExpression.cron({ minute: "0", hour: "5", timeZone: TimeZone.AUSTRALIA_SYDNEY }),
+      target: new LambdaInvoke(priceCheckFn),
+      description: "Daily Coles/Woolworths price check for trackPrice-flagged pantry items",
+    });
   }
 }

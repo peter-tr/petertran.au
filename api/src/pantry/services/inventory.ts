@@ -11,6 +11,13 @@ export interface Purchase {
   quantity: number;
 }
 
+export interface LastKnownPrice {
+  colesPrice: number | null;
+  woolworthsPrice: number | null;
+  note: string | null;
+  checkedAt: string;
+}
+
 export interface InventoryItem {
   id: string;
   name: string;
@@ -24,6 +31,8 @@ export interface InventoryItem {
   isStaple: boolean;
   lowPriority: boolean;
   nearlyEmpty: boolean;
+  trackPrice: boolean;
+  lastKnownPrice: LastKnownPrice | null;
   purchases: Purchase[];
   addedAt: string;
   updatedAt: string;
@@ -41,6 +50,7 @@ export interface AddInventoryItemInput {
   isStaple?: boolean | null;
   lowPriority?: boolean | null;
   nearlyEmpty?: boolean | null;
+  trackPrice?: boolean | null;
 }
 
 export type UpdateInventoryItemInput = Partial<Omit<AddInventoryItemInput, "location">> & {
@@ -59,6 +69,8 @@ function withInventoryDefaults(item: InventoryItem): InventoryItem {
     isStaple: item.isStaple ?? false,
     lowPriority: item.lowPriority ?? false,
     nearlyEmpty: item.nearlyEmpty ?? false,
+    trackPrice: item.trackPrice ?? false,
+    lastKnownPrice: item.lastKnownPrice ?? null,
   };
 }
 
@@ -101,6 +113,16 @@ export async function deleteItem(id: string): Promise<boolean> {
   return res.Attributes !== undefined;
 }
 
+// Called only by the price-check Lambda (lib/anthropic/check-prices.ts), not
+// exposed as a GraphQL mutation - lastKnownPrice is system-written, never
+// something a user (or the AI command bar) can set directly.
+export async function setLastKnownPrice(id: string, price: LastKnownPrice): Promise<void> {
+  const existing = await getItem(id);
+  if (!existing) throw new Error(`No inventory item found with id "${id}".`);
+
+  await putItem({ ...existing, lastKnownPrice: price });
+}
+
 export function createItem(input: AddInventoryItemInput): InventoryItem {
   const now = new Date().toISOString();
   const purchasedAt = input.purchasedAt ?? null;
@@ -117,6 +139,8 @@ export function createItem(input: AddInventoryItemInput): InventoryItem {
     isStaple: input.isStaple ?? false,
     lowPriority: input.lowPriority ?? false,
     nearlyEmpty: input.nearlyEmpty ?? false,
+    trackPrice: input.trackPrice ?? false,
+    lastKnownPrice: null,
     // Only log an initial purchase batch if a date was actually given - no
     // point fabricating one for a bare-minimum add.
     purchases: purchasedAt

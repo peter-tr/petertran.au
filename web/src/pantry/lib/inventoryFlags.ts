@@ -1,4 +1,4 @@
-export type InventoryFlagKey = "isStaple" | "lowPriority" | "nearlyEmpty";
+export type InventoryFlagKey = "isStaple" | "lowPriority" | "nearlyEmpty" | "trackPrice";
 
 export type InventoryFlags = Record<InventoryFlagKey, boolean>;
 
@@ -19,4 +19,9 @@ export const INVENTORY_FLAGS: InventoryFlagDef[] = [
   { key: "isStaple", icon: "★", label: "Staple - always keep stocked" },
   { key: "lowPriority", icon: "↓", label: "Low priority - hide from main list" },
   { key: "nearlyEmpty", icon: "!", label: "Nearly empty" },
+  {
+    key: "trackPrice",
+    icon: "$",
+    label: "Track price - check Coles/Woolworths daily and show the last known price",
+  },
 ];

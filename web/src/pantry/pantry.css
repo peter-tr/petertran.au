@@ -946,6 +946,29 @@
   color: var(--string);
 }
 
+.pantry-track-price-toggle {
+  flex-shrink: 0;
+  font-size: 0.8rem;
+  line-height: 1;
+  color: var(--rule);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.pantry-track-price-toggle:hover {
+  color: var(--signal-dim);
+}
+
+.pantry-track-price-toggle.active {
+  color: var(--signal);
+}
+
+.pantry-item-last-known-price {
+  color: var(--muted-dim);
+}
+
 /* A block-level chip on its own line, not inline text ahead of the meta
    string - previously ran straight into it ("low stock1 · today") with
    only a CSS margin (invisible to copy/paste and screen readers) as the

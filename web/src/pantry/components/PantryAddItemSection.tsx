@@ -42,6 +42,7 @@ export default function PantryAddItemSection({
     isStaple: false,
     lowPriority: false,
     nearlyEmpty: false,
+    trackPrice: false,
   });
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -73,7 +74,7 @@ export default function PantryAddItemSection({
       setPrice("");
       setPurchasedAt(today());
       setExpiresAt("");
-      setFlags({ isStaple: false, lowPriority: false, nearlyEmpty: false });
+      setFlags({ isStaple: false, lowPriority: false, nearlyEmpty: false, trackPrice: false });
       setStatus("idle");
       // Not awaited - the mutation itself already succeeded (that's what
       // the form reset above is responding to), so there's no reason to
