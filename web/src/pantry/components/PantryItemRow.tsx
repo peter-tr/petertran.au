@@ -1,7 +1,7 @@
 import { useState } from "react";
 import QuantityStepper from "./QuantityStepper";
 import PantryEditItemModal from "./PantryEditItemModal";
-import { formatExpiresAt, formatPurchasedAt } from "../../shared/lib/dates";
+import { daysBetween, formatExpiresAt, formatPurchasedAt } from "../../shared/lib/dates";
 import { stepForUnit } from "../lib/units";
 import {
   runPantryQuery,
@@ -30,8 +30,17 @@ function formatMeta(item: InventoryItem): string {
   const parts = [item.unit ? `${item.quantity} ${item.unit}` : `${item.quantity}`];
   if (item.price !== null) parts.push(`$${item.price.toFixed(2)}`);
   if (item.purchasedAt) parts.push(formatPurchasedAt(item.purchasedAt));
-  if (item.expiresAt) parts.push(formatExpiresAt(item.expiresAt));
   return parts.join(" · ");
+}
+
+// Separated from the rest of the meta line so expired/soon-to-expire dates
+// can get their own color without recoloring the whole "1 kg · $4.50 ·
+// 2d ago" string alongside them.
+function expiryClass(expiresAt: string): string {
+  const days = daysBetween(expiresAt);
+  if (days < 0) return "pantry-item-expiry-expired";
+  if (days <= 3) return "pantry-item-expiry-soon";
+  return "";
 }
 
 export default function PantryItemRow({
@@ -217,6 +226,12 @@ export default function PantryItemRow({
       >
         {item.nearlyEmpty && <span className="pantry-nearly-empty-badge">low stock</span>}
         {formatMeta(item)}
+        {item.expiresAt && (
+          <>
+            {" · "}
+            <span className={expiryClass(item.expiresAt)}>{formatExpiresAt(item.expiresAt)}</span>
+          </>
+        )}
       </button>
       <div className="pantry-item-controls">
         <QuantityStepper

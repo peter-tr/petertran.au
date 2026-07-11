@@ -890,6 +890,14 @@
   color: var(--type);
 }
 
+.pantry-item-expiry-expired {
+  color: var(--string);
+}
+
+.pantry-item-expiry-soon {
+  color: var(--signal);
+}
+
 .pantry-purchase-history {
   grid-column: 1 / -1;
   margin: 0.3rem 0 0;
