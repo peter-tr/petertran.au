@@ -2,13 +2,7 @@ import { useState } from "react";
 import QuantityStepper from "./QuantityStepper";
 import PantryInlineAddToggle from "./PantryInlineAddToggle";
 import { UNIT_OPTIONS } from "../lib/units";
-import {
-  runPantryQuery,
-  RECORD_PURCHASE_MUTATION,
-  type PantrySettings,
-  type PantrySettingsInput,
-  type RecordPurchaseResult,
-} from "../api";
+import { runPantryQuery, RECORD_PURCHASE_MUTATION, type RecordPurchaseResult } from "../api";
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
@@ -17,16 +11,12 @@ function today(): string {
 interface PantryCommonItemsSectionProps {
   commonItems: string[];
   onCommonItemsChange: (next: string[]) => void;
-  settings: PantrySettings;
-  onSettingsChange: (partial: PantrySettingsInput) => void;
   onAdded: () => Promise<void>;
 }
 
 export default function PantryCommonItemsSection({
   commonItems,
   onCommonItemsChange,
-  settings,
-  onSettingsChange,
   onAdded,
 }: PantryCommonItemsSectionProps) {
   const [openName, setOpenName] = useState<string | null>(null);
@@ -81,72 +71,59 @@ export default function PantryCommonItemsSection({
   }
 
   return (
-    <section className="pantry-panel">
-      <div className="pantry-panel-header">
-        <h2 className="pantry-panel-title">Common items</h2>
-        <button
-          type="button"
-          className="pantry-details-toggle"
-          onClick={() => onSettingsChange({ commonItemsCollapsed: !settings.commonItemsCollapsed })}
-        >
-          {settings.commonItemsCollapsed ? "+ show" : "− hide"}
-        </button>
+    <div className="pantry-subsection">
+      <h3 className="pantry-subsection-title">Common items</h3>
+
+      <div className="pantry-common-items">
+        {commonItems.map((name) => (
+          <div key={name} className="pantry-common-item">
+            <button type="button" className="pantry-common-item-btn" onClick={() => toggleOpen(name)}>
+              {name}
+              <span
+                className="pantry-common-item-delete"
+                role="button"
+                aria-label={`Remove ${name} from common items`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  deleteCommonItem(name);
+                }}
+              >
+                ×
+              </span>
+            </button>
+
+            {openName === name && (
+              <div className="pantry-common-item-picker">
+                <QuantityStepper value={pickerQty} onChange={setPickerQty} min={1} disabled={busy} />
+                <select
+                  className="form-input pantry-common-item-unit"
+                  value={pickerUnit}
+                  onChange={(e) => setPickerUnit(e.target.value)}
+                  disabled={busy}
+                  aria-label="Unit"
+                >
+                  {UNIT_OPTIONS.map((u) => (
+                    <option key={u} value={u}>
+                      {u}
+                    </option>
+                  ))}
+                </select>
+                <button type="button" className="run-btn" onClick={() => confirmAdd(name)} disabled={busy}>
+                  Add
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
       </div>
 
-      {!settings.commonItemsCollapsed && (
-        <>
-          <div className="pantry-common-items">
-            {commonItems.map((name) => (
-              <div key={name} className="pantry-common-item">
-                <button type="button" className="pantry-common-item-btn" onClick={() => toggleOpen(name)}>
-                  {name}
-                  <span
-                    className="pantry-common-item-delete"
-                    role="button"
-                    aria-label={`Remove ${name} from common items`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      deleteCommonItem(name);
-                    }}
-                  >
-                    ×
-                  </span>
-                </button>
+      <PantryInlineAddToggle
+        placeholder="Add a common item..."
+        toggleLabel="+ add common item"
+        onAdd={handleAddCommonItem}
+      />
 
-                {openName === name && (
-                  <div className="pantry-common-item-picker">
-                    <QuantityStepper value={pickerQty} onChange={setPickerQty} min={1} disabled={busy} />
-                    <select
-                      className="form-input pantry-common-item-unit"
-                      value={pickerUnit}
-                      onChange={(e) => setPickerUnit(e.target.value)}
-                      disabled={busy}
-                      aria-label="Unit"
-                    >
-                      {UNIT_OPTIONS.map((u) => (
-                        <option key={u} value={u}>
-                          {u}
-                        </option>
-                      ))}
-                    </select>
-                    <button type="button" className="run-btn" onClick={() => confirmAdd(name)} disabled={busy}>
-                      Add
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-
-          <PantryInlineAddToggle
-            placeholder="Add a common item..."
-            toggleLabel="+ add common item"
-            onAdd={handleAddCommonItem}
-          />
-
-          {error && <p className="status-line">// {error}</p>}
-        </>
-      )}
-    </section>
+      {error && <p className="status-line">// {error}</p>}
+    </div>
   );
 }

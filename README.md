@@ -36,9 +36,10 @@ To run just one, use its workspace script directly, e.g.
 `npm run dev:portfolio --workspace=api` or `npm run dev --workspace=web`.
 
 The frontend expects each API at a URL configured in `web/.env` (see
-`web/src/lib/graphql.ts`, `pantryGraphql.ts`, and `games/imposter/api.ts` for
-the defaults). Local dev doesn't need real AWS credentials - every API's dev
-server runs against mock data, not DynamoDB.
+`web/src/portfolio/lib/graphql.ts`, `web/src/pantry/api.ts`, and
+`web/src/games/imposter/lib/api.ts` for the defaults). Local dev doesn't need
+real AWS credentials - every API's dev server runs against mock data, not
+DynamoDB.
 
 ## Other commands
 
@@ -46,7 +47,15 @@ server runs against mock data, not DynamoDB.
 npm run lint          # eslint across the whole monorepo
 npm run format        # prettier --write
 npm run format:check  # prettier --check
+npm run validate-schemas --workspace=api  # construct each service's ApolloServer + check the
+                                           # Anthropic structured-output schema stays under its
+                                           # union-type-parameter limit - catches SDL bugs at
+                                           # commit time instead of a live outage
+npm run test:e2e --workspace=api          # boot each service's real dev server and smoke-test it
 ```
+
+`validate-schemas` and `test:e2e` also run as parallel CI jobs the `deploy`
+job depends on - see `.github/workflows/deploy.yml`.
 
 ## Deploying
 

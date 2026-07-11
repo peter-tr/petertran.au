@@ -327,6 +327,15 @@ type PantrySettings {
   True to narrow the Shopping list to urgent entries only.
   """
   shoppingUrgentOnly: Boolean!
+  """
+  Whether the daily urgent-shopping-list digest email is sent at all.
+  """
+  digestEnabled: Boolean!
+  """
+  Hour of the day (0-23, Australia/Sydney local time) the digest email is
+  sent, when digestEnabled is true.
+  """
+  digestHour: Int!
 }
 
 """
@@ -349,6 +358,8 @@ input PantrySettingsInput {
   shoppingCategoryFilter: String
   shoppingRecipeFilter: String
   shoppingUrgentOnly: Boolean
+  digestEnabled: Boolean
+  digestHour: Int
 }
 
 """

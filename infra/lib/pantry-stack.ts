@@ -111,10 +111,15 @@ export class PantryStack extends Stack {
     emailIdentity.grantSendEmail(digestFn);
     recipientIdentity.grantSendEmail(digestFn);
 
+    // Fires every hour on the hour, Sydney-local - the actual send time is
+    // a user-configurable app setting (PantrySettings.digestHour), not
+    // baked into infra, so it can be changed from the Pantry settings page
+    // without a redeploy. The handler itself checks the current Sydney
+    // hour against that setting and no-ops otherwise.
     new Schedule(this, "PantryDigestSchedule", {
-      schedule: ScheduleExpression.cron({ minute: "0", hour: "16", timeZone: TimeZone.AUSTRALIA_SYDNEY }),
+      schedule: ScheduleExpression.cron({ minute: "0", hour: "*", timeZone: TimeZone.AUSTRALIA_SYDNEY }),
       target: new LambdaInvoke(digestFn),
-      description: "Daily 4pm Sydney-time email of urgent pantry shopping list items",
+      description: "Hourly check for the pantry urgent-shopping-list digest email (settings-gated)",
     });
   }
 }

@@ -1,7 +1,22 @@
-// Trimmed to the units actually in use - the pantry API's normalizeUnit
-// alias table (api/src/pantry/normalize.ts) still recognizes more than this,
-// so anything added directly via the API still normalizes fine.
-export const UNIT_OPTIONS = ["pcs", "g", "kg", "mg", "L", "mL"];
+// Mirrors every canonical unit the backend's normalizeUnit alias table
+// (api/src/pantry/lib/util/normalize.ts) recognizes - the AI or the API
+// itself can set any of these (e.g. "bottle" for lemon juice), and this list
+// needs to stay a superset of that so the add/edit unit <select> always has
+// a matching option instead of silently showing the wrong value.
+export const UNIT_OPTIONS = [
+  "pcs",
+  "g",
+  "kg",
+  "mg",
+  "L",
+  "mL",
+  "pack",
+  "box",
+  "bottle",
+  "can",
+  "bag",
+  "dozen",
+];
 
 // Grams and millilitres are tracked in quantities large enough that
 // stepping by 1 at a time is impractically slow - 100 at a time matches how

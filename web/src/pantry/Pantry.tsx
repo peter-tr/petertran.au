@@ -1,7 +1,7 @@
-import PantryAddItemSection from "./components/PantryAddItemSection";
+import { Link } from "react-router-dom";
 import PantryCommandBar from "./components/PantryCommandBar";
-import PantryCommonItemsSection from "./components/PantryCommonItemsSection";
 import PantryInventorySection from "./components/PantryInventorySection";
+import PantryManualAddSection from "./components/PantryManualAddSection";
 import PantryShoppingListSection from "./components/PantryShoppingListSection";
 import { usePantryInventory } from "./hooks/usePantryInventory";
 import { usePantryShoppingList } from "./hooks/usePantryShoppingList";
@@ -23,8 +23,16 @@ export default function Pantry() {
 
   return (
     <>
-      <header className="pantry-head">
+      <header className="pantry-head pantry-head-row">
         <h1>Pantry</h1>
+        <Link
+          to="/pantry/settings"
+          className="pantry-settings-cog"
+          aria-label="Pantry settings"
+          title="Settings"
+        >
+          ⚙
+        </Link>
       </header>
 
       {error && (
@@ -51,14 +59,13 @@ export default function Pantry() {
             onSettingsChange={updateSettings}
             onChanged={refetchAll}
           />
-          <PantryCommonItemsSection
+          <PantryManualAddSection
             commonItems={settings.commonItems}
             onCommonItemsChange={(commonItems) => updateSettings({ commonItems })}
             settings={settings}
             onSettingsChange={updateSettings}
             onAdded={refetchAll}
           />
-          <PantryAddItemSection settings={settings} onSettingsChange={updateSettings} onAdded={refetchAll} />
         </>
       )}
     </>

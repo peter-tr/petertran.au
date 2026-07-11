@@ -33,6 +33,11 @@ interface AssistantTurn {
   // Current servings per recipe index - defaults to that recipe's
   // baseServings when absent (see servingsFor below).
   recipeServings: Record<number, number>;
+  // Recipe indexes the user has clicked "✕" on - hidden from the card list
+  // and left out of the JSON sent back as conversation history, so a
+  // follow-up like "make it vegetarian" can't accidentally apply to a
+  // suggestion the user already said they're done with.
+  dismissedRecipes: Set<number>;
 }
 
 type Turn = UserTurn | AssistantTurn;
@@ -84,7 +89,13 @@ function buildRecipeShoppingActions(
         type: "ADD_TO_SHOPPING_LIST",
         summary: `Add "${ing.name}"${amount ? ` (${amount})` : ""} to the shopping list (for: ${recipe.name})`,
         mutationName: "addToShoppingList",
-        argsJson: JSON.stringify({ name: ing.name, quantity: null, unit: null, note, recipeTag: recipe.name }),
+        argsJson: JSON.stringify({
+          name: ing.name,
+          quantity: null,
+          unit: null,
+          note,
+          recipeTag: recipe.name,
+        }),
       };
     });
 }
@@ -161,19 +172,23 @@ export default function PantryCommandBar({ items, onChanged }: PantryCommandBarP
     // state (servings, excluded ingredients) merged in first - the server
     // never saw those, so without this the AI has no way to know a
     // follow-up like "remove the salt" already happened, or what serving
-    // count is currently showing.
+    // count is currently showing. Dismissed recipes are dropped entirely
+    // (not just flagged) - once the user clicks "✕" on one, it should be as
+    // if it was never suggested for the rest of the conversation.
     const history: ConversationMessage[] = turns.slice(-MAX_HISTORY_TURNS).map((t) => {
       if (t.role === "user") return { role: "user", content: t.text };
       const content = t.result.recipes
         ? {
             ...t.result,
-            recipes: t.result.recipes.map((r, ri) => ({
-              ...r,
-              currentServings: servingsFor(t, ri, r),
-              excludedIngredientIndexes: r.ingredients
-                .map((_, ii) => ii)
-                .filter((ii) => t.excludedIngredients.has(`${ri}-${ii}`)),
-            })),
+            recipes: t.result.recipes
+              .map((r, ri) => ({
+                ...r,
+                currentServings: servingsFor(t, ri, r),
+                excludedIngredientIndexes: r.ingredients
+                  .map((_, ii) => ii)
+                  .filter((ii) => t.excludedIngredients.has(`${ri}-${ii}`)),
+              }))
+              .filter((_, ri) => !t.dismissedRecipes.has(ri)),
           }
         : t.result;
       return { role: "assistant", content: JSON.stringify(content) };
@@ -196,6 +211,7 @@ export default function PantryCommandBar({ items, onChanged }: PantryCommandBarP
           actionsError: null,
           excludedIngredients: new Set(),
           recipeServings: {},
+          dismissedRecipes: new Set(),
         },
       ]);
     } catch (err) {
@@ -214,6 +230,15 @@ export default function PantryCommandBar({ items, onChanged }: PantryCommandBarP
         if (next.has(key)) next.delete(key);
         else next.add(key);
         return { ...t, excludedIngredients: next };
+      })
+    );
+  }
+
+  function dismissRecipe(turnIndex: number, recipeIndex: number) {
+    setTurns((prev) =>
+      prev.map((t, i) => {
+        if (i !== turnIndex || t.role !== "assistant") return t;
+        return { ...t, dismissedRecipes: new Set(t.dismissedRecipes).add(recipeIndex) };
       })
     );
   }
@@ -311,11 +336,17 @@ export default function PantryCommandBar({ items, onChanged }: PantryCommandBarP
 
                 {i === lastRecipesTurnIndex && turn.result.recipes && turn.result.recipes.length > 0 && (
                   <div className="pantry-command-recipes">
+                    {turn.result.recipes.every((_, ri) => turn.dismissedRecipes.has(ri)) && (
+                      <p className="pantry-command-turn-done">All suggestions dismissed.</p>
+                    )}
                     {turn.result.recipes.map((recipe, ri) => {
+                      if (turn.dismissedRecipes.has(ri)) return null;
                       const servings = servingsFor(turn, ri, recipe);
                       const ratio = servings / recipe.baseServings;
                       const missingCount = recipe.ingredients.filter(
-                        (ing, ii) => isEffectivelyMissing(ing, ratio, items) && !turn.excludedIngredients.has(`${ri}-${ii}`)
+                        (ing, ii) =>
+                          isEffectivelyMissing(ing, ratio, items) &&
+                          !turn.excludedIngredients.has(`${ri}-${ii}`)
                       ).length;
                       const totalPriceAud = recipe.ingredients.reduce(
                         (sum, ing) => sum + scalePrice(ing.estimatedPriceAud, ing.quantity, ratio),
@@ -324,7 +355,18 @@ export default function PantryCommandBar({ items, onChanged }: PantryCommandBarP
                       return (
                         <div className="pantry-command-recipe" key={ri}>
                           <div className="pantry-command-recipe-header">
-                            <p className="pantry-command-recipe-name">{recipe.name}</p>
+                            <div className="pantry-command-recipe-title">
+                              <p className="pantry-command-recipe-name">{recipe.name}</p>
+                              <button
+                                type="button"
+                                className="pantry-shopping-remove-btn"
+                                onClick={() => dismissRecipe(i, ri)}
+                                aria-label={`Dismiss "${recipe.name}"`}
+                                title="Not interested in this one"
+                              >
+                                ✕
+                              </button>
+                            </div>
                             <div className="pantry-command-servings">
                               <button
                                 type="button"
@@ -350,14 +392,17 @@ export default function PantryCommandBar({ items, onChanged }: PantryCommandBarP
                             <p className="pantry-command-recipe-desc">{recipe.description}</p>
                           )}
                           <p className="pantry-command-recipe-nutrition">
-                            {Math.round(recipe.caloriesPerServing)} kcal · {Math.round(recipe.proteinGPerServing)}g
-                            protein · {Math.round(recipe.carbsGPerServing)}g carbs ·{" "}
-                            {Math.round(recipe.fatGPerServing)}g fat
+                            {Math.round(recipe.caloriesPerServing)} kcal ·{" "}
+                            {Math.round(recipe.proteinGPerServing)}g protein ·{" "}
+                            {Math.round(recipe.carbsGPerServing)}g carbs · {Math.round(recipe.fatGPerServing)}
+                            g fat
                           </p>
                           <ul className="pantry-command-recipe-ingredients">
                             {recipe.ingredients.map((ing, ii) => {
                               const excluded = turn.excludedIngredients.has(`${ri}-${ii}`);
-                              const matched = ing.itemId ? (items.find((it) => it.id === ing.itemId) ?? null) : null;
+                              const matched = ing.itemId
+                                ? (items.find((it) => it.id === ing.itemId) ?? null)
+                                : null;
                               const sufficiency = ing.haveInInventory
                                 ? checkSufficiency(ing.amount, ing.quantity, ratio, matched)
                                 : "unknown";
@@ -403,7 +448,9 @@ export default function PantryCommandBar({ items, onChanged }: PantryCommandBarP
                                   }
                                 >
                                   {icon} {ing.name}
-                                  {amount && <span className="pantry-command-ingredient-amount"> ({amount})</span>}
+                                  {amount && (
+                                    <span className="pantry-command-ingredient-amount"> ({amount})</span>
+                                  )}
                                   {insufficient && matched && (
                                     <span className="pantry-command-ingredient-amount">
                                       {" "}
@@ -412,7 +459,10 @@ export default function PantryCommandBar({ items, onChanged }: PantryCommandBarP
                                     </span>
                                   )}
                                   {price > 0 && (
-                                    <span className="pantry-command-ingredient-price"> ~${price.toFixed(2)}</span>
+                                    <span className="pantry-command-ingredient-price">
+                                      {" "}
+                                      ~${price.toFixed(2)}
+                                    </span>
                                   )}
                                 </li>
                               );
@@ -502,12 +552,6 @@ export default function PantryCommandBar({ items, onChanged }: PantryCommandBarP
               </div>
             )
           )}
-          {thinking && (
-            <div className="pantry-command-turn-assistant pantry-command-thinking">
-              <span className="pantry-spinner" aria-hidden="true" />
-              Thinking…
-            </div>
-          )}
         </div>
       )}
 
@@ -523,8 +567,8 @@ export default function PantryCommandBar({ items, onChanged }: PantryCommandBarP
           maxLength={200}
           rows={1}
         />
-        <button className="run-btn" type="submit" disabled={thinking || !input.trim()}>
-          {thinking ? "Thinking…" : "Ask"}
+        <button className="run-btn pantry-command-submit" type="submit" disabled={thinking || !input.trim()}>
+          {thinking ? <span className="pantry-spinner" aria-hidden="true" /> : "Ask"}
         </button>
       </form>
 

@@ -1,7 +1,23 @@
 import { SESv2Client, SendEmailCommand } from "@aws-sdk/client-sesv2";
-import { getShoppingList, type ShoppingListEntry } from "../../resolvers/resolvers";
+import { getSettings, getShoppingList, type ShoppingListEntry } from "../../resolvers/resolvers";
 
 const ses = new SESv2Client({});
+
+// The schedule itself fires once an hour (see infra/lib/pantry-stack.ts) -
+// the actual "what time" the user configured in Settings lives in app data,
+// not infrastructure, so it can be changed without a redeploy. This just
+// checks whether the current Sydney-local hour matches their choice.
+function currentSydneyHour(): number {
+  const hourPart = new Intl.DateTimeFormat("en-AU", {
+    timeZone: "Australia/Sydney",
+    hour: "numeric",
+    hour12: false,
+  })
+    .formatToParts(new Date())
+    .find((p) => p.type === "hour")?.value;
+  // ICU can format midnight as "24" with hour12: false - normalize back to 0.
+  return Number(hourPart ?? "0") % 24;
+}
 
 function escapeHtml(value: string): string {
   return value
@@ -19,22 +35,41 @@ function formatEntryText(e: ShoppingListEntry): string {
 }
 
 function formatEntryHtml(e: ShoppingListEntry): string {
-  const amount = e.quantity != null ? ` <span style="color:#666;">(${escapeHtml(String(e.quantity))}${e.unit ? ` ${escapeHtml(e.unit)}` : ""})</span>` : "";
+  const amount =
+    e.quantity != null
+      ? ` <span style="color:#666;">(${escapeHtml(String(e.quantity))}${e.unit ? ` ${escapeHtml(e.unit)}` : ""})</span>`
+      : "";
   const category = e.category
     ? ` <span style="color:#999; font-size:0.85em;">[${escapeHtml(e.category)}]</span>`
     : "";
   return `<li>${escapeHtml(e.name)}${amount}${category}</li>`;
 }
 
-// Triggered daily at 4pm Australia/Sydney by an EventBridge Scheduler
-// schedule (see infra/lib/pantry-stack.ts) - a best-effort reminder, not a
-// data path anything else depends on, so any failure here just means no
-// email today rather than anything user-visible breaking.
+// Triggered hourly by an EventBridge Scheduler schedule (see
+// infra/lib/pantry-stack.ts) - a best-effort reminder, not a data path
+// anything else depends on, so any failure here just means no email this
+// hour rather than anything user-visible breaking. Whether it actually
+// sends is gated by settings.digestEnabled/digestHour, checked below, so
+// the user can turn it off or change the time from Pantry settings without
+// a redeploy.
 export async function sendShoppingListDigest(): Promise<void> {
   const from = process.env.CONTACT_FROM_EMAIL;
   const to = process.env.CONTACT_TO_EMAIL;
   if (!from || !to) {
     console.log("CONTACT_FROM_EMAIL/CONTACT_TO_EMAIL not configured - skipping digest.");
+    return;
+  }
+
+  const settings = await getSettings();
+  if (!settings.digestEnabled) {
+    console.log("Digest email disabled in settings - skipping.");
+    return;
+  }
+  const hour = currentSydneyHour();
+  if (hour !== settings.digestHour) {
+    console.log(
+      `Not the configured digest hour (now ${hour}, configured ${settings.digestHour}) - skipping.`
+    );
     return;
   }
 

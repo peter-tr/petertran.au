@@ -23,7 +23,11 @@ interface PantryAddItemSectionProps {
   onAdded: () => Promise<void>;
 }
 
-export default function PantryAddItemSection({ settings, onSettingsChange, onAdded }: PantryAddItemSectionProps) {
+export default function PantryAddItemSection({
+  settings,
+  onSettingsChange,
+  onAdded,
+}: PantryAddItemSectionProps) {
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [category, setCategory] = useState("");
@@ -34,7 +38,11 @@ export default function PantryAddItemSection({ settings, onSettingsChange, onAdd
   // records a purchase date, without asking the user for one up front.
   const [purchasedAt, setPurchasedAt] = useState(today());
   const [expiresAt, setExpiresAt] = useState("");
-  const [flags, setFlags] = useState<InventoryFlags>({ isStaple: false, lowPriority: false, nearlyEmpty: false });
+  const [flags, setFlags] = useState<InventoryFlags>({
+    isStaple: false,
+    lowPriority: false,
+    nearlyEmpty: false,
+  });
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
 
@@ -81,133 +89,125 @@ export default function PantryAddItemSection({ settings, onSettingsChange, onAdd
   }
 
   return (
-    <section className="pantry-panel">
-      <div className="pantry-panel-header">
-        <h2 className="pantry-panel-title">Add item</h2>
-      </div>
+    <div className="pantry-subsection">
+      <h3 className="pantry-subsection-title">Add item</h3>
 
-      {/* Driven by the Common items panel's hide toggle above it, not its
-          own - the two sit right next to each other as one "quickly log
-          something" area, so a single hide/show should cover both rather
-          than needing two separate toggles that could end up out of sync. */}
-      {!settings.commonItemsCollapsed && (
-        <form onSubmit={handleSubmit}>
-          <div className="pantry-quick-add">
-            <input
-              className="form-input pantry-quick-add-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Item name"
-              required
-              maxLength={200}
-            />
-            <QuantityStepper value={quantity} onChange={setQuantity} min={1} />
-            <select
-              className="form-input pantry-quick-add-unit"
-              value={unit}
-              onChange={(e) => setUnit(e.target.value)}
-              aria-label="Unit"
-            >
-              {UNIT_OPTIONS.map((u) => (
-                <option key={u} value={u}>
-                  {u}
-                </option>
-              ))}
-            </select>
-            <select
-              className="form-input pantry-quick-add-location"
-              value={location}
-              onChange={(e) => setLocation(e.target.value as StorageLocation)}
-              aria-label="Location"
-            >
-              <option value="FRIDGE">Fridge</option>
-              <option value="FREEZER">Freezer</option>
-              <option value="PANTRY">Pantry</option>
-            </select>
-            <input
-              className="form-input pantry-quick-add-price"
-              type="number"
-              min="0"
-              step="0.01"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              placeholder="$"
-              aria-label="Price"
-            />
-            <button className="run-btn" type="submit" disabled={status === "saving"}>
-              {status === "saving" ? "Adding…" : "Add"}
-            </button>
-          </div>
-
-          <button
-            type="button"
-            className="pantry-details-toggle"
-            onClick={() => onSettingsChange({ addItemDetailsShown: !settings.addItemDetailsShown })}
+      <form onSubmit={handleSubmit}>
+        <div className="pantry-quick-add">
+          <input
+            className="form-input pantry-quick-add-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Item name"
+            required
+            maxLength={200}
+          />
+          <QuantityStepper value={quantity} onChange={setQuantity} min={1} />
+          <select
+            className="form-input pantry-quick-add-unit"
+            value={unit}
+            onChange={(e) => setUnit(e.target.value)}
+            aria-label="Unit"
           >
-            {settings.addItemDetailsShown ? "− fewer details" : "+ more details"}
+            {UNIT_OPTIONS.map((u) => (
+              <option key={u} value={u}>
+                {u}
+              </option>
+            ))}
+          </select>
+          <select
+            className="form-input pantry-quick-add-location"
+            value={location}
+            onChange={(e) => setLocation(e.target.value as StorageLocation)}
+            aria-label="Location"
+          >
+            <option value="FRIDGE">Fridge</option>
+            <option value="FREEZER">Freezer</option>
+            <option value="PANTRY">Pantry</option>
+          </select>
+          <input
+            className="form-input pantry-quick-add-price"
+            type="number"
+            min="0"
+            step="0.01"
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            placeholder="$"
+            aria-label="Price"
+          />
+          <button className="run-btn" type="submit" disabled={status === "saving"}>
+            {status === "saving" ? "Adding…" : "Add"}
           </button>
+        </div>
 
-          {settings.addItemDetailsShown && (
-            <div className="pantry-details-grid">
-              <div className="form-row">
-                <label className="form-label" htmlFor="pantry-category">
-                  Category
-                </label>
-                <input
-                  id="pantry-category"
-                  className="form-input"
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  placeholder="Dairy, Produce, Frozen..."
-                  maxLength={100}
-                />
-              </div>
+        <button
+          type="button"
+          className="pantry-details-toggle"
+          onClick={() => onSettingsChange({ addItemDetailsShown: !settings.addItemDetailsShown })}
+        >
+          {settings.addItemDetailsShown ? "− fewer details" : "+ more details"}
+        </button>
 
-              <div className="form-row">
-                <label className="form-label" htmlFor="pantry-purchased">
-                  Purchased on
-                </label>
-                <input
-                  id="pantry-purchased"
-                  className="form-input"
-                  type="date"
-                  value={purchasedAt}
-                  onChange={(e) => setPurchasedAt(e.target.value)}
-                />
-              </div>
-
-              <div className="form-row">
-                <label className="form-label" htmlFor="pantry-expires">
-                  Expires on
-                </label>
-                <input
-                  id="pantry-expires"
-                  className="form-input"
-                  type="date"
-                  value={expiresAt}
-                  onChange={(e) => setExpiresAt(e.target.value)}
-                />
-              </div>
-
-              <div className="form-row pantry-staple-row pantry-flags-row">
-                {INVENTORY_FLAGS.map(({ key, icon, label }) => (
-                  <label className="form-label" htmlFor={`pantry-add-${key}`} key={key}>
-                    <input
-                      id={`pantry-add-${key}`}
-                      type="checkbox"
-                      checked={flags[key]}
-                      onChange={(e) => setFlags({ ...flags, [key]: e.target.checked })}
-                    />{" "}
-                    {icon} {label}
-                  </label>
-                ))}
-              </div>
+        {settings.addItemDetailsShown && (
+          <div className="pantry-details-grid">
+            <div className="form-row">
+              <label className="form-label" htmlFor="pantry-category">
+                Category
+              </label>
+              <input
+                id="pantry-category"
+                className="form-input"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                placeholder="Dairy, Produce, Frozen..."
+                maxLength={100}
+              />
             </div>
-          )}
 
-          {error && <p className="status-line">// {error}</p>}
-        </form>
-      )}
-    </section>
+            <div className="form-row">
+              <label className="form-label" htmlFor="pantry-purchased">
+                Purchased on
+              </label>
+              <input
+                id="pantry-purchased"
+                className="form-input"
+                type="date"
+                value={purchasedAt}
+                onChange={(e) => setPurchasedAt(e.target.value)}
+              />
+            </div>
+
+            <div className="form-row">
+              <label className="form-label" htmlFor="pantry-expires">
+                Expires on
+              </label>
+              <input
+                id="pantry-expires"
+                className="form-input"
+                type="date"
+                value={expiresAt}
+                onChange={(e) => setExpiresAt(e.target.value)}
+              />
+            </div>
+
+            <div className="form-row pantry-staple-row pantry-flags-row">
+              {INVENTORY_FLAGS.map(({ key, icon, label }) => (
+                <label className="form-label" htmlFor={`pantry-add-${key}`} key={key}>
+                  <input
+                    id={`pantry-add-${key}`}
+                    type="checkbox"
+                    checked={flags[key]}
+                    onChange={(e) => setFlags({ ...flags, [key]: e.target.checked })}
+                  />{" "}
+                  {icon} {label}
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {error && <p className="status-line">// {error}</p>}
+      </form>
+    </div>
   );
 }

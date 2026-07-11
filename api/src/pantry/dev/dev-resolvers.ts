@@ -22,6 +22,8 @@ let settings: PantrySettings = {
   shoppingCategoryFilter: null,
   shoppingRecipeFilter: null,
   shoppingUrgentOnly: false,
+  digestEnabled: true,
+  digestHour: 16,
   commonItems: [
     "Milk",
     "Eggs",

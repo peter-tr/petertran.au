@@ -9,6 +9,7 @@ import Nav from "./portfolio/components/Nav";
 const Home = lazy(() => import("./portfolio/Home"));
 const Resume = lazy(() => import("./portfolio/Resume"));
 const Pantry = lazy(() => import("./pantry/Pantry"));
+const PantrySettingsPage = lazy(() => import("./pantry/PantrySettingsPage"));
 const ImposterSetup = lazy(() => import("./games/imposter/Setup"));
 const ImposterGame = lazy(() => import("./games/imposter/Game"));
 
@@ -84,6 +85,7 @@ export default function App() {
             <Route path="/" element={<Home />} />
             <Route path="/resume" element={<Resume />} />
             <Route path="/pantry" element={<Pantry />} />
+            <Route path="/pantry/settings" element={<PantrySettingsPage />} />
             <Route path="/imposter" element={<ImposterSetup />} />
             <Route path="/imposter/:gameId" element={<ImposterGame />} />
           </Routes>

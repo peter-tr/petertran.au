@@ -11,8 +11,59 @@
   margin: 0;
 }
 
+.pantry-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.pantry-settings-cog {
+  font-size: 1.2rem;
+  line-height: 1;
+  color: var(--muted);
+  text-decoration: none;
+  padding: 0.3rem;
+  border-radius: 6px;
+}
+
+.pantry-settings-cog:hover {
+  color: var(--paper);
+  background: var(--panel-2);
+}
+
+.pantry-settings-back {
+  display: inline-block;
+  margin-top: 0.6rem;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.pantry-settings-back:hover {
+  color: var(--paper);
+}
+
+.pantry-settings-row {
+  margin-top: 0.9rem;
+}
+
+.pantry-settings-hour {
+  max-width: 12rem;
+}
+
 .pantry-panel {
   margin-bottom: 1.3rem;
+  padding-top: 1.3rem;
+  border-top: 1px solid var(--rule);
+}
+
+/* Sits right below the page header already, which provides its own
+   spacing - a second rule directly under it would be redundant. */
+.pantry-panel:first-of-type {
+  padding-top: 0;
+  border-top: none;
 }
 
 .pantry-panel-title {
@@ -41,6 +92,22 @@
   flex-wrap: wrap;
   gap: 0.6rem 1.6rem;
   margin-bottom: 0.6rem;
+}
+
+.pantry-subsection + .pantry-subsection {
+  margin-top: 1.1rem;
+  padding-top: 1.1rem;
+  border-top: 1px dashed var(--rule);
+}
+
+.pantry-subsection-title {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin: 0 0 0.5rem;
 }
 
 .pantry-control-group {
@@ -484,13 +551,11 @@
   margin: 0.4rem 0 0;
 }
 
-.pantry-command-thinking {
-  flex-direction: row;
+.pantry-command-submit {
+  min-width: 3.6rem;
+  display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  font-family: var(--font-mono);
-  font-size: 0.85rem;
-  color: var(--muted);
+  justify-content: center;
 }
 
 .pantry-spinner {
@@ -500,6 +565,14 @@
   border-top-color: var(--signal);
   border-radius: 50%;
   animation: pantry-spin 0.7s linear infinite;
+}
+
+/* Inside the (amber) submit button, the default spinner colors would
+   blend straight into the background - darken it to match the button's
+   own (--ink) text color instead. */
+.pantry-command-submit .pantry-spinner {
+  border-color: rgba(11, 14, 20, 0.3);
+  border-top-color: var(--ink);
 }
 
 @keyframes pantry-spin {
@@ -528,6 +601,13 @@
   justify-content: space-between;
   gap: 0.6rem;
   margin: 0 0 0.2rem;
+}
+
+.pantry-command-recipe-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
 }
 
 .pantry-command-recipe-name {

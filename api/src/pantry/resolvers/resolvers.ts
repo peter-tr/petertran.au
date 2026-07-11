@@ -75,6 +75,8 @@ export interface PantrySettings {
   shoppingCategoryFilter: string | null;
   shoppingRecipeFilter: string | null;
   shoppingUrgentOnly: boolean;
+  digestEnabled: boolean;
+  digestHour: number;
 }
 
 interface PantrySettingsInput {
@@ -94,6 +96,8 @@ interface PantrySettingsInput {
   shoppingCategoryFilter?: string | null;
   shoppingRecipeFilter?: string | null;
   shoppingUrgentOnly?: boolean;
+  digestEnabled?: boolean;
+  digestHour?: number;
 }
 
 // Same starting list as the client used to seed localStorage with, so the
@@ -114,6 +118,11 @@ const DEFAULT_SETTINGS: PantrySettings = {
   shoppingCategoryFilter: null,
   shoppingRecipeFilter: null,
   shoppingUrgentOnly: false,
+  // Matches the digest's original fixed 4pm-daily behavior before this
+  // became configurable, so existing rows behave identically once they
+  // pick up this default via the getSettings() backfill merge below.
+  digestEnabled: true,
+  digestHour: 16,
   commonItems: [
     "Milk",
     "Eggs",
@@ -337,7 +346,7 @@ async function upsertShoppingListEntry(
 // stored at all - a settings row saved before a new field (like `sort`) was
 // added would otherwise come back missing it, tripping the schema's
 // non-null check instead of just quietly defaulting.
-async function getSettings(): Promise<PantrySettings> {
+export async function getSettings(): Promise<PantrySettings> {
   const res = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { pk: PK, sk: SETTINGS_SK } }));
   return { ...DEFAULT_SETTINGS, ...(res.Item?.data as Partial<PantrySettings> | undefined) };
 }

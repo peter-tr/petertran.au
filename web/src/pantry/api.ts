@@ -251,6 +251,8 @@ export interface PantrySettings {
   shoppingCategoryFilter: string | null;
   shoppingRecipeFilter: string | null;
   shoppingUrgentOnly: boolean;
+  digestEnabled: boolean;
+  digestHour: number;
 }
 
 export type PantrySettingsInput = Partial<PantrySettings>;
@@ -272,6 +274,8 @@ const SETTINGS_FIELDS = /* GraphQL */ `
   shoppingCategoryFilter
   shoppingRecipeFilter
   shoppingUrgentOnly
+  digestEnabled
+  digestHour
 `;
 
 export const SETTINGS_QUERY = /* GraphQL */ `
