@@ -1,6 +1,7 @@
 import { getAnthropicClient } from "@shared/anthropic-client";
 import { assertAiNotRateLimited } from "../util/ai-rate-limit";
-import type { InventoryItem, ShoppingListEntry } from "../../resolvers/resolvers";
+import type { InventoryItem } from "../../services/inventory";
+import type { ShoppingListEntry } from "../../services/shopping-list";
 
 const MAX_INPUT_LENGTH = 200;
 const MAX_HISTORY_MESSAGES = 20;

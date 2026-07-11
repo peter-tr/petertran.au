@@ -6,10 +6,19 @@ layered on top of the same data.
 
 Follows the layout described in the repo root `CLAUDE.md`: `handler.ts` /
 `schema.ts` / `schema.graphql` / `context.ts` at the root, `lib/` for
-supporting code, `resolvers/resolvers.ts` for the real DynamoDB-backed
-resolvers (the only thing `handler.ts` imports, so it's the only thing that
-ships in the Lambda bundle), and `dev/dev-resolvers.ts` + `dev/dev-server.ts`
-for the in-memory mock used by local dev.
+supporting code, `resolvers/resolvers.ts` for the real GraphQL `Query`/
+`Mutation` map (the only thing `handler.ts` imports, so it's the only thing
+that ships in the Lambda bundle), and `dev/dev-resolvers.ts` +
+`dev/dev-server.ts` for the in-memory mock used by local dev.
+
+`resolvers.ts` itself stays thin - rate limiting, calling into the data
+layer, and shaping the GraphQL response. The actual DynamoDB CRUD and
+merge/backfill logic lives in `services/` (`inventory.ts`,
+`shopping-list.ts`, `settings.ts`), one file per domain, since that logic
+has nothing to do with GraphQL and both `send-digest.ts` and
+`parse-command.ts` need it without pulling in the whole resolver map (and,
+transitively, the Anthropic SDK - `digest-handler.mjs` dropped from ~720kB
+to ~275kB once it stopped doing that).
 
 ## AI command bar (`lib/anthropic/parse-command.ts`)
 
@@ -64,10 +73,11 @@ depends on:
 
 Every field on `ShoppingListEntry`, `InventoryItem`, and `PantrySettings` is
 persisted in DynamoDB. Adding a new **non-nullable** field to any of these
-requires a default in that type's merge/backfill function (see
-`getSettings()`'s `{ ...DEFAULT_SETTINGS, ...stored }` spread, and the
-equivalent in `getShoppingList()`/`withInventoryDefaults()`) - rows written
-before the field existed won't have it, and GraphQL null-propagates a
-missing non-null field to fail the *entire containing list*, not just that
-one row. This caused a real production outage the first time a non-nullable
-field was added without a backfill.
+requires a default in that type's merge/backfill function in the matching
+`services/` file (`settings.ts`'s `getSettings()` `{ ...DEFAULT_SETTINGS,
+...stored }` spread, `shopping-list.ts`'s `withShoppingListDefaults()`,
+`inventory.ts`'s `withInventoryDefaults()`) - rows written before the field
+existed won't have it, and GraphQL null-propagates a missing non-null field
+to fail the *entire containing list*, not just that one row. This caused a
+real production outage the first time a non-nullable field was added
+without a backfill.

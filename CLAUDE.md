@@ -18,7 +18,7 @@ Each project follows the same internal layout:
 
 - `handler.ts`, `schema.ts`, `schema.graphql`, `context.ts` - flat, at the project root
 - `lib/anthropic/`, `lib/aws/`, `lib/util/` - supporting modules, grouped by what they wrap (Anthropic clients, AWS service clients, generic utilities). Pure domain logic (e.g. imposter's `game.ts`, `words.ts`) stays flat in `lib/`, not nested under a category.
-- `resolvers/resolvers.ts` - real, DB-backed resolvers. Only this is imported by `handler.ts`, so only this ships in the production Lambda bundle.
+- `resolvers/resolvers.ts` - real, DB-backed resolvers. Only this is imported by `handler.ts`, so only this ships in the production Lambda bundle. Keep this file to the `Query`/`Mutation` map itself (rate limiting, calling into data-access code, shaping the response) - once a project's DynamoDB CRUD/merge logic grows large enough to crowd that out, split it into `services/<domain>.ts` (one file per domain, e.g. pantry's `services/inventory.ts`/`shopping-list.ts`/`settings.ts`) rather than letting `resolvers.ts` keep growing. Not every project needs this on day one - portfolio's and imposter's resolvers are still small enough to keep their data access inline.
 - `dev/dev-resolvers.ts` + `dev/dev-server.ts` - in-memory mock resolvers and the local Apollo standalone server that runs them. Keep everything mock/dev-only under `dev/` (not mixed into `resolvers/`) _and_ keep the `dev-` filename prefix even inside that folder - between the two, it's unambiguous at a glance, from the file tree alone, that these never ship to production.
 
 ### DRY - use `api/src/shared/`

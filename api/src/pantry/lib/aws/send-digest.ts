@@ -1,5 +1,6 @@
 import { SESv2Client, SendEmailCommand } from "@aws-sdk/client-sesv2";
-import { getSettings, getShoppingList, type ShoppingListEntry } from "../../resolvers/resolvers";
+import { getSettings } from "../../services/settings";
+import { getShoppingList, type ShoppingListEntry } from "../../services/shopping-list";
 
 const ses = new SESv2Client({});
 

@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { normalizeItemName, normalizeUnit } from "../lib/util/normalize";
-import type { InventoryItem, ShoppingListEntry, PantrySettings } from "../resolvers/resolvers";
+import type { InventoryItem } from "../services/inventory";
+import type { ShoppingListEntry } from "../services/shopping-list";
+import type { PantrySettings } from "../services/settings";
 
 // In-memory mock store used only by dev/server.ts - no DynamoDB, no AWS
 // credentials needed locally. Resets every time the dev server restarts.
