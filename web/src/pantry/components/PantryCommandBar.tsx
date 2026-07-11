@@ -23,7 +23,6 @@ interface UserTurn {
 interface AssistantTurn {
   role: "assistant";
   result: ParsedCommand;
-  expandedActions: Set<number>;
   actionsStatus: ActionsStatus;
   actionsError: string | null;
   // Missing ingredients the user has clicked off, keyed by
@@ -47,39 +46,6 @@ interface PantryCommandBarProps {
 // personal pantry's inventory/shopping-list state is small, but there's no
 // reason to let token cost grow unbounded across a very long conversation.
 const MAX_HISTORY_TURNS = 10;
-
-// Enum-valued fields render unquoted in GraphQL (e.g. FRIDGE, not "FRIDGE") -
-// everything else follows normal JSON-ish literal formatting.
-const ENUM_FIELDS = new Set(["location"]);
-
-function formatGraphQLValue(key: string | null, value: unknown): string {
-  if (value === null || value === undefined) return "null";
-  if (typeof value === "number" || typeof value === "boolean") return String(value);
-  if (typeof value === "string") return key && ENUM_FIELDS.has(key) ? value : JSON.stringify(value);
-  if (Array.isArray(value)) return `[${value.map((v) => formatGraphQLValue(null, v)).join(", ")}]`;
-  if (typeof value === "object") {
-    const entries = Object.entries(value as Record<string, unknown>)
-      .map(([k, v]) => `${k}: ${formatGraphQLValue(k, v)}`)
-      .join(", ");
-    return `{ ${entries} }`;
-  }
-  return JSON.stringify(value);
-}
-
-// Reconstructs a readable GraphQL mutation from the server's {mutationName,
-// argsJson} pair, purely for the "view mutation" transparency panel - this
-// text is never sent anywhere, the real call uses PANTRY_ACTION_MUTATIONS.
-function formatMutationPreview(mutationName: string, argsJson: string): string {
-  try {
-    const args = JSON.parse(argsJson) as Record<string, unknown>;
-    const argsText = Object.entries(args)
-      .map(([k, v]) => `${k}: ${formatGraphQLValue(k, v)}`)
-      .join(", ");
-    return `mutation {\n  ${mutationName}(${argsText})\n}`;
-  } catch {
-    return `${mutationName}(${argsJson})`;
-  }
-}
 
 // haveInInventory only ever means "this ingredient exists somewhere in
 // inventory", set once by the AI - it's never re-checked as the servings
@@ -169,21 +135,8 @@ export default function PantryCommandBar({ items, onChanged }: PantryCommandBarP
     setTurns((prev) => prev.map((t, i) => (i === index && t.role === "assistant" ? { ...t, ...patch } : t)));
   }
 
-  function toggleExpandedAction(turnIndex: number, actionIndex: number) {
-    setTurns((prev) =>
-      prev.map((t, i) => {
-        if (i !== turnIndex || t.role !== "assistant") return t;
-        const next = new Set(t.expandedActions);
-        if (next.has(actionIndex)) next.delete(actionIndex);
-        else next.add(actionIndex);
-        return { ...t, expandedActions: next };
-      })
-    );
-  }
-
   // Fine-grained control: drop a single proposed action from the batch
-  // without cancelling the whole thing. Resets expandedActions since
-  // indices shift once an entry is removed.
+  // without cancelling the whole thing.
   function removeAction(turnIndex: number, actionIndex: number) {
     setTurns((prev) =>
       prev.map((t, i) => {
@@ -191,7 +144,6 @@ export default function PantryCommandBar({ items, onChanged }: PantryCommandBarP
         return {
           ...t,
           result: { ...t.result, actions: t.result.actions.filter((_, ai) => ai !== actionIndex) },
-          expandedActions: new Set(),
         };
       })
     );
@@ -240,7 +192,6 @@ export default function PantryCommandBar({ items, onChanged }: PantryCommandBarP
         {
           role: "assistant",
           result: data.parseCommand,
-          expandedActions: new Set(),
           actionsStatus: "pending",
           actionsError: null,
           excludedIngredients: new Set(),
@@ -339,7 +290,7 @@ export default function PantryCommandBar({ items, onChanged }: PantryCommandBarP
         )}
       </div>
 
-      {turns.length > 0 && (
+      {(turns.length > 0 || thinking) && (
         <div className="pantry-command-turns">
           {turns.map((turn, i) =>
             turn.role === "user" ? (
@@ -401,7 +352,7 @@ export default function PantryCommandBar({ items, onChanged }: PantryCommandBarP
                           <p className="pantry-command-recipe-nutrition">
                             {Math.round(recipe.caloriesPerServing)} kcal · {Math.round(recipe.proteinGPerServing)}g
                             protein · {Math.round(recipe.carbsGPerServing)}g carbs ·{" "}
-                            {Math.round(recipe.fatGPerServing)}g fat <span className="status-line">(per serving, AI estimate)</span>
+                            {Math.round(recipe.fatGPerServing)}g fat
                           </p>
                           <ul className="pantry-command-recipe-ingredients">
                             {recipe.ingredients.map((ing, ii) => {
@@ -496,9 +447,9 @@ export default function PantryCommandBar({ items, onChanged }: PantryCommandBarP
                   <div className="pantry-command-actions">
                     {turn.actionsStatus === "done" ? (
                       // Collapsed to a single line once applied - the
-                      // per-action cards (view mutation, remove) were only
-                      // ever useful before confirming, and stayed expanded
-                      // afterward for no reason.
+                      // per-action cards were only ever useful before
+                      // confirming, and stayed expanded afterward for no
+                      // reason.
                       <p className="pantry-command-turn-done">
                         ✓ Added {turn.result.actions.length} item
                         {turn.result.actions.length > 1 ? "s" : ""}
@@ -512,31 +463,17 @@ export default function PantryCommandBar({ items, onChanged }: PantryCommandBarP
                           <div className="pantry-command-action" key={ai}>
                             <div className="pantry-command-action-row">
                               <p className="pantry-command-action-summary">{action.summary}</p>
-                              <span className="pantry-command-action-controls">
-                                <button
-                                  type="button"
-                                  className="pantry-details-toggle"
-                                  onClick={() => toggleExpandedAction(i, ai)}
-                                >
-                                  {turn.expandedActions.has(ai) ? "− hide mutation" : "+ view mutation"}
-                                </button>
-                                <button
-                                  type="button"
-                                  className="pantry-shopping-remove-btn"
-                                  onClick={() => removeAction(i, ai)}
-                                  disabled={turn.actionsStatus === "confirming"}
-                                  aria-label={`Remove "${action.summary}" from this batch`}
-                                  title="Remove this action"
-                                >
-                                  ✕
-                                </button>
-                              </span>
+                              <button
+                                type="button"
+                                className="pantry-shopping-remove-btn"
+                                onClick={() => removeAction(i, ai)}
+                                disabled={turn.actionsStatus === "confirming"}
+                                aria-label={`Remove "${action.summary}" from this batch`}
+                                title="Remove this action"
+                              >
+                                ✕
+                              </button>
                             </div>
-                            {turn.expandedActions.has(ai) && (
-                              <pre className="pantry-command-mutation">
-                                {formatMutationPreview(action.mutationName, action.argsJson)}
-                              </pre>
-                            )}
                           </div>
                         ))}
                         {turn.actionsError && <p className="status-line">// {turn.actionsError}</p>}
@@ -565,6 +502,12 @@ export default function PantryCommandBar({ items, onChanged }: PantryCommandBarP
               </div>
             )
           )}
+          {thinking && (
+            <div className="pantry-command-turn-assistant pantry-command-thinking">
+              <span className="pantry-spinner" aria-hidden="true" />
+              Thinking…
+            </div>
+          )}
         </div>
       )}
 
@@ -575,7 +518,7 @@ export default function PantryCommandBar({ items, onChanged }: PantryCommandBarP
           value={input}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
-          placeholder='"Add 2L milk to the fridge" or "what&apos;s expiring soon?"'
+          placeholder='"What can I make with chicken?" or "Add toothbrush to my shopping list"'
           disabled={thinking}
           maxLength={200}
           rows={1}

@@ -84,16 +84,13 @@ export default function PantryAddItemSection({ settings, onSettingsChange, onAdd
     <section className="pantry-panel">
       <div className="pantry-panel-header">
         <h2 className="pantry-panel-title">Add item</h2>
-        <button
-          type="button"
-          className="pantry-details-toggle"
-          onClick={() => onSettingsChange({ addItemCollapsed: !settings.addItemCollapsed })}
-        >
-          {settings.addItemCollapsed ? "+ options" : "− options"}
-        </button>
       </div>
 
-      {!settings.addItemCollapsed && (
+      {/* Driven by the Common items panel's hide toggle above it, not its
+          own - the two sit right next to each other as one "quickly log
+          something" area, so a single hide/show should cover both rather
+          than needing two separate toggles that could end up out of sync. */}
+      {!settings.commonItemsCollapsed && (
         <form onSubmit={handleSubmit}>
           <div className="pantry-quick-add">
             <input

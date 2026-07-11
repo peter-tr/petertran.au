@@ -445,31 +445,11 @@
   gap: 0.8rem;
 }
 
-.pantry-command-action-controls {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-shrink: 0;
-}
-
 .pantry-command-action-summary {
   font-family: var(--font-sans);
   font-size: 0.88rem;
   color: var(--paper);
   margin: 0;
-}
-
-.pantry-command-mutation {
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  color: var(--muted-dim);
-  background: var(--ink);
-  border: 1px solid var(--rule);
-  border-radius: 6px;
-  padding: 0.6rem 0.7rem;
-  margin-top: 0.5rem;
-  overflow-x: auto;
-  white-space: pre;
 }
 
 .pantry-command-turns {
@@ -502,6 +482,30 @@
   font-size: 0.78rem;
   color: var(--muted-dim);
   margin: 0.4rem 0 0;
+}
+
+.pantry-command-thinking {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.pantry-spinner {
+  width: 0.85rem;
+  height: 0.85rem;
+  border: 2px solid var(--rule);
+  border-top-color: var(--signal);
+  border-radius: 50%;
+  animation: pantry-spin 0.7s linear infinite;
+}
+
+@keyframes pantry-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .pantry-command-recipes {
@@ -977,6 +981,7 @@
   max-width: 28rem;
   max-height: 90vh;
   overflow-y: auto;
+  overflow-x: hidden;
   background: var(--panel);
   border: 1px solid var(--rule);
   border-radius: var(--radius);
@@ -995,8 +1000,18 @@
 
 .pantry-edit-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  /* minmax(0, 1fr), not plain 1fr - grid tracks default to a minimum of
+     the content's intrinsic size, so a select/input with wide content
+     (a long category name, a date input's native rendering) could hold
+     the column wider than available space instead of shrinking to fit,
+     forcing the whole modal to scroll horizontally on mobile. */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.7rem 1rem;
+}
+
+.pantry-edit-grid .form-input {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .pantry-modal-actions {
@@ -1008,8 +1023,13 @@
 
 @media (max-width: 640px) {
   .pantry-edit-grid {
-    grid-template-columns: repeat(2, 1fr);
     gap: 0.5rem 0.6rem;
+  }
+
+  /* Same iOS Safari auto-zoom fix as .form-input in base.css - this input
+     isn't a .form-input, so it needs its own override. */
+  .qty-stepper-input {
+    font-size: 16px;
   }
 }
 
@@ -1045,13 +1065,17 @@
     width: 3.6rem;
   }
 
+  /* 2 visual rows, not 3 - meta and controls share the second row instead
+     of each getting a full-width row of their own, which on a real phone
+     left a card that was mostly empty space around a short "1 · today" and
+     three small buttons. */
   .pantry-item-row {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr auto;
     grid-template-areas:
-      "info"
-      "meta"
-      "controls";
-    row-gap: 0.35rem;
+      "info info"
+      "meta controls";
+    row-gap: 0.3rem;
+    column-gap: 0.6rem;
     padding: 0.5rem 0.6rem;
   }
 
@@ -1073,8 +1097,9 @@
   }
 
   .pantry-item-controls {
-    justify-self: stretch;
-    justify-content: space-between;
+    justify-self: end;
+    justify-content: flex-end;
+    gap: 0.4rem;
   }
 
   .pantry-common-item-picker {
