@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import PantryCommandBar from "./components/PantryCommandBar";
 import PantryInventorySection from "./components/PantryInventorySection";
@@ -12,6 +13,7 @@ export default function Pantry() {
   const { items, error, refetch } = usePantryInventory();
   const { entries: shoppingList, refetch: refetchShoppingList } = usePantryShoppingList();
   const { settings, updateSettings } = usePantrySettings();
+  const [showAbout, setShowAbout] = useState(false);
 
   // Awaited by callers before re-enabling their own busy state (e.g. the
   // staple star toggle) - without that, a quick second click computes its
@@ -24,7 +26,18 @@ export default function Pantry() {
   return (
     <>
       <header className="pantry-head pantry-head-row">
-        <h1>Pantry</h1>
+        <h1>
+          Pantry
+          <button
+            type="button"
+            className="pantry-info-btn"
+            onClick={() => setShowAbout((v) => !v)}
+            aria-label="What is this page?"
+            aria-expanded={showAbout}
+          >
+            i
+          </button>
+        </h1>
         <Link
           to="/pantry/settings"
           className="pantry-settings-cog"
@@ -34,6 +47,13 @@ export default function Pantry() {
           ⚙
         </Link>
       </header>
+
+      {showAbout && (
+        <p className="pantry-about">
+          I kept forgetting what I actually had in the fridge and pantry (spices, especially) - and kept
+          forgetting what I needed to buy. So I built this to keep track of it for me.
+        </p>
+      )}
 
       {error && (
         <p className="status-line">// couldn&apos;t load inventory from the API right now ({error}).</p>

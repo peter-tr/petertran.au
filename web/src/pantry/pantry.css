@@ -18,6 +18,14 @@
   gap: 0.8rem;
 }
 
+.pantry-about {
+  margin: -0.3rem 0 0.9rem;
+  font-family: var(--font-sans);
+  font-size: 0.84rem;
+  font-style: italic;
+  color: var(--muted);
+}
+
 .pantry-settings-cog {
   display: inline-flex;
   align-items: center;
@@ -105,7 +113,6 @@
   margin-left: 0.5rem;
   font-family: var(--font-mono);
   font-size: 0.7rem;
-  font-style: italic;
   font-weight: 700;
   color: var(--muted-dim);
   background: none;
@@ -125,18 +132,92 @@
 }
 
 .pantry-info-list {
-  list-style: none;
   margin: 0 0 0.8rem;
   padding: 0.7rem 0.9rem;
   border: 1px solid var(--rule);
   border-radius: var(--radius);
   background: var(--panel-2);
-  font-family: var(--font-mono);
-  font-size: 0.76rem;
-  color: var(--muted);
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 0.55rem;
+}
+
+.pantry-info-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.pantry-info-group + .pantry-info-group {
+  padding-top: 0.55rem;
+  border-top: 1px dashed var(--rule);
+}
+
+.pantry-info-group-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.pantry-info-label {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  padding: 0.1rem 0.45rem;
+  border-radius: 4px;
+}
+
+.pantry-info-label-0 {
+  color: var(--type);
+  background: rgba(99, 199, 190, 0.12);
+}
+
+.pantry-info-label-1 {
+  color: var(--signal);
+  background: rgba(242, 169, 59, 0.12);
+}
+
+.pantry-info-label-2 {
+  color: var(--string);
+  background: rgba(232, 137, 107, 0.12);
+}
+
+.pantry-info-desc {
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.pantry-info-examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.pantry-info-example {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: var(--paper);
+  background: var(--panel);
+  border: 1px dashed var(--rule);
+  border-radius: 999px;
+  padding: 0.22rem 0.6rem;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    border-style 0.15s ease,
+    color 0.15s ease,
+    background 0.15s ease;
+}
+
+.pantry-info-example:hover {
+  border-style: solid;
+  border-color: var(--type);
+  color: var(--type);
+  background: var(--panel-2);
 }
 
 .pantry-panel-header-controls {
