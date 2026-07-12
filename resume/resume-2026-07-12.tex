@@ -16,7 +16,7 @@
     \textheight=10.4in
     \pagestyle{empty}
     \raggedright
-    \usepackage[left=0.8in,right=0.8in,bottom=0.2in,top=0.25in]{geometry}
+    \usepackage[left=0.8in,right=0.8in,bottom=0.3in,top=0.25in]{geometry}
 
 % DEFINITIONS FOR RESUME %%%%%%%%%%%%%%%%%%%%%%%
 
@@ -62,7 +62,6 @@ Bachelor of Engineering (Honours) \& Master of Engineering (Software) \hfill Feb
     \item Built and own three GraphQL subgraphs (Accounts, Transactions, Parties), migrating legacy REST/SOAP endpoints onto the federated layer and cutting p95 latency from 500ms to 300ms (40\%)
     \item Designed a custom GraphQL directive enforcing OAuth 2.0 scope-based authorization, giving field- and entity-level access control over sensitive financial data
     \item Built an MCP server exposing the supergraph to AI agents, used by 200+ engineers to query the schema and customer usage in natural language instead of hand-writing GraphQL introspection
-    \item Serve as on-call engineer (PagerDuty) for the GraphQL platform serving 17M customers, operating against a 99.9\% availability SLO
 \end{itemize}
 
 
@@ -105,9 +104,16 @@ Bachelor of Engineering (Honours) \& Master of Engineering (Software) \hfill Feb
 \vspace{1.5mm}
 %==== PROJECTS ====%
 \header{Projects}
-{\textbf{petertran.au}} {\sl TypeScript, React, GraphQL/Apollo, AWS (Lambda, DynamoDB, CloudFront, SES, CDK), Anthropic API}\\
-Personal monorepo of three serverless apps provisioned entirely via AWS CDK, with X-Ray tracing, live CloudWatch/Cost Explorer dashboards, and a GitHub Actions pipeline whose schema-validation gate was added after a real production outage. Built an AI-native pantry assistant on Claude: a natural-language command bar with structured JSON-schema outputs and hallucination guards (actions always require client confirmation), plus an agentic price checker using Claude's web-search tools against live retailer listings.\\
-\vspace*{1mm}
+{\textbf{petertran.au}} {\sl React, GraphQL, AWS (Lambda, DynamoDB, CloudFront, CDK), Anthropic API}\\
+petertran.au $\cdot$ petertran.au/pantry $\cdot$ petertran.au/imposter\\
+\vspace{-2mm}
+\begin{itemize} \itemsep -1pt
+    \item Architected a monorepo of three full-stack apps (GraphQL backend, React frontend) on AWS, deployed via CDK with distributed tracing, metrics, and logging
+    \item Shipped a visitor Q\&A feature: a question becomes a live GraphQL query against real data, answered from that result -- contact requests route to a static form, not an auto-run mutation
+    \item Built Pantry, a household inventory/shopping-list app: a natural-language command bar plus a Claude-powered price checker that searches and links real Coles prices
+    \item Added an optional Claude-generated word-pair mode to Imposters, a multiplayer party game
+\end{itemize}
+\vspace{-2mm}
 
 %==== PROGRAMS & TRAINING ====%
 \header{Programs \& Training}
