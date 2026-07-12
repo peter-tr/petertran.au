@@ -1,5 +1,6 @@
 import { CostExplorerClient, GetCostAndUsageCommand } from "@aws-sdk/client-cost-explorer";
 import { GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
+import { ConditionalCheckFailedException } from "@aws-sdk/client-dynamodb";
 import { ddb, TABLE_NAME } from "./ddb";
 
 // Cost Explorer is a global service only reachable via us-east-1, regardless
@@ -37,11 +38,40 @@ export async function getAwsAllTimeCostUsd(): Promise<number> {
 async function fetchAwsAllTimeCostUsd(): Promise<number> {
   const cached = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: CACHE_KEY }));
   const fetchedAt = cached.Item?.fetchedAt as string | undefined;
+  const cachedAmountUsd = cached.Item?.amountUsd as number | undefined;
   if (fetchedAt && Date.now() - new Date(fetchedAt).getTime() < CACHE_TTL_MS) {
-    return cached.Item?.amountUsd as number;
+    return cachedAmountUsd ?? 0;
   }
 
   const now = new Date();
+
+  // Claim the refresh with a conditional write before calling the (paid,
+  // $0.01/call) Cost Explorer API below. Without this, several concurrent
+  // Lambda containers racing past an expired cache would each independently
+  // see it as stale and fire their own real call - the condition only lets
+  // the container that read the cache first "win"; the rest fall back to the
+  // last cached amount instead of double-paying for a duplicate call.
+  try {
+    await ddb.send(
+      new PutCommand({
+        TableName: TABLE_NAME,
+        Item: {
+          ...CACHE_KEY,
+          amountUsd: cachedAmountUsd ?? 0,
+          fetchedAt: now.toISOString(),
+          ttl: Math.floor(Date.now() / 1000) + RETENTION_DAYS * 24 * 60 * 60,
+        },
+        ConditionExpression: fetchedAt ? "fetchedAt = :prevFetchedAt" : "attribute_not_exists(fetchedAt)",
+        ExpressionAttributeValues: fetchedAt ? { ":prevFetchedAt": fetchedAt } : undefined,
+      })
+    );
+  } catch (err) {
+    if (err instanceof ConditionalCheckFailedException) {
+      return cachedAmountUsd ?? 0;
+    }
+    throw err;
+  }
+
   // Cost Explorer refuses to look back more than 14 months - 12 is a safe
   // margin under that, and this project's AWS resources are all much younger
   // than that anyway, so it effectively captures the account's whole history.
@@ -50,7 +80,30 @@ async function fetchAwsAllTimeCostUsd(): Promise<number> {
   // usage entirely - use tomorrow instead to include today's (estimated)
   // spend, which Cost Explorer does support returning same-day.
   const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-  const amountUsd = await fetchAwsCostUsd(start, end);
+
+  let amountUsd: number;
+  try {
+    amountUsd = await fetchAwsCostUsd(start, end);
+  } catch (err) {
+    // Release the claim (restore the pre-claim fetchedAt, or clear it if this
+    // was the first-ever fetch) so a still-stale cache keeps retrying on the
+    // next request instead of sitting "fresh" for a full cache window after
+    // a failure.
+    await ddb
+      .send(
+        new PutCommand({
+          TableName: TABLE_NAME,
+          Item: {
+            ...CACHE_KEY,
+            amountUsd: cachedAmountUsd ?? 0,
+            ...(fetchedAt ? { fetchedAt } : {}),
+            ttl: Math.floor(Date.now() / 1000) + RETENTION_DAYS * 24 * 60 * 60,
+          },
+        })
+      )
+      .catch(() => {});
+    throw err;
+  }
 
   await ddb.send(
     new PutCommand({
