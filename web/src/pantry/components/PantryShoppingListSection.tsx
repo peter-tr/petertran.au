@@ -38,6 +38,19 @@ function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+// "urgent" still falls back to most-recently-added within each of the two
+// groups (urgent first, then not) - never an unstable/arbitrary tiebreak.
+function sortEntries(entries: ShoppingListEntry[], sort: string): ShoppingListEntry[] {
+  const copy = [...entries];
+  if (sort === "urgent") {
+    return copy.sort((a, b) => {
+      if (a.urgent !== b.urgent) return a.urgent ? -1 : 1;
+      return b.addedAt.localeCompare(a.addedAt);
+    });
+  }
+  return copy.sort((a, b) => b.addedAt.localeCompare(a.addedAt));
+}
+
 export default function PantryShoppingListSection({
   entries,
   items,
@@ -214,17 +227,27 @@ export default function PantryShoppingListSection({
   const categories = [...new Set(entries.map((e) => e.category).filter((c): c is string => !!c))].sort();
   const recipeTags = [...new Set(entries.map((e) => e.recipeTag).filter((t): t is string => !!t))].sort();
 
-  const filteredEntries = entries.filter((e) => {
-    if (settings.shoppingCategoryFilter && e.category !== settings.shoppingCategoryFilter) return false;
-    if (settings.shoppingRecipeFilter && e.recipeTag !== settings.shoppingRecipeFilter) return false;
-    if (settings.shoppingUrgentOnly && !e.urgent) return false;
-    return true;
-  });
+  const filteredEntries = sortEntries(
+    entries.filter((e) => {
+      if (settings.shoppingCategoryFilter && e.category !== settings.shoppingCategoryFilter) return false;
+      if (settings.shoppingRecipeFilter && e.recipeTag !== settings.shoppingRecipeFilter) return false;
+      if (settings.shoppingUrgentOnly && !e.urgent) return false;
+      return true;
+    }),
+    settings.shoppingSort
+  );
 
   return (
     <section className="pantry-panel">
       <div className="pantry-panel-header">
         <h2 className="pantry-panel-title">Shopping list</h2>
+        <button
+          type="button"
+          className="pantry-details-toggle"
+          onClick={() => onSettingsChange({ shoppingOptionsCollapsed: !settings.shoppingOptionsCollapsed })}
+        >
+          {settings.shoppingOptionsCollapsed ? "+ options" : "− options"}
+        </button>
         <button
           type="button"
           className="pantry-details-toggle"
@@ -238,8 +261,46 @@ export default function PantryShoppingListSection({
 
       {!settings.shoppingListCollapsed && (
         <>
-          {(categories.length > 0 || recipeTags.length > 0) && (
+          {!settings.shoppingOptionsCollapsed && (
             <div className="pantry-panel-header-controls">
+              <div className="pantry-control-group">
+                <span className="pantry-control-label">Sort by</span>
+                <div className="pantry-view-tabs">
+                  <button
+                    type="button"
+                    className={`pantry-view-tab ${settings.shoppingSort !== "urgent" ? "active" : ""}`}
+                    onClick={() => onSettingsChange({ shoppingSort: "recent" })}
+                  >
+                    Recent
+                  </button>
+                  <button
+                    type="button"
+                    className={`pantry-view-tab ${settings.shoppingSort === "urgent" ? "active" : ""}`}
+                    onClick={() => onSettingsChange({ shoppingSort: "urgent" })}
+                  >
+                    Urgent
+                  </button>
+                </div>
+              </div>
+              <div className="pantry-control-group">
+                <span className="pantry-control-label">Show</span>
+                <div className="pantry-view-tabs">
+                  <button
+                    type="button"
+                    className={`pantry-view-tab ${!settings.shoppingSimple ? "active" : ""}`}
+                    onClick={() => onSettingsChange({ shoppingSimple: false })}
+                  >
+                    Details
+                  </button>
+                  <button
+                    type="button"
+                    className={`pantry-view-tab ${settings.shoppingSimple ? "active" : ""}`}
+                    onClick={() => onSettingsChange({ shoppingSimple: true })}
+                  >
+                    Simple
+                  </button>
+                </div>
+              </div>
               {categories.length > 0 && (
                 <div className="pantry-control-group">
                   <span className="pantry-control-label">Category</span>
@@ -409,16 +470,22 @@ export default function PantryShoppingListSection({
                           {entry.unit ? ` ${entry.unit}` : ""})
                         </span>
                       )}
-                      {entry.note && <span className="pantry-shopping-note"> - {entry.note}</span>}
-                      {entry.category && <span className="pantry-item-category"> {entry.category}</span>}
-                      {entry.recipeTag && <span className="pantry-shopping-recipe-tag"> · {entry.recipeTag}</span>}
-                      {entry.trackPrice && (
+                      {!settings.shoppingSimple && entry.note && (
+                        <span className="pantry-shopping-note"> - {entry.note}</span>
+                      )}
+                      {!settings.shoppingSimple && entry.category && (
+                        <span className="pantry-item-category"> {entry.category}</span>
+                      )}
+                      {!settings.shoppingSimple && entry.recipeTag && (
+                        <span className="pantry-shopping-recipe-tag"> · {entry.recipeTag}</span>
+                      )}
+                      {!settings.shoppingSimple && entry.trackPrice && (
                         <span className="pantry-item-last-known-price" title={entry.lastKnownPrice?.note ?? undefined}>
                           {" · "}
                           {formatLastKnownPrice(entry.lastKnownPrice)}
                         </span>
                       )}
-                      {entry.trackPrice && settings.nerdModeShoppingList && entry.lastKnownPrice && (
+                      {!settings.shoppingSimple && entry.trackPrice && settings.nerdModeShoppingList && entry.lastKnownPrice && (
                         <span className="pantry-nerd-debug-info">
                           {" · "}
                           {formatDebugInfo(entry.lastKnownPrice.debugInfo)}
@@ -426,31 +493,36 @@ export default function PantryShoppingListSection({
                       )}
                     </span>
                     <span className="pantry-shopping-item-actions">
-                      <button
-                        type="button"
-                        className={`pantry-shopping-urgent-toggle ${entry.urgent ? "active" : ""}`}
-                        onClick={() => toggleUrgent(entry)}
-                        disabled={busyId === entry.id}
-                        title={entry.urgent ? "Urgent - needed ASAP" : "Mark as urgent"}
-                        aria-label={entry.urgent ? "Unmark as urgent" : "Mark as urgent"}
-                      >
-                        !
-                      </button>
-                      <button
-                        type="button"
-                        className={`pantry-track-price-toggle ${entry.trackPrice ? "active" : ""}`}
-                        onClick={() => toggleTrackPrice(entry)}
-                        disabled={busyId === entry.id}
-                        title={
-                          entry.trackPrice
-                            ? "Tracking price - checked daily against Coles"
-                            : "Track price (checked daily against Coles)"
-                        }
-                        aria-label={entry.trackPrice ? "Stop tracking price" : "Track price"}
-                      >
-                        $
-                      </button>
-                      {entry.trackPrice &&
+                      {!settings.shoppingSimple && (
+                        <button
+                          type="button"
+                          className={`pantry-shopping-urgent-toggle ${entry.urgent ? "active" : ""}`}
+                          onClick={() => toggleUrgent(entry)}
+                          disabled={busyId === entry.id}
+                          title={entry.urgent ? "Urgent - needed ASAP" : "Mark as urgent"}
+                          aria-label={entry.urgent ? "Unmark as urgent" : "Mark as urgent"}
+                        >
+                          !
+                        </button>
+                      )}
+                      {!settings.shoppingSimple && (
+                        <button
+                          type="button"
+                          className={`pantry-track-price-toggle ${entry.trackPrice ? "active" : ""}`}
+                          onClick={() => toggleTrackPrice(entry)}
+                          disabled={busyId === entry.id}
+                          title={
+                            entry.trackPrice
+                              ? "Tracking price - checked daily against Coles"
+                              : "Track price (checked daily against Coles)"
+                          }
+                          aria-label={entry.trackPrice ? "Stop tracking price" : "Track price"}
+                        >
+                          $
+                        </button>
+                      )}
+                      {!settings.shoppingSimple &&
+                        entry.trackPrice &&
                         (() => {
                           const link = colesLinkFor(entry.name, entry.lastKnownPrice);
                           return (
@@ -461,10 +533,12 @@ export default function PantryShoppingListSection({
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 title={
-                                  entry.lastKnownPrice?.productUrl ? "Open this product on Coles" : "Search for this on Coles"
+                                  entry.lastKnownPrice?.productUrl
+                                    ? "Open this product on Coles"
+                                    : "Not the exact product priced above - a plain Coles search for this name"
                                 }
                               >
-                                Coles ↗
+                                {entry.lastKnownPrice?.productUrl ? "Coles ↗" : "Search Coles ↗"}
                               </a>
                             )
                           );

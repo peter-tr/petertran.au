@@ -396,6 +396,22 @@ type PantrySettings {
   """
   shoppingUrgentOnly: Boolean!
   """
+  True if the Shopping list panel's filter/sort controls are collapsed -
+  same concept as InventoryItem's optionsCollapsed, just for the other list.
+  """
+  shoppingOptionsCollapsed: Boolean!
+  """
+  How the Shopping list is ordered: "recent" (most recently added first) or
+  "urgent" (urgent entries first, then most recently added).
+  """
+  shoppingSort: String!
+  """
+  True for the compact "Simple" shopping list row display, false for
+  "Details" - same concept as InventoryItem's `simple`, just for the other
+  list.
+  """
+  shoppingSimple: Boolean!
+  """
   Whether the daily urgent-shopping-list digest email is sent at all.
   """
   digestEnabled: Boolean!
@@ -438,6 +454,9 @@ input PantrySettingsInput {
   shoppingCategoryFilter: String
   shoppingRecipeFilter: String
   shoppingUrgentOnly: Boolean
+  shoppingOptionsCollapsed: Boolean
+  shoppingSort: String
+  shoppingSimple: Boolean
   digestEnabled: Boolean
   digestHour: Int
   nerdModeInventory: Boolean

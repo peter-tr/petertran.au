@@ -20,6 +20,9 @@ export interface PantrySettings {
   shoppingCategoryFilter: string | null;
   shoppingRecipeFilter: string | null;
   shoppingUrgentOnly: boolean;
+  shoppingOptionsCollapsed: boolean;
+  shoppingSort: string;
+  shoppingSimple: boolean;
   digestEnabled: boolean;
   digestHour: number;
   // Shows extra debug info (AI call cost, duration, search/fetch counts) on
@@ -48,6 +51,9 @@ export interface PantrySettingsInput {
   shoppingCategoryFilter?: string | null;
   shoppingRecipeFilter?: string | null;
   shoppingUrgentOnly?: boolean;
+  shoppingOptionsCollapsed?: boolean;
+  shoppingSort?: string;
+  shoppingSimple?: boolean;
   digestEnabled?: boolean;
   digestHour?: number;
   nerdModeInventory?: boolean;
@@ -72,6 +78,9 @@ const DEFAULT_SETTINGS: PantrySettings = {
   shoppingCategoryFilter: null,
   shoppingRecipeFilter: null,
   shoppingUrgentOnly: false,
+  shoppingOptionsCollapsed: false,
+  shoppingSort: "recent",
+  shoppingSimple: false,
   // Matches the digest's original fixed 4pm-daily behavior before this
   // became configurable, so existing rows behave identically once they
   // pick up this default via the getSettings() backfill merge below.

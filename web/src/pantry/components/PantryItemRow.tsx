@@ -281,9 +281,13 @@ export default function PantryItemRow({
                   href={link}
                   target="_blank"
                   rel="noopener noreferrer"
-                  title={item.lastKnownPrice?.productUrl ? "Open this product on Coles" : "Search for this on Coles"}
+                  title={
+                    item.lastKnownPrice?.productUrl
+                      ? "Open this product on Coles"
+                      : "Not the exact product priced above - a plain Coles search for this name"
+                  }
                 >
-                  Coles ↗
+                  {item.lastKnownPrice?.productUrl ? "Coles ↗" : "Search Coles ↗"}
                 </a>
               )
             );
