@@ -30,9 +30,11 @@ type Purchase {
 """
 The most recent automated price lookup for an item flagged with `trackPrice`.
 Written only by the scheduled price-check Lambda, never by a user mutation
-directly - `note` carries caveats the lookup itself surfaces (e.g. "Woolworths
-not checked" or "multiple pack sizes found") rather than a hard guarantee the
-numbers are exact.
+directly. Coles only - Woolworths' pages don't reliably surface a price
+through search/fetch, so that retailer is skipped entirely rather than shown
+as a usually-null field. `note` carries caveats the lookup surfaces (e.g.
+"assumed standard 12-pack" or "multiple pack sizes found") rather than a hard
+guarantee the number is exact.
 """
 type LastKnownPrice {
   """
@@ -40,15 +42,9 @@ type LastKnownPrice {
   """
   colesPrice: Float
   """
-  Most recently found Woolworths price, in AUD. Null if unconfirmed - in
-  practice this stays null most of the time, since Woolworths' pages don't
-  reliably surface a price through search/fetch (see `note`).
-  """
-  woolworthsPrice: Float
-  """
-  Freeform caveat from the lookup, e.g. "Woolworths not checked - dynamic
-  pricing" or "multiple pack sizes found, showing loose/per-kg". Null if
-  nothing noteworthy.
+  Freeform caveat from the lookup, e.g. "assumed standard 12-pack - item name
+  didn't specify a variant" or "multiple pack sizes found, showing loose/per-
+  kg". Null if nothing noteworthy.
   """
   note: String
   """

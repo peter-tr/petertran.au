@@ -17,7 +17,6 @@ export interface Purchase {
 
 export interface LastKnownPrice {
   colesPrice: number | null;
-  woolworthsPrice: number | null;
   note: string | null;
   checkedAt: string;
 }
@@ -73,7 +72,6 @@ const INVENTORY_ITEM_FIELDS = /* GraphQL */ `
   trackPrice
   lastKnownPrice {
     colesPrice
-    woolworthsPrice
     note
     checkedAt
   }

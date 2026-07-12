@@ -12,35 +12,34 @@ const MAX_ITEMS_PER_RUN = 20;
 // Sonnet's one completed test run spiralled into a 9.5-minute, $2.56 single
 // call with no cap. max_uses + a short request timeout are load-bearing,
 // not optional, given that incident.
-const SYSTEM_PROMPT = `You look up current Australian grocery prices for a pantry-tracking app.
+//
+// Coles only, deliberately - Woolworths' pages don't reliably surface a
+// price through search/fetch (confirmed live, repeatedly), and a field
+// that's usually null isn't worth showing the user at all.
+const SYSTEM_PROMPT = `You look up the current Coles price (Australia) for an item in a pantry-tracking app.
 
 Rules:
-- Only search Coles prices. Do NOT attempt to look up Woolworths prices via search or fetch - their site loads prices dynamically and neither search snippets nor page fetches reliably surface a number, so trying wastes searches. Leave the Woolworths price null and say so in your note; never guess or copy the Coles price onto Woolworths as if it were confirmed there too.
 - For items sold in variable denominations (loose produce priced per kg vs per each vs per bunch, or multiple pack sizes), report the most common/representative one as the price and name any other denominations you found in the note, rather than silently picking one with no explanation.
-- Never state a price unless a search or fetch result actually confirms it for that specific product. Say null instead of guessing or inferring from a similar item.
+- A confirmed exact price beats a labeled assumption, but a labeled assumption beats null - a price of null is close to useless for someone glancing at their pantry list. If a search doesn't turn up a price for the exact item name given (e.g. it's generic, missing a size/variant, or just didn't surface a clean match), don't stop at null: search again for the item's most common/standard version (e.g. the regular-flavour 12-pack for a bare brand name) and report that price, with a note explaining what you assumed (e.g. "assumed standard 12-pack - item name didn't specify a variant"). Only fall back to null if you genuinely can't find a Coles price for anything plausibly matching this item at all, not just the one exact name given.
+- Never silently substitute a different item's price without saying so - the note is what makes an assumption safe to show the user, so an assumed price without a note explaining the assumption isn't good enough.
 
-End your response with exactly these three lines, each on its own line, using the literal word "null" (not a placeholder) when a value is unknown:
-COLES_PRICE: <number or null>
-WOOLWORTHS_PRICE: <number or null>
+End your response with exactly these two lines, each on its own line, using the literal word "null" (not a placeholder) when a value is unknown. COLES_PRICE must be a single plain number with no dollar sign and no range (e.g. "7.00", never "$7.00" or "0.84-6.00") - if multiple variants have different prices, pick one (the cheapest, or the most standard/common) as the number and put the others in NOTE instead:
+COLES_PRICE: <a single plain number, or null>
 NOTE: <short caveat, or null>`;
 
 interface CheckPriceResult {
   colesPrice: number | null;
-  woolworthsPrice: number | null;
   note: string | null;
 }
 
 function parseResult(text: string): CheckPriceResult {
   const colesMatch = text.match(/COLES_PRICE:\s*(null|[\d.]+)/i);
-  const woolworthsMatch = text.match(/WOOLWORTHS_PRICE:\s*(null|[\d.]+)/i);
   const noteMatch = text.match(/NOTE:\s*(.+)/i);
 
   const colesPrice = colesMatch && colesMatch[1].toLowerCase() !== "null" ? parseFloat(colesMatch[1]) : null;
-  const woolworthsPrice =
-    woolworthsMatch && woolworthsMatch[1].toLowerCase() !== "null" ? parseFloat(woolworthsMatch[1]) : null;
   const note = noteMatch && noteMatch[1].trim().toLowerCase() !== "null" ? noteMatch[1].trim() : null;
 
-  return { colesPrice, woolworthsPrice, note };
+  return { colesPrice, note };
 }
 
 async function checkPrice(itemName: string): Promise<CheckPriceResult> {
@@ -85,9 +84,7 @@ export async function checkTrackedPrices(): Promise<void> {
       const result = await checkPrice(item.name);
       const price: LastKnownPrice = { ...result, checkedAt: new Date().toISOString() };
       await setLastKnownPrice(item.id, price);
-      console.log(
-        `Checked "${item.name}": Coles $${price.colesPrice ?? "?"}, Woolworths $${price.woolworthsPrice ?? "?"}${price.note ? ` (${price.note})` : ""}`
-      );
+      console.log(`Checked "${item.name}": Coles $${price.colesPrice ?? "?"}${price.note ? ` (${price.note})` : ""}`);
     } catch (err) {
       console.error(`Price check failed for "${item.name}":`, err);
     }

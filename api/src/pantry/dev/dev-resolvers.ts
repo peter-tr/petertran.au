@@ -133,8 +133,7 @@ if (milkEntry) {
     trackPrice: true,
     lastKnownPrice: {
       colesPrice: 3.55,
-      woolworthsPrice: null,
-      note: "Woolworths not checked - dynamic pricing",
+      note: null,
       checkedAt: new Date().toISOString(),
     },
   });

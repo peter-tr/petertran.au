@@ -39,10 +39,8 @@ function formatMeta(item: InventoryItem): string {
 // errors, so they get plain text rather than looking broken.
 function formatLastKnownPrice(price: LastKnownPrice | null): string {
   if (!price) return "price check pending";
-  const parts: string[] = [];
-  if (price.colesPrice !== null) parts.push(`Coles $${price.colesPrice.toFixed(2)}`);
-  if (price.woolworthsPrice !== null) parts.push(`Woolworths $${price.woolworthsPrice.toFixed(2)}`);
-  return parts.length > 0 ? parts.join(", ") : "price unconfirmed";
+  if (price.colesPrice === null) return "price unconfirmed";
+  return `Coles $${price.colesPrice.toFixed(2)}`;
 }
 
 // Separated from the rest of the meta line so expired/soon-to-expire dates
