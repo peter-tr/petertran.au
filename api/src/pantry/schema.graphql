@@ -42,6 +42,12 @@ type LastKnownPrice {
   """
   colesPrice: Float
   """
+  Direct link to the Coles product page, if the lookup actually found one -
+  never a guessed/constructed URL. Null if no confirmed product page was
+  found (a "sync now" or the next daily check may find one later).
+  """
+  productUrl: String
+  """
   Freeform caveat from the lookup, e.g. "assumed standard 12-pack - item name
   didn't specify a variant" or "multiple pack sizes found, showing loose/per-
   kg". Null if nothing noteworthy.
@@ -440,6 +446,14 @@ type ProposedAction {
   {"input":{"name":"Milk","location":"FRIDGE","quantity":2}}.
   """
   argsJson: String!
+  """
+  Quick, no-search ballpark estimate of the item's price in AUD, for
+  RECORD_PURCHASE/ADD_TO_SHOPPING_LIST only - null for every other action
+  type, or when no estimate could be made. This is never a confirmed live
+  price (see InventoryItem.lastKnownPrice for that) - display it with a "~"
+  prefix so it's clearly a rough guess, not a fact.
+  """
+  estimatedPriceAud: Float
 }
 
 """
@@ -662,4 +676,13 @@ type Mutation {
   Update shared pantry settings. Only provided fields are changed.
   """
   updateSettings(input: PantrySettingsInput!): PantrySettings!
+  """
+  Trigger a price check for every trackPrice-flagged item right now, instead
+  of waiting for the next daily run. Fire-and-forget - this returns as soon
+  as the check has been kicked off, not once it's finished; results land on
+  each item's lastKnownPrice asynchronously, the same as the scheduled run.
+  Always returns true (a failure to even start would throw, not return
+  false).
+  """
+  syncPricesNow: Boolean!
 }

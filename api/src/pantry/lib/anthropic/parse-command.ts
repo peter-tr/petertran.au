@@ -18,7 +18,7 @@ type RawActionType =
   | "ADD_TO_SHOPPING_LIST"
   | "REMOVE_FROM_SHOPPING_LIST";
 
-type RawFlag = "STAPLE" | "LOW_PRIORITY" | "NEARLY_EMPTY";
+type RawFlag = "STAPLE" | "LOW_PRIORITY" | "NEARLY_EMPTY" | "TRACK_PRICE";
 
 interface RawAction {
   type: RawActionType;
@@ -37,11 +37,19 @@ interface RawAction {
   // structured-output schema caps the number of union/nullable-typed
   // parameters at 16, and this app was already close to that limit before
   // lowPriority/nearlyEmpty existed. A plain array isn't a union type, so
-  // this keeps 3 flags (staple/lowPriority/nearlyEmpty) at the cost of only
-  // 2 schema slots instead of 3, with room to add more flags later.
+  // this keeps 4 flags (staple/lowPriority/nearlyEmpty/trackPrice) at the
+  // cost of only 2 schema slots instead of 4, with room to add more later.
   flagsSet: RawFlag[];
   flagsClear: RawFlag[];
   note: string | null;
+  // A quick, no-search ballpark estimate (never a confirmed live price) for
+  // RECORD_PURCHASE/ADD_TO_SHOPPING_LIST, shown once in the confirmation
+  // preview only - never persisted to the mutation. Non-nullable (0 = "no
+  // estimate") rather than anyOf, same reasoning as RawRecipeIngredient's
+  // estimatedPriceAud below - the schema is already at 15/16 of Anthropic's
+  // union-typed-parameter limit (see the outage this caused before), so new
+  // fields must use a sentinel value instead of anyOf wherever possible.
+  estimatedPriceAud: number;
 }
 
 interface RawRecipeIngredient {
@@ -81,6 +89,11 @@ export interface ProposedAction {
   summary: string;
   mutationName: string;
   argsJson: string;
+  // Preview-only ballpark estimate (see RawAction.estimatedPriceAud) - not
+  // part of argsJson, never sent to the mutation itself. Null (not 0) here
+  // specifically so the client can tell "no estimate for this action type"
+  // apart from "estimated at $0", since this is the client-facing shape.
+  estimatedPriceAud: number | null;
 }
 
 export interface RecipeIngredient {
@@ -153,11 +166,12 @@ Decide what the input is and respond with exactly one of these four modes:
 
 - "answer": the input is a read-only question (e.g. "what's expiring soon?", "how much milk do I have?"). Answer directly and concisely from the data above in the "answer" field, in plain conversational text - never invent data not shown above. If the answer is naturally a list of items (e.g. "what spices do I have?", "what's expiring soon?") - set "answer" to a short intro sentence (or leave it null if nothing more needs saying) and put one line per item in "answerItems", instead of writing the whole list out as prose in "answer".
 - "actions": use this mode whenever ANY part of the input is clear enough to act on - even if only part of it is. Fill "actions" with one entry per clear change:
-  - RECORD_PURCHASE: the item is physically in hand already - completed-purchase phrasing only ("add X", "bought X", "got X", "picked up X"). Always use this (never UPDATE_INVENTORY_ITEM) for that phrasing, even if a similar item already exists - the system merges duplicates itself. Do NOT use this for future intent or desire - "want to buy X", "need to buy X", "going to get X", "should pick up X", "I want more X" describe something not yet purchased, even though they contain the word "buy"/"get" - those go to ADD_TO_SHOPPING_LIST instead, never here. Requires name, location (guess FRIDGE/FREEZER/PANTRY sensibly if not stated), and quantity (default 1 if not stated). Set purchasedAt to today's date (${today}) unless the input implies no purchase actually happened. Set "category" when you're confident of a good match - prefer reusing one of the categories already in use above if one fits (e.g. "garlic powder" -> "Spices" if that's already a category), otherwise invent a sensible new one; leave it null if genuinely unclear rather than guessing. "flagsSet"/"flagsClear" turn STAPLE/LOW_PRIORITY/NEARLY_EMPTY on or off - only include a flag in one of these two lists if the input actually says so (e.g. "add salt as low priority" -> flagsSet: ["LOW_PRIORITY"]); leave both lists empty otherwise.
-  - UPDATE_INVENTORY_ITEM: correcting an EXISTING item's fields without it being a new purchase. Requires itemId matching one of the ids listed above exactly - never invent an id. Same category/flagsSet/flagsClear rules as RECORD_PURCHASE apply here too, only when the input actually asks to change them.
+  - RECORD_PURCHASE: the item is physically in hand already - completed-purchase phrasing only ("add X", "bought X", "got X", "picked up X"). Always use this (never UPDATE_INVENTORY_ITEM) for that phrasing, even if a similar item already exists - the system merges duplicates itself. Do NOT use this for future intent or desire - "want to buy X", "need to buy X", "going to get X", "should pick up X", "I want more X" describe something not yet purchased, even though they contain the word "buy"/"get" - those go to ADD_TO_SHOPPING_LIST instead, never here. Requires name, location (guess FRIDGE/FREEZER/PANTRY sensibly if not stated), and quantity (default 1 if not stated). Set purchasedAt to today's date (${today}) unless the input implies no purchase actually happened. Set "category" when you're confident of a good match - prefer reusing one of the categories already in use above if one fits (e.g. "garlic powder" -> "Spices" if that's already a category), otherwise invent a sensible new one; leave it null if genuinely unclear rather than guessing. "flagsSet"/"flagsClear" turn STAPLE/LOW_PRIORITY/NEARLY_EMPTY/TRACK_PRICE on or off - only include a flag in one of these two lists if the input actually says so (e.g. "add salt as low priority" -> flagsSet: ["LOW_PRIORITY"]), EXCEPT TRACK_PRICE: set flagsSet: ["TRACK_PRICE"] automatically (without the input asking) whenever you defaulted the name to a specific branded product with an assumed standard pack size (same condition as ADD_TO_SHOPPING_LIST's pack-size rule below) - a specific enough product is exactly what the daily price check needs, so turn tracking on for it rather than requiring the user to remember to flip it on themselves. Leave both lists empty for TRACK_PRICE when the item is generic/unbranded (e.g. "onions").
+  - UPDATE_INVENTORY_ITEM: correcting an EXISTING item's fields without it being a new purchase. Requires itemId matching one of the ids listed above exactly - never invent an id. Same category/flagsSet/flagsClear rules as RECORD_PURCHASE apply here too, only when the input actually asks to change them (including TRACK_PRICE - only here if the input actually asks to start/stop tracking, no auto-enabling on a plain edit).
   - REMOVE_INVENTORY_ITEM: fully using up or getting rid of an existing item. Requires itemId matching one of the ids listed above exactly.
   - ADD_TO_SHOPPING_LIST: noting something is needed without it being in stock right now (e.g. "we're out of eggs", "need to buy bread", "add 1 kg of coffee beans to my shopping list"). The shopping list isn't limited to food - non-food household items (e.g. "add toothbrush to my shopping list", "we need dish soap", "add paper towels") are also valid here, since it doubles as a general household shopping list; only refuse (via "unclear") a shopping-list request when it's not a purchasable physical item at all. Requires name. Set quantity/unit if the input states an amount (e.g. "1 kg of coffee beans" -> quantity=1, unit="kg"). If it doesn't, and the item is a well-known specific branded product that has one standard/most common pack size (e.g. "Up&Go" -> a 12-pack, "eggs" -> a dozen) - default to that standard size using your own general knowledge, reflect it in "name" (e.g. "Up&Go 12 Pack Choc Ice", not bare "Up and Go") and in quantity/unit, and say what you assumed in "summary" (e.g. "Add Up&Go 12 Pack to the shopping list (assumed standard pack size)") so the user can correct it if they meant something else - this specificity is what lets a later price check find the right product instead of guessing. For a genuinely generic item with no one sensible standard size (e.g. "onions", "toothbrush"), leave quantity/unit null as before - don't force a made-up size onto something that doesn't have a standard one. Set "note" only when there's a specific reason worth remembering (e.g. a recipe it's for) - leave it null for a plain add. Same "category" rule as RECORD_PURCHASE - prefer an existing category, else invent one, else null if unclear; for a non-food household item, use the existing "Household" category unless a more specific one clearly fits. If the name matches an item already on the shopping list (see the list above), this UPDATES that entry's quantity/unit/note/category rather than creating a duplicate - use it for that too, e.g. if the user gives an amount for something already listed.
   - REMOVE_FROM_SHOPPING_LIST: an item on the shopping list has been bought or is no longer needed. Requires itemId matching one of the shopping list ids listed above exactly.
+  For RECORD_PURCHASE and ADD_TO_SHOPPING_LIST only, set "estimatedPriceAud" to your own best-effort ballpark of the current Australian retail price, in AUD, for the item/quantity/pack-size given - this is a quick guess from your own knowledge, never a live/confirmed price (that's a separate background feature), so treat it the same way as a recipe ingredient estimate. Use 0 only when you genuinely can't produce even a rough estimate (never as a real "$0" price). For every other action type, always set "estimatedPriceAud" to 0 - it isn't applicable there.
   Always write a short, specific "summary" for each action describing exactly what will happen, e.g. "Add 2 L Milk to the fridge, bought today".
   If the input names multiple distinct items - separated by commas, "and", or just listed one after another, e.g. "I bought pasta, pesto and cheese" - create one separate action per item, each with its own name. Never combine several item names into a single action's name field (e.g. never "pasta pesto cheese" as one name) - if you're about to write more than two or three words into a "name" field, that's a sign you're merging items that should be split.
   If part of the request is too vague to act on safely (e.g. "and whatever else I need for X" without saying what), don't invent items to fill the gap and don't drop the whole request either - propose actions for the clear part, and use "message" to say what you left out and why, so the user can just ask again for that part specifically.
@@ -219,9 +233,16 @@ export const PARSE_COMMAND_SCHEMA = {
           price: { anyOf: [{ type: "number" }, { type: "null" }] },
           purchasedAt: { anyOf: [{ type: "string" }, { type: "null" }] },
           expiresAt: { anyOf: [{ type: "string" }, { type: "null" }] },
-          flagsSet: { type: "array", items: { type: "string", enum: ["STAPLE", "LOW_PRIORITY", "NEARLY_EMPTY"] } },
-          flagsClear: { type: "array", items: { type: "string", enum: ["STAPLE", "LOW_PRIORITY", "NEARLY_EMPTY"] } },
+          flagsSet: {
+            type: "array",
+            items: { type: "string", enum: ["STAPLE", "LOW_PRIORITY", "NEARLY_EMPTY", "TRACK_PRICE"] },
+          },
+          flagsClear: {
+            type: "array",
+            items: { type: "string", enum: ["STAPLE", "LOW_PRIORITY", "NEARLY_EMPTY", "TRACK_PRICE"] },
+          },
           note: { anyOf: [{ type: "string" }, { type: "null" }] },
+          estimatedPriceAud: { type: "number" },
         },
         required: [
           "type",
@@ -238,6 +259,7 @@ export const PARSE_COMMAND_SCHEMA = {
           "flagsSet",
           "flagsClear",
           "note",
+          "estimatedPriceAud",
         ],
         additionalProperties: false,
       },
@@ -299,7 +321,17 @@ function flagValue(a: RawAction, flag: RawFlag): boolean | null {
   return null;
 }
 
+// 0 is Claude's "no estimate" sentinel (see RawAction.estimatedPriceAud) -
+// only RECORD_PURCHASE/ADD_TO_SHOPPING_LIST ever get a real one, so this
+// converts the sentinel to null for the two action types where it applies,
+// and always null for every other type regardless of what Claude sent.
+function estimateFor(a: RawAction): number | null {
+  if (a.type !== "RECORD_PURCHASE" && a.type !== "ADD_TO_SHOPPING_LIST") return null;
+  return a.estimatedPriceAud > 0 ? a.estimatedPriceAud : null;
+}
+
 function toProposedAction(a: RawAction): ProposedAction | null {
+  const estimatedPriceAud = estimateFor(a);
   switch (a.type) {
     case "RECORD_PURCHASE": {
       if (!a.name || !a.location || a.quantity == null) return null;
@@ -307,6 +339,7 @@ function toProposedAction(a: RawAction): ProposedAction | null {
         type: a.type,
         summary: a.summary,
         mutationName: "recordPurchase",
+        estimatedPriceAud,
         argsJson: JSON.stringify({
           input: {
             name: a.name,
@@ -320,6 +353,7 @@ function toProposedAction(a: RawAction): ProposedAction | null {
             isStaple: flagValue(a, "STAPLE"),
             lowPriority: flagValue(a, "LOW_PRIORITY"),
             nearlyEmpty: flagValue(a, "NEARLY_EMPTY"),
+            trackPrice: flagValue(a, "TRACK_PRICE"),
           },
         }),
       };
@@ -338,13 +372,16 @@ function toProposedAction(a: RawAction): ProposedAction | null {
       const isStaple = flagValue(a, "STAPLE");
       const lowPriority = flagValue(a, "LOW_PRIORITY");
       const nearlyEmpty = flagValue(a, "NEARLY_EMPTY");
+      const trackPrice = flagValue(a, "TRACK_PRICE");
       if (isStaple != null) input.isStaple = isStaple;
       if (lowPriority != null) input.lowPriority = lowPriority;
       if (nearlyEmpty != null) input.nearlyEmpty = nearlyEmpty;
+      if (trackPrice != null) input.trackPrice = trackPrice;
       return {
         type: a.type,
         summary: a.summary,
         mutationName: "updateInventoryItem",
+        estimatedPriceAud,
         argsJson: JSON.stringify({ id: a.itemId, input }),
       };
     }
@@ -354,6 +391,7 @@ function toProposedAction(a: RawAction): ProposedAction | null {
         type: a.type,
         summary: a.summary,
         mutationName: "removeInventoryItem",
+        estimatedPriceAud,
         argsJson: JSON.stringify({ id: a.itemId }),
       };
     }
@@ -363,6 +401,7 @@ function toProposedAction(a: RawAction): ProposedAction | null {
         type: a.type,
         summary: a.summary,
         mutationName: "addToShoppingList",
+        estimatedPriceAud,
         argsJson: JSON.stringify({
           name: a.name,
           quantity: a.quantity,
@@ -378,6 +417,7 @@ function toProposedAction(a: RawAction): ProposedAction | null {
         type: a.type,
         summary: a.summary,
         mutationName: "removeFromShoppingList",
+        estimatedPriceAud,
         argsJson: JSON.stringify({ id: a.itemId }),
       };
     }

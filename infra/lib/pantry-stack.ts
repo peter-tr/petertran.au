@@ -145,6 +145,11 @@ export class PantryStack extends Stack {
     table.grantReadWriteData(priceCheckFn);
     anthropicSecret.grantRead(priceCheckFn);
 
+    // Lets the main GraphQL Lambda's syncPricesNow mutation fire-and-forget
+    // invoke this one on demand, in addition to its own daily schedule.
+    apiFn.addEnvironment("PRICE_CHECK_FUNCTION_NAME", priceCheckFn.functionName);
+    priceCheckFn.grantInvoke(apiFn);
+
     // Once daily, early morning Sydney-local - prices don't need to be
     // fresher than that, and this keeps the (still capped, but non-zero)
     // Anthropic spend from this job as low as it can be while still useful.

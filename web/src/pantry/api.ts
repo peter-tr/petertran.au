@@ -17,6 +17,7 @@ export interface Purchase {
 
 export interface LastKnownPrice {
   colesPrice: number | null;
+  productUrl: string | null;
   note: string | null;
   checkedAt: string;
 }
@@ -72,6 +73,7 @@ const INVENTORY_ITEM_FIELDS = /* GraphQL */ `
   trackPrice
   lastKnownPrice {
     colesPrice
+    productUrl
     note
     checkedAt
   }
@@ -317,6 +319,16 @@ export interface UpdateSettingsResult {
   updateSettings: PantrySettings;
 }
 
+export const SYNC_PRICES_NOW_MUTATION = /* GraphQL */ `
+  mutation SyncPricesNow {
+    syncPricesNow
+  }
+`;
+
+export interface SyncPricesNowResult {
+  syncPricesNow: boolean;
+}
+
 export type PantryActionType =
   | "RECORD_PURCHASE"
   | "UPDATE_INVENTORY_ITEM"
@@ -329,6 +341,9 @@ export interface ProposedAction {
   summary: string;
   mutationName: string;
   argsJson: string;
+  // Quick, no-search ballpark estimate (RECORD_PURCHASE/ADD_TO_SHOPPING_LIST
+  // only) - never a confirmed live price, render with a "~" prefix.
+  estimatedPriceAud: number | null;
 }
 
 export interface RecipeIngredient {
@@ -379,6 +394,7 @@ export const PARSE_COMMAND_QUERY = /* GraphQL */ `
         summary
         mutationName
         argsJson
+        estimatedPriceAud
       }
       recipes {
         name

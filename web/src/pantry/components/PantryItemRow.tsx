@@ -43,6 +43,15 @@ function formatLastKnownPrice(price: LastKnownPrice | null): string {
   return `Coles $${price.colesPrice.toFixed(2)}`;
 }
 
+// Only link out once there's an actual price to show - nothing to send
+// someone to for "pending"/"unconfirmed". Prefer the exact product page the
+// price check itself found; fall back to a plain Coles search for the item
+// name (a real, always-valid URL, not a guess) when it didn't capture one.
+function colesLinkFor(name: string, price: LastKnownPrice | null): string | null {
+  if (!price || price.colesPrice === null) return null;
+  return price.productUrl ?? `https://www.coles.com.au/search?q=${encodeURIComponent(name)}`;
+}
+
 // Separated from the rest of the meta line so expired/soon-to-expire dates
 // can get their own color without recoloring the whole "1 kg · $4.50 ·
 // 2d ago" string alongside them.
@@ -272,6 +281,23 @@ export default function PantryItemRow({
           step={stepForUnit(item.unit)}
           disabled={busy}
         />
+        {item.trackPrice &&
+          (() => {
+            const link = colesLinkFor(item.name, item.lastKnownPrice);
+            return (
+              link && (
+                <a
+                  className="pantry-coles-link"
+                  href={link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={item.lastKnownPrice?.productUrl ? "Open this product on Coles" : "Search for this on Coles"}
+                >
+                  Coles ↗
+                </a>
+              )
+            );
+          })()}
         <button type="button" className="pantry-edit-btn" onClick={() => setShowEdit(true)} disabled={busy}>
           edit
         </button>

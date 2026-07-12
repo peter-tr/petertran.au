@@ -96,6 +96,7 @@ function buildRecipeShoppingActions(
           note,
           recipeTag: recipe.name,
         }),
+        estimatedPriceAud: ing.estimatedPriceAud,
       };
     });
 }
@@ -534,7 +535,18 @@ export default function PantryCommandBar({ items, onChanged }: PantryCommandBarP
                         {turn.result.actions.map((action, ai) => (
                           <div className="pantry-command-action" key={ai}>
                             <div className="pantry-command-action-row">
-                              <p className="pantry-command-action-summary">{action.summary}</p>
+                              <p className="pantry-command-action-summary">
+                                {action.summary}
+                                {action.estimatedPriceAud !== null && (
+                                  <span
+                                    className="pantry-command-action-estimate"
+                                    title="Rough estimate from Claude's own knowledge - not a live/confirmed price"
+                                  >
+                                    {" "}
+                                    ~${action.estimatedPriceAud.toFixed(2)}
+                                  </span>
+                                )}
+                              </p>
                               <button
                                 type="button"
                                 className="pantry-shopping-remove-btn"

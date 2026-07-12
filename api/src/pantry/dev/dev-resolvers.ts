@@ -133,6 +133,7 @@ if (milkEntry) {
     trackPrice: true,
     lastKnownPrice: {
       colesPrice: 3.55,
+      productUrl: null,
       note: null,
       checkedAt: new Date().toISOString(),
     },
@@ -222,6 +223,7 @@ interface MockProposedAction {
   summary: string;
   mutationName: string;
   argsJson: string;
+  estimatedPriceAud: number | null;
 }
 
 interface MockRecipeSuggestion {
@@ -344,8 +346,10 @@ function mockParseCommand(input: string): MockParsedCommand {
               isStaple: null,
               lowPriority: null,
               nearlyEmpty: null,
+              trackPrice: null,
             },
           }),
+          estimatedPriceAud: null,
         },
       ],
       recipes: null,
@@ -373,6 +377,7 @@ function mockParseCommand(input: string): MockParsedCommand {
           summary: `Remove "${match.name}" from inventory (mock preview - dev server only)`,
           mutationName: "removeInventoryItem",
           argsJson: JSON.stringify({ id: match.id }),
+          estimatedPriceAud: null,
         },
       ],
       recipes: null,
@@ -517,5 +522,7 @@ export const devResolvers = {
       };
       return settings;
     },
+    // No Lambda to invoke locally - just acknowledges the click.
+    syncPricesNow: () => true,
   },
 };
