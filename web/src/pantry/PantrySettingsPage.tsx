@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import PantryArchitectureDiagram from "./components/PantryArchitectureDiagram";
 import { usePantrySettings } from "./hooks/usePantrySettings";
+import { runPantryQuery, SYNC_PRICES_NOW_MUTATION, type SyncPricesNowResult } from "./api";
 import "./pantry.css";
 
 const HOURS = Array.from({ length: 24 }, (_, h) => h);
@@ -11,8 +13,21 @@ function formatHour(h: number): string {
   return `${display}:00${period}`;
 }
 
+type SyncStatus = "idle" | "syncing" | "done" | "error";
+
 export default function PantrySettingsPage() {
   const { settings, error, updateSettings } = usePantrySettings();
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle");
+
+  async function handleSyncNow() {
+    setSyncStatus("syncing");
+    try {
+      await runPantryQuery<SyncPricesNowResult>(SYNC_PRICES_NOW_MUTATION);
+      setSyncStatus("done");
+    } catch {
+      setSyncStatus("error");
+    }
+  }
 
   return (
     <>
@@ -68,6 +83,31 @@ export default function PantrySettingsPage() {
           </div>
         </section>
       )}
+
+      <section className="pantry-panel">
+        <div className="pantry-panel-header">
+          <h2 className="pantry-panel-title">Price tracking</h2>
+        </div>
+        <p className="project-desc">
+          Items flagged with the $ toggle get their Coles price checked once a day automatically. Use this to
+          check them right now instead of waiting - results land on each item as soon as the check finishes,
+          not instantly (it's the same background job, just triggered early).
+        </p>
+        <div className="form-row pantry-settings-row">
+          <button
+            type="button"
+            className="pantry-edit-btn"
+            onClick={handleSyncNow}
+            disabled={syncStatus === "syncing"}
+          >
+            {syncStatus === "syncing" ? "Starting sync…" : "Sync prices now"}
+          </button>
+          {syncStatus === "done" && (
+            <span className="status-line">// Sync started - check back in a minute or two.</span>
+          )}
+          {syncStatus === "error" && <span className="status-line">// Couldn&apos;t start the sync.</span>}
+        </div>
+      </section>
 
       <section className="pantry-panel">
         <div className="pantry-panel-header">

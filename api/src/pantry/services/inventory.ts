@@ -13,6 +13,7 @@ export interface Purchase {
 
 export interface LastKnownPrice {
   colesPrice: number | null;
+  productUrl: string | null;
   note: string | null;
   checkedAt: string;
 }

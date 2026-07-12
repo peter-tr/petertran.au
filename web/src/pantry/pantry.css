@@ -571,6 +571,12 @@
   margin: 0;
 }
 
+.pantry-command-action-estimate {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--muted-dim);
+}
+
 .pantry-command-turns {
   margin-top: 0.8rem;
   display: flex;
@@ -1107,7 +1113,8 @@
   cursor: default;
 }
 
-.pantry-edit-btn {
+.pantry-edit-btn,
+.pantry-coles-link {
   font-family: var(--font-mono);
   font-size: 0.68rem;
   color: var(--muted);
@@ -1116,6 +1123,13 @@
   border-radius: 4px;
   padding: 0.25rem 0.45rem;
   cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.pantry-coles-link:hover {
+  color: var(--type);
+  border-color: var(--type);
 }
 
 .pantry-edit-btn:hover {

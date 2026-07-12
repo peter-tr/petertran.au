@@ -21,6 +21,7 @@ import {
   type UpdateShoppingListEntryInput,
 } from "../services/shopping-list";
 import { getSettings, putSettings, type PantrySettings, type PantrySettingsInput } from "../services/settings";
+import { triggerPriceSync } from "../lib/aws/sync-prices";
 import type { Context } from "../context";
 
 export const resolvers = {
@@ -215,6 +216,12 @@ export const resolvers = {
       };
       await putSettings(updated);
       return updated;
+    },
+
+    syncPricesNow: async (_: unknown, args: unknown, context: Context): Promise<boolean> => {
+      await assertNotRateLimited(context.sourceIp);
+      await triggerPriceSync();
+      return true;
     },
   },
 };
