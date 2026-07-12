@@ -24,6 +24,21 @@ import { getSettings, putSettings, type PantrySettings, type PantrySettingsInput
 import { triggerPriceSync } from "../lib/aws/sync-prices";
 import type { Context } from "../context";
 
+// Turning trackPrice on is otherwise a silent no-op until the next daily
+// check (or a manual "sync now") - fires the same background worker
+// immediately instead, so the first price shows up in roughly the time a
+// single Anthropic call takes rather than up to a day later. Never blocks
+// or fails the mutation - a sync trigger failure just means the daily
+// check picks it up as usual.
+async function maybeTriggerPriceSync(wasTracking: boolean, isTracking: boolean): Promise<void> {
+  if (!isTracking || wasTracking) return;
+  try {
+    await triggerPriceSync();
+  } catch (err) {
+    console.error("Failed to auto-trigger price sync:", err);
+  }
+}
+
 export const resolvers = {
   Query: {
     inventory: async (
@@ -71,6 +86,7 @@ export const resolvers = {
       await assertNotRateLimited(context.sourceIp);
       const item = createItem(args.input);
       await putItem(item);
+      await maybeTriggerPriceSync(false, item.trackPrice);
       return item;
     },
 
@@ -90,6 +106,7 @@ export const resolvers = {
       if (!existing) {
         const item = createItem(args.input);
         await putItem(item);
+        await maybeTriggerPriceSync(false, item.trackPrice);
         return item;
       }
 
@@ -134,6 +151,7 @@ export const resolvers = {
       };
 
       await putItem(updated);
+      await maybeTriggerPriceSync(existing.trackPrice, updated.trackPrice);
       return updated;
     },
 
@@ -194,6 +212,7 @@ export const resolvers = {
       };
 
       await putShoppingListEntry(updated);
+      await maybeTriggerPriceSync(existing.trackPrice, updated.trackPrice);
       return updated;
     },
 

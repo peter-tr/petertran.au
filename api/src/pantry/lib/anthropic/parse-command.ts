@@ -126,6 +126,15 @@ export interface ParsedCommandResult {
   debugInfo: AiCallDebugInfo;
 }
 
+// Only ever the last background price check's result, already on file - see
+// the "cost of X at Coles" answer rule below for why this never triggers a
+// live lookup of its own.
+function formatKnownPrice(price: InventoryItem["lastKnownPrice"]): string {
+  if (!price) return "";
+  if (price.colesPrice === null) return ` colesPriceCheckedButUnconfirmed=${price.checkedAt}`;
+  return ` colesPrice=${price.colesPrice}(checked ${price.checkedAt}${price.note ? `, ${price.note}` : ""})`;
+}
+
 function formatInventoryForPrompt(inventory: InventoryItem[]): string {
   if (inventory.length === 0) return "(empty - no items currently tracked)";
   return inventory
@@ -133,7 +142,7 @@ function formatInventoryForPrompt(inventory: InventoryItem[]): string {
       (i) =>
         `- id=${i.id} name="${i.name}" category=${i.category ?? "none"} location=${i.location} quantity=${i.quantity} unit=${i.unit ?? "none"}${
           i.expiresAt ? ` expiresAt=${i.expiresAt}` : ""
-        }`
+        }${formatKnownPrice(i.lastKnownPrice)}`
     )
     .join("\n");
 }
@@ -143,7 +152,7 @@ function formatShoppingListForPrompt(shoppingList: ShoppingListEntry[]): string 
   return shoppingList
     .map(
       (e) =>
-        `- id=${e.id} name="${e.name}"${e.quantity != null ? ` quantity=${e.quantity} unit=${e.unit ?? "none"}` : " (no quantity set)"}`
+        `- id=${e.id} name="${e.name}"${e.quantity != null ? ` quantity=${e.quantity} unit=${e.unit ?? "none"}` : " (no quantity set)"}${formatKnownPrice(e.lastKnownPrice)}`
     )
     .join("\n");
 }
@@ -167,6 +176,7 @@ Categories already in use: ${categories.length ? categories.join(", ") : "(none 
 Decide what the input is and respond with exactly one of these four modes:
 
 - "answer": the input is a read-only question (e.g. "what's expiring soon?", "how much milk do I have?"). Answer directly and concisely from the data above in the "answer" field, in plain conversational text - never invent data not shown above. If the answer is naturally a list of items (e.g. "what spices do I have?", "what's expiring soon?") - set "answer" to a short intro sentence (or leave it null if nothing more needs saying) and put one line per item in "answerItems", instead of writing the whole list out as prose in "answer".
+  - For a price question ("what does milk cost", "how much are carrots at coles") about an item listed above with a colesPrice on file, answer from that - it's the last background price check's real result, including its "checked <date>" timestamp so the user knows how fresh it is (e.g. "Carrots were $2.40 at Coles as of Jul 10."). Never run a new search yourself, there are no web tools here - that's a separate, deliberately async background job (see trackPrice), kept off this fast interactive path so a plain question doesn't have to wait on a live web search. If the item isn't listed above, or is listed but has no colesPrice on file yet, say so plainly and suggest turning trackPrice on for it (or using "Sync prices now" in Settings if it's already tracked) rather than guessing a number or attempting a lookup.
 - "actions": use this mode whenever ANY part of the input is clear enough to act on - even if only part of it is. Fill "actions" with one entry per clear change:
   - RECORD_PURCHASE: the item is physically in hand already - completed-purchase phrasing only ("add X", "bought X", "got X", "picked up X"). Always use this (never UPDATE_INVENTORY_ITEM) for that phrasing, even if a similar item already exists - the system merges duplicates itself. Do NOT use this for future intent or desire - "want to buy X", "need to buy X", "going to get X", "should pick up X", "I want more X" describe something not yet purchased, even though they contain the word "buy"/"get" - those go to ADD_TO_SHOPPING_LIST instead, never here. Requires name, location (guess FRIDGE/FREEZER/PANTRY sensibly if not stated), and quantity (default 1 if not stated). Set purchasedAt to today's date (${today}) unless the input implies no purchase actually happened. Set "category" when you're confident of a good match - prefer reusing one of the categories already in use above if one fits (e.g. "garlic powder" -> "Spices" if that's already a category), otherwise invent a sensible new one; leave it null if genuinely unclear rather than guessing. "flagsSet"/"flagsClear" turn STAPLE/LOW_PRIORITY/NEARLY_EMPTY/TRACK_PRICE on or off - only include a flag in one of these two lists if the input actually says so (e.g. "add salt as low priority" -> flagsSet: ["LOW_PRIORITY"]), EXCEPT TRACK_PRICE: set flagsSet: ["TRACK_PRICE"] automatically (without the input asking) whenever you defaulted the name to a specific branded product with an assumed standard pack size (same condition as ADD_TO_SHOPPING_LIST's pack-size rule below) - a specific enough product is exactly what the daily price check needs, so turn tracking on for it rather than requiring the user to remember to flip it on themselves. Leave both lists empty for TRACK_PRICE when the item is generic/unbranded (e.g. "onions").
   - UPDATE_INVENTORY_ITEM: correcting an EXISTING item's fields without it being a new purchase. Requires itemId matching one of the ids listed above exactly - never invent an id. Same category/flagsSet/flagsClear rules as RECORD_PURCHASE apply here too, only when the input actually asks to change them (including TRACK_PRICE - only here if the input actually asks to start/stop tracking, no auto-enabling on a plain edit).

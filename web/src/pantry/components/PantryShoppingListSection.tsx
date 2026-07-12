@@ -479,7 +479,7 @@ export default function PantryShoppingListSection({
                       {!settings.shoppingSimple && entry.recipeTag && (
                         <span className="pantry-shopping-recipe-tag"> · {entry.recipeTag}</span>
                       )}
-                      {!settings.shoppingSimple && entry.trackPrice && (
+                      {entry.trackPrice && (
                         <span className="pantry-item-last-known-price" title={entry.lastKnownPrice?.note ?? undefined}>
                           {" · "}
                           {formatLastKnownPrice(entry.lastKnownPrice)}

@@ -86,15 +86,22 @@ function buildRecipeShoppingActions(
     .filter((ing, ii) => isEffectivelyMissing(ing, ratio, items) && !excluded.has(`${recipeIndex}-${ii}`))
     .map((ing) => {
       const amount = scaleAmount(ing.amount, ing.quantity, ratio);
-      const note = amount ? `${amount} - for: ${recipe.name}` : `For: ${recipe.name}`;
+      // Only a cleanly-scalable amount (ing.quantity > 0) splits into real
+      // quantity/unit fields - same rule scaleAmount itself uses. Anything
+      // else ("to taste", a range) has nothing safe to parse out, so it
+      // stays freeform text in the note, same as before.
+      const scaledQuantityMatch = ing.quantity > 0 ? amount?.match(/^([\d.]+)/) : null;
+      const quantity = scaledQuantityMatch ? Number(scaledQuantityMatch[1]) : null;
+      const unit = quantity !== null ? amount!.replace(/^[\d.]+\s*/, "").trim() || null : null;
+      const note = quantity !== null ? `For: ${recipe.name}` : amount ? `${amount} - for: ${recipe.name}` : `For: ${recipe.name}`;
       return {
         type: "ADD_TO_SHOPPING_LIST",
         summary: `Add "${ing.name}"${amount ? ` (${amount})` : ""} to the shopping list (for: ${recipe.name})`,
         mutationName: "addToShoppingList",
         argsJson: JSON.stringify({
           name: ing.name,
-          quantity: null,
-          unit: null,
+          quantity,
+          unit,
           note,
           recipeTag: recipe.name,
         }),

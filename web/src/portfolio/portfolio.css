@@ -647,27 +647,8 @@
 }
 
 /* ---------- footer ---------- */
-
-.footer {
-  padding: 2.5rem 0 4rem;
-  border-top: 1px solid var(--rule);
-  font-family: var(--font-mono);
-  font-size: 0.78rem;
-  color: var(--muted-dim);
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem 1.2rem;
-  justify-content: space-between;
-}
-
-.footer a {
-  color: var(--muted);
-  text-decoration: none;
-}
-
-.footer a:hover {
-  color: var(--type);
-}
+/* .footer rules moved to styles/base.css - shared across all three
+   projects' pages now, not just portfolio's. */
 
 /* ---------- tech stack ---------- */
 
