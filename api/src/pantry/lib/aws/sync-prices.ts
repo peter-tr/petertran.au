@@ -1,5 +1,4 @@
 import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
-import type { PriceCheckTarget } from "../anthropic/check-prices";
 
 const lambda = new LambdaClient({});
 
@@ -7,12 +6,12 @@ const lambda = new LambdaClient({});
 // / lib/anthropic/check-prices.ts) - InvocationType "Event" returns as soon
 // as AWS has accepted the invoke, not once it's finished, so this resolves
 // in milliseconds regardless of how many tracked items there are. Results
-// land on each item's lastKnownPrice the same way the scheduled run's do.
+// land on each item's lastKnownPrice the same way once the batch finishes.
 //
-// `only` scopes the run to a single item (e.g. just-toggled trackPrice) -
-// omit it for the bulk paths (daily schedule, "sync prices now") that
-// deliberately check everything tracked.
-export async function triggerPriceSync(only?: PriceCheckTarget): Promise<void> {
+// Only ever called from the "sync prices now" settings button - there's no
+// automatic schedule and no per-toggle auto-trigger (both removed after a
+// real credit-exhaustion incident); this is the only way a price check runs.
+export async function triggerPriceSync(): Promise<void> {
   const functionName = process.env.PRICE_CHECK_FUNCTION_NAME;
   if (!functionName) {
     throw new Error("PRICE_CHECK_FUNCTION_NAME not configured.");
@@ -22,7 +21,6 @@ export async function triggerPriceSync(only?: PriceCheckTarget): Promise<void> {
     new InvokeCommand({
       FunctionName: functionName,
       InvocationType: "Event",
-      Payload: only ? JSON.stringify({ only }) : undefined,
     })
   );
 }
