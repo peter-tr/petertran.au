@@ -1,5 +1,6 @@
 import { useState } from "react";
 import PantryInlineAddToggle from "./PantryInlineAddToggle";
+import PantryEditShoppingListEntryModal from "./PantryEditShoppingListEntryModal";
 import { UNIT_OPTIONS } from "../lib/units";
 import { formatLastKnownPrice, colesLinkFor, formatDebugInfo } from "../lib/priceDisplay";
 import {
@@ -22,8 +23,6 @@ interface EditDraft {
   name: string;
   quantity: string;
   unit: string;
-  note: string;
-  category: string;
 }
 
 interface PantryShoppingListSectionProps {
@@ -61,33 +60,23 @@ export default function PantryShoppingListSection({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editMode, setEditMode] = useState<"edit" | "bought">("edit");
   const [draft, setDraft] = useState<EditDraft | null>(null);
+  // The full-fields form (all of name/quantity/unit/note/category/recipe/
+  // urgent/trackPrice) - separate from the inline row above, which only
+  // ever handles "confirm what you actually bought" now.
+  const [showEditId, setShowEditId] = useState<string | null>(null);
 
-  function draftFrom(entry: ShoppingListEntry): EditDraft {
-    return {
+  // Opens the inline row in "confirm what you actually bought" mode -
+  // quantity/unit are prefilled from the entry but editable before
+  // recordPurchase is called, instead of blindly trusting whatever was on
+  // the list.
+  function startBought(entry: ShoppingListEntry) {
+    setEditingId(entry.id);
+    setDraft({
       name: entry.name,
       quantity: entry.quantity != null ? String(entry.quantity) : "",
       unit: entry.unit ?? "",
-      note: entry.note ?? "",
-      category: entry.category ?? "",
-    };
-  }
-
-  function startEdit(entry: ShoppingListEntry) {
-    setEditingId(entry.id);
-    setEditMode("edit");
-    setDraft(draftFrom(entry));
-  }
-
-  // Opens the same inline row as startEdit, but in "confirm what you
-  // actually bought" mode - quantity/unit are prefilled from the entry but
-  // editable before recordPurchase is called, instead of blindly trusting
-  // whatever was on the list.
-  function startBought(entry: ShoppingListEntry) {
-    setEditingId(entry.id);
-    setEditMode("bought");
-    setDraft(draftFrom(entry));
+    });
   }
 
   function cancelEdit() {
@@ -95,30 +84,12 @@ export default function PantryShoppingListSection({
     setDraft(null);
   }
 
-  async function saveEdit(id: string) {
-    if (!draft) return;
-    const trimmedName = draft.name.trim();
-    if (!trimmedName) {
-      setError("Name can't be empty.");
-      return;
-    }
+  async function saveEditModal(id: string, input: Record<string, unknown>) {
     setBusyId(id);
     setError(null);
     try {
-      await runPantryQuery<UpdateShoppingListEntryResult>(UPDATE_SHOPPING_LIST_ENTRY_MUTATION, {
-        id,
-        input: {
-          name: trimmedName,
-          quantity: draft.quantity.trim() ? Number(draft.quantity) : null,
-          unit: draft.unit || null,
-          note: draft.note.trim() || null,
-          category: draft.category.trim() || null,
-        },
-      });
-      cancelEdit();
+      await runPantryQuery<UpdateShoppingListEntryResult>(UPDATE_SHOPPING_LIST_ENTRY_MUTATION, { id, input });
       await onChanged();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update shopping list entry.");
     } finally {
       setBusyId(null);
     }
@@ -148,7 +119,7 @@ export default function PantryShoppingListSection({
           // shopping list -> re-buy cycle instead of them silently
           // resetting.
           isStaple: entry.isStaple || matchingItem?.isStaple || false,
-          category: draft.category.trim() || entry.category || matchingItem?.category || null,
+          category: entry.category || matchingItem?.category || null,
         },
       });
       await runPantryQuery<RemoveFromShoppingListResult>(REMOVE_FROM_SHOPPING_LIST_MUTATION, {
@@ -366,10 +337,7 @@ export default function PantryShoppingListSection({
                         disabled={busyId === entry.id}
                         autoFocus
                         onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            if (editMode === "bought") confirmBought(entry);
-                            else saveEdit(entry.id);
-                          }
+                          if (e.key === "Enter") confirmBought(entry);
                           if (e.key === "Escape") cancelEdit();
                         }}
                       />
@@ -399,43 +367,15 @@ export default function PantryShoppingListSection({
                           </option>
                         ))}
                       </select>
-                      {editMode === "edit" && (
-                        <>
-                          <select
-                            className="form-input pantry-shopping-edit-category"
-                            value={draft.category}
-                            onChange={(e) => setDraft({ ...draft, category: e.target.value })}
-                            disabled={busyId === entry.id}
-                          >
-                            <option value="">No category</option>
-                            {(draft.category && !settings.categories.includes(draft.category)
-                              ? [draft.category, ...settings.categories]
-                              : settings.categories
-                            ).map((c) => (
-                              <option key={c} value={c}>
-                                {c}
-                              </option>
-                            ))}
-                          </select>
-                          <input
-                            className="form-input"
-                            value={draft.note}
-                            onChange={(e) => setDraft({ ...draft, note: e.target.value })}
-                            placeholder="Note"
-                            maxLength={200}
-                            disabled={busyId === entry.id}
-                          />
-                        </>
-                      )}
                     </div>
                     <span className="pantry-shopping-item-actions">
                       <button
                         type="button"
                         className="run-btn"
-                        onClick={() => (editMode === "bought" ? confirmBought(entry) : saveEdit(entry.id))}
+                        onClick={() => confirmBought(entry)}
                         disabled={busyId === entry.id}
                       >
-                        {busyId === entry.id ? "…" : editMode === "bought" ? "Confirm bought" : "save"}
+                        {busyId === entry.id ? "…" : "Confirm bought"}
                       </button>
                       <button
                         type="button"
@@ -454,11 +394,11 @@ export default function PantryShoppingListSection({
                       role="button"
                       tabIndex={0}
                       title="Click to edit"
-                      onClick={() => startEdit(entry)}
+                      onClick={() => setShowEditId(entry.id)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault();
-                          startEdit(entry);
+                          setShowEditId(entry.id);
                         }
                       }}
                     >
@@ -562,6 +502,17 @@ export default function PantryShoppingListSection({
                         ✕
                       </button>
                     </span>
+
+                    {showEditId === entry.id && (
+                      <PantryEditShoppingListEntryModal
+                        entry={entry}
+                        busy={busyId === entry.id}
+                        categories={settings.categories}
+                        onAddCategory={(name) => onSettingsChange({ categories: [...settings.categories, name] })}
+                        onClose={() => setShowEditId(null)}
+                        onSave={(input) => saveEditModal(entry.id, input)}
+                      />
+                    )}
                   </li>
                 )
               )}
