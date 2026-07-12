@@ -1,6 +1,7 @@
 import { getAnthropicClient } from "@shared/anthropic-client";
 import { getAllItems, setLastKnownPrice, type LastKnownPrice } from "../../services/inventory";
 import { getShoppingList, setShoppingListLastKnownPrice } from "../../services/shopping-list";
+import { startPriceSync, recordPriceCheckProgress, finishPriceSync } from "../../services/price-sync-status";
 import { buildDebugInfo, type AiCallDebugInfo } from "./debug-info";
 
 // Hard cap on tracked items processed per run - a safety net against cost
@@ -33,6 +34,47 @@ End your response with exactly these three lines, each on its own line, using th
 COLES_PRICE: <a single plain number, or null>
 PRODUCT_URL: <the exact coles.com.au product page URL for the closest matching product, or null>
 NOTE: <short caveat, or null>`;
+
+// Verifying the price actually shown on the product page we're about to
+// link, rather than trusting the first call's self-reported number - real
+// runs showed the first call reporting a price from a search snippet (or a
+// different variant/pack size) that didn't match the exact page it also
+// linked, which is worse than useless once the user clicks through and
+// finds a different number. This is deliberately a separate, narrowly-
+// scoped call rather than folding the instruction into SYSTEM_PROMPT -
+// "verify what you just found" needs its own fetch of the exact URL, not
+// another round of search.
+const VERIFY_SYSTEM_PROMPT = `You confirm the current price shown on a specific Coles (Australia) product page.
+
+Fetch the URL given and report ONLY the price actually displayed on that exact page for the main product - not a per-unit/per-kg rate unless that's the only number shown, not a price from anywhere else. If the fetch is blocked, errors, or the page requires a store location before showing a price, report null - never guess or reuse a price from memory.
+
+End your response with exactly one line:
+COLES_PRICE: <a single plain number with no dollar sign, or null>`;
+
+async function verifyPriceOnPage(productUrl: string): Promise<{ colesPrice: number | null; debugInfo: AiCallDebugInfo }> {
+  const client = await getAnthropicClient();
+  const startedAt = Date.now();
+  const response = await client.messages.create(
+    {
+      model: "claude-haiku-4-5",
+      max_tokens: 300,
+      system: VERIFY_SYSTEM_PROMPT,
+      tools: [{ type: "web_fetch_20250910", name: "web_fetch", max_uses: 2 }],
+      messages: [{ role: "user", content: `Fetch ${productUrl} and report the current price shown on it.` }],
+    },
+    { timeout: 30_000 }
+  );
+  const debugInfo = buildDebugInfo(response.usage, Date.now() - startedAt);
+
+  const text = response.content
+    .filter((b): b is Extract<(typeof response.content)[number], { type: "text" }> => b.type === "text")
+    .map((b) => b.text)
+    .join("\n");
+  const match = text.match(/COLES_PRICE:\s*(null|[\d.]+)/i);
+  const colesPrice = match && match[1].toLowerCase() !== "null" ? parseFloat(match[1]) : null;
+
+  return { colesPrice, debugInfo };
+}
 
 export interface CheckPriceResult {
   colesPrice: number | null;
@@ -82,7 +124,28 @@ export async function checkPrice(itemName: string): Promise<CheckPriceResult> {
     .map((b) => b.text)
     .join("\n");
 
-  return { ...parseResult(text), debugInfo };
+  const result = parseResult(text);
+
+  // Re-fetch the exact page we're about to link and use ITS price as the
+  // final answer, falling back to the first call's number only if
+  // verification itself couldn't get one (still better than no price at
+  // all). Combine both calls' usage so nerd mode reflects the true total
+  // cost/duration for this one price check, not just half of it.
+  if (result.productUrl) {
+    const verified = await verifyPriceOnPage(result.productUrl);
+    return {
+      ...result,
+      colesPrice: verified.colesPrice ?? result.colesPrice,
+      debugInfo: {
+        costUsd: debugInfo.costUsd + verified.debugInfo.costUsd,
+        durationMs: debugInfo.durationMs + verified.debugInfo.durationMs,
+        searchesUsed: debugInfo.searchesUsed + verified.debugInfo.searchesUsed,
+        fetchesUsed: debugInfo.fetchesUsed + verified.debugInfo.fetchesUsed,
+      },
+    };
+  }
+
+  return { ...result, debugInfo };
 }
 
 // A tracked target can come from either list - trackPrice is independently
@@ -146,14 +209,24 @@ export async function checkTrackedPrices(only?: PriceCheckTarget): Promise<void>
     return;
   }
 
+  await startPriceSync(targets.length);
+
   for (const target of targets) {
     try {
       const result = await checkPrice(target.name);
       const price: LastKnownPrice = { ...result, checkedAt: new Date().toISOString() };
       await target.apply(price);
       console.log(`Checked "${target.name}": Coles $${price.colesPrice ?? "?"}${price.note ? ` (${price.note})` : ""}`);
+      await recordPriceCheckProgress();
     } catch (err) {
       console.error(`Price check failed for "${target.name}":`, err);
+      await recordPriceCheckProgress({
+        itemName: target.name,
+        message: err instanceof Error ? err.message : "Unknown error",
+        occurredAt: new Date().toISOString(),
+      });
     }
   }
+
+  await finishPriceSync();
 }

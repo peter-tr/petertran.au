@@ -382,6 +382,42 @@ export interface CheckPriceNowResult {
   checkPriceNow: boolean;
 }
 
+export interface PriceCheckError {
+  itemName: string;
+  message: string;
+  occurredAt: string;
+}
+
+export interface PriceSyncStatus {
+  running: boolean;
+  startedAt: string | null;
+  finishedAt: string | null;
+  totalItems: number;
+  checkedItems: number;
+  errors: PriceCheckError[];
+}
+
+export const PRICE_SYNC_STATUS_QUERY = /* GraphQL */ `
+  query PriceSyncStatus {
+    priceSyncStatus {
+      running
+      startedAt
+      finishedAt
+      totalItems
+      checkedItems
+      errors {
+        itemName
+        message
+        occurredAt
+      }
+    }
+  }
+`;
+
+export interface PriceSyncStatusResult {
+  priceSyncStatus: PriceSyncStatus;
+}
+
 export type PantryActionType =
   | "RECORD_PURCHASE"
   | "UPDATE_INVENTORY_ITEM"

@@ -443,6 +443,15 @@ export const devResolvers = {
     shoppingList: () => [...shoppingList.values()].sort((a, b) => a.addedAt.localeCompare(b.addedAt)),
     settings: () => settings,
     parseCommand: (_: unknown, args: { input: string; history?: unknown }) => mockParseCommand(args.input),
+    // No real worker Lambda locally - always reports idle/never-run.
+    priceSyncStatus: () => ({
+      running: false,
+      startedAt: null,
+      finishedAt: null,
+      totalItems: 0,
+      checkedItems: 0,
+      errors: [],
+    }),
   },
   Mutation: {
     addInventoryItem: (_: unknown, args: { input: AddInput }) => {

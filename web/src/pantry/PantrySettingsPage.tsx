@@ -1,8 +1,15 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import PantryArchitectureDiagram from "./components/PantryArchitectureDiagram";
 import { usePantrySettings } from "./hooks/usePantrySettings";
-import { runPantryQuery, SYNC_PRICES_NOW_MUTATION, type SyncPricesNowResult } from "./api";
+import {
+  runPantryQuery,
+  SYNC_PRICES_NOW_MUTATION,
+  PRICE_SYNC_STATUS_QUERY,
+  type SyncPricesNowResult,
+  type PriceSyncStatus,
+  type PriceSyncStatusResult,
+} from "./api";
 import "./pantry.css";
 
 const HOURS = Array.from({ length: 24 }, (_, h) => h);
@@ -13,21 +20,73 @@ function formatHour(h: number): string {
   return `${display}:00${period}`;
 }
 
-type SyncStatus = "idle" | "syncing" | "done" | "error";
+// Rough average from real check-prices.ts calls observed this session
+// (mostly web_search + an occasional web_fetch, 6-12s each) - a ballpark
+// for "how long is this going to take", not a measured guarantee.
+const AVG_SECONDS_PER_ITEM = 8;
+
+function formatEstimate(seconds: number): string {
+  if (seconds < 60) return `~${Math.max(1, Math.round(seconds))}s`;
+  return `~${Math.round(seconds / 60)}m`;
+}
 
 export default function PantrySettingsPage() {
   const { settings, error, updateSettings } = usePantrySettings();
-  const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle");
+  const [syncStatus, setSyncStatus] = useState<PriceSyncStatus | null>(null);
+  const [syncTriggerError, setSyncTriggerError] = useState<string | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  async function handleSyncNow() {
-    setSyncStatus("syncing");
-    try {
-      await runPantryQuery<SyncPricesNowResult>(SYNC_PRICES_NOW_MUTATION);
-      setSyncStatus("done");
-    } catch {
-      setSyncStatus("error");
+  function stopPolling() {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
     }
   }
+
+  async function fetchStatus(): Promise<PriceSyncStatus | null> {
+    try {
+      const data = await runPantryQuery<PriceSyncStatusResult>(PRICE_SYNC_STATUS_QUERY);
+      setSyncStatus(data.priceSyncStatus);
+      return data.priceSyncStatus;
+    } catch {
+      return null;
+    }
+  }
+
+  function startPolling() {
+    if (pollRef.current) return;
+    pollRef.current = setInterval(async () => {
+      const status = await fetchStatus();
+      if (status && !status.running) stopPolling();
+    }, 2000);
+  }
+
+  // Reflects whatever triggered the run - the schedule, another device's
+  // "sync now" click, or a single-item auto-trigger from toggling
+  // trackPrice - not just this page's own button, so opening Settings
+  // while one happens to be running shows it immediately.
+  useEffect(() => {
+    fetchStatus().then((status) => {
+      if (status?.running) startPolling();
+    });
+    return stopPolling;
+  }, []);
+
+  async function handleSyncNow() {
+    setSyncTriggerError(null);
+    try {
+      await runPantryQuery<SyncPricesNowResult>(SYNC_PRICES_NOW_MUTATION);
+      await fetchStatus();
+      startPolling();
+    } catch {
+      setSyncTriggerError("Couldn't start the sync.");
+    }
+  }
+
+  const isSyncing = syncStatus?.running ?? false;
+  const remainingSeconds = syncStatus
+    ? Math.max(syncStatus.totalItems - syncStatus.checkedItems, 0) * AVG_SECONDS_PER_ITEM
+    : 0;
 
   return (
     <>
@@ -90,23 +149,40 @@ export default function PantrySettingsPage() {
         </div>
         <p className="project-desc">
           Items flagged with the $ toggle get their Coles price checked once a day automatically. Use this to
-          check them right now instead of waiting - results land on each item as soon as the check finishes,
-          not instantly (it's the same background job, just triggered early).
+          check them right now instead of waiting.
         </p>
         <div className="form-row pantry-settings-row">
-          <button
-            type="button"
-            className="pantry-edit-btn"
-            onClick={handleSyncNow}
-            disabled={syncStatus === "syncing"}
-          >
-            {syncStatus === "syncing" ? "Starting sync…" : "Sync prices now"}
+          <button type="button" className="pantry-edit-btn" onClick={handleSyncNow} disabled={isSyncing}>
+            {isSyncing ? <span className="pantry-spinner" aria-hidden="true" /> : "Sync prices now"}
           </button>
-          {syncStatus === "done" && (
-            <span className="status-line">// Sync started - check back in a minute or two.</span>
+          {isSyncing && syncStatus && (
+            <span className="status-line">
+              // checking {syncStatus.checkedItems} of {syncStatus.totalItems}
+              {remainingSeconds > 0 && ` - ${formatEstimate(remainingSeconds)} remaining`}
+            </span>
           )}
-          {syncStatus === "error" && <span className="status-line">// Couldn&apos;t start the sync.</span>}
+          {!isSyncing && syncStatus?.finishedAt && (
+            <span className="status-line">
+              // last synced {syncStatus.checkedItems} of {syncStatus.totalItems} item
+              {syncStatus.totalItems === 1 ? "" : "s"}
+              {syncStatus.errors.length > 0 && ` (${syncStatus.errors.length} failed)`}
+            </span>
+          )}
+          {syncTriggerError && <span className="status-line">// {syncTriggerError}</span>}
         </div>
+
+        {syncStatus && syncStatus.errors.length > 0 && (
+          <div className="pantry-sync-errors">
+            <p className="form-label">Recent errors</p>
+            <ul>
+              {syncStatus.errors.map((e, i) => (
+                <li key={i}>
+                  <span className="pantry-sync-error-item">{e.itemName}</span> - {e.message}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </section>
 
       {settings && (
