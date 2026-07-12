@@ -3,6 +3,8 @@ import {
   runPantryQuery,
   PARSE_COMMAND_QUERY,
   PANTRY_ACTION_MUTATIONS,
+  CHECK_PRICE_NOW_MUTATION,
+  type CheckPriceNowResult,
   type ConversationMessage,
   type InventoryItem,
   type ParseCommandResult,
@@ -39,6 +41,10 @@ interface AssistantTurn {
   // follow-up like "make it vegetarian" can't accidentally apply to a
   // suggestion the user already said they're done with.
   dismissedRecipes: Set<number>;
+  // Tracks the "want me to check now?" offer's own button separately from
+  // actionsStatus - a price check isn't an action the user is confirming
+  // before it happens, it's a single already-agreed-to live lookup.
+  priceCheckStatus: "idle" | "checking" | "done" | "error";
 }
 
 type Turn = UserTurn | AssistantTurn;
@@ -269,6 +275,7 @@ export default function PantryCommandBar({ items, onChanged, nerdMode }: PantryC
           excludedIngredients: new Set(),
           recipeServings: {},
           dismissedRecipes: new Set(),
+          priceCheckStatus: "idle",
         },
       ]);
     } catch (err) {
@@ -351,6 +358,20 @@ export default function PantryCommandBar({ items, onChanged, nerdMode }: PantryC
     }
   }
 
+  // The one-off live Coles check the user explicitly opted into from the
+  // "want me to check now?" offer - a single real Anthropic call, so this
+  // takes a few seconds, not the instant round-trip everything else here is.
+  async function checkPriceNow(turnIndex: number, itemId: string, list: string) {
+    updateAssistantTurn(turnIndex, { priceCheckStatus: "checking" });
+    try {
+      await runPantryQuery<CheckPriceNowResult>(CHECK_PRICE_NOW_MUTATION, { id: itemId, list });
+      await onChanged();
+      updateAssistantTurn(turnIndex, { priceCheckStatus: "done" });
+    } catch {
+      updateAssistantTurn(turnIndex, { priceCheckStatus: "error" });
+    }
+  }
+
   // Recipes represent "the current suggestion we're iterating on" - only
   // the latest one should render as a live card, or a refinement like
   // "remove garlic" would appear to duplicate the card instead of updating
@@ -419,6 +440,38 @@ export default function PantryCommandBar({ items, onChanged, nerdMode }: PantryC
             ) : (
               <div className="pantry-command-turn-assistant" key={i}>
                 {turn.result.answer && <p className="pantry-command-answer">{turn.result.answer}</p>}
+
+                {turn.result.offerPriceCheckItemId && turn.result.offerPriceCheckList && (
+                  <p className="pantry-command-price-offer">
+                    {turn.priceCheckStatus === "done" ? (
+                      "Checked - see the updated price on the list below."
+                    ) : turn.priceCheckStatus === "error" ? (
+                      <>
+                        Couldn&apos;t check just now.{" "}
+                        <button
+                          type="button"
+                          className="run-btn"
+                          onClick={() =>
+                            checkPriceNow(i, turn.result.offerPriceCheckItemId!, turn.result.offerPriceCheckList!)
+                          }
+                        >
+                          Try again
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        className="run-btn"
+                        disabled={turn.priceCheckStatus === "checking"}
+                        onClick={() =>
+                          checkPriceNow(i, turn.result.offerPriceCheckItemId!, turn.result.offerPriceCheckList!)
+                        }
+                      >
+                        {turn.priceCheckStatus === "checking" ? "Checking…" : "Check Coles now"}
+                      </button>
+                    )}
+                  </p>
+                )}
 
                 {turn.result.answerItems && turn.result.answerItems.length > 0 && (
                   <ul className="pantry-command-answer-items">

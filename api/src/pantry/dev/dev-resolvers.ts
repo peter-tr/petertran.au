@@ -260,6 +260,8 @@ interface MockParsedCommand {
   recipes: MockRecipeSuggestion[] | null;
   message: string | null;
   debugInfo: { costUsd: number; durationMs: number; searchesUsed: number; fetchesUsed: number };
+  offerPriceCheckItemId: string | null;
+  offerPriceCheckList: string | null;
 }
 
 // No real Anthropic call in dev mode, so there's nothing to measure - zeros
@@ -283,6 +285,8 @@ function mockParseCommand(input: string): MockParsedCommand {
       recipes: null,
       message: "Type a command or question.",
       debugInfo: MOCK_DEBUG_INFO,
+      offerPriceCheckItemId: null,
+      offerPriceCheckList: null,
     };
   }
 
@@ -298,6 +302,8 @@ function mockParseCommand(input: string): MockParsedCommand {
       recipes: null,
       message: null,
       debugInfo: MOCK_DEBUG_INFO,
+      offerPriceCheckItemId: null,
+      offerPriceCheckList: null,
     };
   }
 
@@ -338,6 +344,8 @@ function mockParseCommand(input: string): MockParsedCommand {
       ],
       message: null,
       debugInfo: MOCK_DEBUG_INFO,
+      offerPriceCheckItemId: null,
+      offerPriceCheckList: null,
     };
   }
 
@@ -373,6 +381,8 @@ function mockParseCommand(input: string): MockParsedCommand {
       recipes: null,
       message: null,
       debugInfo: MOCK_DEBUG_INFO,
+      offerPriceCheckItemId: null,
+      offerPriceCheckList: null,
     };
   }
 
@@ -386,6 +396,8 @@ function mockParseCommand(input: string): MockParsedCommand {
         recipes: null,
         message: "Couldn't find an item matching that name.",
         debugInfo: MOCK_DEBUG_INFO,
+        offerPriceCheckItemId: null,
+        offerPriceCheckList: null,
       };
     }
     return {
@@ -403,6 +415,8 @@ function mockParseCommand(input: string): MockParsedCommand {
       recipes: null,
       message: null,
       debugInfo: MOCK_DEBUG_INFO,
+      offerPriceCheckItemId: null,
+      offerPriceCheckList: null,
     };
   }
 
@@ -414,6 +428,8 @@ function mockParseCommand(input: string): MockParsedCommand {
     message:
       'This is a local mock - only "add X", "remove X", "what\'s expiring", and "recipe" are recognized.',
     debugInfo: MOCK_DEBUG_INFO,
+    offerPriceCheckItemId: null,
+    offerPriceCheckList: null,
   };
 }
 
@@ -547,5 +563,7 @@ export const devResolvers = {
     },
     // No Lambda to invoke locally - just acknowledges the click.
     syncPricesNow: () => true,
+    // No real Anthropic call locally either - just acknowledges the click.
+    checkPriceNow: () => true,
   },
 };

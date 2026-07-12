@@ -613,6 +613,16 @@
   margin-top: 0.6rem;
 }
 
+.pantry-command-price-offer {
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  color: var(--muted-dim);
+  margin: 0.5rem 0 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .pantry-command-answer-items {
   font-family: var(--font-sans);
   font-size: 0.88rem;

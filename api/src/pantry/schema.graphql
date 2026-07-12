@@ -779,4 +779,13 @@ type Mutation {
   false).
   """
   syncPricesNow: Boolean!
+  """
+  Check the Coles price for a single item right now, synchronously -
+  unlike syncPricesNow (fire-and-forget, checks everything tracked), this
+  waits for the one real Anthropic call to finish and returns once
+  lastKnownPrice has actually been written. Used for the command bar's
+  "want me to check now?" offer on an untracked price question - never
+  runs automatically. `list` is "inventory" or "shoppingList".
+  """
+  checkPriceNow(id: ID!, list: String!): Boolean!
 }

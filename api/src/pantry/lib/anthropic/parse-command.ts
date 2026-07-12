@@ -83,6 +83,11 @@ interface RawParseResult {
   actions: RawAction[];
   recipes: RawRecipe[];
   message: string | null;
+  // "" sentinel (not anyOf - see the comment on PARSE_COMMAND_SCHEMA) means
+  // "no offer". Set together, only for a price question with nothing on
+  // file yet for a real, already-known item - see the "answer" mode rule.
+  offerPriceCheckItemId: string;
+  offerPriceCheckList: "inventory" | "shoppingList" | "";
 }
 
 export interface ProposedAction {
@@ -124,6 +129,12 @@ export interface ParsedCommandResult {
   recipes: RecipeSuggestion[] | null;
   message: string | null;
   debugInfo: AiCallDebugInfo;
+  // Set together when the answer just offered to check Coles right now for
+  // an item with nothing on file yet - lets the client show a "check now"
+  // button that calls checkPriceNow(id, list) instead of guessing at one.
+  // Null (not "") here - this is the client-facing shape.
+  offerPriceCheckItemId: string | null;
+  offerPriceCheckList: "inventory" | "shoppingList" | null;
 }
 
 // Only ever the last background price check's result, already on file - see
@@ -176,7 +187,7 @@ Categories already in use: ${categories.length ? categories.join(", ") : "(none 
 Decide what the input is and respond with exactly one of these four modes:
 
 - "answer": the input is a read-only question (e.g. "what's expiring soon?", "how much milk do I have?"). Answer directly and concisely from the data above in the "answer" field, in plain conversational text - never invent data not shown above. If the answer is naturally a list of items (e.g. "what spices do I have?", "what's expiring soon?") - set "answer" to a short intro sentence (or leave it null if nothing more needs saying) and put one line per item in "answerItems", instead of writing the whole list out as prose in "answer".
-  - For a price question ("what does milk cost", "how much are carrots at coles") about an item listed above with a colesPrice on file, answer from that - it's the last background price check's real result, including its "checked <date>" timestamp so the user knows how fresh it is (e.g. "Carrots were $2.40 at Coles as of Jul 10."). Never run a new search yourself, there are no web tools here - that's a separate, deliberately async background job (see trackPrice), kept off this fast interactive path so a plain question doesn't have to wait on a live web search. If the item isn't listed above, or is listed but has no colesPrice on file yet, say so plainly and suggest turning trackPrice on for it (or using "Sync prices now" in Settings if it's already tracked) rather than guessing a number or attempting a lookup.
+  - For a price question ("what does milk cost", "how much are carrots at coles") about an item listed above with a colesPrice on file, answer from that - it's the last background price check's real result, including its "checked <date>" timestamp so the user knows how fresh it is (e.g. "Carrots were $2.40 at Coles as of Jul 10."). Never run a new search yourself, there are no web tools here - that's a separate, deliberately async job, kept off this fast interactive path so a plain question doesn't have to wait on a live web search by default. If the item is listed above but has no colesPrice on file yet, say so plainly in "answer" (e.g. "I don't have a Coles price on file for Milk yet - want me to check now?") AND set "offerPriceCheckItemId" to that item's id and "offerPriceCheckList" to "inventory" or "shoppingList" (whichever list it's actually in) - this lets the user opt into a single one-off live check instead of you guessing or silently doing one yourself. Leave both as "" (empty string) in every other case - not just when there's nothing to offer, but also whenever a colesPrice is already on file (nothing to check) or the item isn't listed above at all (no id to check a price against - tell them to add it first instead).
 - "actions": use this mode whenever ANY part of the input is clear enough to act on - even if only part of it is. Fill "actions" with one entry per clear change:
   - RECORD_PURCHASE: the item is physically in hand already - completed-purchase phrasing only ("add X", "bought X", "got X", "picked up X"). Always use this (never UPDATE_INVENTORY_ITEM) for that phrasing, even if a similar item already exists - the system merges duplicates itself. Do NOT use this for future intent or desire - "want to buy X", "need to buy X", "going to get X", "should pick up X", "I want more X" describe something not yet purchased, even though they contain the word "buy"/"get" - those go to ADD_TO_SHOPPING_LIST instead, never here. Requires name, location (guess FRIDGE/FREEZER/PANTRY sensibly if not stated), and quantity (default 1 if not stated). Set purchasedAt to today's date (${today}) unless the input implies no purchase actually happened. Set "category" when you're confident of a good match - prefer reusing one of the categories already in use above if one fits (e.g. "garlic powder" -> "Spices" if that's already a category), otherwise invent a sensible new one; leave it null if genuinely unclear rather than guessing. "flagsSet"/"flagsClear" turn STAPLE/LOW_PRIORITY/NEARLY_EMPTY/TRACK_PRICE on or off - only include a flag in one of these two lists if the input actually says so (e.g. "add salt as low priority" -> flagsSet: ["LOW_PRIORITY"]), EXCEPT TRACK_PRICE: set flagsSet: ["TRACK_PRICE"] automatically (without the input asking) whenever you defaulted the name to a specific branded product with an assumed standard pack size (same condition as ADD_TO_SHOPPING_LIST's pack-size rule below) - a specific enough product is exactly what the daily price check needs, so turn tracking on for it rather than requiring the user to remember to flip it on themselves. Leave both lists empty for TRACK_PRICE when the item is generic/unbranded (e.g. "onions").
   - UPDATE_INVENTORY_ITEM: correcting an EXISTING item's fields without it being a new purchase. Requires itemId matching one of the ids listed above exactly - never invent an id. Same category/flagsSet/flagsClear rules as RECORD_PURCHASE apply here too, only when the input actually asks to change them (including TRACK_PRICE - only here if the input actually asks to start/stop tracking, no auto-enabling on a plain edit).
@@ -319,8 +330,21 @@ export const PARSE_COMMAND_SCHEMA = {
       },
     },
     message: { anyOf: [{ type: "string" }, { type: "null" }] },
+    // Non-nullable ("" sentinel), not anyOf - same 15/16 budget reasoning
+    // as estimatedPriceAud above.
+    offerPriceCheckItemId: { type: "string" },
+    offerPriceCheckList: { type: "string", enum: ["inventory", "shoppingList", ""] },
   },
-  required: ["mode", "answer", "answerItems", "actions", "recipes", "message"],
+  required: [
+    "mode",
+    "answer",
+    "answerItems",
+    "actions",
+    "recipes",
+    "message",
+    "offerPriceCheckItemId",
+    "offerPriceCheckList",
+  ],
   additionalProperties: false,
 } as const;
 
@@ -535,7 +559,19 @@ export async function parseCommand(
   const parsed = response.parsed_output as RawParseResult | null;
   if (!parsed) throw new Error("Claude didn't return a valid response - try rephrasing.");
 
+  const inventoryIds = new Set(inventory.map((i) => i.id));
+  const shoppingListIds = new Set(shoppingList.map((e) => e.id));
+
   if (parsed.mode === "answer") {
+    // Defensive, same rule as everywhere else Claude names an id - never
+    // pass one through that isn't a real, current item in the list it
+    // claims, in case of a stale id from earlier in the conversation.
+    const offerValid =
+      parsed.offerPriceCheckItemId !== "" &&
+      parsed.offerPriceCheckList !== "" &&
+      (parsed.offerPriceCheckList === "inventory" ? inventoryIds : shoppingListIds).has(
+        parsed.offerPriceCheckItemId
+      );
     return {
       answer: parsed.answer,
       answerItems: parsed.answerItems.length ? parsed.answerItems : null,
@@ -543,11 +579,10 @@ export async function parseCommand(
       recipes: null,
       message: null,
       debugInfo,
+      offerPriceCheckItemId: offerValid ? parsed.offerPriceCheckItemId : null,
+      offerPriceCheckList: offerValid ? (parsed.offerPriceCheckList as "inventory" | "shoppingList") : null,
     };
   }
-
-  const inventoryIds = new Set(inventory.map((i) => i.id));
-  const shoppingListIds = new Set(shoppingList.map((e) => e.id));
 
   if (parsed.mode === "recipes") {
     // Recipes mode isn't mutually exclusive with actions - a follow-up like
@@ -563,6 +598,8 @@ export async function parseCommand(
         parsed.message ??
         (droppedCount > 0 ? "Some of what you asked couldn't be matched to a real item and was skipped." : null),
       debugInfo,
+      offerPriceCheckItemId: null,
+      offerPriceCheckList: null,
     };
   }
 
@@ -574,6 +611,8 @@ export async function parseCommand(
       recipes: null,
       message: parsed.message ?? "I couldn't understand that - try rephrasing.",
       debugInfo,
+      offerPriceCheckItemId: null,
+      offerPriceCheckList: null,
     };
   }
 
@@ -590,6 +629,8 @@ export async function parseCommand(
           ? "Couldn't find one of the items you mentioned - it may have already been removed or renamed."
           : "I couldn't turn that into an action - try rephrasing.",
       debugInfo,
+      offerPriceCheckItemId: null,
+      offerPriceCheckList: null,
     };
   }
 
@@ -601,5 +642,7 @@ export async function parseCommand(
     message:
       droppedCount > 0 ? "Some of what you asked couldn't be matched to a real item and was skipped." : null,
     debugInfo,
+    offerPriceCheckItemId: null,
+    offerPriceCheckList: null,
   };
 }

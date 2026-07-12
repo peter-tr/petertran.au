@@ -32,7 +32,7 @@ COLES_PRICE: <a single plain number, or null>
 PRODUCT_URL: <the exact coles.com.au product URL you saw for this product, or null>
 NOTE: <short caveat, or null>`;
 
-interface CheckPriceResult {
+export interface CheckPriceResult {
   colesPrice: number | null;
   productUrl: string | null;
   note: string | null;
@@ -57,7 +57,7 @@ function parseResult(text: string): Omit<CheckPriceResult, "debugInfo"> {
   return { colesPrice, productUrl, note };
 }
 
-async function checkPrice(itemName: string): Promise<CheckPriceResult> {
+export async function checkPrice(itemName: string): Promise<CheckPriceResult> {
   const client = await getAnthropicClient();
   const startedAt = Date.now();
   const response = await client.messages.create(
@@ -89,32 +89,55 @@ async function checkPrice(itemName: string): Promise<CheckPriceResult> {
 // same way and written back through their own list's setter.
 interface TrackedTarget {
   id: string;
+  list: "inventory" | "shoppingList";
   name: string;
   apply: (price: LastKnownPrice) => Promise<void>;
 }
 
+export interface PriceCheckTarget {
+  id: string;
+  list: "inventory" | "shoppingList";
+}
+
 // Triggered daily by an EventBridge Scheduler schedule (see
-// infra/lib/pantry-stack.ts), and on-demand via the "sync prices now"
-// settings button - a best-effort background refresh, not a data path
-// anything else depends on, so a failure on one item just leaves its
-// lastKnownPrice stale rather than anything user-visible breaking.
-export async function checkTrackedPrices(): Promise<void> {
+// infra/lib/pantry-stack.ts), on-demand via the "sync prices now" settings
+// button (checks everything tracked), and on-demand for a single item via
+// `only` (checks just that one) - a best-effort background refresh, not a
+// data path anything else depends on, so a failure on one item just leaves
+// its lastKnownPrice stale rather than anything user-visible breaking.
+export async function checkTrackedPrices(only?: PriceCheckTarget): Promise<void> {
   const [items, shoppingList] = await Promise.all([getAllItems(), getShoppingList()]);
 
-  const targets: TrackedTarget[] = [
+  const allTargets: TrackedTarget[] = [
     ...items
       .filter((i) => i.trackPrice)
-      .map((i): TrackedTarget => ({ id: i.id, name: i.name, apply: (price) => setLastKnownPrice(i.id, price) })),
+      .map(
+        (i): TrackedTarget => ({
+          id: i.id,
+          list: "inventory",
+          name: i.name,
+          apply: (price) => setLastKnownPrice(i.id, price),
+        })
+      ),
     ...shoppingList
       .filter((e) => e.trackPrice)
       .map(
         (e): TrackedTarget => ({
           id: e.id,
+          list: "shoppingList",
           name: e.name,
           apply: (price) => setShoppingListLastKnownPrice(e.id, price),
         })
       ),
-  ].slice(0, MAX_ITEMS_PER_RUN);
+  ];
+
+  // A toggle-on for one specific item shouldn't re-check everything else
+  // that happens to be tracked too - that's "crazy amount of calls to
+  // Coles" for what should be a single lookup. Only the bulk paths (no
+  // `only`) apply the run-size cap.
+  const targets = only
+    ? allTargets.filter((t) => t.id === only.id && t.list === only.list)
+    : allTargets.slice(0, MAX_ITEMS_PER_RUN);
 
   if (targets.length === 0) {
     console.log("No trackPrice items - skipping price check.");
