@@ -407,15 +407,21 @@ type PantrySettings {
   """
   Shows extra debug info (AI call cost, duration, search/fetch counts) next
   to inventory rows - see AiCallDebugInfo. Independent from
-  nerdModeShoppingList since the two lists are usually checked separately.
+  nerdModeShoppingList/nerdModeCommandBar since each is usually checked
+  separately.
   """
   nerdModeInventory: Boolean!
   """
-  Same as nerdModeInventory, but for the shopping list and the AI command
-  bar's own call cost - kept separate since shopping list price tracking is
-  the more commonly used one.
+  Same as nerdModeInventory, but for the shopping list's own price-tracking
+  debug info.
   """
   nerdModeShoppingList: Boolean!
+  """
+  Same as nerdModeInventory, but for the AI command bar's own call cost -
+  kept separate from nerdModeShoppingList since a command-bar reply isn't
+  specific to either list.
+  """
+  nerdModeCommandBar: Boolean!
 }
 
 """
@@ -442,6 +448,7 @@ input PantrySettingsInput {
   digestHour: Int
   nerdModeInventory: Boolean
   nerdModeShoppingList: Boolean
+  nerdModeCommandBar: Boolean
 }
 
 """
@@ -643,9 +650,8 @@ type ParsedCommand {
   message: String
   """
   Cost/duration info for the Anthropic call that parsed this command - only
-  meaningful to show when nerdModeShoppingList is on (the command bar isn't
-  specific to either list). searchesUsed/fetchesUsed are always 0 here
-  since command parsing doesn't use those
+  meaningful to show when nerdModeCommandBar is on. searchesUsed/fetchesUsed
+  are always 0 here since command parsing doesn't use those
   tools (see AiCallDebugInfo).
   """
   debugInfo: AiCallDebugInfo!

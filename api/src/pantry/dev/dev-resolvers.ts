@@ -28,6 +28,7 @@ let settings: PantrySettings = {
   digestHour: 16,
   nerdModeInventory: false,
   nerdModeShoppingList: false,
+  nerdModeCommandBar: false,
   commonItems: [
     "Milk",
     "Eggs",

@@ -116,19 +116,9 @@ export default function PantrySettingsPage() {
           </div>
           <p className="project-desc">
             Shows the AI call cost, duration, and Coles search/fetch counts behind each price check and command
-            bar reply - split by list since inventory and shopping list are usually checked separately.
+            bar reply - split by list/feature since inventory, the shopping list, and the command bar are
+            usually checked separately.
           </p>
-          <div className="form-row pantry-settings-row">
-            <label className="form-label" htmlFor="pantry-nerd-mode-shopping-list">
-              <input
-                id="pantry-nerd-mode-shopping-list"
-                type="checkbox"
-                checked={settings.nerdModeShoppingList}
-                onChange={(e) => updateSettings({ nerdModeShoppingList: e.target.checked })}
-              />{" "}
-              Shopping list + command bar
-            </label>
-          </div>
           <div className="form-row pantry-settings-row">
             <label className="form-label" htmlFor="pantry-nerd-mode-inventory">
               <input
@@ -138,6 +128,28 @@ export default function PantrySettingsPage() {
                 onChange={(e) => updateSettings({ nerdModeInventory: e.target.checked })}
               />{" "}
               Inventory
+            </label>
+          </div>
+          <div className="form-row pantry-settings-row">
+            <label className="form-label" htmlFor="pantry-nerd-mode-shopping-list">
+              <input
+                id="pantry-nerd-mode-shopping-list"
+                type="checkbox"
+                checked={settings.nerdModeShoppingList}
+                onChange={(e) => updateSettings({ nerdModeShoppingList: e.target.checked })}
+              />{" "}
+              Shopping list
+            </label>
+          </div>
+          <div className="form-row pantry-settings-row">
+            <label className="form-label" htmlFor="pantry-nerd-mode-command-bar">
+              <input
+                id="pantry-nerd-mode-command-bar"
+                type="checkbox"
+                checked={settings.nerdModeCommandBar}
+                onChange={(e) => updateSettings({ nerdModeCommandBar: e.target.checked })}
+              />{" "}
+              Command bar
             </label>
           </div>
         </section>
