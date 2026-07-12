@@ -145,18 +145,14 @@ export class PantryStack extends Stack {
     table.grantReadWriteData(priceCheckFn);
     anthropicSecret.grantRead(priceCheckFn);
 
-    // Lets the main GraphQL Lambda's syncPricesNow mutation fire-and-forget
-    // invoke this one on demand, in addition to its own daily schedule.
+    // No automatic schedule - lets the main GraphQL Lambda's syncPricesNow
+    // mutation fire-and-forget invoke this one, purely on demand from the
+    // Settings page's "Sync prices now" button. Previously ran on a daily
+    // schedule too, but real Anthropic spend from unattended runs (this
+    // job's own, plus the auto-trigger that used to fire whenever
+    // trackPrice was toggled on) turned out to be a meaningful chunk of a
+    // real credit-exhaustion incident - manual-only removes both.
     apiFn.addEnvironment("PRICE_CHECK_FUNCTION_NAME", priceCheckFn.functionName);
     priceCheckFn.grantInvoke(apiFn);
-
-    // Once daily, early morning Sydney-local - prices don't need to be
-    // fresher than that, and this keeps the (still capped, but non-zero)
-    // Anthropic spend from this job as low as it can be while still useful.
-    new Schedule(this, "PantryPriceCheckSchedule", {
-      schedule: ScheduleExpression.cron({ minute: "0", hour: "5", timeZone: TimeZone.AUSTRALIA_SYDNEY }),
-      target: new LambdaInvoke(priceCheckFn),
-      description: "Daily Coles/Woolworths price check for trackPrice-flagged pantry items",
-    });
   }
 }

@@ -30,28 +30,6 @@ import { getPriceSyncStatus, type PriceSyncStatus } from "../services/price-sync
 import { triggerPriceSync } from "../lib/aws/sync-prices";
 import type { Context } from "../context";
 
-// Turning trackPrice on is otherwise a silent no-op until the next daily
-// check (or a manual "sync now") - fires the same background worker
-// immediately instead, so the first price shows up in roughly the time a
-// single Anthropic call takes rather than up to a day later. Scoped to just
-// this one item (`only`) - toggling one thing on shouldn't also re-check
-// everything else already tracked, that's what the "sync now" button is
-// for. Never blocks or fails the mutation - a sync trigger failure just
-// means the daily check picks it up as usual.
-async function maybeTriggerPriceSync(
-  wasTracking: boolean,
-  isTracking: boolean,
-  id: string,
-  list: "inventory" | "shoppingList"
-): Promise<void> {
-  if (!isTracking || wasTracking) return;
-  try {
-    await triggerPriceSync({ id, list });
-  } catch (err) {
-    console.error("Failed to auto-trigger price sync:", err);
-  }
-}
-
 export const resolvers = {
   Query: {
     inventory: async (
@@ -100,7 +78,6 @@ export const resolvers = {
       await assertNotRateLimited(context.sourceIp);
       const item = createItem(args.input);
       await putItem(item);
-      await maybeTriggerPriceSync(false, item.trackPrice, item.id, "inventory");
       return item;
     },
 
@@ -120,7 +97,6 @@ export const resolvers = {
       if (!existing) {
         const item = createItem(args.input);
         await putItem(item);
-        await maybeTriggerPriceSync(false, item.trackPrice, item.id, "inventory");
         return item;
       }
 
@@ -165,7 +141,6 @@ export const resolvers = {
       };
 
       await putItem(updated);
-      await maybeTriggerPriceSync(existing.trackPrice, updated.trackPrice, updated.id, "inventory");
       return updated;
     },
 
@@ -226,7 +201,6 @@ export const resolvers = {
       };
 
       await putShoppingListEntry(updated);
-      await maybeTriggerPriceSync(existing.trackPrice, updated.trackPrice, updated.id, "shoppingList");
       return updated;
     },
 
