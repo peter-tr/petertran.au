@@ -15,6 +15,12 @@ export interface Purchase {
   quantity: number;
 }
 
+export interface LastKnownPrice {
+  colesPrice: number | null;
+  note: string | null;
+  checkedAt: string;
+}
+
 export interface InventoryItem {
   id: string;
   name: string;
@@ -28,6 +34,8 @@ export interface InventoryItem {
   isStaple: boolean;
   lowPriority: boolean;
   nearlyEmpty: boolean;
+  trackPrice: boolean;
+  lastKnownPrice: LastKnownPrice | null;
   purchases: Purchase[];
   addedAt: string;
   updatedAt: string;
@@ -45,6 +53,7 @@ export interface AddInventoryItemInput {
   isStaple?: boolean | null;
   lowPriority?: boolean | null;
   nearlyEmpty?: boolean | null;
+  trackPrice?: boolean | null;
 }
 
 const INVENTORY_ITEM_FIELDS = /* GraphQL */ `
@@ -60,6 +69,12 @@ const INVENTORY_ITEM_FIELDS = /* GraphQL */ `
   isStaple
   lowPriority
   nearlyEmpty
+  trackPrice
+  lastKnownPrice {
+    colesPrice
+    note
+    checkedAt
+  }
   purchases {
     date
     price

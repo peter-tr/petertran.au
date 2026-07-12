@@ -63,7 +63,15 @@ let settings: PantrySettings = {
 function seed(
   item: Omit<
     InventoryItem,
-    "id" | "addedAt" | "updatedAt" | "isStaple" | "lowPriority" | "nearlyEmpty" | "purchases"
+    | "id"
+    | "addedAt"
+    | "updatedAt"
+    | "isStaple"
+    | "lowPriority"
+    | "nearlyEmpty"
+    | "trackPrice"
+    | "lastKnownPrice"
+    | "purchases"
   >
 ): void {
   const id = randomUUID();
@@ -79,6 +87,8 @@ function seed(
     isStaple: false,
     lowPriority: false,
     nearlyEmpty: false,
+    trackPrice: false,
+    lastKnownPrice: null,
     purchases,
   });
 }
@@ -114,13 +124,37 @@ seed({
   expiresAt: null,
 });
 
+// Demo data for trackPrice/lastKnownPrice so the UI has something to render
+// locally without needing a real price-check Lambda run.
+const milkEntry = [...items.values()].find((i) => i.name === "Milk");
+if (milkEntry) {
+  items.set(milkEntry.id, {
+    ...milkEntry,
+    trackPrice: true,
+    lastKnownPrice: {
+      colesPrice: 3.55,
+      note: null,
+      checkedAt: new Date().toISOString(),
+    },
+  });
+}
+
 type AddInput = Omit<
   InventoryItem,
-  "id" | "addedAt" | "updatedAt" | "purchases" | "isStaple" | "lowPriority" | "nearlyEmpty"
+  | "id"
+  | "addedAt"
+  | "updatedAt"
+  | "purchases"
+  | "isStaple"
+  | "lowPriority"
+  | "nearlyEmpty"
+  | "trackPrice"
+  | "lastKnownPrice"
 > & {
   isStaple?: boolean | null;
   lowPriority?: boolean | null;
   nearlyEmpty?: boolean | null;
+  trackPrice?: boolean | null;
 };
 
 function createItem(input: AddInput): InventoryItem {
@@ -135,6 +169,8 @@ function createItem(input: AddInput): InventoryItem {
     isStaple: input.isStaple ?? false,
     lowPriority: input.lowPriority ?? false,
     nearlyEmpty: input.nearlyEmpty ?? false,
+    trackPrice: input.trackPrice ?? false,
+    lastKnownPrice: null,
     purchases: input.purchasedAt
       ? [{ date: input.purchasedAt, price: input.price, quantity: input.quantity }]
       : [],
