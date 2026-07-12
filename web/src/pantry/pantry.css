@@ -70,6 +70,22 @@
   max-width: 12rem;
 }
 
+.pantry-sync-errors {
+  margin-top: 0.7rem;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+}
+
+.pantry-sync-errors ul {
+  margin: 0.3rem 0 0;
+  padding-left: 1.2rem;
+  color: var(--muted-dim);
+}
+
+.pantry-sync-error-item {
+  color: var(--paper);
+}
+
 .pantry-panel {
   margin-bottom: 1.3rem;
   padding-top: 1.3rem;

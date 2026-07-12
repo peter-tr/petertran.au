@@ -26,6 +26,7 @@ import {
   type UpdateShoppingListEntryInput,
 } from "../services/shopping-list";
 import { getSettings, putSettings, type PantrySettings, type PantrySettingsInput } from "../services/settings";
+import { getPriceSyncStatus, type PriceSyncStatus } from "../services/price-sync-status";
 import { triggerPriceSync } from "../lib/aws/sync-prices";
 import type { Context } from "../context";
 
@@ -69,6 +70,7 @@ export const resolvers = {
       return entries.sort((a, b) => a.addedAt.localeCompare(b.addedAt));
     },
     settings: (): Promise<PantrySettings> => getSettings(),
+    priceSyncStatus: (): Promise<PriceSyncStatus> => getPriceSyncStatus(),
     parseCommand: async (
       _: unknown,
       args: { input: string; history?: { role: string; content: string }[] },

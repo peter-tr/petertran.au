@@ -18,13 +18,17 @@ export function formatLastKnownPrice(price: LastKnownPrice | null): string {
   return `${price.note ? "~" : ""}$${price.colesPrice.toFixed(2)}`;
 }
 
-// Only link out once there's an actual price to show - nothing to send
-// someone to for "pending"/"unconfirmed". Prefer the exact product page the
-// price check itself found; fall back to a plain Coles search for the item
-// name (a real, always-valid URL, not a guess) when it didn't capture one.
+// productUrl and colesPrice are independent (see check-prices.ts) - Coles
+// often blocks/location-gates the price half without blocking the product
+// match itself, so a confirmed product page is common even when the price
+// is "$ N/A". Link out whenever there's a real product page OR a confirmed
+// price to search for; nothing to send someone to when neither exists
+// ("price check pending", or a genuine no-match).
 export function colesLinkFor(name: string, price: LastKnownPrice | null): string | null {
-  if (!price || price.colesPrice === null) return null;
-  return price.productUrl ?? `https://www.coles.com.au/search?q=${encodeURIComponent(name)}`;
+  if (!price) return null;
+  if (price.productUrl) return price.productUrl;
+  if (price.colesPrice === null) return null;
+  return `https://www.coles.com.au/search?q=${encodeURIComponent(name)}`;
 }
 
 // Nerd-mode-only display of what a single Anthropic call cost - shared by

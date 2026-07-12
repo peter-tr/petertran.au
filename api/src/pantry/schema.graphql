@@ -707,6 +707,57 @@ type Query {
   e.g. answering a clarifying question this returned last time.
   """
   parseCommand(input: String!, history: [ConversationMessage!]): ParsedCommand!
+  """
+  Live progress of the price-check worker - reflects ANY run (the daily
+  schedule, "sync prices now", or a single-item auto-trigger from just
+  toggling trackPrice on), not just ones started from this session. Poll
+  this while `running` is true to drive a progress indicator; `errors`
+  reflects the most recently COMPLETED run and stays populated after
+  `running` flips back to false, so there's something to look at even once
+  it's done.
+  """
+  priceSyncStatus: PriceSyncStatus!
+}
+
+"""
+A single item's price check failing during the most recent price-check run.
+"""
+type PriceCheckError {
+  itemName: String!
+  message: String!
+  occurredAt: String!
+}
+
+"""
+See Query.priceSyncStatus.
+"""
+type PriceSyncStatus {
+  running: Boolean!
+  """
+  ISO 8601. Null if no run has ever started.
+  """
+  startedAt: String
+  """
+  ISO 8601. Null while running, or if no run has ever finished.
+  """
+  finishedAt: String
+  """
+  How many items this run is checking in total - a single-item
+  auto-trigger has totalItems=1, "sync prices now"/the daily schedule
+  reflect however many trackPrice items exist (capped per-run, see
+  check-prices.ts).
+  """
+  totalItems: Int!
+  """
+  How many of totalItems have been checked so far (success or failure) -
+  climbs in real time as the run progresses, not just at the end.
+  """
+  checkedItems: Int!
+  """
+  Failures from the most recently COMPLETED run, oldest dropped first past
+  a small cap - not a full audit log, just "what recently went wrong".
+  """
+  errors: [PriceCheckError!]!
 }
 
 """
