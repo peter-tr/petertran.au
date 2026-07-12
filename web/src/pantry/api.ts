@@ -15,11 +15,26 @@ export interface Purchase {
   quantity: number;
 }
 
+export interface AiCallDebugInfo {
+  costUsd: number;
+  durationMs: number;
+  searchesUsed: number;
+  fetchesUsed: number;
+}
+
+const AI_CALL_DEBUG_INFO_FIELDS = /* GraphQL */ `
+  costUsd
+  durationMs
+  searchesUsed
+  fetchesUsed
+`;
+
 export interface LastKnownPrice {
   colesPrice: number | null;
   productUrl: string | null;
   note: string | null;
   checkedAt: string;
+  debugInfo: AiCallDebugInfo;
 }
 
 export interface InventoryItem {
@@ -76,6 +91,9 @@ const INVENTORY_ITEM_FIELDS = /* GraphQL */ `
     productUrl
     note
     checkedAt
+    debugInfo {
+      ${AI_CALL_DEBUG_INFO_FIELDS}
+    }
   }
   purchases {
     date
@@ -181,6 +199,9 @@ const SHOPPING_LIST_ENTRY_FIELDS = /* GraphQL */ `
     productUrl
     note
     checkedAt
+    debugInfo {
+      ${AI_CALL_DEBUG_INFO_FIELDS}
+    }
   }
   addedAt
 `;
@@ -280,7 +301,8 @@ export interface PantrySettings {
   shoppingUrgentOnly: boolean;
   digestEnabled: boolean;
   digestHour: number;
-  nerdMode: boolean;
+  nerdModeInventory: boolean;
+  nerdModeShoppingList: boolean;
 }
 
 export type PantrySettingsInput = Partial<PantrySettings>;
@@ -304,7 +326,8 @@ const SETTINGS_FIELDS = /* GraphQL */ `
   shoppingUrgentOnly
   digestEnabled
   digestHour
-  nerdMode
+  nerdModeInventory
+  nerdModeShoppingList
 `;
 
 export const SETTINGS_QUERY = /* GraphQL */ `
@@ -386,6 +409,7 @@ export interface ParsedCommand {
   actions: ProposedAction[] | null;
   recipes: RecipeSuggestion[] | null;
   message: string | null;
+  debugInfo: AiCallDebugInfo;
 }
 
 // Mirrors Claude's own {role, content} chat message shape - see
@@ -401,6 +425,9 @@ export const PARSE_COMMAND_QUERY = /* GraphQL */ `
       answer
       answerItems
       message
+      debugInfo {
+        ${AI_CALL_DEBUG_INFO_FIELDS}
+      }
       actions {
         type
         summary

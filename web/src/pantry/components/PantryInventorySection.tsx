@@ -276,6 +276,7 @@ export default function PantryInventorySection({
                       key={item.id}
                       item={item}
                       simple={settings.simple}
+                      nerdMode={settings.nerdModeInventory}
                       categories={settings.categories}
                       onAddCategory={(name) =>
                         onSettingsChange({ categories: [...settings.categories, name] })

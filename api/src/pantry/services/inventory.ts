@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { QueryCommand, GetCommand, PutCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
 import { ddb, TABLE_NAME, PK } from "../lib/aws/ddb";
 import { normalizeUnit } from "../lib/util/normalize";
+import type { AiCallDebugInfo } from "../lib/anthropic/debug-info";
 
 const ITEM_PREFIX = "ITEM#";
 
@@ -16,6 +17,7 @@ export interface LastKnownPrice {
   productUrl: string | null;
   note: string | null;
   checkedAt: string;
+  debugInfo: AiCallDebugInfo;
 }
 
 export interface InventoryItem {
@@ -57,6 +59,13 @@ export type UpdateInventoryItemInput = Partial<Omit<AddInventoryItemInput, "loca
   location?: InventoryItem["location"];
 };
 
+// A price row written before debugInfo existed - zeros read as "unknown",
+// not "free/instant", but that's preferable to the alternative: debugInfo
+// is non-null in the schema, so leaving it missing would null-propagate the
+// whole lastKnownPrice field back to the client (see this file's
+// withInventoryDefaults comment), silently hiding an already-confirmed price.
+export const UNKNOWN_DEBUG_INFO: AiCallDebugInfo = { costUsd: 0, durationMs: 0, searchesUsed: 0, fetchesUsed: 0 };
+
 // Backfills fields added after some rows were already written - critical
 // for lowPriority/isStaple/nearlyEmpty specifically, since they're
 // non-nullable: a missing value on even one row would fail the whole
@@ -70,7 +79,9 @@ function withInventoryDefaults(item: InventoryItem): InventoryItem {
     lowPriority: item.lowPriority ?? false,
     nearlyEmpty: item.nearlyEmpty ?? false,
     trackPrice: item.trackPrice ?? false,
-    lastKnownPrice: item.lastKnownPrice ?? null,
+    lastKnownPrice: item.lastKnownPrice
+      ? { ...item.lastKnownPrice, debugInfo: item.lastKnownPrice.debugInfo ?? UNKNOWN_DEBUG_INFO }
+      : null,
   };
 }
 

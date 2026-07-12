@@ -23,9 +23,12 @@ export interface PantrySettings {
   digestEnabled: boolean;
   digestHour: number;
   // Shows extra debug info (AI call cost, duration, search/fetch counts) on
-  // the pantry page - the command bar and tracked-item rows read this to
-  // decide whether to render it, nothing server-side depends on it.
-  nerdMode: boolean;
+  // the pantry page - inventory rows and the shopping list (+ command bar)
+  // read their own flag to decide whether to render it, nothing
+  // server-side depends on either. Split in two since shopping list is the
+  // one actually used day-to-day; inventory is the noisier, bigger list.
+  nerdModeInventory: boolean;
+  nerdModeShoppingList: boolean;
 }
 
 export interface PantrySettingsInput {
@@ -47,7 +50,8 @@ export interface PantrySettingsInput {
   shoppingUrgentOnly?: boolean;
   digestEnabled?: boolean;
   digestHour?: number;
-  nerdMode?: boolean;
+  nerdModeInventory?: boolean;
+  nerdModeShoppingList?: boolean;
 }
 
 // Same starting list as the client used to seed localStorage with, so the
@@ -73,7 +77,8 @@ const DEFAULT_SETTINGS: PantrySettings = {
   // pick up this default via the getSettings() backfill merge below.
   digestEnabled: true,
   digestHour: 16,
-  nerdMode: false,
+  nerdModeInventory: false,
+  nerdModeShoppingList: false,
   commonItems: [
     "Milk",
     "Eggs",

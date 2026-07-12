@@ -1,6 +1,7 @@
 import { getAnthropicClient } from "@shared/anthropic-client";
 import { getAllItems, setLastKnownPrice, type LastKnownPrice } from "../../services/inventory";
 import { getShoppingList, setShoppingListLastKnownPrice } from "../../services/shopping-list";
+import { buildDebugInfo, type AiCallDebugInfo } from "./debug-info";
 
 // Hard cap on tracked items processed per run - a safety net against cost
 // blowing out if the tracked list grows large, not an expected ceiling.
@@ -34,9 +35,10 @@ interface CheckPriceResult {
   colesPrice: number | null;
   productUrl: string | null;
   note: string | null;
+  debugInfo: AiCallDebugInfo;
 }
 
-function parseResult(text: string): CheckPriceResult {
+function parseResult(text: string): Omit<CheckPriceResult, "debugInfo"> {
   const colesMatch = text.match(/COLES_PRICE:\s*(null|[\d.]+)/i);
   const urlMatch = text.match(/PRODUCT_URL:\s*(\S+)/i);
   const noteMatch = text.match(/NOTE:\s*(.+)/i);
@@ -56,6 +58,7 @@ function parseResult(text: string): CheckPriceResult {
 
 async function checkPrice(itemName: string): Promise<CheckPriceResult> {
   const client = await getAnthropicClient();
+  const startedAt = Date.now();
   const response = await client.messages.create(
     {
       model: "claude-haiku-4-5",
@@ -69,13 +72,14 @@ async function checkPrice(itemName: string): Promise<CheckPriceResult> {
     },
     { timeout: 30_000 }
   );
+  const debugInfo = buildDebugInfo(response.usage, Date.now() - startedAt);
 
   const text = response.content
     .filter((b): b is Extract<(typeof response.content)[number], { type: "text" }> => b.type === "text")
     .map((b) => b.text)
     .join("\n");
 
-  return parseResult(text);
+  return { ...parseResult(text), debugInfo };
 }
 
 // A tracked target can come from either list - trackPrice is independently

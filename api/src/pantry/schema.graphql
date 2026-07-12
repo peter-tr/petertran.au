@@ -57,6 +57,13 @@ type LastKnownPrice {
   Timestamp of this lookup, ISO 8601.
   """
   checkedAt: String!
+  """
+  Cost/duration/tool-use info for the Anthropic call that produced this
+  price - only meaningful to show when the relevant nerdMode* setting is on
+  (nerdModeInventory for InventoryItem, nerdModeShoppingList for
+  ShoppingListEntry).
+  """
+  debugInfo: AiCallDebugInfo!
 }
 
 """
@@ -398,10 +405,17 @@ type PantrySettings {
   """
   digestHour: Int!
   """
-  Shows extra debug info (AI call cost, duration, search/fetch counts) on
-  the pantry page - see AiCallDebugInfo.
+  Shows extra debug info (AI call cost, duration, search/fetch counts) next
+  to inventory rows - see AiCallDebugInfo. Independent from
+  nerdModeShoppingList since the two lists are usually checked separately.
   """
-  nerdMode: Boolean!
+  nerdModeInventory: Boolean!
+  """
+  Same as nerdModeInventory, but for the shopping list and the AI command
+  bar's own call cost - kept separate since shopping list price tracking is
+  the more commonly used one.
+  """
+  nerdModeShoppingList: Boolean!
 }
 
 """
@@ -426,7 +440,8 @@ input PantrySettingsInput {
   shoppingUrgentOnly: Boolean
   digestEnabled: Boolean
   digestHour: Int
-  nerdMode: Boolean
+  nerdModeInventory: Boolean
+  nerdModeShoppingList: Boolean
 }
 
 """
@@ -567,8 +582,8 @@ input ConversationMessage {
 
 """
 Debug/cost info about a single Anthropic API call, shown on the pantry page
-only when PantrySettings.nerdMode is on - purely informational, nothing
-else reads or depends on this data.
+only when the relevant PantrySettings.nerdMode* setting is on - purely
+informational, nothing else reads or depends on this data.
 """
 type AiCallDebugInfo {
   """
@@ -626,6 +641,14 @@ type ParsedCommand {
   alongside them (e.g. part of a multi-item request was skipped).
   """
   message: String
+  """
+  Cost/duration info for the Anthropic call that parsed this command - only
+  meaningful to show when nerdModeShoppingList is on (the command bar isn't
+  specific to either list). searchesUsed/fetchesUsed are always 0 here
+  since command parsing doesn't use those
+  tools (see AiCallDebugInfo).
+  """
+  debugInfo: AiCallDebugInfo!
 }
 
 """

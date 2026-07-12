@@ -59,7 +59,7 @@ export default function Pantry() {
         <p className="status-line">// couldn&apos;t load inventory from the API right now ({error}).</p>
       )}
 
-      <PantryCommandBar items={items ?? []} onChanged={refetchAll} />
+      <PantryCommandBar items={items ?? []} onChanged={refetchAll} nerdMode={settings?.nerdModeShoppingList ?? false} />
 
       {shoppingList && items && settings && (
         <PantryShoppingListSection

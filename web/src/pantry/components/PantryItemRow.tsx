@@ -3,7 +3,7 @@ import QuantityStepper from "./QuantityStepper";
 import PantryEditItemModal from "./PantryEditItemModal";
 import { daysBetween, formatExpiresAt, formatPurchasedAt } from "../../shared/lib/dates";
 import { stepForUnit } from "../lib/units";
-import { formatLastKnownPrice, colesLinkFor } from "../lib/priceDisplay";
+import { formatLastKnownPrice, colesLinkFor, formatDebugInfo } from "../lib/priceDisplay";
 import {
   runPantryQuery,
   REMOVE_INVENTORY_ITEM_MUTATION,
@@ -16,6 +16,7 @@ import {
 interface PantryItemRowProps {
   item: InventoryItem;
   simple: boolean;
+  nerdMode: boolean;
   categories: string[];
   onAddCategory: (name: string) => void;
   onChanged: () => Promise<void>;
@@ -47,6 +48,7 @@ function expiryClass(expiresAt: string): string {
 export default function PantryItemRow({
   item,
   simple,
+  nerdMode,
   categories,
   onAddCategory,
   onChanged,
@@ -252,6 +254,12 @@ export default function PantryItemRow({
             <span className="pantry-item-last-known-price" title={item.lastKnownPrice?.note ?? undefined}>
               {formatLastKnownPrice(item.lastKnownPrice)}
             </span>
+          </>
+        )}
+        {item.trackPrice && nerdMode && item.lastKnownPrice && (
+          <>
+            {" · "}
+            <span className="pantry-nerd-debug-info">{formatDebugInfo(item.lastKnownPrice.debugInfo)}</span>
           </>
         )}
       </button>

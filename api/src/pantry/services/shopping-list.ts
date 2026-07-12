@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { QueryCommand, GetCommand, PutCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
 import { ddb, TABLE_NAME, PK } from "../lib/aws/ddb";
 import { normalizeItemName, normalizeUnit } from "../lib/util/normalize";
-import type { LastKnownPrice } from "./inventory";
+import { UNKNOWN_DEBUG_INFO, type LastKnownPrice } from "./inventory";
 
 const SHOPLIST_PREFIX = "SHOPLIST#";
 
@@ -50,7 +50,9 @@ function withShoppingListDefaults(entry: ShoppingListEntry): ShoppingListEntry {
     recipeTag: entry.recipeTag ?? null,
     urgent: entry.urgent ?? false,
     trackPrice: entry.trackPrice ?? false,
-    lastKnownPrice: entry.lastKnownPrice ?? null,
+    lastKnownPrice: entry.lastKnownPrice
+      ? { ...entry.lastKnownPrice, debugInfo: entry.lastKnownPrice.debugInfo ?? UNKNOWN_DEBUG_INFO }
+      : null,
   };
 }
 

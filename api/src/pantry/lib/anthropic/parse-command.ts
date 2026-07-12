@@ -2,6 +2,7 @@ import { getAnthropicClient } from "@shared/anthropic-client";
 import { assertAiNotRateLimited } from "../util/ai-rate-limit";
 import type { InventoryItem } from "../../services/inventory";
 import type { ShoppingListEntry } from "../../services/shopping-list";
+import { buildDebugInfo, type AiCallDebugInfo } from "./debug-info";
 
 const MAX_INPUT_LENGTH = 200;
 const MAX_HISTORY_MESSAGES = 20;
@@ -122,6 +123,7 @@ export interface ParsedCommandResult {
   actions: ProposedAction[] | null;
   recipes: RecipeSuggestion[] | null;
   message: string | null;
+  debugInfo: AiCallDebugInfo;
 }
 
 function formatInventoryForPrompt(inventory: InventoryItem[]): string {
@@ -504,6 +506,7 @@ export async function parseCommand(
     role: (m.role === "assistant" ? "assistant" : "user") as "assistant" | "user",
     content: m.content,
   }));
+  const startedAt = Date.now();
   const response = await client.messages.parse({
     model: "claude-haiku-4-5",
     // Recipes mode can return up to 3 recipes, each with a full ingredient
@@ -515,6 +518,9 @@ export async function parseCommand(
     messages: [...priorMessages, { role: "user", content: trimmed }],
     output_config: { format: { type: "json_schema", schema: PARSE_COMMAND_SCHEMA } },
   });
+  // searchesUsed/fetchesUsed are always 0 here - command parsing doesn't use
+  // web_search/web_fetch, unlike check-prices.ts's call.
+  const debugInfo = buildDebugInfo(response.usage, Date.now() - startedAt);
 
   const parsed = response.parsed_output as RawParseResult | null;
   if (!parsed) throw new Error("Claude didn't return a valid response - try rephrasing.");
@@ -526,6 +532,7 @@ export async function parseCommand(
       actions: null,
       recipes: null,
       message: null,
+      debugInfo,
     };
   }
 
@@ -545,6 +552,7 @@ export async function parseCommand(
       message:
         parsed.message ??
         (droppedCount > 0 ? "Some of what you asked couldn't be matched to a real item and was skipped." : null),
+      debugInfo,
     };
   }
 
@@ -555,6 +563,7 @@ export async function parseCommand(
       actions: null,
       recipes: null,
       message: parsed.message ?? "I couldn't understand that - try rephrasing.",
+      debugInfo,
     };
   }
 
@@ -570,6 +579,7 @@ export async function parseCommand(
         droppedCount > 0
           ? "Couldn't find one of the items you mentioned - it may have already been removed or renamed."
           : "I couldn't turn that into an action - try rephrasing.",
+      debugInfo,
     };
   }
 
@@ -580,5 +590,6 @@ export async function parseCommand(
     recipes: null,
     message:
       droppedCount > 0 ? "Some of what you asked couldn't be matched to a real item and was skipped." : null,
+    debugInfo,
   };
 }
