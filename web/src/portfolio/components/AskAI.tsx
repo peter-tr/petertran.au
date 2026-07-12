@@ -6,6 +6,16 @@ const OPERATION_PATTERN = /(query|mutation|subscription)\s+(\w+)/;
 const DEFAULT_DRAFT_NOTE =
   "I've filled in the message form below - add your details and click Run to send it.";
 
+// A handful of one-click prompts chosen to show off what this bar can
+// actually do (real bio data, and the self-referential cost/stats query),
+// so a visitor who doesn't feel like typing still sees something impressive.
+const EXAMPLE_PROMPTS = [
+  "What's he working on right now?",
+  "What's his most impressive project?",
+  "What are his strongest technical skills?",
+  "How much has this website cost to run?",
+];
+
 export default function AskAI() {
   const queryEditor = useGraphiQL((state) => state.queryEditor);
   const isFetching = useGraphiQL((state) => state.isFetching);
@@ -29,11 +39,10 @@ export default function AskAI() {
     if (!isFetching) setAwaitingResult(false);
   }
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
+  async function runPrompt(question: string) {
     if (loading) return;
 
-    if (!prompt.trim()) {
+    if (!question.trim()) {
       setError("Type a question first.");
       setNote(null);
       return;
@@ -45,7 +54,7 @@ export default function AskAI() {
     setAnswer(null);
 
     try {
-      const result = await runQuery<GenerateQueryResult>(GENERATE_QUERY_QUERY, { prompt });
+      const result = await runQuery<GenerateQueryResult>(GENERATE_QUERY_QUERY, { prompt: question });
       const { query, message, answer: reply } = result.meta.generateQuery;
 
       if (!query) {
@@ -90,7 +99,13 @@ export default function AskAI() {
   }
 
   return (
-    <form className="ask-ai" onSubmit={handleSubmit}>
+    <form
+      className="ask-ai"
+      onSubmit={(e: FormEvent) => {
+        e.preventDefault();
+        void runPrompt(prompt);
+      }}
+    >
       <input
         className="ask-ai-input"
         value={prompt}
@@ -104,6 +119,22 @@ export default function AskAI() {
       <button className="run-btn" type="submit" disabled={loading}>
         {loading ? "Thinking…" : "Ask Claude ▸"}
       </button>
+      <div className="ask-ai-examples">
+        {EXAMPLE_PROMPTS.map((example) => (
+          <button
+            key={example}
+            type="button"
+            className="ask-ai-example"
+            disabled={loading}
+            onClick={() => {
+              setPrompt(example);
+              void runPrompt(example);
+            }}
+          >
+            {example}
+          </button>
+        ))}
+      </div>
       {answer && <p className="ask-ai-answer">{answer}</p>}
       {awaitingResult && <span className="ask-ai-note">// running the generated query…</span>}
       {note && <span className="ask-ai-note">// {note}</span>}

@@ -16,6 +16,16 @@ async function itemsOfType<T>(context: Context, type: string): Promise<T[]> {
   return items.filter((item) => item.type === type).map((item) => item.data as T);
 }
 
+// Manual $5 downward adjustment to the displayed Anthropic figure only -
+// applied here rather than in anthropic-cost.ts so the cached raw amount
+// stays the true value from Anthropic's cost report.
+const ANTHROPIC_COST_ADJUSTMENT_USD = 5;
+
+async function getAdjustedAnthropicCostUsd(): Promise<number> {
+  const raw = await getAnthropicAllTimeCostUsd();
+  return Math.max(0, raw - ANTHROPIC_COST_ADJUSTMENT_USD);
+}
+
 export const resolvers = {
   Query: {
     person: async (_: unknown, __: unknown, context: Context): Promise<Person> => {
@@ -60,9 +70,9 @@ export const resolvers = {
     systemStats: (_: unknown, __: unknown, context: Context) => getSystemStats(context.functionName),
     traceBreakdown: (_: unknown, args: { traceId: string }) => getTraceBreakdown(args.traceId),
     awsCostUsd: () => getAwsAllTimeCostUsd(),
-    anthropicCostUsd: () => getAnthropicAllTimeCostUsd(),
+    anthropicCostUsd: () => getAdjustedAnthropicCostUsd(),
     totalCostUsd: async () => {
-      const [aws, anthropic] = await Promise.all([getAwsAllTimeCostUsd(), getAnthropicAllTimeCostUsd()]);
+      const [aws, anthropic] = await Promise.all([getAwsAllTimeCostUsd(), getAdjustedAnthropicCostUsd()]);
       return aws + anthropic;
     },
   },
