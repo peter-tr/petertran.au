@@ -1,14 +1,21 @@
 import type { AiCallDebugInfo, LastKnownPrice } from "../api";
 
 // Written asynchronously by the daily price-check Lambda, not on this
-// request - "pending" and "unconfirmed" are both real, expected states, not
-// errors, so they get plain text rather than looking broken. Shared between
-// inventory rows and shopping list rows, since both can independently set
-// trackPrice.
+// request - "pending" and "$ N/A" are both real, expected states, not
+// errors. Shared between inventory rows and shopping list rows, since both
+// can independently set trackPrice.
+//
+// No "Coles" prefix - Woolworths is never shown (see check-prices.ts), so
+// there's only ever one retailer here and naming it on every row is just
+// noise, especially on narrow screens. A "~" prefix (matching the command
+// bar's ballpark-estimate convention) signals a price that came with a
+// caveat/assumption (see LastKnownPrice.note) rather than a plain
+// confirmed number - the note itself is still available via the row's
+// title/tooltip.
 export function formatLastKnownPrice(price: LastKnownPrice | null): string {
   if (!price) return "price check pending";
-  if (price.colesPrice === null) return "price unconfirmed";
-  return `Coles $${price.colesPrice.toFixed(2)}`;
+  if (price.colesPrice === null) return "$ N/A";
+  return `${price.note ? "~" : ""}$${price.colesPrice.toFixed(2)}`;
 }
 
 // Only link out once there's an actual price to show - nothing to send
