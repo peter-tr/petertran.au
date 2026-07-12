@@ -10,13 +10,21 @@ GraphQL client at the API directly and query it yourself.
 
 ## Stack
 
-- **`web/`** - React + Vite frontend, including an embedded GraphiQL explorer
-  and an "Ask Claude" natural-language-to-GraphQL feature
-- **`api/`** - Apollo Server GraphQL API, running on Lambda behind a Function URL
-- **`infra/`** - AWS CDK (TypeScript), provisioning everything: Lambda, DynamoDB,
-  S3 + CloudFront, Route 53, ACM, SES, Secrets Manager
-- **`.github/`** - GitHub Actions CI/CD, authenticating to AWS via OIDC (no
-  long-lived access keys)
+```
+petertran.au/
+├── web/      React + Vite frontend - GraphiQL explorer, "Ask Claude" (NL → GraphQL), Pantry, Imposter
+├── api/      Apollo Server GraphQL API, on Lambda behind a Function URL
+│   └── src/
+│       ├── portfolio/       this resume/API site
+│       ├── pantry/          AI-assisted grocery inventory + shopping list
+│       └── games/imposter/  a Werewolf/Mafia-style party game
+├── infra/    AWS CDK (TypeScript) - Lambda, DynamoDB, S3 + CloudFront, Route 53, ACM, SES, Secrets Manager
+└── .github/  CI/CD via GitHub Actions, authenticating to AWS via OIDC (no long-lived access keys)
+```
+
+Each of `portfolio`, `pantry`, and `games/imposter` is its own independent
+backend - separate Lambda, Function URL, and DynamoDB table - deployed as its
+own CDK stack so they evolve independently.
 
 ## Running it locally
 
