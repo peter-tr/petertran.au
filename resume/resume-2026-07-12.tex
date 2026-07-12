@@ -1,0 +1,124 @@
+\documentclass[a4paper]{article}
+    \usepackage{cmap}
+    \usepackage{fullpage}
+    \usepackage{amsmath}
+    \usepackage{amssymb}
+    \usepackage{textcomp}
+    \usepackage[utf8]{inputenc}
+    \usepackage[T1]{fontenc}
+    \usepackage{lmodern}
+    % \pdfgentounicode is pdfTeX-only; guard it so this also compiles under
+    % XeTeX-based engines (e.g. tectonic), which have no such primitive
+    \ifdefined\pdfgentounicode
+      \input{glyphtounicode}
+      \pdfgentounicode=1
+    \fi
+    \textheight=10.4in
+    \pagestyle{empty}
+    \raggedright
+    \usepackage[left=0.8in,right=0.8in,bottom=0.3in,top=0.25in]{geometry}
+
+% DEFINITIONS FOR RESUME %%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\lineunder}{
+    \vspace*{-8pt} \\
+    \hspace*{-18pt} \hrulefill \\
+    \vspace*{-4pt}
+}
+
+\newcommand{\header}[1]{
+    {\hspace*{-18pt}\vspace*{3pt} \textsc{#1}}
+    \vspace*{-3pt} \lineunder
+}
+
+% END RESUME DEFINITIONS %%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{document}
+\vspace*{-18pt}
+
+%==== PROFILE ====%
+\begin{center}
+    {\Huge \scshape {Peter Tran}}\\
+    peter2002tran@outlook.com $\cdot$ linkedin.com/in/peter-k-tran $\cdot$ github.com/peter-tr $\cdot$ petertran.au\\
+    {\small Australian Citizen $\cdot$ Security Clearance: Negative Vetting 1}
+\end{center}
+
+%==== EDUCATION ====%
+\header{Education}
+\vspace{1.5mm}
+\textbf{University of Queensland}\hfill Brisbane, Australia\\
+Bachelor of Engineering (Honours) \& Master of Engineering (Software) \hfill Feb 2020 - Dec 2024\\
+\textit{First Class Honours -- GPA: 6.35/7}\\
+
+%==== EXPERIENCE ====%
+\header{Work Experience}
+\vspace{1.5mm}
+\textbf{Commonwealth Bank of Australia} \hfill Sydney, Australia\\
+\textit{Backend Software Engineer} \hfill Feb 2026 - Present\\
+{\small \textit{NetBank Next -- rebuilding the backend of CommBank's online banking (17M+ customers, 170 TPS) onto a federated GraphQL API -- one of the bank's first large-scale GraphQL federation deployments}}\\
+\vspace{-2mm}
+\begin{itemize} \itemsep -1pt
+    \item Drove architectural decisions for the GraphQL federation platform -- supergraph composition, schema governance, observability, subgraph CI/CD -- and implemented its core infrastructure, enabling 10+ service domains to independently build and deploy subgraphs
+    \item Built and own three GraphQL subgraphs (Accounts, Transactions, Parties), migrating legacy REST/SOAP endpoints onto the federated layer and cutting p95 latency from 500ms to 300ms (40\%)
+    \item Designed a custom GraphQL directive enforcing OAuth 2.0 scope-based authorization, giving field- and entity-level access control over sensitive financial data
+    \item Built an MCP server exposing the supergraph to AI agents, used by 200+ engineers to query the schema and customer usage in natural language instead of hand-writing GraphQL introspection
+\end{itemize}
+
+
+\textit{Graduate Software Engineer} \hfill Feb 2025 - Feb 2026\\
+\vspace{-2mm}
+\begin{itemize} \itemsep -1pt
+    \item Built event-driven ingestion and storage pipelines (SQS $\rightarrow$ Lambda $\rightarrow$ S3/PostgreSQL $\rightarrow$ Kafka) within CommBank's Payment Data Platform, normalizing 5,000 payment events/sec into ISO 20022 as a common cross-bank, cross-country standard
+    \item Joined NetBank Next at inception (Sep 2025), built its first subgraphs -- promoted to the platform team
+\end{itemize}
+\vspace{-2mm}
+\textbf{Boeing Australia} \hfill Brisbane, Australia\\
+\textit{Graduate Software Engineer} \hfill Nov 2024 - Feb 2025\\
+\textit{Undergraduate Software Engineer} \hfill Nov 2021 - Nov 2024\\
+{\small \textit{Safety-critical, distributed embedded systems engineering on the MQ-28 Ghost Bat, Boeing's autonomous fighter aircraft}}\\
+\vspace{-2mm}
+\begin{itemize} \itemsep -1pt
+    \item Built sensor data ingestion software for the MQ-28 mission computer on Green Hills INTEGRITY RTOS, meeting DO-178C safety-critical certification standards
+    \item Developed C++ scenario-based testing frameworks and hardware-in-the-loop (HWIL) infrastructure (Python, MATLAB), verifying mission computer software against real avionics hardware
+    \item Built a custom internal React dashboard for monitoring health and gathering metrics from air-gapped physical components and servers in the aircraft\textquotesingle{}s digital twin, cutting hardware fault diagnosis time from 2 hours to 2 minutes
+    \item Completed a master\textquotesingle{}s thesis with Boeing evaluating Rust as a certifiable replacement for C++ and Ada in DO-178C safety-critical aviation software
+\end{itemize}
+\vspace{-2mm}
+\textbf{Services Australia} \hfill Brisbane, Australia\\
+\textit{Software Engineering Intern} \hfill Feb 2022 - Nov 2023\\
+\vspace{-2mm}
+\begin{itemize} \itemsep -1pt
+    \item Optimised the myGov Inbox, a React-based messaging feature serving millions of citizens across myGov, Centrelink, and Medicare, improving page load times by 30\%
+\end{itemize}
+\vspace{-2mm}
+%==== SKILLS ====%
+\header{Skills}
+\vspace{1.5mm}
+\begin{tabular}{ l p{6.7in} }
+    Languages:                  & TypeScript, Java, Python, C/C++, Rust \\
+    Frameworks \& APIs:        & GraphQL (Apollo Federation), Spring Boot, React, Next.js, Node.js, OAuth 2.0 \\
+    Infrastructure \& Tools:   & AWS, DynamoDB, PostgreSQL, Kafka, Docker, \mbox{GitHub Actions}, Grafana \\
+    Certifications:            & AWS Certified Developer -- Associate \\
+\end{tabular}
+
+\vspace{1.5mm}
+%==== PROJECTS ====%
+\header{Projects}
+{\textbf{petertran.au}} {\sl React, GraphQL, AWS (Lambda, DynamoDB, CloudFront, CDK), Anthropic API}\\
+petertran.au $\cdot$ petertran.au/pantry $\cdot$ petertran.au/imposter $\quad|\quad$ github.com/peter-tr/petertran.au\\
+\vspace{-2mm}
+\begin{itemize} \itemsep -1pt
+    \item Architected a monorepo of three full-stack apps (GraphQL backend, React frontend) on AWS, deployed via CDK with distributed tracing, metrics, and logging
+    \item Shipped a visitor Q\&A feature: a question becomes a live GraphQL query against real data, answered from that result
+    \item Built Pantry, a household inventory/shopping-list app: a natural-language command bar plus a Claude-powered price checker that searches and links real Coles prices
+    \item Built Imposters, a real-time multiplayer party game with an optional Claude-generated word-pair mode
+\end{itemize}
+\vspace{-2mm}
+
+%==== PROGRAMS & TRAINING ====%
+\header{Programs \& Training}
+\textbf{Australian Defence Force Cyber GAP Program} \hfill Australian Defence Force\\
+Selected for a competitive 12-month ADF cybersecurity development program; completed hands-on training in digital forensics, threat and risk assessment, and cybersecurity fundamentals \hfill Jan 2022 - Dec 2022\\
+
+\end{document}
+Pf
