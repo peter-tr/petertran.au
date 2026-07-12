@@ -306,6 +306,7 @@ export interface PantrySettings {
   digestHour: number;
   nerdModeInventory: boolean;
   nerdModeShoppingList: boolean;
+  nerdModeCommandBar: boolean;
 }
 
 export type PantrySettingsInput = Partial<PantrySettings>;
@@ -334,6 +335,7 @@ const SETTINGS_FIELDS = /* GraphQL */ `
   digestHour
   nerdModeInventory
   nerdModeShoppingList
+  nerdModeCommandBar
 `;
 
 export const SETTINGS_QUERY = /* GraphQL */ `
