@@ -1,5 +1,6 @@
 import { getAnthropicClient } from "@shared/anthropic-client";
 import { getAllItems, setLastKnownPrice, type LastKnownPrice } from "../../services/inventory";
+import { getShoppingList, setShoppingListLastKnownPrice } from "../../services/shopping-list";
 
 // Hard cap on tracked items processed per run - a safety net against cost
 // blowing out if the tracked list grows large, not an expected ceiling.
@@ -77,28 +78,52 @@ async function checkPrice(itemName: string): Promise<CheckPriceResult> {
   return parseResult(text);
 }
 
+// A tracked target can come from either list - trackPrice is independently
+// toggleable on inventory items and shopping list entries (see
+// ShoppingListEntry.trackPrice's schema comment), and both get checked the
+// same way and written back through their own list's setter.
+interface TrackedTarget {
+  id: string;
+  name: string;
+  apply: (price: LastKnownPrice) => Promise<void>;
+}
+
 // Triggered daily by an EventBridge Scheduler schedule (see
 // infra/lib/pantry-stack.ts), and on-demand via the "sync prices now"
 // settings button - a best-effort background refresh, not a data path
 // anything else depends on, so a failure on one item just leaves its
 // lastKnownPrice stale rather than anything user-visible breaking.
 export async function checkTrackedPrices(): Promise<void> {
-  const items = await getAllItems();
-  const tracked = items.filter((i) => i.trackPrice).slice(0, MAX_ITEMS_PER_RUN);
+  const [items, shoppingList] = await Promise.all([getAllItems(), getShoppingList()]);
 
-  if (tracked.length === 0) {
+  const targets: TrackedTarget[] = [
+    ...items
+      .filter((i) => i.trackPrice)
+      .map((i): TrackedTarget => ({ id: i.id, name: i.name, apply: (price) => setLastKnownPrice(i.id, price) })),
+    ...shoppingList
+      .filter((e) => e.trackPrice)
+      .map(
+        (e): TrackedTarget => ({
+          id: e.id,
+          name: e.name,
+          apply: (price) => setShoppingListLastKnownPrice(e.id, price),
+        })
+      ),
+  ].slice(0, MAX_ITEMS_PER_RUN);
+
+  if (targets.length === 0) {
     console.log("No trackPrice items - skipping price check.");
     return;
   }
 
-  for (const item of tracked) {
+  for (const target of targets) {
     try {
-      const result = await checkPrice(item.name);
+      const result = await checkPrice(target.name);
       const price: LastKnownPrice = { ...result, checkedAt: new Date().toISOString() };
-      await setLastKnownPrice(item.id, price);
-      console.log(`Checked "${item.name}": Coles $${price.colesPrice ?? "?"}${price.note ? ` (${price.note})` : ""}`);
+      await target.apply(price);
+      console.log(`Checked "${target.name}": Coles $${price.colesPrice ?? "?"}${price.note ? ` (${price.note})` : ""}`);
     } catch (err) {
-      console.error(`Price check failed for "${item.name}":`, err);
+      console.error(`Price check failed for "${target.name}":`, err);
     }
   }
 }

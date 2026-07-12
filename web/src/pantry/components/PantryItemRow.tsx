@@ -3,12 +3,12 @@ import QuantityStepper from "./QuantityStepper";
 import PantryEditItemModal from "./PantryEditItemModal";
 import { daysBetween, formatExpiresAt, formatPurchasedAt } from "../../shared/lib/dates";
 import { stepForUnit } from "../lib/units";
+import { formatLastKnownPrice, colesLinkFor } from "../lib/priceDisplay";
 import {
   runPantryQuery,
   REMOVE_INVENTORY_ITEM_MUTATION,
   UPDATE_INVENTORY_ITEM_MUTATION,
   type InventoryItem,
-  type LastKnownPrice,
   type RemoveInventoryItemResult,
   type UpdateInventoryItemResult,
 } from "../api";
@@ -32,24 +32,6 @@ function formatMeta(item: InventoryItem): string {
   if (item.price !== null) parts.push(`$${item.price.toFixed(2)}`);
   if (item.purchasedAt) parts.push(formatPurchasedAt(item.purchasedAt));
   return parts.join(" · ");
-}
-
-// Written asynchronously by the daily price-check Lambda, not on this
-// request - "pending" and "unconfirmed" are both real, expected states, not
-// errors, so they get plain text rather than looking broken.
-function formatLastKnownPrice(price: LastKnownPrice | null): string {
-  if (!price) return "price check pending";
-  if (price.colesPrice === null) return "price unconfirmed";
-  return `Coles $${price.colesPrice.toFixed(2)}`;
-}
-
-// Only link out once there's an actual price to show - nothing to send
-// someone to for "pending"/"unconfirmed". Prefer the exact product page the
-// price check itself found; fall back to a plain Coles search for the item
-// name (a real, always-valid URL, not a guess) when it didn't capture one.
-function colesLinkFor(name: string, price: LastKnownPrice | null): string | null {
-  if (!price || price.colesPrice === null) return null;
-  return price.productUrl ?? `https://www.coles.com.au/search?q=${encodeURIComponent(name)}`;
 }
 
 // Separated from the rest of the meta line so expired/soon-to-expire dates

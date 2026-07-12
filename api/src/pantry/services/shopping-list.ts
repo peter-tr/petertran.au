@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { QueryCommand, GetCommand, PutCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
 import { ddb, TABLE_NAME, PK } from "../lib/aws/ddb";
 import { normalizeItemName, normalizeUnit } from "../lib/util/normalize";
+import type { LastKnownPrice } from "./inventory";
 
 const SHOPLIST_PREFIX = "SHOPLIST#";
 
@@ -15,6 +16,8 @@ export interface ShoppingListEntry {
   category: string | null;
   recipeTag: string | null;
   urgent: boolean;
+  trackPrice: boolean;
+  lastKnownPrice: LastKnownPrice | null;
   addedAt: string;
 }
 
@@ -27,6 +30,7 @@ export interface UpdateShoppingListEntryInput {
   category?: string | null;
   recipeTag?: string | null;
   urgent?: boolean;
+  trackPrice?: boolean;
 }
 
 // Backfills fields added after some rows were already written. Critical
@@ -45,6 +49,8 @@ function withShoppingListDefaults(entry: ShoppingListEntry): ShoppingListEntry {
     category: entry.category ?? null,
     recipeTag: entry.recipeTag ?? null,
     urgent: entry.urgent ?? false,
+    trackPrice: entry.trackPrice ?? false,
+    lastKnownPrice: entry.lastKnownPrice ?? null,
   };
 }
 
@@ -87,6 +93,15 @@ export async function deleteShoppingListEntry(id: string): Promise<boolean> {
     })
   );
   return res.Attributes !== undefined;
+}
+
+// Called only by the price-check Lambda (lib/anthropic/check-prices.ts), not
+// exposed as a GraphQL mutation - mirrors inventory.ts's setLastKnownPrice.
+export async function setShoppingListLastKnownPrice(id: string, price: LastKnownPrice): Promise<void> {
+  const existing = await getShoppingListEntry(id);
+  if (!existing) throw new Error(`No shopping list entry found with id "${id}".`);
+
+  await putShoppingListEntry({ ...existing, lastKnownPrice: price });
 }
 
 // Used both automatically (a staple running out), manually (the "add to
@@ -132,6 +147,8 @@ export async function upsertShoppingListEntry(
         category,
         recipeTag,
         urgent,
+        trackPrice: false,
+        lastKnownPrice: null,
         addedAt: new Date().toISOString(),
       };
 

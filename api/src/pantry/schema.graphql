@@ -276,6 +276,17 @@ type ShoppingListEntry {
   """
   urgent: Boolean!
   """
+  True if this entry's price should be checked daily against Coles - same
+  concept as InventoryItem.trackPrice, independently toggleable since an
+  item can be tracked on the shopping list before it's ever in inventory.
+  """
+  trackPrice: Boolean!
+  """
+  Most recent Coles price check result, written by the price-check worker
+  Lambda. Null until the first check runs after trackPrice is enabled.
+  """
+  lastKnownPrice: LastKnownPrice
+  """
   Timestamp this entry was added, ISO 8601.
   """
   addedAt: String!
@@ -296,6 +307,7 @@ input UpdateShoppingListEntryInput {
   category: String
   recipeTag: String
   urgent: Boolean
+  trackPrice: Boolean
 }
 
 """
@@ -385,6 +397,11 @@ type PantrySettings {
   sent, when digestEnabled is true.
   """
   digestHour: Int!
+  """
+  Shows extra debug info (AI call cost, duration, search/fetch counts) on
+  the pantry page - see AiCallDebugInfo.
+  """
+  nerdMode: Boolean!
 }
 
 """
@@ -409,6 +426,7 @@ input PantrySettingsInput {
   shoppingUrgentOnly: Boolean
   digestEnabled: Boolean
   digestHour: Int
+  nerdMode: Boolean
 }
 
 """
@@ -545,6 +563,34 @@ request instead of being a new, standalone, likely-unclear one.
 input ConversationMessage {
   role: String!
   content: String!
+}
+
+"""
+Debug/cost info about a single Anthropic API call, shown on the pantry page
+only when PantrySettings.nerdMode is on - purely informational, nothing
+else reads or depends on this data.
+"""
+type AiCallDebugInfo {
+  """
+  Estimated cost of this call in USD, computed from the model's actual
+  token usage and its known per-token pricing. An estimate, not a billed
+  amount.
+  """
+  costUsd: Float!
+  """
+  Wall-clock duration of the call, in milliseconds.
+  """
+  durationMs: Int!
+  """
+  Number of web_search tool calls made during this request. Always 0 for
+  calls that don't use it (e.g. the AI command bar).
+  """
+  searchesUsed: Int!
+  """
+  Number of web_fetch tool calls made during this request. Always 0 for
+  calls that don't use it.
+  """
+  fetchesUsed: Int!
 }
 
 """
