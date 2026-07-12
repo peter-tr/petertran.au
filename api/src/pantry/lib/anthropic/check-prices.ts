@@ -19,15 +19,15 @@ const MAX_ITEMS_PER_RUN = 20;
 // Coles only, deliberately - Woolworths' pages don't reliably surface a
 // price through search/fetch (confirmed live, repeatedly), and a field
 // that's usually null isn't worth showing the user at all.
-const SYSTEM_PROMPT = `You look up the current Coles price (Australia) for an item in a pantry-tracking app.
+const SYSTEM_PROMPT = `You look up the current Coles price (Australia) for an item in a pantry-tracking app. The person looking at this wants a real number to glance at, even an approximate/labeled one - null is a last resort, not a safe default, and should be rare.
 
 Rules:
-- Pick ONE specific, real product at Coles that's the closest match to the item name given - the standard/most common variant if the name is generic (e.g. a regular-flavour 12-pack for a bare brand name, a standard 1kg pack for loose produce), the exact one if it's specific. PRODUCT_URL and COLES_PRICE, when both present, must be from that SAME product - never a price from one product paired with a URL you saw for a different one.
+- Pick ONE specific, real product at Coles that's the closest match to the item name given - the standard/most common variant if the name is generic (e.g. a regular-flavour 12-pack for a bare brand name, a standard 1kg pack for loose produce), the exact one if it's specific. A different PACK SIZE than what the name implies is still a match, not a miss - e.g. if the item is "400g chicken breast" and the closest/only product you can find and confirm is a 1kg pack, use that: report its real price and its real URL, and say in NOTE what size it actually is (e.g. "priced as the 1kg pack - no 400g size found"). Never withhold an answer just because the exact size wasn't available. PRODUCT_URL and COLES_PRICE, when both present, must be from that SAME product - never a price from one product paired with a URL you saw for a different one.
 - PRODUCT_URL and COLES_PRICE are independent - finding the closest matching product (so you have a real URL for it) and confirming its current price are two different things, and Coles frequently makes the second one hard (see below) without that meaning you failed at the first. Report PRODUCT_URL for the closest matching product whenever ANY real, plausible match exists at Coles - which is true for nearly every ordinary grocery/household item - even if COLES_PRICE ends up null for it.
-- Try web_fetch on that product's page to confirm its price. Coles' site sometimes blocks fetches outright (a security/access error) or requires a store location to show a "final" price - when that happens, don't give up on the price entirely: fall back to whatever price a search result showed for that same product, with a note about the location caveat. Only report COLES_PRICE as null when you truly can't find any price for that specific product anywhere, not merely because a fetch attempt failed - and still report its PRODUCT_URL in that case.
+- Try web_fetch on that product's page to confirm its price. Coles' site sometimes blocks fetches outright (a security/access error) or requires a store location to show a "final" price - when that happens, don't give up on the price entirely: fall back to whatever price a search result showed for that same product, with a note about the location caveat. A blocked/failed fetch is never itself a reason to report null - it just means the number came from search instead of the page, which is exactly what NOTE is for.
 - A confirmed exact price beats a labeled assumption, but a labeled assumption beats null - a price of null is close to useless for someone glancing at their pantry list. If a search doesn't turn up a clean match for the exact item name given, don't stop at null: search again for the item's most common/standard version and report that price, with a note explaining what you assumed (e.g. "assumed standard 12-pack - item name didn't specify a variant").
 - Finding multiple brands/sizes is NOT a reason to report null for either field - pick the closest match (the cheapest, the most standard size, or whichever you can actually confirm) and note the other options in NOTE instead.
-- Only report null for PRODUCT_URL when you genuinely cannot find any real Coles product that plausibly matches this item at all (COLES_PRICE should then be null too, since there's nothing to price). Never construct, guess, or infer a URL yourself - only report one you actually fetched or saw linked in a search result.
+- Only report null for COLES_PRICE (and, separately, only report null for PRODUCT_URL) when you genuinely cannot find ANYTHING - no search result mentioning any price at all, or no real product at Coles that plausibly matches. If you found even one number from one source for a plausible match, report it with a caveat in NOTE rather than null. Never construct, guess, or infer a URL yourself - only report one you actually fetched or saw linked in a search result.
 - Never silently substitute a different item's price without saying so - the note is what makes an assumption safe to show the user, so an assumed price without a note explaining the assumption isn't good enough.
 
 End your response with exactly these three lines, each on its own line, using the literal word "null" (not a placeholder) only when you truly found nothing for that field. COLES_PRICE must be a single plain number with no dollar sign and no range (e.g. "7.00", never "$7.00" or "0.84-6.00"):
@@ -133,9 +133,18 @@ export async function checkPrice(itemName: string): Promise<CheckPriceResult> {
   // cost/duration for this one price check, not just half of it.
   if (result.productUrl) {
     const verified = await verifyPriceOnPage(result.productUrl);
+    // Falling back to the first call's number (not null) when verification
+    // itself couldn't confirm one - "an unconfirmed number" beats "no
+    // number", same reasoning as the rest of this prompt. Label it so the
+    // client's "~" convention kicks in, rather than showing it as flatly
+    // confirmed when it's really just carried over from a search result.
+    const usingUnverifiedFallback = verified.colesPrice === null && result.colesPrice !== null;
     return {
       ...result,
       colesPrice: verified.colesPrice ?? result.colesPrice,
+      note: usingUnverifiedFallback
+        ? `${result.note ? `${result.note} - ` : ""}not independently confirmed on the product page`
+        : result.note,
       debugInfo: {
         costUsd: debugInfo.costUsd + verified.debugInfo.costUsd,
         durationMs: debugInfo.durationMs + verified.debugInfo.durationMs,
