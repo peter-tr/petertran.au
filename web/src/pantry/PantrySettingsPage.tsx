@@ -109,6 +109,40 @@ export default function PantrySettingsPage() {
         </div>
       </section>
 
+      {settings && (
+        <section className="pantry-panel">
+          <div className="pantry-panel-header">
+            <h2 className="pantry-panel-title">Nerd mode</h2>
+          </div>
+          <p className="project-desc">
+            Shows the AI call cost, duration, and Coles search/fetch counts behind each price check and command
+            bar reply - split by list since inventory and shopping list are usually checked separately.
+          </p>
+          <div className="form-row pantry-settings-row">
+            <label className="form-label" htmlFor="pantry-nerd-mode-shopping-list">
+              <input
+                id="pantry-nerd-mode-shopping-list"
+                type="checkbox"
+                checked={settings.nerdModeShoppingList}
+                onChange={(e) => updateSettings({ nerdModeShoppingList: e.target.checked })}
+              />{" "}
+              Shopping list + command bar
+            </label>
+          </div>
+          <div className="form-row pantry-settings-row">
+            <label className="form-label" htmlFor="pantry-nerd-mode-inventory">
+              <input
+                id="pantry-nerd-mode-inventory"
+                type="checkbox"
+                checked={settings.nerdModeInventory}
+                onChange={(e) => updateSettings({ nerdModeInventory: e.target.checked })}
+              />{" "}
+              Inventory
+            </label>
+          </div>
+        </section>
+      )}
+
       <section className="pantry-panel">
         <div className="pantry-panel-header">
           <h2 className="pantry-panel-title">Architecture</h2>

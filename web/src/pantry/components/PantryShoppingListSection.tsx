@@ -1,7 +1,7 @@
 import { useState } from "react";
 import PantryInlineAddToggle from "./PantryInlineAddToggle";
 import { UNIT_OPTIONS } from "../lib/units";
-import { formatLastKnownPrice, colesLinkFor } from "../lib/priceDisplay";
+import { formatLastKnownPrice, colesLinkFor, formatDebugInfo } from "../lib/priceDisplay";
 import {
   runPantryQuery,
   ADD_TO_SHOPPING_LIST_MUTATION,
@@ -416,6 +416,12 @@ export default function PantryShoppingListSection({
                         <span className="pantry-item-last-known-price" title={entry.lastKnownPrice?.note ?? undefined}>
                           {" · "}
                           {formatLastKnownPrice(entry.lastKnownPrice)}
+                        </span>
+                      )}
+                      {entry.trackPrice && settings.nerdModeShoppingList && entry.lastKnownPrice && (
+                        <span className="pantry-nerd-debug-info">
+                          {" · "}
+                          {formatDebugInfo(entry.lastKnownPrice.debugInfo)}
                         </span>
                       )}
                     </span>

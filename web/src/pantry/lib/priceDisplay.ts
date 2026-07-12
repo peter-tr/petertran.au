@@ -1,4 +1,4 @@
-import type { LastKnownPrice } from "../api";
+import type { AiCallDebugInfo, LastKnownPrice } from "../api";
 
 // Written asynchronously by the daily price-check Lambda, not on this
 // request - "pending" and "unconfirmed" are both real, expected states, not
@@ -18,4 +18,14 @@ export function formatLastKnownPrice(price: LastKnownPrice | null): string {
 export function colesLinkFor(name: string, price: LastKnownPrice | null): string | null {
   if (!price || price.colesPrice === null) return null;
   return price.productUrl ?? `https://www.coles.com.au/search?q=${encodeURIComponent(name)}`;
+}
+
+// Nerd-mode-only display of what a single Anthropic call cost - shared by
+// the inventory/shopping list rows (from LastKnownPrice) and the command
+// bar (from ParsedCommand), so the format stays identical everywhere.
+export function formatDebugInfo(info: AiCallDebugInfo): string {
+  const parts = [`$${info.costUsd.toFixed(4)}`, `${(info.durationMs / 1000).toFixed(1)}s`];
+  if (info.searchesUsed > 0) parts.push(`${info.searchesUsed} search${info.searchesUsed === 1 ? "" : "es"}`);
+  if (info.fetchesUsed > 0) parts.push(`${info.fetchesUsed} fetch${info.fetchesUsed === 1 ? "" : "es"}`);
+  return parts.join(" · ");
 }

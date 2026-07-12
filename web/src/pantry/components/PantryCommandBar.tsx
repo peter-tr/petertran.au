@@ -12,6 +12,7 @@ import {
   type RecipeSuggestion,
 } from "../api";
 import { scaleAmount, scalePrice, checkSufficiency } from "../lib/recipeScaling";
+import { formatDebugInfo } from "../lib/priceDisplay";
 
 type ActionsStatus = "pending" | "confirming" | "done" | "cancelled";
 
@@ -45,6 +46,7 @@ type Turn = UserTurn | AssistantTurn;
 interface PantryCommandBarProps {
   items: InventoryItem[];
   onChanged: () => Promise<void>;
+  nerdMode: boolean;
 }
 
 // Only the last few turns are sent back as context on each call - a
@@ -144,7 +146,7 @@ const CAPABILITIES: CapabilityGroup[] = [
   },
 ];
 
-export default function PantryCommandBar({ items, onChanged }: PantryCommandBarProps) {
+export default function PantryCommandBar({ items, onChanged, nerdMode }: PantryCommandBarProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [input, setInput] = useState("");
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -644,6 +646,9 @@ export default function PantryCommandBar({ items, onChanged }: PantryCommandBarP
                       </>
                     )}
                   </div>
+                )}
+                {nerdMode && (
+                  <p className="pantry-nerd-debug-info">{formatDebugInfo(turn.result.debugInfo)}</p>
                 )}
               </div>
             )

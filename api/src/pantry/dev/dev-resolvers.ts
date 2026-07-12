@@ -26,7 +26,8 @@ let settings: PantrySettings = {
   shoppingUrgentOnly: false,
   digestEnabled: true,
   digestHour: 16,
-  nerdMode: false,
+  nerdModeInventory: false,
+  nerdModeShoppingList: false,
   commonItems: [
     "Milk",
     "Eggs",
@@ -137,6 +138,7 @@ if (milkEntry) {
       productUrl: null,
       note: null,
       checkedAt: new Date().toISOString(),
+      debugInfo: { costUsd: 0.002, durationMs: 4200, searchesUsed: 2, fetchesUsed: 1 },
     },
   });
 }
@@ -253,7 +255,13 @@ interface MockParsedCommand {
   actions: MockProposedAction[] | null;
   recipes: MockRecipeSuggestion[] | null;
   message: string | null;
+  debugInfo: { costUsd: number; durationMs: number; searchesUsed: number; fetchesUsed: number };
 }
+
+// No real Anthropic call in dev mode, so there's nothing to measure - zeros
+// read as "this ran locally, not against the real model" rather than a
+// real (if tiny) cost/duration.
+const MOCK_DEBUG_INFO = { costUsd: 0, durationMs: 0, searchesUsed: 0, fetchesUsed: 0 };
 
 // Crude local keyword matching, no Anthropic call, no conversation history
 // awareness - just enough to exercise the frontend's preview/confirm flow
@@ -270,6 +278,7 @@ function mockParseCommand(input: string): MockParsedCommand {
       actions: null,
       recipes: null,
       message: "Type a command or question.",
+      debugInfo: MOCK_DEBUG_INFO,
     };
   }
 
@@ -284,6 +293,7 @@ function mockParseCommand(input: string): MockParsedCommand {
       actions: null,
       recipes: null,
       message: null,
+      debugInfo: MOCK_DEBUG_INFO,
     };
   }
 
@@ -323,6 +333,7 @@ function mockParseCommand(input: string): MockParsedCommand {
         },
       ],
       message: null,
+      debugInfo: MOCK_DEBUG_INFO,
     };
   }
 
@@ -357,6 +368,7 @@ function mockParseCommand(input: string): MockParsedCommand {
       ],
       recipes: null,
       message: null,
+      debugInfo: MOCK_DEBUG_INFO,
     };
   }
 
@@ -369,6 +381,7 @@ function mockParseCommand(input: string): MockParsedCommand {
         actions: null,
         recipes: null,
         message: "Couldn't find an item matching that name.",
+        debugInfo: MOCK_DEBUG_INFO,
       };
     }
     return {
@@ -385,6 +398,7 @@ function mockParseCommand(input: string): MockParsedCommand {
       ],
       recipes: null,
       message: null,
+      debugInfo: MOCK_DEBUG_INFO,
     };
   }
 
@@ -395,6 +409,7 @@ function mockParseCommand(input: string): MockParsedCommand {
     recipes: null,
     message:
       'This is a local mock - only "add X", "remove X", "what\'s expiring", and "recipe" are recognized.',
+    debugInfo: MOCK_DEBUG_INFO,
   };
 }
 
