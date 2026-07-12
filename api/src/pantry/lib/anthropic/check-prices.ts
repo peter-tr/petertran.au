@@ -23,6 +23,7 @@ const SYSTEM_PROMPT = `You look up the current Coles price (Australia) for an it
 Rules:
 - For items sold in variable denominations (loose produce priced per kg vs per each vs per bunch, or multiple pack sizes), report the most common/representative one as the price and name any other denominations you found in the note, rather than silently picking one with no explanation.
 - A confirmed exact price beats a labeled assumption, but a labeled assumption beats null - a price of null is close to useless for someone glancing at their pantry list. If a search doesn't turn up a price for the exact item name given (e.g. it's generic, missing a size/variant, or just didn't surface a clean match), don't stop at null: search again for the item's most common/standard version (e.g. the regular-flavour 12-pack for a bare brand name) and report that price, with a note explaining what you assumed (e.g. "assumed standard 12-pack - item name didn't specify a variant"). Only fall back to null if you genuinely can't find a Coles price for anything plausibly matching this item at all, not just the one exact name given.
+- Finding multiple brands/sizes, or seeing that Coles' page needs a store location selected to show its "final" price, is NOT a reason to report null - you have already done the hard part. Pick one (the cheapest, the most standard size, or whichever you have an actual number for) and report that specific number, noting the others and the location caveat in NOTE instead. Only report null when you found zero real prices for anything plausibly matching this item, not when you found several and couldn't decide between them.
 - Never silently substitute a different item's price without saying so - the note is what makes an assumption safe to show the user, so an assumed price without a note explaining the assumption isn't good enough.
 - If a search result gives you the exact Coles product page URL for the item you priced, report it. Never construct, guess, or infer a URL yourself - only report one you actually saw in a search result or fetched page. If you don't have a real URL for the specific product you priced, say null - a broken/guessed link is worse than no link.
 
@@ -31,7 +32,7 @@ COLES_PRICE: <a single plain number, or null>
 PRODUCT_URL: <the exact coles.com.au product URL you saw for this product, or null>
 NOTE: <short caveat, or null>`;
 
-interface CheckPriceResult {
+export interface CheckPriceResult {
   colesPrice: number | null;
   productUrl: string | null;
   note: string | null;
@@ -56,7 +57,7 @@ function parseResult(text: string): Omit<CheckPriceResult, "debugInfo"> {
   return { colesPrice, productUrl, note };
 }
 
-async function checkPrice(itemName: string): Promise<CheckPriceResult> {
+export async function checkPrice(itemName: string): Promise<CheckPriceResult> {
   const client = await getAnthropicClient();
   const startedAt = Date.now();
   const response = await client.messages.create(
@@ -88,32 +89,55 @@ async function checkPrice(itemName: string): Promise<CheckPriceResult> {
 // same way and written back through their own list's setter.
 interface TrackedTarget {
   id: string;
+  list: "inventory" | "shoppingList";
   name: string;
   apply: (price: LastKnownPrice) => Promise<void>;
 }
 
+export interface PriceCheckTarget {
+  id: string;
+  list: "inventory" | "shoppingList";
+}
+
 // Triggered daily by an EventBridge Scheduler schedule (see
-// infra/lib/pantry-stack.ts), and on-demand via the "sync prices now"
-// settings button - a best-effort background refresh, not a data path
-// anything else depends on, so a failure on one item just leaves its
-// lastKnownPrice stale rather than anything user-visible breaking.
-export async function checkTrackedPrices(): Promise<void> {
+// infra/lib/pantry-stack.ts), on-demand via the "sync prices now" settings
+// button (checks everything tracked), and on-demand for a single item via
+// `only` (checks just that one) - a best-effort background refresh, not a
+// data path anything else depends on, so a failure on one item just leaves
+// its lastKnownPrice stale rather than anything user-visible breaking.
+export async function checkTrackedPrices(only?: PriceCheckTarget): Promise<void> {
   const [items, shoppingList] = await Promise.all([getAllItems(), getShoppingList()]);
 
-  const targets: TrackedTarget[] = [
+  const allTargets: TrackedTarget[] = [
     ...items
       .filter((i) => i.trackPrice)
-      .map((i): TrackedTarget => ({ id: i.id, name: i.name, apply: (price) => setLastKnownPrice(i.id, price) })),
+      .map(
+        (i): TrackedTarget => ({
+          id: i.id,
+          list: "inventory",
+          name: i.name,
+          apply: (price) => setLastKnownPrice(i.id, price),
+        })
+      ),
     ...shoppingList
       .filter((e) => e.trackPrice)
       .map(
         (e): TrackedTarget => ({
           id: e.id,
+          list: "shoppingList",
           name: e.name,
           apply: (price) => setShoppingListLastKnownPrice(e.id, price),
         })
       ),
-  ].slice(0, MAX_ITEMS_PER_RUN);
+  ];
+
+  // A toggle-on for one specific item shouldn't re-check everything else
+  // that happens to be tracked too - that's "crazy amount of calls to
+  // Coles" for what should be a single lookup. Only the bulk paths (no
+  // `only`) apply the run-size cap.
+  const targets = only
+    ? allTargets.filter((t) => t.id === only.id && t.list === only.list)
+    : allTargets.slice(0, MAX_ITEMS_PER_RUN);
 
   if (targets.length === 0) {
     console.log("No trackPrice items - skipping price check.");

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import Footer from "../portfolio/components/Footer";
 import PantryCommandBar from "./components/PantryCommandBar";
 import PantryInventorySection from "./components/PantryInventorySection";
 import PantryManualAddSection from "./components/PantryManualAddSection";
@@ -88,6 +89,7 @@ export default function Pantry() {
           />
         </>
       )}
+      <Footer />
     </>
   );
 }

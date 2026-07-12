@@ -313,3 +313,28 @@ a {
   color: var(--muted);
   opacity: 0.85;
 }
+
+/* Shared by Footer.tsx (portfolio/components/Footer.tsx) across all three
+   projects' pages, not just portfolio's - lives here rather than
+   portfolio.css so pantry/imposter pages don't need to pull in the whole
+   portfolio stylesheet just for this one component. */
+.footer {
+  padding: 2.5rem 0 4rem;
+  border-top: 1px solid var(--rule);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--muted-dim);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.2rem;
+  justify-content: space-between;
+}
+
+.footer a {
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.footer a:hover {
+  color: var(--type);
+}

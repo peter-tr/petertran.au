@@ -1,15 +1,19 @@
 import { assertNotRateLimited } from "../lib/util/rate-limit";
+import { assertAiNotRateLimited } from "../lib/util/ai-rate-limit";
 import { normalizeItemName, normalizeUnit } from "../lib/util/normalize";
 import { parseCommand, type ParsedCommandResult } from "../lib/anthropic/parse-command";
+import { checkPrice } from "../lib/anthropic/check-prices";
 import {
   getItem,
   getAllItems,
   putItem,
   deleteItem,
   createItem,
+  setLastKnownPrice,
   type InventoryItem,
   type AddInventoryItemInput,
   type UpdateInventoryItemInput,
+  type LastKnownPrice,
 } from "../services/inventory";
 import {
   getShoppingListEntry,
@@ -17,12 +21,35 @@ import {
   putShoppingListEntry,
   deleteShoppingListEntry,
   upsertShoppingListEntry,
+  setShoppingListLastKnownPrice,
   type ShoppingListEntry,
   type UpdateShoppingListEntryInput,
 } from "../services/shopping-list";
 import { getSettings, putSettings, type PantrySettings, type PantrySettingsInput } from "../services/settings";
 import { triggerPriceSync } from "../lib/aws/sync-prices";
 import type { Context } from "../context";
+
+// Turning trackPrice on is otherwise a silent no-op until the next daily
+// check (or a manual "sync now") - fires the same background worker
+// immediately instead, so the first price shows up in roughly the time a
+// single Anthropic call takes rather than up to a day later. Scoped to just
+// this one item (`only`) - toggling one thing on shouldn't also re-check
+// everything else already tracked, that's what the "sync now" button is
+// for. Never blocks or fails the mutation - a sync trigger failure just
+// means the daily check picks it up as usual.
+async function maybeTriggerPriceSync(
+  wasTracking: boolean,
+  isTracking: boolean,
+  id: string,
+  list: "inventory" | "shoppingList"
+): Promise<void> {
+  if (!isTracking || wasTracking) return;
+  try {
+    await triggerPriceSync({ id, list });
+  } catch (err) {
+    console.error("Failed to auto-trigger price sync:", err);
+  }
+}
 
 export const resolvers = {
   Query: {
@@ -71,6 +98,7 @@ export const resolvers = {
       await assertNotRateLimited(context.sourceIp);
       const item = createItem(args.input);
       await putItem(item);
+      await maybeTriggerPriceSync(false, item.trackPrice, item.id, "inventory");
       return item;
     },
 
@@ -90,6 +118,7 @@ export const resolvers = {
       if (!existing) {
         const item = createItem(args.input);
         await putItem(item);
+        await maybeTriggerPriceSync(false, item.trackPrice, item.id, "inventory");
         return item;
       }
 
@@ -134,6 +163,7 @@ export const resolvers = {
       };
 
       await putItem(updated);
+      await maybeTriggerPriceSync(existing.trackPrice, updated.trackPrice, updated.id, "inventory");
       return updated;
     },
 
@@ -194,6 +224,7 @@ export const resolvers = {
       };
 
       await putShoppingListEntry(updated);
+      await maybeTriggerPriceSync(existing.trackPrice, updated.trackPrice, updated.id, "shoppingList");
       return updated;
     },
 
@@ -221,6 +252,32 @@ export const resolvers = {
     syncPricesNow: async (_: unknown, args: unknown, context: Context): Promise<boolean> => {
       await assertNotRateLimited(context.sourceIp);
       await triggerPriceSync();
+      return true;
+    },
+
+    // Synchronous, unlike everything else here that touches prices - the
+    // command bar's "want me to check now?" offer is a one-off, explicitly
+    // user-initiated Anthropic call, so it uses the AI limiter (15/min) not
+    // the plain CRUD one, and awaits the real result instead of firing the
+    // background worker.
+    checkPriceNow: async (
+      _: unknown,
+      args: { id: string; list: string },
+      context: Context
+    ): Promise<boolean> => {
+      await assertAiNotRateLimited(context.sourceIp);
+
+      const name =
+        args.list === "inventory" ? (await getItem(args.id))?.name : (await getShoppingListEntry(args.id))?.name;
+      if (!name) throw new Error(`No ${args.list === "inventory" ? "inventory item" : "shopping list entry"} found with id "${args.id}".`);
+
+      const result = await checkPrice(name);
+      const price: LastKnownPrice = { ...result, checkedAt: new Date().toISOString() };
+      if (args.list === "inventory") {
+        await setLastKnownPrice(args.id, price);
+      } else {
+        await setShoppingListLastKnownPrice(args.id, price);
+      }
       return true;
     },
   },

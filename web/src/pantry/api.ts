@@ -372,6 +372,16 @@ export interface SyncPricesNowResult {
   syncPricesNow: boolean;
 }
 
+export const CHECK_PRICE_NOW_MUTATION = /* GraphQL */ `
+  mutation CheckPriceNow($id: ID!, $list: String!) {
+    checkPriceNow(id: $id, list: $list)
+  }
+`;
+
+export interface CheckPriceNowResult {
+  checkPriceNow: boolean;
+}
+
 export type PantryActionType =
   | "RECORD_PURCHASE"
   | "UPDATE_INVENTORY_ITEM"
@@ -418,6 +428,10 @@ export interface ParsedCommand {
   recipes: RecipeSuggestion[] | null;
   message: string | null;
   debugInfo: AiCallDebugInfo;
+  // Set together when the answer just offered a one-off live Coles check
+  // for an item with nothing on file yet - see checkPriceNow.
+  offerPriceCheckItemId: string | null;
+  offerPriceCheckList: "inventory" | "shoppingList" | null;
 }
 
 // Mirrors Claude's own {role, content} chat message shape - see
@@ -436,6 +450,8 @@ export const PARSE_COMMAND_QUERY = /* GraphQL */ `
       debugInfo {
         ${AI_CALL_DEBUG_INFO_FIELDS}
       }
+      offerPriceCheckItemId
+      offerPriceCheckList
       actions {
         type
         summary
