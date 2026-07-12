@@ -1,6 +1,7 @@
 import { useState } from "react";
 import PantryInlineAddToggle from "./PantryInlineAddToggle";
 import { UNIT_OPTIONS } from "../lib/units";
+import { formatLastKnownPrice, colesLinkFor } from "../lib/priceDisplay";
 import {
   runPantryQuery,
   ADD_TO_SHOPPING_LIST_MUTATION,
@@ -157,6 +158,23 @@ export default function PantryShoppingListSection({
       await runPantryQuery<UpdateShoppingListEntryResult>(UPDATE_SHOPPING_LIST_ENTRY_MUTATION, {
         id: entry.id,
         input: { urgent: !entry.urgent },
+      });
+      await onChanged();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update shopping list entry.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function toggleTrackPrice(entry: ShoppingListEntry) {
+    if (busyId) return;
+    setBusyId(entry.id);
+    setError(null);
+    try {
+      await runPantryQuery<UpdateShoppingListEntryResult>(UPDATE_SHOPPING_LIST_ENTRY_MUTATION, {
+        id: entry.id,
+        input: { trackPrice: !entry.trackPrice },
       });
       await onChanged();
     } catch (err) {
@@ -394,6 +412,12 @@ export default function PantryShoppingListSection({
                       {entry.note && <span className="pantry-shopping-note"> - {entry.note}</span>}
                       {entry.category && <span className="pantry-item-category"> {entry.category}</span>}
                       {entry.recipeTag && <span className="pantry-shopping-recipe-tag"> · {entry.recipeTag}</span>}
+                      {entry.trackPrice && (
+                        <span className="pantry-item-last-known-price" title={entry.lastKnownPrice?.note ?? undefined}>
+                          {" · "}
+                          {formatLastKnownPrice(entry.lastKnownPrice)}
+                        </span>
+                      )}
                     </span>
                     <span className="pantry-shopping-item-actions">
                       <button
@@ -406,6 +430,39 @@ export default function PantryShoppingListSection({
                       >
                         !
                       </button>
+                      <button
+                        type="button"
+                        className={`pantry-track-price-toggle ${entry.trackPrice ? "active" : ""}`}
+                        onClick={() => toggleTrackPrice(entry)}
+                        disabled={busyId === entry.id}
+                        title={
+                          entry.trackPrice
+                            ? "Tracking price - checked daily against Coles"
+                            : "Track price (checked daily against Coles)"
+                        }
+                        aria-label={entry.trackPrice ? "Stop tracking price" : "Track price"}
+                      >
+                        $
+                      </button>
+                      {entry.trackPrice &&
+                        (() => {
+                          const link = colesLinkFor(entry.name, entry.lastKnownPrice);
+                          return (
+                            link && (
+                              <a
+                                className="pantry-coles-link"
+                                href={link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title={
+                                  entry.lastKnownPrice?.productUrl ? "Open this product on Coles" : "Search for this on Coles"
+                                }
+                              >
+                                Coles ↗
+                              </a>
+                            )
+                          );
+                        })()}
                       <button
                         type="button"
                         className="pantry-delete-btn"

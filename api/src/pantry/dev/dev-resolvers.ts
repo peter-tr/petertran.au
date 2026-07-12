@@ -26,6 +26,7 @@ let settings: PantrySettings = {
   shoppingUrgentOnly: false,
   digestEnabled: true,
   digestHour: 16,
+  nerdMode: false,
   commonItems: [
     "Milk",
     "Eggs",
@@ -212,6 +213,8 @@ function upsertShoppingListEntry(
         category,
         recipeTag,
         urgent,
+        trackPrice: false,
+        lastKnownPrice: null,
         addedAt: new Date().toISOString(),
       };
   shoppingList.set(entry.id, entry);
@@ -500,6 +503,7 @@ export const devResolvers = {
           category?: string | null;
           recipeTag?: string | null;
           urgent?: boolean;
+          trackPrice?: boolean;
         };
       }
     ) => {

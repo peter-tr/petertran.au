@@ -19,7 +19,7 @@ export default function PantryArchitectureDiagram() {
       className="arch-diagram"
       viewBox="0 0 1170 530"
       role="img"
-      aria-label="Architecture diagram: the browser calls a Lambda-backed GraphQL API directly, which reads and writes inventory, shopping list, and settings data in DynamoDB, and fetches an API key from Secrets Manager to call the Anthropic API (Claude Haiku) for the AI command bar. Separately, an EventBridge Scheduler rule invokes a second Lambda every hour; it reads the digest settings and shopping list from the same DynamoDB table and, only if enabled and the configured hour matches and an urgent item exists, sends a digest email via SES. AWS CDK provisions all of it, deployed by GitHub Actions."
+      aria-label="Architecture diagram: the browser calls a Lambda-backed GraphQL API directly, which reads and writes inventory, shopping list, and settings data in DynamoDB, fetches an API key from Secrets Manager to call the Anthropic API (Claude Haiku) for the AI command bar, and can fire-and-forget invoke a third Lambda on demand to sync prices immediately. Separately, an EventBridge Scheduler fires two independent schedules: hourly, it invokes a digest Lambda that reads settings and the shopping list from the same DynamoDB table and, only if enabled and the configured hour matches and an urgent item exists, sends a digest email via SES; daily, it invokes a price-check Lambda (worker) that reads trackPrice-flagged inventory items, calls the Anthropic API with the web_search tool to look up Coles prices, and writes the result back to DynamoDB. AWS CDK provisions all of it, deployed by GitHub Actions."
     >
       <defs>
         <marker
@@ -55,10 +55,20 @@ export default function PantryArchitectureDiagram() {
         read / write
       </text>
 
-      {/* EventBridge Scheduler down to Digest Lambda */}
+      {/* GraphQL Lambda -> Price Check Lambda (on-demand "sync prices now") */}
+      <line x1="400" y1="190" x2="1072" y2="260" className="arch-edge" markerEnd="url(#pantry-arch-arrow)" />
+      <text x="730" y="248" className="arch-edge-label">
+        sync now (invoke)
+      </text>
+
+      {/* EventBridge Scheduler fanning out to both scheduled Lambdas */}
       <line x1="765" y1="190" x2="700" y2="260" className="arch-edge" markerEnd="url(#pantry-arch-arrow)" />
       <text x="710" y="225" className="arch-edge-label">
         invoke hourly
+      </text>
+      <line x1="820" y1="190" x2="1072" y2="260" className="arch-edge" markerEnd="url(#pantry-arch-arrow)" />
+      <text x="920" y="222" className="arch-edge-label">
+        invoke daily
       </text>
 
       {/* Digest Lambda's own two dependencies, same row - labeled below to
@@ -70,6 +80,20 @@ export default function PantryArchitectureDiagram() {
       <line x1="795" y1="290" x2="830" y2="290" className="arch-edge" markerEnd="url(#pantry-arch-arrow)" />
       <text x="745" y="340" className="arch-edge-label">
         send digest email
+      </text>
+
+      {/* Price Check Lambda's dependencies - routed below the row (a small
+          drop then fan-out, mirroring the GraphQL Lambda fan-out above) so
+          the long reach back to DynamoDB/Anthropic API doesn't cut through
+          the Digest Lambda / SES boxes sitting between them. */}
+      <line x1="1072" y1="320" x2="1072" y2="350" className="arch-edge" />
+      <line x1="1072" y1="350" x2="495" y2="320" className="arch-edge" markerEnd="url(#pantry-arch-arrow)" />
+      <line x1="1072" y1="350" x2="300" y2="320" className="arch-edge" markerEnd="url(#pantry-arch-arrow)" />
+      <text x="600" y="345" className="arch-edge-label">
+        write lastKnownPrice
+      </text>
+      <text x="380" y="365" className="arch-edge-label">
+        Claude Haiku + web_search
       </text>
 
       {/* connectors: provisioning + deploy */}
@@ -117,7 +141,7 @@ export default function PantryArchitectureDiagram() {
           EventBridge Scheduler
         </text>
         <text x="765" y="173" className="arch-node-sublabel">
-          hourly, Australia/Sydney
+          Australia/Sydney
         </text>
       </g>
 
@@ -188,6 +212,23 @@ export default function PantryArchitectureDiagram() {
         </text>
         <text x="895" y="303" className="arch-node-sublabel">
           digest email
+        </text>
+      </g>
+
+      {/* Price Check Lambda - a worker: no request ever waits on it, both its
+          triggers (daily schedule, on-demand sync) are fire-and-forget, and
+          it writes results back to DynamoDB for the GraphQL Lambda to read
+          on the next query, same as everything else in this diagram. */}
+      <g>
+        <rect x="985" y="260" width="175" height="60" rx="8" className="arch-node arch-node-compute" />
+        <NodeIcon x={997} y={270}>
+          <FaAws size={16} />
+        </NodeIcon>
+        <text x="1072" y="285" className="arch-node-label">
+          Lambda
+        </text>
+        <text x="1072" y="303" className="arch-node-sublabel">
+          price-check worker
         </text>
       </g>
 

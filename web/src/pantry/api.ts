@@ -157,6 +157,8 @@ export interface ShoppingListEntry {
   category: string | null;
   recipeTag: string | null;
   urgent: boolean;
+  trackPrice: boolean;
+  lastKnownPrice: LastKnownPrice | null;
   addedAt: string;
 }
 
@@ -173,6 +175,13 @@ const SHOPPING_LIST_ENTRY_FIELDS = /* GraphQL */ `
   category
   recipeTag
   urgent
+  trackPrice
+  lastKnownPrice {
+    colesPrice
+    productUrl
+    note
+    checkedAt
+  }
   addedAt
 `;
 
@@ -237,6 +246,7 @@ export interface UpdateShoppingListEntryInput {
   category?: string | null;
   recipeTag?: string | null;
   urgent?: boolean;
+  trackPrice?: boolean;
 }
 
 export const UPDATE_SHOPPING_LIST_ENTRY_MUTATION = /* GraphQL */ `
@@ -270,6 +280,7 @@ export interface PantrySettings {
   shoppingUrgentOnly: boolean;
   digestEnabled: boolean;
   digestHour: number;
+  nerdMode: boolean;
 }
 
 export type PantrySettingsInput = Partial<PantrySettings>;
@@ -293,6 +304,7 @@ const SETTINGS_FIELDS = /* GraphQL */ `
   shoppingUrgentOnly
   digestEnabled
   digestHour
+  nerdMode
 `;
 
 export const SETTINGS_QUERY = /* GraphQL */ `
