@@ -497,11 +497,25 @@
 .ask-ai-examples {
   flex-basis: 100%;
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
+  flex-wrap: nowrap;
+  overflow-x: auto;
   gap: 0.4rem;
+  scrollbar-width: none;
+}
+
+.ask-ai-examples::-webkit-scrollbar {
+  display: none;
+}
+
+.ask-ai-examples-expanded {
+  flex-wrap: wrap;
+  overflow-x: visible;
 }
 
 .ask-ai-example {
+  flex: 0 0 auto;
+  white-space: nowrap;
   background: var(--panel-2);
   border: 1px solid var(--rule);
   border-radius: 999px;
@@ -521,6 +535,22 @@
 .ask-ai-example:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+.ask-ai-examples-toggle {
+  flex: 0 0 auto;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  line-height: 1;
+  padding: 0.32rem 0.3rem;
+  cursor: pointer;
+}
+
+.ask-ai-examples-toggle:hover {
+  color: var(--type);
 }
 
 .ask-ai-error {

@@ -25,6 +25,7 @@ export default function AskAI() {
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [answer, setAnswer] = useState<string | null>(null);
+  const [examplesExpanded, setExamplesExpanded] = useState(false);
 
   // Tracks whether the in-flight (or just-finished) GraphQL request was one we
   // kicked off ourselves, so we only show the "running…" note for that request
@@ -119,7 +120,7 @@ export default function AskAI() {
       <button className="run-btn" type="submit" disabled={loading}>
         {loading ? "Thinking…" : "Ask Claude ▸"}
       </button>
-      <div className="ask-ai-examples">
+      <div className={`ask-ai-examples${examplesExpanded ? " ask-ai-examples-expanded" : ""}`}>
         {EXAMPLE_PROMPTS.map((example) => (
           <button
             key={example}
@@ -134,6 +135,15 @@ export default function AskAI() {
             {example}
           </button>
         ))}
+        <button
+          type="button"
+          className="ask-ai-examples-toggle"
+          aria-expanded={examplesExpanded}
+          aria-label={examplesExpanded ? "Show fewer examples" : "Show more examples"}
+          onClick={() => setExamplesExpanded((v) => !v)}
+        >
+          {examplesExpanded ? "‹" : "…"}
+        </button>
       </div>
       {answer && <p className="ask-ai-answer">{answer}</p>}
       {awaitingResult && <span className="ask-ai-note">// running the generated query…</span>}

@@ -1,4 +1,4 @@
-import { useRef, useState, type ChangeEvent, type FormEvent, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import {
   runPantryQuery,
   PARSE_COMMAND_QUERY,
@@ -107,6 +107,43 @@ function servingsFor(turn: AssistantTurn, recipeIndex: number, recipe: RecipeSug
   return turn.recipeServings[recipeIndex] ?? recipe.baseServings;
 }
 
+interface CapabilityGroup {
+  label: string;
+  description: string;
+  examples: string[];
+}
+
+// Grouped (rather than one flat list) so each capability gets its own label
+// color, and each example is its own clickable button that fills the input
+// below instead of just being inert copy.
+const CAPABILITIES: CapabilityGroup[] = [
+  {
+    label: "Recipes",
+    description: "Ask for a recipe from what you have.",
+    examples: ["what can I make with chicken?", "how do I make carbonara"],
+  },
+  {
+    label: "Inventory",
+    description: "Add, update, or remove items.",
+    examples: ["add 2L milk to the fridge", "used up the eggs"],
+  },
+  {
+    label: "Shopping list",
+    description: "Food or household items.",
+    examples: ["add toothbrush to my shopping list"],
+  },
+  {
+    label: "Flags",
+    description: "Staple, low priority, or nearly empty.",
+    examples: ["mark rice as low priority"],
+  },
+  {
+    label: "Follow-ups",
+    description: "It remembers the conversation.",
+    examples: ["make it vegetarian", "remove the salt"],
+  },
+];
+
 export default function PantryCommandBar({ items, onChanged }: PantryCommandBarProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [input, setInput] = useState("");
@@ -129,10 +166,19 @@ export default function PantryCommandBar({ items, onChanged }: PantryCommandBarP
 
   // Grows the box to fit what's typed - stays single-line at rest, expands
   // as text wraps instead of scrolling horizontally inside a fixed box.
-  function handleInputChange(e: ChangeEvent<HTMLTextAreaElement>) {
-    setInput(e.target.value);
-    e.target.style.height = "auto";
-    e.target.style.height = `${e.target.scrollHeight}px`;
+  // Keyed off `input` itself (not just the change handler) so a programmatic
+  // fill - like clicking an example prompt - resizes the box too.
+  useEffect(() => {
+    if (!textareaRef.current) return;
+    textareaRef.current.style.height = "auto";
+    textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+  }, [input]);
+
+  // Fills the input from a clicked example without submitting it - the user
+  // still reviews/edits and hits Enter themselves, same as if they'd typed it.
+  function fillExample(example: string) {
+    setInput(example);
+    textareaRef.current?.focus();
   }
 
   // Enter submits like a chat/command input; Shift+Enter still inserts a
@@ -318,7 +364,7 @@ export default function PantryCommandBar({ items, onChanged }: PantryCommandBarP
             aria-label="What can I ask it to do?"
             aria-expanded={showInfo}
           >
-            i
+            h
           </button>
         </h2>
         {turns.length > 0 && (
@@ -329,13 +375,29 @@ export default function PantryCommandBar({ items, onChanged }: PantryCommandBarP
       </div>
 
       {showInfo && (
-        <ul className="pantry-info-list">
-          <li>Ask for a recipe — “what can I make with chicken?”, “how do I make carbonara”</li>
-          <li>Add, update, or remove inventory — “add 2L milk to the fridge”, “used up the eggs”</li>
-          <li>Add to the shopping list — food or household items, e.g. “add toothbrush”</li>
-          <li>Flag items — staple, low priority, or nearly empty, e.g. “mark rice as low priority”</li>
-          <li>Follow up naturally — “make it vegetarian”, “remove the salt” — it remembers the conversation</li>
-        </ul>
+        <div className="pantry-info-list">
+          {CAPABILITIES.map((group, gi) => (
+            <div className="pantry-info-group" key={group.label}>
+              <div className="pantry-info-group-head">
+                <span className={`pantry-info-label pantry-info-label-${gi % 3}`}>{group.label}</span>
+                <span className="pantry-info-desc">{group.description}</span>
+              </div>
+              <div className="pantry-info-examples">
+                {group.examples.map((example) => (
+                  <button
+                    key={example}
+                    type="button"
+                    className="pantry-info-example"
+                    title="Click to fill the input below"
+                    onClick={() => fillExample(example)}
+                  >
+                    “{example}”
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
       )}
 
       {(turns.length > 0 || thinking) && (
@@ -594,7 +656,7 @@ export default function PantryCommandBar({ items, onChanged }: PantryCommandBarP
           ref={textareaRef}
           className="form-input pantry-command-input"
           value={input}
-          onChange={handleInputChange}
+          onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="What items do I have?"
           disabled={thinking}
