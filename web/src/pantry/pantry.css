@@ -1308,6 +1308,25 @@
 }
 
 @media (max-width: 640px) {
+  /* The actions bar (!/$/Coles link/bought/✕) is fixed-width and was
+     squeezing the name down to a sliver on narrow screens instead of
+     wrapping - give it its own full-width row below the name instead of
+     fighting it for horizontal space. */
+  .pantry-shopping-item {
+    flex-wrap: wrap;
+  }
+
+  .pantry-shopping-item-name {
+    flex-basis: 100%;
+  }
+
+  .pantry-shopping-item-actions {
+    flex-basis: 100%;
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 640px) {
   .pantry-head {
     padding: 1rem 0 0.6rem;
   }
