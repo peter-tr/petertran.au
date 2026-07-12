@@ -299,6 +299,9 @@ export interface PantrySettings {
   shoppingCategoryFilter: string | null;
   shoppingRecipeFilter: string | null;
   shoppingUrgentOnly: boolean;
+  shoppingOptionsCollapsed: boolean;
+  shoppingSort: string;
+  shoppingSimple: boolean;
   digestEnabled: boolean;
   digestHour: number;
   nerdModeInventory: boolean;
@@ -324,6 +327,9 @@ const SETTINGS_FIELDS = /* GraphQL */ `
   shoppingCategoryFilter
   shoppingRecipeFilter
   shoppingUrgentOnly
+  shoppingOptionsCollapsed
+  shoppingSort
+  shoppingSimple
   digestEnabled
   digestHour
   nerdModeInventory
