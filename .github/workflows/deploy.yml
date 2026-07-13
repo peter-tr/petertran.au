@@ -72,6 +72,12 @@ jobs:
           BUCKET=$(aws cloudformation describe-stacks --stack-name PetertranSiteStack --region ap-southeast-2 \
             --query "Stacks[0].Outputs[?OutputKey=='BucketName'].OutputValue" --output text)
           aws s3 sync web/dist "s3://$BUCKET" --delete
+          # The prerendered /resume route has no file extension (so CloudFront's
+          # exact-key lookup matches the URL path with no rewriting), so S3 can't
+          # content-type-sniff it from sync alone - it'd otherwise default to
+          # binary/octet-stream and browsers would download it instead of
+          # rendering it.
+          aws s3 cp web/dist/resume "s3://$BUCKET/resume" --content-type text/html
 
       - name: Invalidate CloudFront cache
         run: |
