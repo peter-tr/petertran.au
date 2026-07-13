@@ -1,0 +1,9 @@
+# Peter Tran
+
+> Backend software engineer in Sydney, Australia — GraphQL federation, distributed systems, safety-critical software. Currently at Commonwealth Bank of Australia; previously Boeing and Services Australia.
+
+- [Resume](https://www.petertran.au/resume): Full work history, education, projects, and skills.
+- [Resume (PDF)](https://www.petertran.au/peter-tran-resume.pdf): Downloadable version.
+- [Home](https://www.petertran.au/): Overview, plus a live GraphQL API and query explorer over this same resume data.
+
+The GraphQL API backing this site is public and schema-introspectable — query it directly for structured data rather than scraping the rendered page.
