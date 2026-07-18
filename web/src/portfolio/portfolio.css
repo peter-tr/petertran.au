@@ -25,7 +25,7 @@
 
 .hero-secret {
   font-family: var(--font-mono);
-  font-size: 0.85rem;
+  font-size: 0.78rem;
   color: var(--signal);
   margin: -0.2rem 0 1rem;
   animation: hero-secret-in 0.4s ease;
@@ -39,6 +39,27 @@
 
 .hero-secret a:hover {
   border-color: var(--signal);
+}
+
+/* Small unobtrusive link revealed by clicking the h1 three times - same
+   fade-in spot the "also built" line used to occupy before that became
+   always-visible. */
+.hero-easter-egg {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  margin: -0.2rem 0 1rem;
+  animation: hero-secret-in 0.4s ease;
+}
+
+.hero-easter-egg a {
+  color: var(--muted);
+  text-decoration: none;
+  border-bottom: 1px solid var(--rule);
+}
+
+.hero-easter-egg a:hover {
+  color: var(--paper);
+  border-color: var(--muted);
 }
 
 .hero-links {

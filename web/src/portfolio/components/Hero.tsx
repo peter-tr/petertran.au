@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { FaLinkedin, FaGithub, FaFilePdf } from "react-icons/fa6";
 import { runQuery, HERO_QUERY, type HeroQueryResult } from "../lib/graphql";
 import type { Link as PersonLink } from "../lib/types";
+import { useShowAlsoBuilt } from "../hooks/useShowAlsoBuilt";
 
 const LINK_ICONS: Record<string, typeof FaLinkedin> = {
   LinkedIn: FaLinkedin,
@@ -37,6 +38,7 @@ export default function Hero() {
   const [errored, setErrored] = useState(false);
   const [nameClicks, setNameClicks] = useState(0);
   const secretRevealed = nameClicks >= SECRET_CLICK_COUNT;
+  const { showAlsoBuilt } = useShowAlsoBuilt();
 
   function handleNameClick() {
     if (!secretRevealed) setNameClicks((n) => n + 1);
@@ -79,9 +81,14 @@ export default function Hero() {
     <header className="hero">
       <p className="eyebrow">backend software engineer · sydney, australia</p>
       <h1 onClick={handleNameClick}>Peter Tran</h1>
-      {secretRevealed && (
+      {showAlsoBuilt && (
         <p className="hero-secret">
           // psst, also built <Link to="/imposter">imposter</Link> and <Link to="/pantry">pantry</Link>
+        </p>
+      )}
+      {secretRevealed && (
+        <p className="hero-easter-egg">
+          <Link to="/settings">→ settings</Link>
         </p>
       )}
       <p className="tagline">

@@ -8,6 +8,7 @@ import Nav from "./portfolio/components/Nav";
 // to render.
 const Home = lazy(() => import("./portfolio/Home"));
 const Resume = lazy(() => import("./portfolio/Resume"));
+const PortfolioSettingsPage = lazy(() => import("./portfolio/PortfolioSettingsPage"));
 const Pantry = lazy(() => import("./pantry/Pantry"));
 const PantrySettingsPage = lazy(() => import("./pantry/PantrySettingsPage"));
 const ImposterSetup = lazy(() => import("./games/imposter/Setup"));
@@ -84,6 +85,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/resume" element={<Resume />} />
+            <Route path="/settings" element={<PortfolioSettingsPage />} />
             <Route path="/pantry" element={<Pantry />} />
             <Route path="/pantry/settings" element={<PantrySettingsPage />} />
             <Route path="/imposter" element={<ImposterSetup />} />
