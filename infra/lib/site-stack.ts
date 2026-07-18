@@ -92,7 +92,11 @@ export class SiteStack extends Stack {
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "portfolio/handler.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/dist")),
-      memorySize: 256,
+      // 512, not the default 256 - same reasoning as pantry's GraphQLFunction:
+      // this is a synchronous Function URL on a user-facing request path, so
+      // cold-start CPU (which scales with memory) is latency a real visitor
+      // waits on, not a background job nobody's watching.
+      memorySize: 512,
       // 30s (not the default 15s) to leave headroom for the all-time cost
       // fields on a cold cache: Anthropic's cost report caps at 31 days per
       // page, so a 12-month lookback can take a dozen-odd sequential requests.
