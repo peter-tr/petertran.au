@@ -16,7 +16,9 @@ import {
 // explicit null, so an optimistic merge can safely skip any (never-sent-in-
 // practice) null/undefined key rather than letting it null out a
 // non-nullable PantrySettings field.
-function mergeSettings(prev: PantrySettings, partial: PantrySettingsInput): PantrySettings {
+// Exported for usePantryHome, which needs the identical optimistic-merge
+// behavior for its own updateSettings.
+export function mergeSettings(prev: PantrySettings, partial: PantrySettingsInput): PantrySettings {
   const next = { ...prev };
   for (const key of Object.keys(partial) as (keyof PantrySettingsInput)[]) {
     const value = partial[key];

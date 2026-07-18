@@ -10,18 +10,17 @@ import type {
   AiCallDebugInfoFieldsFragment,
   LastKnownPriceFieldsFragment,
   InventoryItemFieldsFragment,
-  InventoryQuery,
   AddInventoryItemMutation,
   RecordPurchaseMutation,
   UpdateInventoryItemMutation,
   RemoveInventoryItemMutation,
   ShoppingListEntryFieldsFragment,
-  ShoppingListQuery,
   RemoveFromShoppingListMutation,
   AddToShoppingListMutation,
   UpdateShoppingListEntryMutation,
   SettingsFieldsFragment,
   PantrySettingsQueryQuery,
+  PantryHomeQuery,
   UpdateSettingsMutation,
   SyncPricesNowMutation,
   CheckPriceNowMutation,
@@ -101,17 +100,6 @@ const INVENTORY_ITEM_FIELDS = /* GraphQL */ `
   ${LAST_KNOWN_PRICE_FIELDS}
 `;
 
-export const INVENTORY_QUERY = /* GraphQL */ `
-  query Inventory {
-    inventory {
-      ...InventoryItemFields
-    }
-  }
-  ${INVENTORY_ITEM_FIELDS}
-`;
-
-export type InventoryQueryResult = InventoryQuery;
-
 export const ADD_INVENTORY_ITEM_MUTATION = /* GraphQL */ `
   mutation AddInventoryItem($input: AddInventoryItemInput!) {
     addInventoryItem(input: $input) {
@@ -182,17 +170,6 @@ const SHOPPING_LIST_ENTRY_FIELDS = /* GraphQL */ `
   }
   ${LAST_KNOWN_PRICE_FIELDS}
 `;
-
-export const SHOPPING_LIST_QUERY = /* GraphQL */ `
-  query ShoppingList {
-    shoppingList {
-      ...ShoppingListEntryFields
-    }
-  }
-  ${SHOPPING_LIST_ENTRY_FIELDS}
-`;
-
-export type ShoppingListQueryResult = ShoppingListQuery;
 
 export const REMOVE_FROM_SHOPPING_LIST_MUTATION = /* GraphQL */ `
   mutation RemoveFromShoppingList($id: ID!) {
@@ -298,6 +275,31 @@ export const UPDATE_SETTINGS_MUTATION = /* GraphQL */ `
 `;
 
 export type UpdateSettingsResult = UpdateSettingsMutation;
+
+// Single round-trip for the Pantry page's initial load (and its post-mutation
+// refetchAll) instead of 3 separate requests - each independent request used
+// to risk a separate concurrent Lambda cold start on a cool Function URL, so
+// the page's very first load could pay the cold-start tax up to 3x in
+// parallel instead of once. graphql-js already resolves sibling root Query
+// fields concurrently server-side, so bundling these costs nothing there.
+export const PANTRY_HOME_QUERY = /* GraphQL */ `
+  query PantryHome {
+    inventory {
+      ...InventoryItemFields
+    }
+    shoppingList {
+      ...ShoppingListEntryFields
+    }
+    settings {
+      ...SettingsFields
+    }
+  }
+  ${INVENTORY_ITEM_FIELDS}
+  ${SHOPPING_LIST_ENTRY_FIELDS}
+  ${SETTINGS_FIELDS}
+`;
+
+export type PantryHomeQueryResult = PantryHomeQuery;
 
 export const SYNC_PRICES_NOW_MUTATION = /* GraphQL */ `
   mutation SyncPricesNow {

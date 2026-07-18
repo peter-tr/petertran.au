@@ -5,15 +5,11 @@ import PantryCommandBar from "./components/PantryCommandBar";
 import PantryInventorySection from "./components/PantryInventorySection";
 import PantryManualAddSection from "./components/PantryManualAddSection";
 import PantryShoppingListSection from "./components/PantryShoppingListSection";
-import { usePantryInventory } from "./hooks/usePantryInventory";
-import { usePantryShoppingList } from "./hooks/usePantryShoppingList";
-import { usePantrySettings } from "./hooks/usePantrySettings";
+import { usePantryHome } from "./hooks/usePantryHome";
 import "./pantry.css";
 
 export default function Pantry() {
-  const { items, error, refetch } = usePantryInventory();
-  const { entries: shoppingList, refetch: refetchShoppingList } = usePantryShoppingList();
-  const { settings, updateSettings } = usePantrySettings();
+  const { items, shoppingList, settings, error, refetch, updateSettings } = usePantryHome();
   const [showAbout, setShowAbout] = useState(false);
 
   // Awaited by callers before re-enabling their own busy state (e.g. the
@@ -21,7 +17,7 @@ export default function Pantry() {
   // next value from stale props because the refetch hadn't landed yet,
   // which looked like the toggle "getting stuck" instead of flipping back.
   async function refetchAll() {
-    await Promise.all([refetch(), refetchShoppingList()]);
+    await refetch();
   }
 
   return (
