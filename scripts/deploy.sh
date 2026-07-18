@@ -5,8 +5,7 @@ cd "$(dirname "$0")/.."
 
 aws login
 
-npm run build --workspace=api
-npm run build --workspace=web
+npm run build
 
 npm run cdk --workspace=infra -- deploy --all --concurrency 4 --require-approval never
 
