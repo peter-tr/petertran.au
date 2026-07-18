@@ -71,6 +71,15 @@ const LAST_KNOWN_PRICE_FIELDS = /* GraphQL */ `
   ${AI_CALL_DEBUG_INFO_FIELDS}
 `;
 
+// Deliberately doesn't self-embed ${LAST_KNOWN_PRICE_FIELDS} the way its
+// sibling fragments below do (contrast SETTINGS_FIELDS, which has no
+// dependencies) - every caller must append LAST_KNOWN_PRICE_FIELDS itself.
+// PANTRY_HOME_QUERY is why: it's the one place both InventoryItemFields and
+// ShoppingListEntryFields are used *in the same document*, and GraphQL
+// rejects two fragment definitions with the same name - self-embedding here
+// would silently duplicate LastKnownPriceFields (and, via it,
+// AiCallDebugInfoFields) the moment two consumers of this fragment landed in
+// one query, which is exactly what broke PantryHome in production.
 const INVENTORY_ITEM_FIELDS = /* GraphQL */ `
   fragment InventoryItemFields on InventoryItem {
     id
@@ -97,7 +106,6 @@ const INVENTORY_ITEM_FIELDS = /* GraphQL */ `
     addedAt
     updatedAt
   }
-  ${LAST_KNOWN_PRICE_FIELDS}
 `;
 
 export const ADD_INVENTORY_ITEM_MUTATION = /* GraphQL */ `
@@ -107,6 +115,7 @@ export const ADD_INVENTORY_ITEM_MUTATION = /* GraphQL */ `
     }
   }
   ${INVENTORY_ITEM_FIELDS}
+  ${LAST_KNOWN_PRICE_FIELDS}
 `;
 
 export type AddInventoryItemResult = AddInventoryItemMutation;
@@ -121,6 +130,7 @@ export const RECORD_PURCHASE_MUTATION = /* GraphQL */ `
     }
   }
   ${INVENTORY_ITEM_FIELDS}
+  ${LAST_KNOWN_PRICE_FIELDS}
 `;
 
 export type RecordPurchaseResult = RecordPurchaseMutation;
@@ -134,6 +144,7 @@ export const UPDATE_INVENTORY_ITEM_MUTATION = /* GraphQL */ `
     }
   }
   ${INVENTORY_ITEM_FIELDS}
+  ${LAST_KNOWN_PRICE_FIELDS}
 `;
 
 export type UpdateInventoryItemResult = UpdateInventoryItemMutation;
@@ -151,6 +162,8 @@ export type ShoppingListEntry = ShoppingListEntryFieldsFragment;
 // Shared across the query and both mutations below so adding a field means
 // editing one list, not hunting down every place ShoppingListEntry is
 // selected - the same class of drift that bit the inventory add form.
+// Doesn't self-embed LAST_KNOWN_PRICE_FIELDS - see INVENTORY_ITEM_FIELDS's
+// comment above for why (same reasoning, same fragment).
 const SHOPPING_LIST_ENTRY_FIELDS = /* GraphQL */ `
   fragment ShoppingListEntryFields on ShoppingListEntry {
     id
@@ -168,7 +181,6 @@ const SHOPPING_LIST_ENTRY_FIELDS = /* GraphQL */ `
     }
     addedAt
   }
-  ${LAST_KNOWN_PRICE_FIELDS}
 `;
 
 export const REMOVE_FROM_SHOPPING_LIST_MUTATION = /* GraphQL */ `
@@ -204,6 +216,7 @@ export const ADD_TO_SHOPPING_LIST_MUTATION = /* GraphQL */ `
     }
   }
   ${SHOPPING_LIST_ENTRY_FIELDS}
+  ${LAST_KNOWN_PRICE_FIELDS}
 `;
 
 export type AddToShoppingListResult = AddToShoppingListMutation;
@@ -217,6 +230,7 @@ export const UPDATE_SHOPPING_LIST_ENTRY_MUTATION = /* GraphQL */ `
     }
   }
   ${SHOPPING_LIST_ENTRY_FIELDS}
+  ${LAST_KNOWN_PRICE_FIELDS}
 `;
 
 export type UpdateShoppingListEntryResult = UpdateShoppingListEntryMutation;
@@ -296,6 +310,7 @@ export const PANTRY_HOME_QUERY = /* GraphQL */ `
   }
   ${INVENTORY_ITEM_FIELDS}
   ${SHOPPING_LIST_ENTRY_FIELDS}
+  ${LAST_KNOWN_PRICE_FIELDS}
   ${SETTINGS_FIELDS}
 `;
 
