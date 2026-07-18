@@ -46,6 +46,9 @@ export class GamesStack extends Stack {
     );
 
     const imposterFn = new lambda.Function(this, "ImposterFunction", {
+      // Explicit, so it reads clearly in the X-Ray trace map instead of
+      // CloudFormation's auto-generated name.
+      functionName: "imposter-graphql",
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "games/imposter/handler.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/dist")),

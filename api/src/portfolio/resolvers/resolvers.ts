@@ -66,7 +66,7 @@ export const resolvers = {
   },
   Meta: {
     generateQuery: (_: unknown, args: { prompt: string }, context: Context) =>
-      generateQuery(args.prompt, context.sourceIp, context.runInternalQuery),
+      generateQuery(args.prompt, context.sourceIp, context.runInternalQuery, context.xraySegment),
     systemStats: (_: unknown, __: unknown, context: Context) => getSystemStats(context.functionName),
     traceBreakdown: (_: unknown, args: { traceId: string }) => getTraceBreakdown(args.traceId),
     awsCostUsd: () => getAwsAllTimeCostUsd(),

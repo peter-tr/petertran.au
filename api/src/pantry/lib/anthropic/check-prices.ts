@@ -3,6 +3,7 @@ import { traced, ANTHROPIC_API_SEGMENT_NAME } from "@shared/xray";
 import { getAllItems, setLastKnownPrice, type LastKnownPrice } from "../../services/inventory";
 import { getShoppingList, setShoppingListLastKnownPrice } from "../../services/shopping-list";
 import { startPriceSync, recordPriceCheckProgress, finishPriceSync } from "../../services/price-sync-status";
+import type { Context } from "../../context";
 import { buildDebugInfo, type AiCallDebugInfo } from "./debug-info";
 
 // Hard cap on tracked items processed per run - a safety net against cost
@@ -70,7 +71,8 @@ const BATCH_PRICE_CHECK_SCHEMA = {
 // scale with batch size so a bigger tracked list doesn't silently starve
 // itself of search/fetch calls or get cut off mid-response.
 async function checkPricesBatch(
-  names: string[]
+  names: string[],
+  xraySegment: Context["xraySegment"]
 ): Promise<{ results: Map<string, BatchPriceResult>; debugInfo: AiCallDebugInfo }> {
   const client = await getAnthropicClient();
   const startedAt = Date.now();
@@ -87,26 +89,29 @@ async function checkPricesBatch(
   const timeoutMs = Math.min(30_000 + names.length * 15_000, 300_000);
   const maxTokens = Math.min(400 + names.length * 200, 4096);
 
-  const response = await traced(ANTHROPIC_API_SEGMENT_NAME, () =>
-    client.messages.parse(
-      {
-        model: "claude-haiku-4-5",
-        max_tokens: maxTokens,
-        system: BATCH_SYSTEM_PROMPT,
-        tools: [
-          { type: "web_search_20250305", name: "web_search", max_uses: toolBudget },
-          { type: "web_fetch_20250910", name: "web_fetch", max_uses: toolBudget },
-        ],
-        messages: [
-          {
-            role: "user",
-            content: `Look up the current Coles price for each of these items:\n${names.map((n) => `- ${n}`).join("\n")}`,
-          },
-        ],
-        output_config: { format: { type: "json_schema", schema: BATCH_PRICE_CHECK_SCHEMA } },
-      },
-      { timeout: timeoutMs }
-    )
+  const response = await traced(
+    ANTHROPIC_API_SEGMENT_NAME,
+    () =>
+      client.messages.parse(
+        {
+          model: "claude-haiku-4-5",
+          max_tokens: maxTokens,
+          system: BATCH_SYSTEM_PROMPT,
+          tools: [
+            { type: "web_search_20250305", name: "web_search", max_uses: toolBudget },
+            { type: "web_fetch_20250910", name: "web_fetch", max_uses: toolBudget },
+          ],
+          messages: [
+            {
+              role: "user",
+              content: `Look up the current Coles price for each of these items:\n${names.map((n) => `- ${n}`).join("\n")}`,
+            },
+          ],
+          output_config: { format: { type: "json_schema", schema: BATCH_PRICE_CHECK_SCHEMA } },
+        },
+        { timeout: timeoutMs }
+      ),
+    xraySegment
   );
 
   const debugInfo = buildDebugInfo(response.usage, Date.now() - startedAt);
@@ -137,8 +142,8 @@ export interface CheckPriceResult {
 // checked interactively. Deliberately just a batch of one rather than a
 // separate prompt/schema to maintain - same rules, same verification-via-
 // fetch behavior, one prompt to keep in sync instead of two.
-export async function checkPrice(itemName: string): Promise<CheckPriceResult> {
-  const { results, debugInfo } = await checkPricesBatch([itemName]);
+export async function checkPrice(itemName: string, xraySegment: Context["xraySegment"]): Promise<CheckPriceResult> {
+  const { results, debugInfo } = await checkPricesBatch([itemName], xraySegment);
   const entry = results.get(itemName);
   return {
     colesPrice: entry?.colesPrice ?? null,
@@ -164,7 +169,7 @@ interface TrackedTarget {
 // exhaustion incident) - a best-effort background refresh, not a data path
 // anything else depends on, so a failure just leaves lastKnownPrice stale
 // rather than anything user-visible breaking.
-export async function checkTrackedPrices(): Promise<void> {
+export async function checkTrackedPrices(xraySegment: Context["xraySegment"]): Promise<void> {
   const [items, shoppingList] = await Promise.all([getAllItems(), getShoppingList()]);
 
   const targets: TrackedTarget[] = [
@@ -196,7 +201,10 @@ export async function checkTrackedPrices(): Promise<void> {
   let batch: { results: Map<string, BatchPriceResult>; debugInfo: AiCallDebugInfo } | null = null;
   let batchError: string | null = null;
   try {
-    batch = await checkPricesBatch(targets.map((t) => t.name));
+    batch = await checkPricesBatch(
+      targets.map((t) => t.name),
+      xraySegment
+    );
   } catch (err) {
     batchError = err instanceof Error ? err.message : "Unknown error";
     console.error("Batch price check failed entirely:", err);

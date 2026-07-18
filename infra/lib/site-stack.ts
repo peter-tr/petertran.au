@@ -89,6 +89,9 @@ export class SiteStack extends Stack {
 
     // --- GraphQL API (Lambda + Function URL, no API Gateway needed) ---
     const apiFn = new lambda.Function(this, "GraphQLFunction", {
+      // Explicit, so it reads clearly in the X-Ray trace map instead of
+      // CloudFormation's auto-generated "PetertranSiteStack-GraphQLFunction72B66DDD-..." name.
+      functionName: "portfolio-graphql",
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "portfolio/handler.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/dist")),

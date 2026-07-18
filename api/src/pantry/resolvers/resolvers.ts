@@ -70,7 +70,8 @@ export const resolvers = {
         inventory,
         shoppingList,
         settings.categories,
-        context.sourceIp
+        context.sourceIp,
+        context.xraySegment
       );
     },
   },
@@ -257,7 +258,7 @@ export const resolvers = {
           `No ${args.list === "inventory" ? "inventory item" : "shopping list entry"} found with id "${args.id}".`
         );
 
-      const result = await checkPrice(name);
+      const result = await checkPrice(name, context.xraySegment);
       const price: LastKnownPrice = { ...result, checkedAt: new Date().toISOString() };
       if (args.list === "inventory") {
         await setLastKnownPrice(args.id, price);
