@@ -107,13 +107,21 @@ async function handleCallback(event: APIGatewayProxyEventV2): Promise<APIGateway
 async function handleIntrospect(event: APIGatewayProxyEventV2): Promise<APIGatewayProxyStructuredResultV2> {
   const { token } = parseJsonBody<{ token?: string }>(event);
   if (!token) {
-    return { statusCode: 400, headers: { "content-type": "application/json" }, body: JSON.stringify({ active: false }) };
+    return {
+      statusCode: 400,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ active: false }),
+    };
   }
 
   const { Item } = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { pk: token } }));
   const now = Math.floor(Date.now() / 1000);
   if (!Item || (Item.ttl as number) < now) {
-    return { statusCode: 200, headers: { "content-type": "application/json" }, body: JSON.stringify({ active: false }) };
+    return {
+      statusCode: 200,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ active: false }),
+    };
   }
 
   return {
@@ -128,7 +136,11 @@ async function handleLogout(event: APIGatewayProxyEventV2): Promise<APIGatewayPr
   if (!token) return { statusCode: 400, body: "missing token" };
 
   await ddb.send(new DeleteCommand({ TableName: TABLE_NAME, Key: { pk: token } }));
-  return { statusCode: 200, headers: { "content-type": "application/json" }, body: JSON.stringify({ loggedOut: true }) };
+  return {
+    statusCode: 200,
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ loggedOut: true }),
+  };
 }
 
 export async function handler(

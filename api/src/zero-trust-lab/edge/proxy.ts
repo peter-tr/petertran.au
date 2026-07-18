@@ -1,4 +1,7 @@
-import type { APIGatewayProxyEventV2WithLambdaAuthorizer, APIGatewayProxyStructuredResultV2 } from "aws-lambda";
+import type {
+  APIGatewayProxyEventV2WithLambdaAuthorizer,
+  APIGatewayProxyStructuredResultV2,
+} from "aws-lambda";
 import type { EdgeAuthContext } from "./authorizer";
 import { isWarmupPing, type WarmupPing } from "@shared/warmup";
 

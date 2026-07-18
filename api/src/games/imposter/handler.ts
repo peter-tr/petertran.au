@@ -1,6 +1,10 @@
 import { ApolloServer } from "@apollo/server";
 import { startServerAndCreateLambdaHandler, handlers } from "@as-integrations/aws-lambda";
-import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2, Context as LambdaContext } from "aws-lambda";
+import type {
+  APIGatewayProxyEventV2,
+  APIGatewayProxyStructuredResultV2,
+  Context as LambdaContext,
+} from "aws-lambda";
 import { typeDefs } from "./schema";
 import { createImposterResolvers } from "./resolvers/resolvers";
 import { getGame, listLiveGames, putGame, createGameWithUniqueId } from "./lib/aws/store";

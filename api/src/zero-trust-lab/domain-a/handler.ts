@@ -9,6 +9,9 @@ export async function handler(
   return {
     statusCode: 200,
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ message: "hello from domain-a", claims: event.requestContext.authorizer.jwt.claims }),
+    body: JSON.stringify({
+      message: "hello from domain-a",
+      claims: event.requestContext.authorizer.jwt.claims,
+    }),
   };
 }

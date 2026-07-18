@@ -51,9 +51,17 @@ export async function handler(
       };
     }
     await setEnabled(enabled);
-    return { statusCode: 200, headers: { "content-type": "application/json" }, body: JSON.stringify({ enabled }) };
+    return {
+      statusCode: 200,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ enabled }),
+    };
   }
 
   const enabled = await getEnabled();
-  return { statusCode: 200, headers: { "content-type": "application/json" }, body: JSON.stringify({ enabled }) };
+  return {
+    statusCode: 200,
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ enabled }),
+  };
 }

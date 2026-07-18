@@ -1,6 +1,10 @@
 import { ApolloServer } from "@apollo/server";
 import { startServerAndCreateLambdaHandler, handlers } from "@as-integrations/aws-lambda";
-import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2, Context as LambdaContext } from "aws-lambda";
+import type {
+  APIGatewayProxyEventV2,
+  APIGatewayProxyStructuredResultV2,
+  Context as LambdaContext,
+} from "aws-lambda";
 import { typeDefs } from "./schema";
 import { resolvers } from "./resolvers/resolvers";
 import { operationStatsPlugin } from "./lib/util/operation-stats-plugin";

@@ -6,7 +6,11 @@ import * as kms from "aws-cdk-lib/aws-kms";
 import * as cognito from "aws-cdk-lib/aws-cognito";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as apigwv2 from "aws-cdk-lib/aws-apigatewayv2";
-import { HttpLambdaAuthorizer, HttpLambdaResponseType, HttpJwtAuthorizer } from "aws-cdk-lib/aws-apigatewayv2-authorizers";
+import {
+  HttpLambdaAuthorizer,
+  HttpLambdaResponseType,
+  HttpJwtAuthorizer,
+} from "aws-cdk-lib/aws-apigatewayv2-authorizers";
 import { HttpLambdaIntegration } from "aws-cdk-lib/aws-apigatewayv2-integrations";
 import * as path from "path";
 

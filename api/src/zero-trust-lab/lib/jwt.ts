@@ -21,7 +21,12 @@ export interface JwtClaims {
   scope?: string;
 }
 
-export async function signJwt(claims: JwtClaims, kmsKeyId: string, kid: string, ttlSeconds = 120): Promise<string> {
+export async function signJwt(
+  claims: JwtClaims,
+  kmsKeyId: string,
+  kid: string,
+  ttlSeconds = 120
+): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   const header = { alg: JWT_ALG, typ: "JWT", kid };
   const payload = { ...claims, iat: now, exp: now + ttlSeconds };

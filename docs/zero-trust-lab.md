@@ -43,7 +43,7 @@ DomainAFunction - returns the validated claims
 storage, a ready-made login page, no hand-rolled credential handling. A thin
 `IdpBridgeFunction` receives the OAuth callback, exchanges the code once, and
 mints this lab's own long-lived opaque token (bound to the Cognito identity,
-stored in DynamoDB) - the browser only ever holds *that*, never a Cognito
+stored in DynamoDB) - the browser only ever holds _that_, never a Cognito
 token directly.
 
 **Internal signer**: `InternalStsFunction` mints RS256 JWTs using a KMS
