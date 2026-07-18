@@ -73,7 +73,9 @@ job depends on - see `.github/workflows/deploy.yml`.
 chaining: each task is content-hashed per package (including `web`'s generated
 GraphQL types against the `api` schema files they're generated from), so an
 unchanged package replays its cached result instead of re-running, and
-independent packages build in parallel instead of sequentially.
+independent packages build in parallel instead of sequentially. In CI, turbo's
+local cache (`.turbo/cache`) is persisted across runs via `actions/cache` (see
+`deploy.yml`) so this pays off there too, not just locally.
 
 ## Deploying
 
