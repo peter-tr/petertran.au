@@ -24,9 +24,9 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: .turbo/cache
-          key: turbo-${{ runner.os }}-${{ github.sha }}
+          key: turbo-${{ github.job }}-${{ runner.os }}-${{ github.sha }}
           restore-keys: |
-            turbo-${{ runner.os }}-
+            turbo-${{ github.job }}-${{ runner.os }}-
 
       - name: Validate frontend queries against each schema (graphql-codegen)
         run: npx turbo run codegen
@@ -75,9 +75,9 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: .turbo/cache
-          key: turbo-${{ runner.os }}-${{ github.sha }}
+          key: turbo-${{ github.job }}-${{ runner.os }}-${{ github.sha }}
           restore-keys: |
-            turbo-${{ runner.os }}-
+            turbo-${{ github.job }}-${{ runner.os }}-
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
