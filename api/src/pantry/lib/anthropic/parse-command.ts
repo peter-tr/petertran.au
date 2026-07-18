@@ -596,7 +596,9 @@ export async function parseCommand(
       recipes: sanitizeRecipes(parsed.recipes, inventoryIds),
       message:
         parsed.message ??
-        (droppedCount > 0 ? "Some of what you asked couldn't be matched to a real item and was skipped." : null),
+        (droppedCount > 0
+          ? "Some of what you asked couldn't be matched to a real item and was skipped."
+          : null),
       debugInfo,
       offerPriceCheckItemId: null,
       offerPriceCheckList: null,

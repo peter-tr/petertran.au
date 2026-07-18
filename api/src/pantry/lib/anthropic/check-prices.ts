@@ -167,24 +167,20 @@ export async function checkTrackedPrices(): Promise<void> {
   const targets: TrackedTarget[] = [
     ...items
       .filter((i) => i.trackPrice)
-      .map(
-        (i): TrackedTarget => ({
-          id: i.id,
-          list: "inventory",
-          name: i.name,
-          apply: (price) => setLastKnownPrice(i.id, price),
-        })
-      ),
+      .map((i): TrackedTarget => ({
+        id: i.id,
+        list: "inventory",
+        name: i.name,
+        apply: (price) => setLastKnownPrice(i.id, price),
+      })),
     ...shoppingList
       .filter((e) => e.trackPrice)
-      .map(
-        (e): TrackedTarget => ({
-          id: e.id,
-          list: "shoppingList",
-          name: e.name,
-          apply: (price) => setShoppingListLastKnownPrice(e.id, price),
-        })
-      ),
+      .map((e): TrackedTarget => ({
+        id: e.id,
+        list: "shoppingList",
+        name: e.name,
+        apply: (price) => setShoppingListLastKnownPrice(e.id, price),
+      })),
   ].slice(0, MAX_ITEMS_PER_RUN);
 
   if (targets.length === 0) {
@@ -220,7 +216,11 @@ export async function checkTrackedPrices(): Promise<void> {
 
   for (const target of targets) {
     if (batchError) {
-      await recordPriceCheckProgress({ itemName: target.name, message: batchError, occurredAt: new Date().toISOString() });
+      await recordPriceCheckProgress({
+        itemName: target.name,
+        message: batchError,
+        occurredAt: new Date().toISOString(),
+      });
       continue;
     }
 
@@ -228,7 +228,11 @@ export async function checkTrackedPrices(): Promise<void> {
     if (!entry) {
       const message = "No result returned for this item in the batch response.";
       console.error(`Price check missing for "${target.name}"`);
-      await recordPriceCheckProgress({ itemName: target.name, message, occurredAt: new Date().toISOString() });
+      await recordPriceCheckProgress({
+        itemName: target.name,
+        message,
+        occurredAt: new Date().toISOString(),
+      });
       continue;
     }
 
@@ -241,7 +245,9 @@ export async function checkTrackedPrices(): Promise<void> {
         debugInfo: perItemDebugInfo!,
       };
       await target.apply(price);
-      console.log(`Checked "${target.name}": Coles $${price.colesPrice ?? "?"}${price.note ? ` (${price.note})` : ""}`);
+      console.log(
+        `Checked "${target.name}": Coles $${price.colesPrice ?? "?"}${price.note ? ` (${price.note})` : ""}`
+      );
       await recordPriceCheckProgress();
     } catch (err) {
       console.error(`Failed to save price for "${target.name}":`, err);

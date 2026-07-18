@@ -39,7 +39,10 @@ const SERVICES: ServiceCheck[] = [
     script: "src/pantry/dev/dev-server.ts",
     port: 4002,
     queries: [
-      { query: "{ settings { view } }", check: (d) => typeof (d.settings as { view?: unknown })?.view === "string" },
+      {
+        query: "{ settings { view } }",
+        check: (d) => typeof (d.settings as { view?: unknown })?.view === "string",
+      },
       { query: "{ inventory { id } }", check: (d) => Array.isArray(d.inventory) },
     ],
   },
@@ -104,7 +107,9 @@ async function testService(service: ServiceCheck): Promise<void> {
         throw new Error(`unexpected response shape for "${query}": ${JSON.stringify(data)}`);
       }
     }
-    console.log(`[e2e] ${service.name}: OK (${service.queries.length} check${service.queries.length > 1 ? "s" : ""})`);
+    console.log(
+      `[e2e] ${service.name}: OK (${service.queries.length} check${service.queries.length > 1 ? "s" : ""})`
+    );
   } catch (err) {
     console.error(`[e2e] ${service.name}: FAILED - ${err instanceof Error ? err.message : String(err)}`);
     if (stderr) console.error(`[e2e] ${service.name} stderr:\n${stderr}`);

@@ -14,7 +14,13 @@ interface QuantityStepperProps {
 // burned through the pantry API's rate limit fast.
 const DEBOUNCE_MS = 400;
 
-export default function QuantityStepper({ value, onChange, min = 1, step = 1, disabled }: QuantityStepperProps) {
+export default function QuantityStepper({
+  value,
+  onChange,
+  min = 1,
+  step = 1,
+  disabled,
+}: QuantityStepperProps) {
   // Typing is tracked as free text and only clamped/committed on blur or
   // Enter - clamping on every keystroke made it impossible to clear the
   // field and type a new multi-digit number (it would snap back to `min`

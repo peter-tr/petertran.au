@@ -25,7 +25,12 @@ import {
   type ShoppingListEntry,
   type UpdateShoppingListEntryInput,
 } from "../services/shopping-list";
-import { getSettings, putSettings, type PantrySettings, type PantrySettingsInput } from "../services/settings";
+import {
+  getSettings,
+  putSettings,
+  type PantrySettings,
+  type PantrySettingsInput,
+} from "../services/settings";
 import { getPriceSyncStatus, type PriceSyncStatus } from "../services/price-sync-status";
 import { triggerPriceSync } from "../lib/aws/sync-prices";
 import type { Context } from "../context";
@@ -244,8 +249,13 @@ export const resolvers = {
       await assertAiNotRateLimited(context.sourceIp);
 
       const name =
-        args.list === "inventory" ? (await getItem(args.id))?.name : (await getShoppingListEntry(args.id))?.name;
-      if (!name) throw new Error(`No ${args.list === "inventory" ? "inventory item" : "shopping list entry"} found with id "${args.id}".`);
+        args.list === "inventory"
+          ? (await getItem(args.id))?.name
+          : (await getShoppingListEntry(args.id))?.name;
+      if (!name)
+        throw new Error(
+          `No ${args.list === "inventory" ? "inventory item" : "shopping list entry"} found with id "${args.id}".`
+        );
 
       const result = await checkPrice(name);
       const price: LastKnownPrice = { ...result, checkedAt: new Date().toISOString() };

@@ -100,7 +100,12 @@ function buildRecipeShoppingActions(
       const scaledQuantityMatch = ing.quantity > 0 ? amount?.match(/^([\d.]+)/) : null;
       const quantity = scaledQuantityMatch ? Number(scaledQuantityMatch[1]) : null;
       const unit = quantity !== null ? amount!.replace(/^[\d.]+\s*/, "").trim() || null : null;
-      const note = quantity !== null ? `For: ${recipe.name}` : amount ? `${amount} - for: ${recipe.name}` : `For: ${recipe.name}`;
+      const note =
+        quantity !== null
+          ? `For: ${recipe.name}`
+          : amount
+            ? `${amount} - for: ${recipe.name}`
+            : `For: ${recipe.name}`;
       return {
         type: PantryActionType.AddToShoppingList,
         summary: `Add "${ing.name}"${amount ? ` (${amount})` : ""} to the shopping list (for: ${recipe.name})`,
@@ -453,7 +458,11 @@ export default function PantryCommandBar({ items, onChanged, nerdMode }: PantryC
                           type="button"
                           className="run-btn"
                           onClick={() =>
-                            checkPriceNow(i, turn.result.offerPriceCheckItemId!, turn.result.offerPriceCheckList!)
+                            checkPriceNow(
+                              i,
+                              turn.result.offerPriceCheckItemId!,
+                              turn.result.offerPriceCheckList!
+                            )
                           }
                         >
                           Try again
@@ -465,7 +474,11 @@ export default function PantryCommandBar({ items, onChanged, nerdMode }: PantryC
                         className="run-btn"
                         disabled={turn.priceCheckStatus === "checking"}
                         onClick={() =>
-                          checkPriceNow(i, turn.result.offerPriceCheckItemId!, turn.result.offerPriceCheckList!)
+                          checkPriceNow(
+                            i,
+                            turn.result.offerPriceCheckItemId!,
+                            turn.result.offerPriceCheckList!
+                          )
                         }
                       >
                         {turn.priceCheckStatus === "checking" ? "Checking…" : "Check Coles now"}

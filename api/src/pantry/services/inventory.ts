@@ -64,7 +64,12 @@ export type UpdateInventoryItemInput = Partial<Omit<AddInventoryItemInput, "loca
 // is non-null in the schema, so leaving it missing would null-propagate the
 // whole lastKnownPrice field back to the client (see this file's
 // withInventoryDefaults comment), silently hiding an already-confirmed price.
-export const UNKNOWN_DEBUG_INFO: AiCallDebugInfo = { costUsd: 0, durationMs: 0, searchesUsed: 0, fetchesUsed: 0 };
+export const UNKNOWN_DEBUG_INFO: AiCallDebugInfo = {
+  costUsd: 0,
+  durationMs: 0,
+  searchesUsed: 0,
+  fetchesUsed: 0,
+};
 
 // Backfills fields added after some rows were already written - critical
 // for lowPriority/isStaple/nearlyEmpty specifically, since they're

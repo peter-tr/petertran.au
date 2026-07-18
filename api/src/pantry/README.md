@@ -78,6 +78,6 @@ requires a default in that type's merge/backfill function in the matching
 ...stored }` spread, `shopping-list.ts`'s `withShoppingListDefaults()`,
 `inventory.ts`'s `withInventoryDefaults()`) - rows written before the field
 existed won't have it, and GraphQL null-propagates a missing non-null field
-to fail the *entire containing list*, not just that one row. This caused a
+to fail the _entire containing list_, not just that one row. This caused a
 real production outage the first time a non-nullable field was added
 without a backfill.

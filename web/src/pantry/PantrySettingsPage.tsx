@@ -202,9 +202,9 @@ export default function PantrySettingsPage() {
             <h2 className="pantry-panel-title">Nerd mode</h2>
           </div>
           <p className="project-desc">
-            Shows the AI call cost, duration, and Coles search/fetch counts behind each price check and command
-            bar reply - split by list/feature since inventory, the shopping list, and the command bar are
-            usually checked separately.
+            Shows the AI call cost, duration, and Coles search/fetch counts behind each price check and
+            command bar reply - split by list/feature since inventory, the shopping list, and the command bar
+            are usually checked separately.
           </p>
           <div className="form-row pantry-settings-row">
             <label className="form-label" htmlFor="pantry-nerd-mode-inventory">
