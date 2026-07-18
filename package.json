@@ -16,7 +16,9 @@
     "cdk": "npm run cdk --workspace=infra",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "typecheck": "npm run typecheck --workspace=api && npm run typecheck --workspace=web",
+    "prepare": "husky"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -27,6 +29,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.3",
     "globals": "^17.7.0",
+    "husky": "^9.1.7",
     "prettier": "^3.9.4",
     "typescript-eslint": "^8.62.1"
   }
