@@ -1,11 +1,19 @@
 import { Link } from "react-router-dom";
 import { useShowAlsoBuilt } from "./hooks/useShowAlsoBuilt";
-import { useZeroTrustWarmup } from "./hooks/useZeroTrustWarmup";
+import { useWarmupSchedule } from "./hooks/useWarmupSchedule";
+import { usePageLoadWarmup } from "./hooks/usePageLoadWarmup";
 import "./portfolio.css";
 
 export default function PortfolioSettingsPage() {
   const { showAlsoBuilt, setShowAlsoBuilt } = useShowAlsoBuilt();
-  const { enabled: warmupEnabled, pending: warmupPending, error: warmupError, setEnabled: setWarmupEnabled, available: warmupAvailable } = useZeroTrustWarmup();
+  const {
+    enabled: scheduleEnabled,
+    pending: schedulePending,
+    error: scheduleError,
+    setEnabled: setScheduleEnabled,
+    available: scheduleAvailable,
+  } = useWarmupSchedule();
+  const { pageLoadWarmup, setPageLoadWarmup } = usePageLoadWarmup();
 
   return (
     <>
@@ -26,19 +34,31 @@ export default function PortfolioSettingsPage() {
         </label>
       </div>
 
-      {warmupAvailable && (
+      <div className="form-row">
+        <label className="form-label" htmlFor="page-load-warmup">
+          <input
+            id="page-load-warmup"
+            type="checkbox"
+            checked={pageLoadWarmup}
+            onChange={(e) => setPageLoadWarmup(e.target.checked)}
+          />{" "}
+          Warm pantry/imposter on page load (tighter timing, only helps this browser)
+        </label>
+      </div>
+
+      {scheduleAvailable && (
         <div className="form-row">
-          <label className="form-label" htmlFor="zero-trust-warmup">
+          <label className="form-label" htmlFor="warmup-schedule">
             <input
-              id="zero-trust-warmup"
+              id="warmup-schedule"
               type="checkbox"
-              checked={warmupEnabled ?? false}
-              disabled={warmupEnabled === null || warmupPending}
-              onChange={(e) => setWarmupEnabled(e.target.checked)}
+              checked={scheduleEnabled ?? false}
+              disabled={scheduleEnabled === null || schedulePending}
+              onChange={(e) => setScheduleEnabled(e.target.checked)}
             />{" "}
-            Keep the zero-trust-lab demo Lambdas warm (pings every 10 minutes)
+            Keep the site's Lambdas warm on a schedule (pings every 10 minutes, cheaper, helps every visitor)
           </label>
-          {warmupError && <p className="section-hint">{warmupError}</p>}
+          {scheduleError && <p className="section-hint">{scheduleError}</p>}
         </div>
       )}
 

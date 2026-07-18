@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 
 // Unlike useShowAlsoBuilt, this isn't a per-browser preference - it's a
-// direct read/write against the zero-trust-lab's WarmupConfigFunction, which
-// flips the actual EventBridge Scheduler rules on/off for every visitor.
-const ENDPOINT = import.meta.env.VITE_ZERO_TRUST_WARMUP_CONFIG_ENDPOINT;
+// direct read/write against WarmupStack's WarmupConfigFunction, which flips
+// the actual EventBridge Scheduler rules (covering portfolio, pantry,
+// imposter, and zero-trust-lab's Lambdas) on/off for every visitor.
+const ENDPOINT = import.meta.env.VITE_WARMUP_CONFIG_ENDPOINT;
 
-export function useZeroTrustWarmup() {
+export function useWarmupSchedule() {
   const [enabled, setEnabledState] = useState<boolean | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
