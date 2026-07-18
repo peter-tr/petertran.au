@@ -27,6 +27,9 @@ jobs:
       - name: Validate frontend queries against each schema (graphql-codegen)
         run: npm run codegen --workspace=web
 
+      - name: Lint
+        run: npm run lint
+
   e2e-smoke:
     runs-on: ubuntu-latest
     steps:

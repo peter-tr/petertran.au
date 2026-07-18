@@ -6,6 +6,9 @@
     "api",
     "web"
   ],
+  "overrides": {
+    "graphql": "^16.14.2"
+  },
   "scripts": {
     "dev": "concurrently -n portfolio,pantry,imposter,web -c blue,green,magenta,yellow \"npm run dev:portfolio --workspace=api\" \"npm run dev:pantry --workspace=api\" \"npm run dev:imposter --workspace=api\" \"npm run dev --workspace=web\"",
     "seed": "npm run seed --workspace=api",
@@ -17,6 +20,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@graphql-eslint/eslint-plugin": "^4.4.0",
     "concurrently": "^10.0.3",
     "eslint": "^10.6.0",
     "eslint-config-prettier": "^10.1.8",

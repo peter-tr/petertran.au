@@ -29,6 +29,9 @@ type Query {
   imposterStats: ImposterStats!
 }
 
+"""
+Write operations for the Imposter game.
+"""
 type Mutation {
   """
   Start a new game: picks a word pair (from a built-in category or
