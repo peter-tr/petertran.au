@@ -49,7 +49,11 @@ export class GamesStack extends Stack {
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "games/imposter/handler.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/dist")),
-      memorySize: 256,
+      // 512, not the default 256 - same reasoning as pantry's/portfolio's
+      // GraphQLFunction: this is a synchronous Function URL on a user-facing
+      // request path, so cold-start CPU (which scales with memory) is
+      // latency a real visitor waits on, not a background job.
+      memorySize: 512,
       timeout: Duration.seconds(15),
       environment: {
         TABLE_NAME: table.tableName,
