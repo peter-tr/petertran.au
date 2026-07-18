@@ -21,11 +21,18 @@ jobs:
 
       - run: npm ci
 
-      - name: Validate GraphQL schemas and Anthropic structured-output schemas
-        run: npm run validate-schemas --workspace=api
-
       - name: Validate frontend queries against each schema (graphql-codegen)
         run: npm run codegen --workspace=web
+
+      # Must run after codegen, not before - it require()s each service's
+      # real frontend module (web/src/*/api.ts etc.) to validate their query
+      # strings, and those modules import real (non-type-only) values like
+      # generated enums from *.generated.ts, which don't exist until codegen
+      # has run. Passed locally the first time only because those gitignored
+      # files were already sitting on disk from a previous local run - a
+      # fresh CI checkout has neither.
+      - name: Validate GraphQL schemas and Anthropic structured-output schemas
+        run: npm run validate-schemas --workspace=api
 
       - name: Lint
         run: npm run lint
