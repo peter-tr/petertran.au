@@ -421,17 +421,23 @@ export default function PantryShoppingListSection({
                         <span className="pantry-shopping-recipe-tag"> · {entry.recipeTag}</span>
                       )}
                       {entry.trackPrice && (
-                        <span className="pantry-item-last-known-price" title={entry.lastKnownPrice?.note ?? undefined}>
+                        <span
+                          className="pantry-item-last-known-price"
+                          title={entry.lastKnownPrice?.note ?? undefined}
+                        >
                           {" · "}
                           {formatLastKnownPrice(entry.lastKnownPrice)}
                         </span>
                       )}
-                      {!settings.shoppingSimple && entry.trackPrice && settings.nerdModeShoppingList && entry.lastKnownPrice && (
-                        <span className="pantry-nerd-debug-info">
-                          {" · "}
-                          {formatDebugInfo(entry.lastKnownPrice.debugInfo)}
-                        </span>
-                      )}
+                      {!settings.shoppingSimple &&
+                        entry.trackPrice &&
+                        settings.nerdModeShoppingList &&
+                        entry.lastKnownPrice && (
+                          <span className="pantry-nerd-debug-info">
+                            {" · "}
+                            {formatDebugInfo(entry.lastKnownPrice.debugInfo)}
+                          </span>
+                        )}
                     </span>
                     <span className="pantry-shopping-item-actions">
                       {!settings.shoppingSimple && (
@@ -509,7 +515,9 @@ export default function PantryShoppingListSection({
                         entry={entry}
                         busy={busyId === entry.id}
                         categories={settings.categories}
-                        onAddCategory={(name) => onSettingsChange({ categories: [...settings.categories, name] })}
+                        onAddCategory={(name) =>
+                          onSettingsChange({ categories: [...settings.categories, name] })
+                        }
                         onClose={() => setShowEditId(null)}
                         onSave={(input) => saveEditModal(entry.id, input)}
                       />

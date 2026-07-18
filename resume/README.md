@@ -28,6 +28,7 @@ web-accessible.
    (`tectonic-<version>-aarch64-apple-darwin.tar.gz` for Apple Silicon,
    `x86_64-apple-darwin` for Intel), `tar xzf` it, and put the extracted
    `tectonic` binary on your `PATH`.
+
 3. Rename the compiled output to `peter-tran-resume-<date>.pdf`.
 4. Copy that file over the live site path so the site picks it up:
 

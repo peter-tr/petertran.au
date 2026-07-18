@@ -43,7 +43,10 @@ export async function getPriceSyncStatus(): Promise<PriceSyncStatus> {
 
 async function putPriceSyncStatus(status: PriceSyncStatus): Promise<void> {
   await ddb.send(
-    new PutCommand({ TableName: TABLE_NAME, Item: { pk: PK, sk: STATUS_SK, type: "PRICE_SYNC_STATUS", data: status } })
+    new PutCommand({
+      TableName: TABLE_NAME,
+      Item: { pk: PK, sk: STATUS_SK, type: "PRICE_SYNC_STATUS", data: status },
+    })
   );
 }
 

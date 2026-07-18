@@ -3,3 +3,4 @@ dist
 cdk.out
 *.mjs.map
 web/public
+.claude/worktrees

@@ -24,7 +24,8 @@ interface UsageLike {
 
 export function buildDebugInfo(usage: UsageLike, durationMs: number): AiCallDebugInfo {
   return {
-    costUsd: usage.input_tokens * HAIKU_INPUT_USD_PER_TOKEN + usage.output_tokens * HAIKU_OUTPUT_USD_PER_TOKEN,
+    costUsd:
+      usage.input_tokens * HAIKU_INPUT_USD_PER_TOKEN + usage.output_tokens * HAIKU_OUTPUT_USD_PER_TOKEN,
     durationMs,
     searchesUsed: usage.server_tool_use?.web_search_requests ?? 0,
     fetchesUsed: usage.server_tool_use?.web_fetch_requests ?? 0,

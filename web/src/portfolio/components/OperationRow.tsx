@@ -40,7 +40,7 @@ export default function OperationRow({ op }: { op: OperationStat }) {
     () => () => {
       unmounted.current = true;
     },
-    [],
+    []
   );
 
   function fetchTrace(traceId: string) {
