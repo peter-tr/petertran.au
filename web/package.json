@@ -8,6 +8,7 @@
     "predev": "npm run codegen",
     "dev": "vite",
     "prebuild": "npm run codegen",
+    "typecheck": "npm run codegen && tsc -b",
     "build": "tsc -b && vite build && npm run prerender",
     "prerender": "tsx scripts/prerender.tsx",
     "preview": "vite preview"
