@@ -17,7 +17,10 @@ import type {
   RevealImposterWordMutation,
 } from "./api.generated";
 
-const ENDPOINT = import.meta.env.VITE_IMPOSTER_GRAPHQL_ENDPOINT as string | undefined;
+// See pantry/api.ts's identical guard for why this optional-chains `env`
+// even though Vite always defines it - api/scripts/validate-schemas.ts
+// requires this module outside Vite to validate the queries below.
+const ENDPOINT = import.meta.env?.VITE_IMPOSTER_GRAPHQL_ENDPOINT as string | undefined;
 
 export const runImposterQuery = createGraphQLClient(ENDPOINT, "VITE_IMPOSTER_GRAPHQL_ENDPOINT");
 

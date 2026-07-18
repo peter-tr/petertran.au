@@ -8,7 +8,10 @@ import type {
   TraceBreakdownQuery,
 } from "./graphql.generated";
 
-export const ENDPOINT = import.meta.env.VITE_GRAPHQL_ENDPOINT as string | undefined;
+// See pantry/api.ts's identical guard for why this optional-chains `env`
+// even though Vite always defines it - api/scripts/validate-schemas.ts
+// requires this module outside Vite to validate the queries below.
+export const ENDPOINT = import.meta.env?.VITE_GRAPHQL_ENDPOINT as string | undefined;
 
 export const runQuery = createGraphQLClient(ENDPOINT, "VITE_GRAPHQL_ENDPOINT");
 
