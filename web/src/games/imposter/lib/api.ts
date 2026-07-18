@@ -4,37 +4,30 @@
 // query surface with the portfolio.
 
 import { createGraphQLClient } from "../../../shared/graphqlClient";
+import { ImposterDifficulty, ImposterPhase, ImposterWordSource } from "./api-schema-types.generated";
+import type {
+  CreateImposterGameMutation,
+  CreateImposterGameMutationVariables,
+  ImposterCategoriesQuery,
+  ImposterGameFieldsFragment,
+  ImposterGameStateQuery,
+  ImposterStatsQueryQuery,
+  LiveImposterGamesQuery,
+  RevealImposterMutation,
+  RevealImposterWordMutation,
+} from "./api.generated";
 
 const ENDPOINT = import.meta.env.VITE_IMPOSTER_GRAPHQL_ENDPOINT as string | undefined;
 
 export const runImposterQuery = createGraphQLClient(ENDPOINT, "VITE_IMPOSTER_GRAPHQL_ENDPOINT");
 
-export type ImposterPhase = "REVEAL" | "DISCUSSION" | "RESULTS";
-export type ImposterWordSource = "BUILTIN" | "AI";
-export type ImposterDifficulty = "NORMAL" | "HARD";
+export { ImposterPhase, ImposterWordSource, ImposterDifficulty };
 
-export interface ImposterCategory {
-  id: string;
-  label: string;
-}
+export type ImposterCategory = ImposterCategoriesQuery["imposterCategories"][number];
 
-export interface ImposterPlayer {
-  id: string;
-  name: string;
-  hasRevealed: boolean;
-}
+export type ImposterPlayer = ImposterGameFieldsFragment["players"][number];
 
-export interface ImposterGame {
-  gameId: string;
-  categoryLabel: string | null;
-  hintEnabled: boolean;
-  phase: ImposterPhase;
-  players: ImposterPlayer[];
-  imposterPlayerIds: string[] | null;
-  civilianWord: string | null;
-  imposterWord: string | null;
-  createdAt: string;
-}
+export type ImposterGame = ImposterGameFieldsFragment;
 
 const IMPOSTER_GAME_FIELDS = /* GraphQL */ `
   fragment ImposterGameFields on ImposterGame {
@@ -63,9 +56,7 @@ export const IMPOSTER_CATEGORIES_QUERY = /* GraphQL */ `
   }
 `;
 
-export interface ImposterCategoriesResult {
-  imposterCategories: ImposterCategory[];
-}
+export type ImposterCategoriesResult = ImposterCategoriesQuery;
 
 export const IMPOSTER_GAME_QUERY = /* GraphQL */ `
   query ImposterGameState($gameId: String!) {
@@ -76,9 +67,7 @@ export const IMPOSTER_GAME_QUERY = /* GraphQL */ `
   ${IMPOSTER_GAME_FIELDS}
 `;
 
-export interface ImposterGameResult {
-  imposterGame: ImposterGame | null;
-}
+export type ImposterGameResult = ImposterGameStateQuery;
 
 export const LIVE_IMPOSTER_GAMES_QUERY = /* GraphQL */ `
   query LiveImposterGames {
@@ -89,9 +78,7 @@ export const LIVE_IMPOSTER_GAMES_QUERY = /* GraphQL */ `
   ${IMPOSTER_GAME_FIELDS}
 `;
 
-export interface LiveImposterGamesResult {
-  liveImposterGames: ImposterGame[];
-}
+export type LiveImposterGamesResult = LiveImposterGamesQuery;
 
 export const CREATE_IMPOSTER_GAME_MUTATION = /* GraphQL */ `
   mutation CreateImposterGame(
@@ -120,20 +107,9 @@ export const CREATE_IMPOSTER_GAME_MUTATION = /* GraphQL */ `
   ${IMPOSTER_GAME_FIELDS}
 `;
 
-export interface CreateImposterGameVariables {
-  wordSource: ImposterWordSource;
-  categoryId?: string | null;
-  customCategory?: string | null;
-  playerNames: string[];
-  imposterCount?: number;
-  hintEnabled?: boolean;
-  difficulty?: ImposterDifficulty;
-  hideCategory?: boolean;
-}
+export type CreateImposterGameVariables = CreateImposterGameMutationVariables;
 
-export interface CreateImposterGameResult {
-  createImposterGame: ImposterGame;
-}
+export type CreateImposterGameResult = CreateImposterGameMutation;
 
 export const REVEAL_IMPOSTER_WORD_MUTATION = /* GraphQL */ `
   mutation RevealImposterWord($gameId: String!, $playerId: String!) {
@@ -148,9 +124,7 @@ export const REVEAL_IMPOSTER_WORD_MUTATION = /* GraphQL */ `
   ${IMPOSTER_GAME_FIELDS}
 `;
 
-export interface RevealImposterWordResult {
-  revealImposterWord: { word: string | null; isImposter: boolean; game: ImposterGame };
-}
+export type RevealImposterWordResult = RevealImposterWordMutation;
 
 export const REVEAL_IMPOSTER_MUTATION = /* GraphQL */ `
   mutation RevealImposter($gameId: String!) {
@@ -161,15 +135,9 @@ export const REVEAL_IMPOSTER_MUTATION = /* GraphQL */ `
   ${IMPOSTER_GAME_FIELDS}
 `;
 
-export interface RevealImposterResult {
-  revealImposter: ImposterGame;
-}
+export type RevealImposterResult = RevealImposterMutation;
 
-export interface ImposterStats {
-  gamesPlayedTotal: number;
-  gamesCompletedTotal: number;
-  avgGameDurationMs: number;
-}
+export type ImposterStats = ImposterStatsQueryQuery["imposterStats"];
 
 export const IMPOSTER_STATS_QUERY = /* GraphQL */ `
   query ImposterStatsQuery {
@@ -181,6 +149,4 @@ export const IMPOSTER_STATS_QUERY = /* GraphQL */ `
   }
 `;
 
-export interface ImposterStatsResult {
-  imposterStats: ImposterStats;
-}
+export type ImposterStatsResult = ImposterStatsQueryQuery;
