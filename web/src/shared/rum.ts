@@ -19,6 +19,13 @@ export function initRum(): void {
       allowCookies: true,
       sessionSampleRate: 1,
       telemetries: ["errors", "performance", "http"],
+      // aws-rum-web's own default config pre-populates `endpoint` to the
+      // us-west-2 dataplane URL, and that populated value wins over the
+      // `region` constructor arg during its internal config merge unless
+      // overridden explicitly here - passing `region` alone silently sends
+      // every event to the wrong region (403s, since the guest role/app
+      // monitor only exist in ap-southeast-2).
+      endpoint: `https://dataplane.rum.${REGION}.amazonaws.com`,
     };
     new AwsRum(applicationId, APPLICATION_VERSION, REGION, config);
   } catch {
