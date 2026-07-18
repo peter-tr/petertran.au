@@ -21,6 +21,10 @@ export interface SiteStackProps extends StackProps {
 }
 
 export class SiteStack extends Stack {
+  // Exposed so PetertranWarmupStack can schedule a keep-warm ping against it
+  // without this stack needing to know anything about warmup at all.
+  public readonly apiFn: lambda.Function;
+
   constructor(scope: Construct, id: string, props: SiteStackProps) {
     super(scope, id, props);
 
@@ -128,6 +132,8 @@ export class SiteStack extends Stack {
         resources: ["*"],
       })
     );
+
+    this.apiFn = apiFn;
 
     const fnUrl = apiFn.addFunctionUrl({
       authType: lambda.FunctionUrlAuthType.NONE,

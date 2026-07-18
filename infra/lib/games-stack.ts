@@ -17,6 +17,10 @@ export interface GamesStackProps extends StackProps {
  * API's GraphiQL explorer or its schema-aware "Ask AI" query generator.
  */
 export class GamesStack extends Stack {
+  // Exposed so PetertranWarmupStack can schedule a keep-warm ping against it
+  // without this stack needing to know anything about warmup at all.
+  public readonly imposterFn: lambda.Function;
+
   constructor(scope: Construct, id: string, props: GamesStackProps) {
     super(scope, id, props);
 
@@ -58,6 +62,7 @@ export class GamesStack extends Stack {
     });
     table.grantReadWriteData(imposterFn);
     anthropicSecret.grantRead(imposterFn);
+    this.imposterFn = imposterFn;
 
     const imposterFnUrl = imposterFn.addFunctionUrl({
       authType: lambda.FunctionUrlAuthType.NONE,
