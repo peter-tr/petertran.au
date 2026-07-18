@@ -2,7 +2,7 @@ import { useState } from "react";
 import QuantityStepper from "./QuantityStepper";
 import { UNIT_OPTIONS, stepForUnit } from "../lib/units";
 import { INVENTORY_FLAGS, type InventoryFlags } from "../lib/inventoryFlags";
-import type { InventoryItem, StorageLocation } from "../api";
+import { StorageLocation, type InventoryItem } from "../api";
 
 interface PantryEditItemModalProps {
   item: InventoryItem;
@@ -14,9 +14,9 @@ interface PantryEditItemModalProps {
 }
 
 const LOCATION_OPTIONS: { value: StorageLocation; label: string }[] = [
-  { value: "FRIDGE", label: "Fridge" },
-  { value: "FREEZER", label: "Freezer" },
-  { value: "PANTRY", label: "Pantry" },
+  { value: StorageLocation.Fridge, label: "Fridge" },
+  { value: StorageLocation.Freezer, label: "Freezer" },
+  { value: StorageLocation.Pantry, label: "Pantry" },
 ];
 
 const ADD_CATEGORY_VALUE = "__add_new__";

@@ -9,6 +9,7 @@ import {
   RECORD_PURCHASE_MUTATION,
   REMOVE_FROM_SHOPPING_LIST_MUTATION,
   UPDATE_SHOPPING_LIST_ENTRY_MUTATION,
+  StorageLocation,
   type AddToShoppingListResult,
   type InventoryItem,
   type PantrySettings,
@@ -111,7 +112,7 @@ export default function PantryShoppingListSection({
       await runPantryQuery<RecordPurchaseResult>(RECORD_PURCHASE_MUTATION, {
         input: {
           name: entry.name,
-          location: matchingItem?.location ?? "PANTRY",
+          location: matchingItem?.location ?? StorageLocation.Pantry,
           quantity: draft.quantity.trim() ? Number(draft.quantity) : (entry.quantity ?? 1),
           unit: draft.unit || entry.unit,
           purchasedAt: today(),
