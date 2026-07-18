@@ -46,7 +46,13 @@ export class PantryStack extends Stack {
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "pantry/handler.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/dist")),
-      memorySize: 256,
+      // 512, not the other Lambdas' 256 - this is the one on the user-facing
+      // request path (Function URL), and Lambda cold-start CPU scales with
+      // memory: the bundle pulls in @apollo/server + AWS SDK v3 +
+      // @anthropic-ai/sdk (parse-command/check-prices import it eagerly even
+      // though the client itself inits lazily), so init time was a real
+      // contributor to the ~2-3s first-load-of-the-day latency.
+      memorySize: 512,
       // Generous - "recipes" mode (esp. an open "what can I make?" request
       // returning several full recipes) has been observed taking 6-8s warm,
       // and a cold start (Secrets Manager fetch + Anthropic client init) on
