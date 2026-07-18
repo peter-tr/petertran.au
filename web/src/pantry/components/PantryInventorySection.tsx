@@ -1,6 +1,6 @@
 import { useState } from "react";
 import PantryItemRow from "./PantryItemRow";
-import type { InventoryItem, PantrySettings, PantrySettingsInput, StorageLocation } from "../api";
+import { StorageLocation, type InventoryItem, type PantrySettings, type PantrySettingsInput } from "../api";
 
 type ViewMode = "location" | "category" | "priority" | "all";
 type SortMode = "recent" | "name" | "expiry" | "quantity";
@@ -12,9 +12,9 @@ interface Group {
 }
 
 const LOCATIONS: { key: StorageLocation; label: string }[] = [
-  { key: "FRIDGE", label: "Fridge" },
-  { key: "FREEZER", label: "Freezer" },
-  { key: "PANTRY", label: "Pantry" },
+  { key: StorageLocation.Fridge, label: "Fridge" },
+  { key: StorageLocation.Freezer, label: "Freezer" },
+  { key: StorageLocation.Pantry, label: "Pantry" },
 ];
 
 // Applied within every group regardless of view, so "sort by name" still

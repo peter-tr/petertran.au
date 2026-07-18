@@ -4,6 +4,7 @@ import {
   PARSE_COMMAND_QUERY,
   PANTRY_ACTION_MUTATIONS,
   CHECK_PRICE_NOW_MUTATION,
+  PantryActionType,
   type CheckPriceNowResult,
   type ConversationMessage,
   type InventoryItem,
@@ -101,7 +102,7 @@ function buildRecipeShoppingActions(
       const unit = quantity !== null ? amount!.replace(/^[\d.]+\s*/, "").trim() || null : null;
       const note = quantity !== null ? `For: ${recipe.name}` : amount ? `${amount} - for: ${recipe.name}` : `For: ${recipe.name}`;
       return {
-        type: "ADD_TO_SHOPPING_LIST",
+        type: PantryActionType.AddToShoppingList,
         summary: `Add "${ing.name}"${amount ? ` (${amount})` : ""} to the shopping list (for: ${recipe.name})`,
         mutationName: "addToShoppingList",
         argsJson: JSON.stringify({

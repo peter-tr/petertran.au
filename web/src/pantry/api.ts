@@ -1,7 +1,6 @@
 import { createGraphQLClient } from "../shared/graphqlClient";
+import { StorageLocation, PantryActionType } from "./api-schema-types.generated";
 import type {
-  StorageLocation as SchemaStorageLocation,
-  PantryActionType as SchemaPantryActionType,
   AddInventoryItemInput as SchemaAddInventoryItemInput,
   UpdateInventoryItemInput as SchemaUpdateInventoryItemInput,
   UpdateShoppingListEntryInput as SchemaUpdateShoppingListEntryInput,
@@ -37,7 +36,7 @@ export const PANTRY_ENDPOINT = import.meta.env.VITE_PANTRY_GRAPHQL_ENDPOINT as s
 
 export const runPantryQuery = createGraphQLClient(PANTRY_ENDPOINT, "VITE_PANTRY_GRAPHQL_ENDPOINT");
 
-export type StorageLocation = SchemaStorageLocation;
+export { StorageLocation };
 
 export type AiCallDebugInfo = AiCallDebugInfoFieldsFragment;
 
@@ -339,7 +338,7 @@ export const PRICE_SYNC_STATUS_QUERY = /* GraphQL */ `
 
 export type PriceSyncStatusResult = PriceSyncStatusQuery;
 
-export type PantryActionType = SchemaPantryActionType;
+export { PantryActionType };
 
 // No standalone GraphQL fragment - actions/recipes/ingredients below are only
 // ever selected inline as part of ParseCommand's response.

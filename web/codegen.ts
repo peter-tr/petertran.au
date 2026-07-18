@@ -44,19 +44,16 @@ const portfolio = serviceConfig(
   "src/portfolio/**/*.{ts,tsx}",
   "src/portfolio/lib/graphql-schema-types.generated.ts"
 );
-// enumsAsTypes: pantry's hand-written types (now aliased to these generated
-// ones in api.ts) always modeled StorageLocation/PantryActionType as plain
-// string literal unions, e.g. `location: "FRIDGE"`. The plugin's default is a
-// real TS enum, which - unlike a literal union - isn't structurally
-// compatible with a bare string literal, so every existing `"FRIDGE"`/
-// `"ADD_TO_SHOPPING_LIST"` call site would need rewriting to `StorageLocation.Fridge`
-// just to satisfy the type checker. A literal union keeps those call sites as
-// they are while remaining just as schema-accurate.
+// Real TS enums (the plugin default, same as imposter) rather than plain
+// string literal unions - StorageLocation.Fridge, not the bare string
+// "FRIDGE", is the safer pattern: it's a compile error to pass a
+// misspelled/stale string where an enum is expected, which a literal union
+// alone doesn't catch as reliably once the value flows through a few
+// non-literal call sites.
 const pantry = serviceConfig(
   "../api/src/pantry/schema.graphql",
   "src/pantry/**/*.{ts,tsx}",
-  "src/pantry/api-schema-types.generated.ts",
-  { enumsAsTypes: true }
+  "src/pantry/api-schema-types.generated.ts"
 );
 const imposter = serviceConfig(
   "../api/src/games/imposter/schema.graphql",

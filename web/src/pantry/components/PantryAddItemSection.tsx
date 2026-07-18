@@ -5,10 +5,10 @@ import { INVENTORY_FLAGS, type InventoryFlags } from "../lib/inventoryFlags";
 import {
   runPantryQuery,
   RECORD_PURCHASE_MUTATION,
+  StorageLocation,
   type PantrySettings,
   type PantrySettingsInput,
   type RecordPurchaseResult,
-  type StorageLocation,
 } from "../api";
 
 type Status = "idle" | "saving" | "error";
@@ -31,7 +31,7 @@ export default function PantryAddItemSection({
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [category, setCategory] = useState("");
-  const [location, setLocation] = useState<StorageLocation>("FRIDGE");
+  const [location, setLocation] = useState<StorageLocation>(StorageLocation.Fridge);
   const [unit, setUnit] = useState("pcs");
   const [price, setPrice] = useState("");
   // Defaults to today so a bare-minimum add (name + quantity only) still
@@ -69,7 +69,7 @@ export default function PantryAddItemSection({
       setName("");
       setQuantity(1);
       setCategory("");
-      setLocation("FRIDGE");
+      setLocation(StorageLocation.Fridge);
       setUnit("pcs");
       setPrice("");
       setPurchasedAt(today());
@@ -122,9 +122,9 @@ export default function PantryAddItemSection({
             onChange={(e) => setLocation(e.target.value as StorageLocation)}
             aria-label="Location"
           >
-            <option value="FRIDGE">Fridge</option>
-            <option value="FREEZER">Freezer</option>
-            <option value="PANTRY">Pantry</option>
+            <option value={StorageLocation.Fridge}>Fridge</option>
+            <option value={StorageLocation.Freezer}>Freezer</option>
+            <option value={StorageLocation.Pantry}>Pantry</option>
           </select>
           <input
             className="form-input pantry-quick-add-price"
