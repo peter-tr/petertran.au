@@ -4,10 +4,10 @@ import {
   runImposterQuery,
   IMPOSTER_CATEGORIES_QUERY,
   CREATE_IMPOSTER_GAME_MUTATION,
+  ImposterWordSource,
+  ImposterDifficulty,
   type ImposterCategory,
   type ImposterCategoriesResult,
-  type ImposterWordSource,
-  type ImposterDifficulty,
   type CreateImposterGameResult,
 } from "./lib/api";
 import { addRecentGame } from "./lib/recentGamesStore";
@@ -35,7 +35,7 @@ export default function ImposterSetup() {
 
   const [categories, setCategories] = useState<ImposterCategory[] | null>(null);
   const [categoriesError, setCategoriesError] = useState<string | null>(null);
-  const [wordSource, setWordSource] = useState<ImposterWordSource>("BUILTIN");
+  const [wordSource, setWordSource] = useState<ImposterWordSource>(ImposterWordSource.Builtin);
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [aiThemeMode, setAiThemeMode] = useState<"surprise" | "custom">("surprise");
   const [customCategory, setCustomCategory] = useState("");
@@ -44,7 +44,7 @@ export default function ImposterSetup() {
   const [imposterCountNotice, setImposterCountNotice] = useState<string | null>(null);
   const [playerListNotice, setPlayerListNotice] = useState<string | null>(null);
   const [hintEnabled, setHintEnabled] = useState(true);
-  const [difficulty, setDifficulty] = useState<ImposterDifficulty>("NORMAL");
+  const [difficulty, setDifficulty] = useState<ImposterDifficulty>(ImposterDifficulty.Normal);
   const [hideCategory, setHideCategory] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -113,7 +113,9 @@ export default function ImposterSetup() {
   }
 
   const canSubmit =
-    !submitting && names.length >= MIN_PLAYERS && (wordSource === "AI" || categoryId !== null);
+    !submitting &&
+    names.length >= MIN_PLAYERS &&
+    (wordSource === ImposterWordSource.Ai || categoryId !== null);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -124,9 +126,11 @@ export default function ImposterSetup() {
     try {
       const res = await runImposterQuery<CreateImposterGameResult>(CREATE_IMPOSTER_GAME_MUTATION, {
         wordSource,
-        categoryId: wordSource === "BUILTIN" ? categoryId : undefined,
+        categoryId: wordSource === ImposterWordSource.Builtin ? categoryId : undefined,
         customCategory:
-          wordSource === "AI" && aiThemeMode === "custom" ? customCategory.trim() || undefined : undefined,
+          wordSource === ImposterWordSource.Ai && aiThemeMode === "custom"
+            ? customCategory.trim() || undefined
+            : undefined,
         playerNames: effectiveNames,
         imposterCount: effectiveImposterCount,
         hintEnabled,
@@ -166,22 +170,22 @@ export default function ImposterSetup() {
           <div className="imposter-category-grid">
             <button
               type="button"
-              className={`imposter-category-btn ${wordSource === "BUILTIN" ? "active" : ""}`}
-              onClick={() => setWordSource("BUILTIN")}
+              className={`imposter-category-btn ${wordSource === ImposterWordSource.Builtin ? "active" : ""}`}
+              onClick={() => setWordSource(ImposterWordSource.Builtin)}
             >
               Built-in category
             </button>
             <button
               type="button"
-              className={`imposter-category-btn ${wordSource === "AI" ? "active" : ""}`}
-              onClick={() => setWordSource("AI")}
+              className={`imposter-category-btn ${wordSource === ImposterWordSource.Ai ? "active" : ""}`}
+              onClick={() => setWordSource(ImposterWordSource.Ai)}
             >
               AI-generated
             </button>
           </div>
         </div>
 
-        {wordSource === "BUILTIN" ? (
+        {wordSource === ImposterWordSource.Builtin ? (
           <div className="imposter-field-group">
             <p className="form-label">Category</p>
             {categoriesError && <p className="status-line">// {categoriesError}</p>}
@@ -355,21 +359,21 @@ export default function ImposterSetup() {
             <div className="imposter-category-grid">
               <button
                 type="button"
-                className={`imposter-category-btn ${difficulty === "NORMAL" ? "active" : ""}`}
-                onClick={() => setDifficulty("NORMAL")}
+                className={`imposter-category-btn ${difficulty === ImposterDifficulty.Normal ? "active" : ""}`}
+                onClick={() => setDifficulty(ImposterDifficulty.Normal)}
               >
                 Normal
               </button>
               <button
                 type="button"
-                className={`imposter-category-btn ${difficulty === "HARD" ? "active" : ""}`}
-                onClick={() => setDifficulty("HARD")}
+                className={`imposter-category-btn ${difficulty === ImposterDifficulty.Hard ? "active" : ""}`}
+                onClick={() => setDifficulty(ImposterDifficulty.Hard)}
               >
                 Hard
               </button>
             </div>
             <p className="imposter-hint">
-              {difficulty === "NORMAL"
+              {difficulty === ImposterDifficulty.Normal
                 ? "The imposter's word is closely related - easier to bluff."
                 : "The imposter's word is a bigger stretch - harder to bluff convincingly."}
             </p>
