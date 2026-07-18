@@ -1,4 +1,5 @@
 import { getAnthropicClient } from "@shared/anthropic-client";
+import { traced, ANTHROPIC_API_SEGMENT_NAME } from "@shared/xray";
 import { assertAiNotRateLimited } from "../util/ai-rate-limit";
 import type { InventoryItem } from "../../services/inventory";
 import type { ShoppingListEntry } from "../../services/shopping-list";
@@ -541,17 +542,19 @@ export async function parseCommand(
     content: m.content,
   }));
   const startedAt = Date.now();
-  const response = await client.messages.parse({
-    model: "claude-haiku-4-5",
-    // Recipes mode can return up to 3 recipes, each with a full ingredient
-    // list plus nutrition/pricing fields per ingredient - 1536 was cutting
-    // that off mid-JSON on richer answers (SyntaxError: Unterminated
-    // string), so this needs real headroom.
-    max_tokens: 4096,
-    system: buildSystemPrompt(inventory, shoppingList, categories),
-    messages: [...priorMessages, { role: "user", content: trimmed }],
-    output_config: { format: { type: "json_schema", schema: PARSE_COMMAND_SCHEMA } },
-  });
+  const response = await traced(ANTHROPIC_API_SEGMENT_NAME, () =>
+    client.messages.parse({
+      model: "claude-haiku-4-5",
+      // Recipes mode can return up to 3 recipes, each with a full ingredient
+      // list plus nutrition/pricing fields per ingredient - 1536 was cutting
+      // that off mid-JSON on richer answers (SyntaxError: Unterminated
+      // string), so this needs real headroom.
+      max_tokens: 4096,
+      system: buildSystemPrompt(inventory, shoppingList, categories),
+      messages: [...priorMessages, { role: "user", content: trimmed }],
+      output_config: { format: { type: "json_schema", schema: PARSE_COMMAND_SCHEMA } },
+    })
+  );
   // searchesUsed/fetchesUsed are always 0 here - command parsing doesn't use
   // web_search/web_fetch, unlike check-prices.ts's call.
   const debugInfo = buildDebugInfo(response.usage, Date.now() - startedAt);

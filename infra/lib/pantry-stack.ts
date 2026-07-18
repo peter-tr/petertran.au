@@ -62,6 +62,10 @@ export class PantryStack extends Stack {
         TABLE_NAME: table.tableName,
         ANTHROPIC_SECRET_ARN: anthropicSecret.secretArn,
       },
+      // Traces every invocation to X-Ray, same as the portfolio GraphQL
+      // Lambda - without this the Function URL never gets a trace since
+      // there's no upstream (API Gateway etc.) to originate one.
+      tracing: lambda.Tracing.ACTIVE,
     });
     table.grantReadWriteData(apiFn);
     anthropicSecret.grantRead(apiFn);
@@ -112,6 +116,7 @@ export class PantryStack extends Stack {
         CONTACT_FROM_EMAIL: "contact@petertran.au",
         CONTACT_TO_EMAIL: "peter2002tran@outlook.com",
       },
+      tracing: lambda.Tracing.ACTIVE,
     });
     table.grantReadData(digestFn);
     emailIdentity.grantSendEmail(digestFn);
@@ -147,6 +152,7 @@ export class PantryStack extends Stack {
         TABLE_NAME: table.tableName,
         ANTHROPIC_SECRET_ARN: anthropicSecret.secretArn,
       },
+      tracing: lambda.Tracing.ACTIVE,
     });
     table.grantReadWriteData(priceCheckFn);
     anthropicSecret.grantRead(priceCheckFn);
