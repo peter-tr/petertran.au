@@ -18,7 +18,9 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "typecheck": "npm run typecheck --workspace=api && npm run typecheck --workspace=web",
+    "typecheck": "turbo run typecheck",
+    "build": "turbo run build",
+    "verify": "turbo run lint format:check typecheck build",
     "prepare": "husky"
   },
   "devDependencies": {

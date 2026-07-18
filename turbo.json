@@ -3,6 +3,7 @@
   "ui": "tui",
   "tasks": {
     "dev": {
+      "dependsOn": ["codegen"],
       "cache": false,
       "persistent": true
     },
@@ -17,6 +18,24 @@
     "dev:imposter": {
       "cache": false,
       "persistent": true
+    },
+    "codegen": {
+      "inputs": ["$TURBO_DEFAULT$", "../api/src/**/schema.graphql"],
+      "outputs": ["src/**/*.generated.ts"]
+    },
+    "typecheck": {
+      "dependsOn": ["codegen"],
+      "outputs": []
+    },
+    "build": {
+      "dependsOn": ["codegen"],
+      "outputs": ["dist/**"]
+    },
+    "//#lint": {
+      "outputs": []
+    },
+    "//#format:check": {
+      "outputs": []
     }
   }
 }

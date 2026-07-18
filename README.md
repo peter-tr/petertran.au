@@ -52,6 +52,9 @@ DynamoDB.
 ## Other commands
 
 ```bash
+npm run typecheck     # tsc across api + web, via turbo (cached, parallel)
+npm run build         # build api + web + infra, via turbo (cached, parallel)
+npm run verify        # lint + format:check + typecheck + build, all via turbo
 npm run lint          # eslint across the whole monorepo
 npm run format        # prettier --write
 npm run format:check  # prettier --check
@@ -65,6 +68,13 @@ npm run test:e2e --workspace=api          # boot each service's real dev server 
 `validate-schemas` and `test:e2e` also run as parallel CI jobs the `deploy`
 job depends on - see `.github/workflows/deploy.yml`.
 
+`dev`, `typecheck`, and `build` are orchestrated by
+[Turborepo](https://turbo.build) (`turbo.json`) rather than plain npm-workspace
+chaining: each task is content-hashed per package (including `web`'s generated
+GraphQL types against the `api` schema files they're generated from), so an
+unchanged package replays its cached result instead of re-running, and
+independent packages build in parallel instead of sequentially.
+
 ## Deploying
 
 Deploys run automatically via GitHub Actions on push to `main`. To deploy
@@ -74,4 +84,5 @@ manually (requires AWS credentials for the target account):
 npm run deploy
 ```
 
-This builds `api` and `web`, then runs `cdk deploy` from `infra`.
+This builds `api`, `web`, and `infra` (via turbo, in parallel and cached),
+then runs `cdk deploy` from `infra`.
