@@ -24,6 +24,9 @@ jobs:
       - name: Validate GraphQL schemas and Anthropic structured-output schemas
         run: npm run validate-schemas --workspace=api
 
+      - name: Validate frontend queries against each schema (graphql-codegen)
+        run: npm run codegen --workspace=web
+
   e2e-smoke:
     runs-on: ubuntu-latest
     steps:
