@@ -1,4 +1,5 @@
 import { getAnthropicClient } from "@shared/anthropic-client";
+import { traced, ANTHROPIC_API_SEGMENT_NAME } from "@shared/xray";
 import { getAllItems, setLastKnownPrice, type LastKnownPrice } from "../../services/inventory";
 import { getShoppingList, setShoppingListLastKnownPrice } from "../../services/shopping-list";
 import { startPriceSync, recordPriceCheckProgress, finishPriceSync } from "../../services/price-sync-status";
@@ -86,24 +87,26 @@ async function checkPricesBatch(
   const timeoutMs = Math.min(30_000 + names.length * 15_000, 300_000);
   const maxTokens = Math.min(400 + names.length * 200, 4096);
 
-  const response = await client.messages.parse(
-    {
-      model: "claude-haiku-4-5",
-      max_tokens: maxTokens,
-      system: BATCH_SYSTEM_PROMPT,
-      tools: [
-        { type: "web_search_20250305", name: "web_search", max_uses: toolBudget },
-        { type: "web_fetch_20250910", name: "web_fetch", max_uses: toolBudget },
-      ],
-      messages: [
-        {
-          role: "user",
-          content: `Look up the current Coles price for each of these items:\n${names.map((n) => `- ${n}`).join("\n")}`,
-        },
-      ],
-      output_config: { format: { type: "json_schema", schema: BATCH_PRICE_CHECK_SCHEMA } },
-    },
-    { timeout: timeoutMs }
+  const response = await traced(ANTHROPIC_API_SEGMENT_NAME, () =>
+    client.messages.parse(
+      {
+        model: "claude-haiku-4-5",
+        max_tokens: maxTokens,
+        system: BATCH_SYSTEM_PROMPT,
+        tools: [
+          { type: "web_search_20250305", name: "web_search", max_uses: toolBudget },
+          { type: "web_fetch_20250910", name: "web_fetch", max_uses: toolBudget },
+        ],
+        messages: [
+          {
+            role: "user",
+            content: `Look up the current Coles price for each of these items:\n${names.map((n) => `- ${n}`).join("\n")}`,
+          },
+        ],
+        output_config: { format: { type: "json_schema", schema: BATCH_PRICE_CHECK_SCHEMA } },
+      },
+      { timeout: timeoutMs }
+    )
   );
 
   const debugInfo = buildDebugInfo(response.usage, Date.now() - startedAt);
@@ -167,24 +170,20 @@ export async function checkTrackedPrices(): Promise<void> {
   const targets: TrackedTarget[] = [
     ...items
       .filter((i) => i.trackPrice)
-      .map(
-        (i): TrackedTarget => ({
-          id: i.id,
-          list: "inventory",
-          name: i.name,
-          apply: (price) => setLastKnownPrice(i.id, price),
-        })
-      ),
+      .map((i): TrackedTarget => ({
+        id: i.id,
+        list: "inventory",
+        name: i.name,
+        apply: (price) => setLastKnownPrice(i.id, price),
+      })),
     ...shoppingList
       .filter((e) => e.trackPrice)
-      .map(
-        (e): TrackedTarget => ({
-          id: e.id,
-          list: "shoppingList",
-          name: e.name,
-          apply: (price) => setShoppingListLastKnownPrice(e.id, price),
-        })
-      ),
+      .map((e): TrackedTarget => ({
+        id: e.id,
+        list: "shoppingList",
+        name: e.name,
+        apply: (price) => setShoppingListLastKnownPrice(e.id, price),
+      })),
   ].slice(0, MAX_ITEMS_PER_RUN);
 
   if (targets.length === 0) {
@@ -220,7 +219,11 @@ export async function checkTrackedPrices(): Promise<void> {
 
   for (const target of targets) {
     if (batchError) {
-      await recordPriceCheckProgress({ itemName: target.name, message: batchError, occurredAt: new Date().toISOString() });
+      await recordPriceCheckProgress({
+        itemName: target.name,
+        message: batchError,
+        occurredAt: new Date().toISOString(),
+      });
       continue;
     }
 
@@ -228,7 +231,11 @@ export async function checkTrackedPrices(): Promise<void> {
     if (!entry) {
       const message = "No result returned for this item in the batch response.";
       console.error(`Price check missing for "${target.name}"`);
-      await recordPriceCheckProgress({ itemName: target.name, message, occurredAt: new Date().toISOString() });
+      await recordPriceCheckProgress({
+        itemName: target.name,
+        message,
+        occurredAt: new Date().toISOString(),
+      });
       continue;
     }
 
@@ -241,7 +248,9 @@ export async function checkTrackedPrices(): Promise<void> {
         debugInfo: perItemDebugInfo!,
       };
       await target.apply(price);
-      console.log(`Checked "${target.name}": Coles $${price.colesPrice ?? "?"}${price.note ? ` (${price.note})` : ""}`);
+      console.log(
+        `Checked "${target.name}": Coles $${price.colesPrice ?? "?"}${price.note ? ` (${price.note})` : ""}`
+      );
       await recordPriceCheckProgress();
     } catch (err) {
       console.error(`Failed to save price for "${target.name}":`, err);

@@ -1,132 +1,130 @@
 import { createGraphQLClient } from "../shared/graphqlClient";
+import { StorageLocation, PantryActionType } from "./api-schema-types.generated";
+import type {
+  AddInventoryItemInput as SchemaAddInventoryItemInput,
+  UpdateInventoryItemInput as SchemaUpdateInventoryItemInput,
+  UpdateShoppingListEntryInput as SchemaUpdateShoppingListEntryInput,
+  PantrySettingsInput as SchemaPantrySettingsInput,
+} from "./api-schema-types.generated";
+import type {
+  AiCallDebugInfoFieldsFragment,
+  LastKnownPriceFieldsFragment,
+  InventoryItemFieldsFragment,
+  AddInventoryItemMutation,
+  RecordPurchaseMutation,
+  UpdateInventoryItemMutation,
+  RemoveInventoryItemMutation,
+  ShoppingListEntryFieldsFragment,
+  RemoveFromShoppingListMutation,
+  AddToShoppingListMutation,
+  UpdateShoppingListEntryMutation,
+  SettingsFieldsFragment,
+  PantrySettingsQueryQuery,
+  PantryHomeQuery,
+  UpdateSettingsMutation,
+  SyncPricesNowMutation,
+  CheckPriceNowMutation,
+  PriceSyncStatusQuery,
+  ParseCommandQuery,
+} from "./api.generated";
 
 // Separate endpoint, separate service - the pantry API (api/src/pantry/) is
 // its own Lambda/Function URL, deployed independently of the resume API this
 // site otherwise runs on, even though its source lives in the same workspace.
-export const PANTRY_ENDPOINT = import.meta.env.VITE_PANTRY_GRAPHQL_ENDPOINT as string | undefined;
+// Optional chaining on `env` looks redundant under Vite (it's always
+// defined there) but isn't - api/scripts/validate-schemas.ts requires this
+// module from plain Node/tsx to validate the query strings below against
+// the schema, and `import.meta.env` doesn't exist outside a Vite-processed
+// build, so accessing it un-guarded throws before that script even gets to
+// the queries it's there to check.
+export const PANTRY_ENDPOINT = import.meta.env?.VITE_PANTRY_GRAPHQL_ENDPOINT as string | undefined;
 
 export const runPantryQuery = createGraphQLClient(PANTRY_ENDPOINT, "VITE_PANTRY_GRAPHQL_ENDPOINT");
 
-export type StorageLocation = "FRIDGE" | "FREEZER" | "PANTRY";
+export { StorageLocation };
 
-export interface Purchase {
-  date: string;
-  price: number | null;
-  quantity: number;
-}
-
-export interface AiCallDebugInfo {
-  costUsd: number;
-  durationMs: number;
-  searchesUsed: number;
-  fetchesUsed: number;
-}
+export type AiCallDebugInfo = AiCallDebugInfoFieldsFragment;
 
 const AI_CALL_DEBUG_INFO_FIELDS = /* GraphQL */ `
-  costUsd
-  durationMs
-  searchesUsed
-  fetchesUsed
+  fragment AiCallDebugInfoFields on AiCallDebugInfo {
+    costUsd
+    durationMs
+    searchesUsed
+    fetchesUsed
+  }
 `;
 
-export interface LastKnownPrice {
-  colesPrice: number | null;
-  productUrl: string | null;
-  note: string | null;
-  checkedAt: string;
-  debugInfo: AiCallDebugInfo;
-}
+export type LastKnownPrice = LastKnownPriceFieldsFragment;
 
-export interface InventoryItem {
-  id: string;
-  name: string;
-  category: string | null;
-  location: StorageLocation;
-  quantity: number;
-  unit: string | null;
-  price: number | null;
-  purchasedAt: string | null;
-  expiresAt: string | null;
-  isStaple: boolean;
-  lowPriority: boolean;
-  nearlyEmpty: boolean;
-  trackPrice: boolean;
-  lastKnownPrice: LastKnownPrice | null;
-  purchases: Purchase[];
-  addedAt: string;
-  updatedAt: string;
-}
+export type InventoryItem = InventoryItemFieldsFragment;
 
-export interface AddInventoryItemInput {
-  name: string;
-  category?: string | null;
-  location: StorageLocation;
-  quantity: number;
-  unit?: string | null;
-  price?: number | null;
-  purchasedAt?: string | null;
-  expiresAt?: string | null;
-  isStaple?: boolean | null;
-  lowPriority?: boolean | null;
-  nearlyEmpty?: boolean | null;
-  trackPrice?: boolean | null;
-}
+// No standalone GraphQL fragment - purchases are only ever selected inline
+// as part of InventoryItemFields below.
+export type Purchase = InventoryItemFieldsFragment["purchases"][number];
 
-const INVENTORY_ITEM_FIELDS = /* GraphQL */ `
-  id
-  name
-  category
-  location
-  quantity
-  unit
-  price
-  purchasedAt
-  expiresAt
-  isStaple
-  lowPriority
-  nearlyEmpty
-  trackPrice
-  lastKnownPrice {
+export type AddInventoryItemInput = SchemaAddInventoryItemInput;
+
+const LAST_KNOWN_PRICE_FIELDS = /* GraphQL */ `
+  fragment LastKnownPriceFields on LastKnownPrice {
     colesPrice
     productUrl
     note
     checkedAt
     debugInfo {
-      ${AI_CALL_DEBUG_INFO_FIELDS}
+      ...AiCallDebugInfoFields
     }
   }
-  purchases {
-    date
-    price
+  ${AI_CALL_DEBUG_INFO_FIELDS}
+`;
+
+// Deliberately doesn't self-embed ${LAST_KNOWN_PRICE_FIELDS} the way its
+// sibling fragments below do (contrast SETTINGS_FIELDS, which has no
+// dependencies) - every caller must append LAST_KNOWN_PRICE_FIELDS itself.
+// PANTRY_HOME_QUERY is why: it's the one place both InventoryItemFields and
+// ShoppingListEntryFields are used *in the same document*, and GraphQL
+// rejects two fragment definitions with the same name - self-embedding here
+// would silently duplicate LastKnownPriceFields (and, via it,
+// AiCallDebugInfoFields) the moment two consumers of this fragment landed in
+// one query, which is exactly what broke PantryHome in production.
+const INVENTORY_ITEM_FIELDS = /* GraphQL */ `
+  fragment InventoryItemFields on InventoryItem {
+    id
+    name
+    category
+    location
     quantity
-  }
-  addedAt
-  updatedAt
-`;
-
-export const INVENTORY_QUERY = /* GraphQL */ `
-  query Inventory {
-    inventory {
-      ${INVENTORY_ITEM_FIELDS}
+    unit
+    price
+    purchasedAt
+    expiresAt
+    isStaple
+    lowPriority
+    nearlyEmpty
+    trackPrice
+    lastKnownPrice {
+      ...LastKnownPriceFields
     }
+    purchases {
+      date
+      price
+      quantity
+    }
+    addedAt
+    updatedAt
   }
 `;
-
-export interface InventoryQueryResult {
-  inventory: InventoryItem[];
-}
 
 export const ADD_INVENTORY_ITEM_MUTATION = /* GraphQL */ `
   mutation AddInventoryItem($input: AddInventoryItemInput!) {
     addInventoryItem(input: $input) {
-      ${INVENTORY_ITEM_FIELDS}
+      ...InventoryItemFields
     }
   }
+  ${INVENTORY_ITEM_FIELDS}
+  ${LAST_KNOWN_PRICE_FIELDS}
 `;
 
-export interface AddInventoryItemResult {
-  addInventoryItem: InventoryItem;
-}
+export type AddInventoryItemResult = AddInventoryItemMutation;
 
 // The merge-or-create decision (matching by normalized name within the same
 // location) happens server-side now, so the client just always calls this
@@ -134,26 +132,28 @@ export interface AddInventoryItemResult {
 export const RECORD_PURCHASE_MUTATION = /* GraphQL */ `
   mutation RecordPurchase($input: AddInventoryItemInput!) {
     recordPurchase(input: $input) {
-      ${INVENTORY_ITEM_FIELDS}
+      ...InventoryItemFields
     }
   }
+  ${INVENTORY_ITEM_FIELDS}
+  ${LAST_KNOWN_PRICE_FIELDS}
 `;
 
-export interface RecordPurchaseResult {
-  recordPurchase: InventoryItem;
-}
+export type RecordPurchaseResult = RecordPurchaseMutation;
+
+export type UpdateInventoryItemInput = SchemaUpdateInventoryItemInput;
 
 export const UPDATE_INVENTORY_ITEM_MUTATION = /* GraphQL */ `
   mutation UpdateInventoryItem($id: ID!, $input: UpdateInventoryItemInput!) {
     updateInventoryItem(id: $id, input: $input) {
-      ${INVENTORY_ITEM_FIELDS}
+      ...InventoryItemFields
     }
   }
+  ${INVENTORY_ITEM_FIELDS}
+  ${LAST_KNOWN_PRICE_FIELDS}
 `;
 
-export interface UpdateInventoryItemResult {
-  updateInventoryItem: InventoryItem;
-}
+export type UpdateInventoryItemResult = UpdateInventoryItemMutation;
 
 export const REMOVE_INVENTORY_ITEM_MUTATION = /* GraphQL */ `
   mutation RemoveInventoryItem($id: ID!) {
@@ -161,62 +161,33 @@ export const REMOVE_INVENTORY_ITEM_MUTATION = /* GraphQL */ `
   }
 `;
 
-export interface RemoveInventoryItemResult {
-  removeInventoryItem: boolean;
-}
+export type RemoveInventoryItemResult = RemoveInventoryItemMutation;
 
-export interface ShoppingListEntry {
-  id: string;
-  name: string;
-  quantity: number | null;
-  unit: string | null;
-  note: string | null;
-  isStaple: boolean;
-  category: string | null;
-  recipeTag: string | null;
-  urgent: boolean;
-  trackPrice: boolean;
-  lastKnownPrice: LastKnownPrice | null;
-  addedAt: string;
-}
+export type ShoppingListEntry = ShoppingListEntryFieldsFragment;
 
 // Shared across the query and both mutations below so adding a field means
 // editing one list, not hunting down every place ShoppingListEntry is
 // selected - the same class of drift that bit the inventory add form.
+// Doesn't self-embed LAST_KNOWN_PRICE_FIELDS - see INVENTORY_ITEM_FIELDS's
+// comment above for why (same reasoning, same fragment).
 const SHOPPING_LIST_ENTRY_FIELDS = /* GraphQL */ `
-  id
-  name
-  quantity
-  unit
-  note
-  isStaple
-  category
-  recipeTag
-  urgent
-  trackPrice
-  lastKnownPrice {
-    colesPrice
-    productUrl
+  fragment ShoppingListEntryFields on ShoppingListEntry {
+    id
+    name
+    quantity
+    unit
     note
-    checkedAt
-    debugInfo {
-      ${AI_CALL_DEBUG_INFO_FIELDS}
+    isStaple
+    category
+    recipeTag
+    urgent
+    trackPrice
+    lastKnownPrice {
+      ...LastKnownPriceFields
     }
-  }
-  addedAt
-`;
-
-export const SHOPPING_LIST_QUERY = /* GraphQL */ `
-  query ShoppingList {
-    shoppingList {
-      ${SHOPPING_LIST_ENTRY_FIELDS}
-    }
+    addedAt
   }
 `;
-
-export interface ShoppingListQueryResult {
-  shoppingList: ShoppingListEntry[];
-}
 
 export const REMOVE_FROM_SHOPPING_LIST_MUTATION = /* GraphQL */ `
   mutation RemoveFromShoppingList($id: ID!) {
@@ -224,9 +195,7 @@ export const REMOVE_FROM_SHOPPING_LIST_MUTATION = /* GraphQL */ `
   }
 `;
 
-export interface RemoveFromShoppingListResult {
-  removeFromShoppingList: boolean;
-}
+export type RemoveFromShoppingListResult = RemoveFromShoppingListMutation;
 
 export const ADD_TO_SHOPPING_LIST_MUTATION = /* GraphQL */ `
   mutation AddToShoppingList(
@@ -249,118 +218,109 @@ export const ADD_TO_SHOPPING_LIST_MUTATION = /* GraphQL */ `
       recipeTag: $recipeTag
       urgent: $urgent
     ) {
-      ${SHOPPING_LIST_ENTRY_FIELDS}
+      ...ShoppingListEntryFields
     }
   }
+  ${SHOPPING_LIST_ENTRY_FIELDS}
+  ${LAST_KNOWN_PRICE_FIELDS}
 `;
 
-export interface AddToShoppingListResult {
-  addToShoppingList: ShoppingListEntry;
-}
+export type AddToShoppingListResult = AddToShoppingListMutation;
 
-export interface UpdateShoppingListEntryInput {
-  name?: string;
-  quantity?: number | null;
-  unit?: string | null;
-  note?: string | null;
-  isStaple?: boolean;
-  category?: string | null;
-  recipeTag?: string | null;
-  urgent?: boolean;
-  trackPrice?: boolean;
-}
+export type UpdateShoppingListEntryInput = SchemaUpdateShoppingListEntryInput;
 
 export const UPDATE_SHOPPING_LIST_ENTRY_MUTATION = /* GraphQL */ `
   mutation UpdateShoppingListEntry($id: ID!, $input: UpdateShoppingListEntryInput!) {
     updateShoppingListEntry(id: $id, input: $input) {
-      ${SHOPPING_LIST_ENTRY_FIELDS}
+      ...ShoppingListEntryFields
     }
   }
+  ${SHOPPING_LIST_ENTRY_FIELDS}
+  ${LAST_KNOWN_PRICE_FIELDS}
 `;
 
-export interface UpdateShoppingListEntryResult {
-  updateShoppingListEntry: ShoppingListEntry;
-}
+export type UpdateShoppingListEntryResult = UpdateShoppingListEntryMutation;
 
-export interface PantrySettings {
-  view: string;
-  sort: string;
-  simple: boolean;
-  optionsCollapsed: boolean;
-  collapsedGroups: string[];
-  commonItems: string[];
-  shoppingListCollapsed: boolean;
-  showLowPriority: boolean;
-  categoryFilter: string | null;
-  categories: string[];
-  addItemDetailsShown: boolean;
-  addItemCollapsed: boolean;
-  commonItemsCollapsed: boolean;
-  shoppingCategoryFilter: string | null;
-  shoppingRecipeFilter: string | null;
-  shoppingUrgentOnly: boolean;
-  shoppingOptionsCollapsed: boolean;
-  shoppingSort: string;
-  shoppingSimple: boolean;
-  digestEnabled: boolean;
-  digestHour: number;
-  nerdModeInventory: boolean;
-  nerdModeShoppingList: boolean;
-  nerdModeCommandBar: boolean;
-}
+export type PantrySettings = SettingsFieldsFragment;
 
-export type PantrySettingsInput = Partial<PantrySettings>;
+export type PantrySettingsInput = SchemaPantrySettingsInput;
 
 const SETTINGS_FIELDS = /* GraphQL */ `
-  view
-  sort
-  simple
-  optionsCollapsed
-  collapsedGroups
-  commonItems
-  shoppingListCollapsed
-  showLowPriority
-  categoryFilter
-  categories
-  addItemDetailsShown
-  addItemCollapsed
-  commonItemsCollapsed
-  shoppingCategoryFilter
-  shoppingRecipeFilter
-  shoppingUrgentOnly
-  shoppingOptionsCollapsed
-  shoppingSort
-  shoppingSimple
-  digestEnabled
-  digestHour
-  nerdModeInventory
-  nerdModeShoppingList
-  nerdModeCommandBar
+  fragment SettingsFields on PantrySettings {
+    view
+    sort
+    simple
+    optionsCollapsed
+    collapsedGroups
+    commonItems
+    shoppingListCollapsed
+    showLowPriority
+    categoryFilter
+    categories
+    addItemDetailsShown
+    addItemCollapsed
+    commonItemsCollapsed
+    shoppingCategoryFilter
+    shoppingRecipeFilter
+    shoppingUrgentOnly
+    shoppingOptionsCollapsed
+    shoppingSort
+    shoppingSimple
+    digestEnabled
+    digestHour
+    nerdModeInventory
+    nerdModeShoppingList
+    nerdModeCommandBar
+  }
 `;
 
 export const SETTINGS_QUERY = /* GraphQL */ `
   query PantrySettingsQuery {
     settings {
-      ${SETTINGS_FIELDS}
+      ...SettingsFields
     }
   }
+  ${SETTINGS_FIELDS}
 `;
 
-export interface SettingsQueryResult {
-  settings: PantrySettings;
-}
+export type SettingsQueryResult = PantrySettingsQueryQuery;
 
 export const UPDATE_SETTINGS_MUTATION = /* GraphQL */ `
   mutation UpdateSettings($input: PantrySettingsInput!) {
     updateSettings(input: $input) {
-      ${SETTINGS_FIELDS}
+      ...SettingsFields
     }
   }
+  ${SETTINGS_FIELDS}
 `;
 
-export interface UpdateSettingsResult {
-  updateSettings: PantrySettings;
-}
+export type UpdateSettingsResult = UpdateSettingsMutation;
+
+// Single round-trip for the Pantry page's initial load (and its post-mutation
+// refetchAll) instead of 3 separate requests - each independent request used
+// to risk a separate concurrent Lambda cold start on a cool Function URL, so
+// the page's very first load could pay the cold-start tax up to 3x in
+// parallel instead of once. graphql-js already resolves sibling root Query
+// fields concurrently server-side, so bundling these costs nothing there.
+export const PANTRY_HOME_QUERY = /* GraphQL */ `
+  query PantryHome {
+    inventory {
+      ...InventoryItemFields
+    }
+    shoppingList {
+      ...ShoppingListEntryFields
+    }
+    settings {
+      ...SettingsFields
+    }
+  }
+  ${INVENTORY_ITEM_FIELDS}
+  ${SHOPPING_LIST_ENTRY_FIELDS}
+  ${LAST_KNOWN_PRICE_FIELDS}
+  ${SETTINGS_FIELDS}
+`;
+
+export type PantryHomeQueryResult = PantryHomeQuery;
 
 export const SYNC_PRICES_NOW_MUTATION = /* GraphQL */ `
   mutation SyncPricesNow {
@@ -368,9 +328,7 @@ export const SYNC_PRICES_NOW_MUTATION = /* GraphQL */ `
   }
 `;
 
-export interface SyncPricesNowResult {
-  syncPricesNow: boolean;
-}
+export type SyncPricesNowResult = SyncPricesNowMutation;
 
 export const CHECK_PRICE_NOW_MUTATION = /* GraphQL */ `
   mutation CheckPriceNow($id: ID!, $list: String!) {
@@ -378,24 +336,11 @@ export const CHECK_PRICE_NOW_MUTATION = /* GraphQL */ `
   }
 `;
 
-export interface CheckPriceNowResult {
-  checkPriceNow: boolean;
-}
+export type CheckPriceNowResult = CheckPriceNowMutation;
 
-export interface PriceCheckError {
-  itemName: string;
-  message: string;
-  occurredAt: string;
-}
+export type PriceCheckError = PriceSyncStatusQuery["priceSyncStatus"]["errors"][number];
 
-export interface PriceSyncStatus {
-  running: boolean;
-  startedAt: string | null;
-  finishedAt: string | null;
-  totalItems: number;
-  checkedItems: number;
-  errors: PriceCheckError[];
-}
+export type PriceSyncStatus = PriceSyncStatusQuery["priceSyncStatus"];
 
 export const PRICE_SYNC_STATUS_QUERY = /* GraphQL */ `
   query PriceSyncStatus {
@@ -414,61 +359,19 @@ export const PRICE_SYNC_STATUS_QUERY = /* GraphQL */ `
   }
 `;
 
-export interface PriceSyncStatusResult {
-  priceSyncStatus: PriceSyncStatus;
-}
+export type PriceSyncStatusResult = PriceSyncStatusQuery;
 
-export type PantryActionType =
-  | "RECORD_PURCHASE"
-  | "UPDATE_INVENTORY_ITEM"
-  | "REMOVE_INVENTORY_ITEM"
-  | "ADD_TO_SHOPPING_LIST"
-  | "REMOVE_FROM_SHOPPING_LIST";
+export { PantryActionType };
 
-export interface ProposedAction {
-  type: PantryActionType;
-  summary: string;
-  mutationName: string;
-  argsJson: string;
-  // Quick, no-search ballpark estimate (RECORD_PURCHASE/ADD_TO_SHOPPING_LIST
-  // only) - never a confirmed live price, render with a "~" prefix.
-  estimatedPriceAud: number | null;
-}
+// No standalone GraphQL fragment - actions/recipes/ingredients below are only
+// ever selected inline as part of ParseCommand's response.
+export type ProposedAction = NonNullable<ParseCommandQuery["parseCommand"]["actions"]>[number];
 
-export interface RecipeIngredient {
-  name: string;
-  amount: string | null;
-  haveInInventory: boolean;
-  itemId: string | null;
-  // Leading numeric amount when cleanly scalable, 0 otherwise (a range,
-  // "to taste", etc.) - see recipeScaling.ts.
-  quantity: number;
-  estimatedPriceAud: number;
-}
+export type RecipeSuggestion = NonNullable<ParseCommandQuery["parseCommand"]["recipes"]>[number];
 
-export interface RecipeSuggestion {
-  name: string;
-  description: string | null;
-  ingredients: RecipeIngredient[];
-  baseServings: number;
-  caloriesPerServing: number;
-  proteinGPerServing: number;
-  carbsGPerServing: number;
-  fatGPerServing: number;
-}
+export type RecipeIngredient = RecipeSuggestion["ingredients"][number];
 
-export interface ParsedCommand {
-  answer: string | null;
-  answerItems: string[] | null;
-  actions: ProposedAction[] | null;
-  recipes: RecipeSuggestion[] | null;
-  message: string | null;
-  debugInfo: AiCallDebugInfo;
-  // Set together when the answer just offered a one-off live Coles check
-  // for an item with nothing on file yet - see checkPriceNow.
-  offerPriceCheckItemId: string | null;
-  offerPriceCheckList: "inventory" | "shoppingList" | null;
-}
+export type ParsedCommand = ParseCommandQuery["parseCommand"];
 
 // Mirrors Claude's own {role, content} chat message shape - see
 // api/src/pantry/lib/anthropic/parse-command.ts.
@@ -484,7 +387,7 @@ export const PARSE_COMMAND_QUERY = /* GraphQL */ `
       answerItems
       message
       debugInfo {
-        ${AI_CALL_DEBUG_INFO_FIELDS}
+        ...AiCallDebugInfoFields
       }
       offerPriceCheckItemId
       offerPriceCheckList
@@ -514,11 +417,10 @@ export const PARSE_COMMAND_QUERY = /* GraphQL */ `
       }
     }
   }
+  ${AI_CALL_DEBUG_INFO_FIELDS}
 `;
 
-export interface ParseCommandResult {
-  parseCommand: ParsedCommand;
-}
+export type ParseCommandResult = ParseCommandQuery;
 
 // Confirming a proposed action just calls the same mutation the rest of the
 // UI already uses - parseCommand never executes anything itself, it only

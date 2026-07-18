@@ -545,7 +545,9 @@
   font-size: 0.74rem;
   padding: 0.32rem 0.7rem;
   cursor: pointer;
-  transition: border-color 0.15s, color 0.15s;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
 }
 
 .ask-ai-example:hover:not(:disabled) {

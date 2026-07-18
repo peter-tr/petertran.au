@@ -1,29 +1,39 @@
 {
   "name": "petertran-au",
   "private": true,
+  "packageManager": "npm@11.16.0",
   "workspaces": [
     "infra",
     "api",
     "web"
   ],
+  "overrides": {
+    "graphql": "^16.14.2"
+  },
   "scripts": {
-    "dev": "concurrently -n portfolio,pantry,imposter,web -c blue,green,magenta,yellow \"npm run dev:portfolio --workspace=api\" \"npm run dev:pantry --workspace=api\" \"npm run dev:imposter --workspace=api\" \"npm run dev --workspace=web\"",
+    "dev": "turbo run dev:portfolio dev:pantry dev:imposter dev",
     "seed": "npm run seed --workspace=api",
     "deploy": "./scripts/deploy.sh",
     "cdk": "npm run cdk --workspace=infra",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "typecheck": "turbo run typecheck",
+    "build": "turbo run build",
+    "verify": "turbo run lint format:check typecheck build",
+    "prepare": "husky"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "concurrently": "^10.0.3",
+    "@graphql-eslint/eslint-plugin": "^4.4.0",
     "eslint": "^10.6.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.3",
     "globals": "^17.7.0",
+    "husky": "^9.1.7",
     "prettier": "^3.9.4",
+    "turbo": "^2.10.5",
     "typescript-eslint": "^8.62.1"
   }
 }

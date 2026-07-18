@@ -33,7 +33,7 @@ export default function SystemStatsSection() {
         ? current.direction === "desc"
           ? { key, direction: "asc" }
           : null
-        : { key, direction: "desc" },
+        : { key, direction: "desc" }
     );
   }
 
@@ -83,9 +83,7 @@ export default function SystemStatsSection() {
   const sortedOperations = useMemo(() => {
     if (!opsSort) return activeOperations;
     const { key, direction } = opsSort;
-    return [...activeOperations].sort((a, b) =>
-      direction === "desc" ? b[key] - a[key] : a[key] - b[key],
-    );
+    return [...activeOperations].sort((a, b) => (direction === "desc" ? b[key] - a[key] : a[key] - b[key]));
   }, [activeOperations, opsSort]);
 
   return (
@@ -136,7 +134,12 @@ export default function SystemStatsSection() {
                 <thead>
                   <tr>
                     <th>operation</th>
-                    <SortableOpsHeader label="count" sortKey="count" sort={opsSort} onToggle={toggleOpsSort} />
+                    <SortableOpsHeader
+                      label="count"
+                      sortKey="count"
+                      sort={opsSort}
+                      onToggle={toggleOpsSort}
+                    />
                     <SortableOpsHeader
                       label="avg latency"
                       sortKey="avgDurationMs"

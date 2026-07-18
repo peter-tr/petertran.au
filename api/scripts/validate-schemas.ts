@@ -1,4 +1,6 @@
+import { createRequire } from "node:module";
 import { ApolloServer } from "@apollo/server";
+import { buildSchema, parse, validate } from "graphql";
 import { typeDefs as portfolioTypeDefs } from "../src/portfolio/schema";
 import { devResolvers as portfolioResolvers } from "../src/portfolio/dev/dev-resolvers";
 import { typeDefs as imposterTypeDefs } from "../src/games/imposter/schema";
@@ -6,6 +8,17 @@ import { devResolvers as imposterResolvers } from "../src/games/imposter/dev/dev
 import { typeDefs as pantryTypeDefs } from "../src/pantry/schema";
 import { devResolvers as pantryResolvers } from "../src/pantry/dev/dev-resolvers";
 import { PARSE_COMMAND_SCHEMA } from "../src/pantry/lib/anthropic/parse-command";
+
+// require(), not a static `import` - the web workspace has its own tsconfig
+// (Vite ambient types, DOM lib) that api's doesn't share, so a type-level
+// import here would pull those files into *api*'s tsc program and fail on
+// things like `import.meta.env` that only Vite's types know about. require()
+// only needs tsx's runtime transform, not type-checking, which is all this
+// script actually needs from these modules - the raw exported query strings.
+const require = createRequire(import.meta.url);
+const portfolioApi: Record<string, unknown> = require("../../web/src/portfolio/lib/graphql.ts");
+const imposterApi: Record<string, unknown> = require("../../web/src/games/imposter/lib/api.ts");
+const pantryApi: Record<string, unknown> = require("../../web/src/pantry/api.ts");
 
 // Catches SDL-level bugs that neither tsc nor esbuild can see - both just
 // treat schema.graphql as an opaque string. This is the exact check that
@@ -68,6 +81,58 @@ for (const { name, schema } of ANTHROPIC_SCHEMAS) {
     );
   } else {
     console.log(`[anthropic-schema] ${name}: OK (${count}/${ANTHROPIC_UNION_PARAM_LIMIT})`);
+  }
+}
+
+// Catches the class of bug that broke the live Pantry page on 2026-07-18:
+// PANTRY_HOME_QUERY combined two fragments that each independently
+// self-embedded a shared dependency, so the *composed* request string ended
+// up with that fragment defined twice - invalid per GraphQL's "unique
+// fragment names" rule, rejected by Apollo Server at request time. Neither
+// tsc (which only sees these as untyped strings) nor graphql-codegen (which
+// parses each tagged template's own source text, never the actual runtime
+// ${...} concatenation) can see this - only parsing the real, fully-
+// interpolated string catches it, which is exactly what importing each
+// service's own frontend module and validating its exports gives us.
+//
+// Every service's api module exports its query/mutation strings as plain
+// `export const X = ...`, so scanning for exported values that look like an
+// operation (rather than maintaining a hand-kept list here) means a newly
+// added query gets covered automatically, with nothing to remember to update.
+const FRONTEND_QUERY_SERVICES = [
+  { name: "portfolio", typeDefs: portfolioTypeDefs, module: portfolioApi },
+  { name: "imposter", typeDefs: imposterTypeDefs, module: imposterApi },
+  { name: "pantry", typeDefs: pantryTypeDefs, module: pantryApi },
+];
+
+for (const { name, typeDefs, module } of FRONTEND_QUERY_SERVICES) {
+  const schema = buildSchema(typeDefs);
+  let checked = 0;
+  let serviceFailed = false;
+
+  for (const [exportName, value] of Object.entries(module)) {
+    if (typeof value !== "string" || !/^\s*(query|mutation)\b/.test(value)) continue;
+    checked++;
+
+    try {
+      const errors = validate(schema, parse(value));
+      if (errors.length > 0) {
+        failed = true;
+        serviceFailed = true;
+        console.error(`[frontend-query] ${name}.${exportName}: FAILED`);
+        for (const error of errors) console.error(`  - ${error.message}`);
+      }
+    } catch (err) {
+      failed = true;
+      serviceFailed = true;
+      console.error(
+        `[frontend-query] ${name}.${exportName}: FAILED - ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  }
+
+  if (!serviceFailed) {
+    console.log(`[frontend-query] ${name}: OK (${checked} operation${checked === 1 ? "" : "s"})`);
   }
 }
 

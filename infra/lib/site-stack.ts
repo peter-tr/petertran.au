@@ -10,6 +10,8 @@ import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as route53 from "aws-cdk-lib/aws-route53";
 import * as ses from "aws-cdk-lib/aws-ses";
+import * as cognito from "aws-cdk-lib/aws-cognito";
+import * as rum from "aws-cdk-lib/aws-rum";
 import * as path from "path";
 
 export interface SiteStackProps extends StackProps {
@@ -94,7 +96,11 @@ export class SiteStack extends Stack {
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "portfolio/handler.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/dist")),
-      memorySize: 256,
+      // 512, not the default 256 - same reasoning as pantry's GraphQLFunction:
+      // this is a synchronous Function URL on a user-facing request path, so
+      // cold-start CPU (which scales with memory) is latency a real visitor
+      // waits on, not a background job nobody's watching.
+      memorySize: 512,
       // 30s (not the default 15s) to leave headroom for the all-time cost
       // fields on a cold cache: Anthropic's cost report caps at 31 days per
       // page, so a 12-month lookback can take a dozen-odd sequential requests.
@@ -183,10 +189,71 @@ export class SiteStack extends Stack {
       ],
     });
 
+    // --- CloudWatch RUM: pageviews, client-side errors, performance ---
+    // Guest (unauthenticated) Cognito identity pool is the auth path RUM's
+    // web client uses to sign PutRumEvents from the browser - there's no
+    // logged-in user on this site, so every visitor assumes the same
+    // guest role, scoped to nothing but sending telemetry for this one
+    // app monitor.
+    const rumIdentityPool = new cognito.CfnIdentityPool(this, "RumIdentityPool", {
+      allowUnauthenticatedIdentities: true,
+    });
+
+    // Name (not the generated AppMonitor id) is what the ARN is keyed on,
+    // so it can be computed here and handed to the guest role's policy
+    // before the app monitor resource below exists - avoids a circular
+    // dependency between the two.
+    const rumAppMonitorName = "petertran-au";
+    const rumAppMonitorArn = `arn:aws:rum:${this.region}:${this.account}:appmonitor/${rumAppMonitorName}`;
+
+    const rumGuestRole = new iam.Role(this, "RumGuestRole", {
+      assumedBy: new iam.FederatedPrincipal(
+        "cognito-identity.amazonaws.com",
+        {
+          StringEquals: { "cognito-identity.amazonaws.com:aud": rumIdentityPool.ref },
+          "ForAnyValue:StringLike": { "cognito-identity.amazonaws.com:amr": "unauthenticated" },
+        },
+        "sts:AssumeRoleWithWebIdentity"
+      ),
+    });
+    rumGuestRole.addToPolicy(
+      new iam.PolicyStatement({
+        actions: ["rum:PutRumEvents"],
+        resources: [rumAppMonitorArn],
+      })
+    );
+
+    new cognito.CfnIdentityPoolRoleAttachment(this, "RumIdentityPoolRoleAttachment", {
+      identityPoolId: rumIdentityPool.ref,
+      roles: { unauthenticated: rumGuestRole.roleArn },
+    });
+
+    const rumAppMonitor = new rum.CfnAppMonitor(this, "RumAppMonitor", {
+      name: rumAppMonitorName,
+      domainList: [props.domainName, ...(props.alternateDomainNames ?? [])],
+      // Telemetry data itself is 30-day-retained inside RUM regardless; this
+      // also mirrors it to CloudWatch Logs so it can be queried with Logs
+      // Insights (or graphed on a dashboard) past that window, same as the
+      // X-Ray traces the GraphQL Lambda above already writes.
+      cwLogEnabled: true,
+      appMonitorConfiguration: {
+        identityPoolId: rumIdentityPool.ref,
+        guestRoleArn: rumGuestRole.roleArn,
+        allowCookies: true,
+        // Traffic here is low enough that 100% sampling costs nothing
+        // meaningful and gives a complete picture rather than an
+        // extrapolated one.
+        sessionSampleRate: 1,
+        telemetries: ["errors", "performance", "http"],
+      },
+    });
+
     new CfnOutput(this, "CloudFrontDomainName", { value: distribution.distributionDomainName });
     new CfnOutput(this, "DistributionId", { value: distribution.distributionId });
     new CfnOutput(this, "BucketName", { value: siteBucket.bucketName });
     new CfnOutput(this, "GraphQLEndpoint", { value: fnUrl.url });
     new CfnOutput(this, "TableName", { value: table.tableName });
+    new CfnOutput(this, "RumAppMonitorId", { value: rumAppMonitor.attrId });
+    new CfnOutput(this, "RumIdentityPoolId", { value: rumIdentityPool.ref });
   }
 }

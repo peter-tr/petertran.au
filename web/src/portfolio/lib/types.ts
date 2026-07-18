@@ -1,68 +1,12 @@
-export interface Link {
-  label: string;
-  url: string;
-}
+import type { ResumeQuery } from "./graphql.generated";
 
-export interface Person {
-  name: string;
-  email: string;
-  location: string;
-  clearance: string;
-  links: Link[];
-}
+export type ResumeData = ResumeQuery;
 
-export interface Education {
-  institution: string;
-  degree: string;
-  location: string;
-  startDate: string;
-  endDate: string;
-  honors: string;
-}
-
-export interface Experience {
-  company: string;
-  role: string;
-  location: string;
-  startDate: string;
-  endDate: string | null;
-  isCurrent: boolean;
-  summary: string | null;
-  highlights: string[];
-}
-
-export interface Project {
-  name: string;
-  stack: string[];
-  description: string;
-  url: string | null;
-}
-
-export interface SkillCategory {
-  category: string;
-  items: string[];
-}
-
-export interface Program {
-  name: string;
-  organization: string;
-  description: string;
-  startDate: string;
-  endDate: string;
-}
-
-export interface Interests {
-  hobbies: string[];
-  favoriteFoods: string[];
-  favoriteShows: string[];
-}
-
-export interface ResumeData {
-  person: Person;
-  interests: Interests;
-  education: Education[];
-  experience: Experience[];
-  projects: Project[];
-  skills: SkillCategory[];
-  programs: Program[];
-}
+export type Person = ResumeQuery["person"];
+export type Link = ResumeQuery["person"]["links"][number];
+export type Education = ResumeQuery["education"][number];
+export type Experience = ResumeQuery["experience"][number];
+export type Project = ResumeQuery["projects"][number];
+export type SkillCategory = ResumeQuery["skills"][number];
+export type Program = ResumeQuery["programs"][number];
+export type Interests = ResumeQuery["interests"];

@@ -43,10 +43,14 @@ export default function PantrySettingsPage() {
     }
   }
 
+  // Fetch-only, no setState of its own - callers each set syncStatus
+  // themselves from the result. Keeping the setState call visible at each
+  // call site (rather than buried in here) is what tells React's effect
+  // linter this is the endorsed "call setState in a callback when external
+  // state changes" shape, not an effect synchronously deriving state.
   async function fetchStatus(): Promise<PriceSyncStatus | null> {
     try {
       const data = await runPantryQuery<PriceSyncStatusResult>(PRICE_SYNC_STATUS_QUERY);
-      setSyncStatus(data.priceSyncStatus);
       return data.priceSyncStatus;
     } catch {
       return null;
@@ -57,6 +61,7 @@ export default function PantrySettingsPage() {
     if (pollRef.current) return;
     pollRef.current = setInterval(async () => {
       const status = await fetchStatus();
+      setSyncStatus(status);
       if (status && !status.running) stopPolling();
     }, 2000);
   }
@@ -66,17 +71,23 @@ export default function PantrySettingsPage() {
   // trackPrice - not just this page's own button, so opening Settings
   // while one happens to be running shows it immediately.
   useEffect(() => {
+    let ignore = false;
     fetchStatus().then((status) => {
+      if (ignore) return;
+      setSyncStatus(status);
       if (status?.running) startPolling();
     });
-    return stopPolling;
+    return () => {
+      ignore = true;
+      stopPolling();
+    };
   }, []);
 
   async function handleSyncNow() {
     setSyncTriggerError(null);
     try {
       await runPantryQuery<SyncPricesNowResult>(SYNC_PRICES_NOW_MUTATION);
-      await fetchStatus();
+      setSyncStatus(await fetchStatus());
       startPolling();
     } catch {
       setSyncTriggerError("Couldn't start the sync.");
@@ -191,9 +202,9 @@ export default function PantrySettingsPage() {
             <h2 className="pantry-panel-title">Nerd mode</h2>
           </div>
           <p className="project-desc">
-            Shows the AI call cost, duration, and Coles search/fetch counts behind each price check and command
-            bar reply - split by list/feature since inventory, the shopping list, and the command bar are
-            usually checked separately.
+            Shows the AI call cost, duration, and Coles search/fetch counts behind each price check and
+            command bar reply - split by list/feature since inventory, the shopping list, and the command bar
+            are usually checked separately.
           </p>
           <div className="form-row pantry-settings-row">
             <label className="form-label" htmlFor="pantry-nerd-mode-inventory">

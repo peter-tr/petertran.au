@@ -9,6 +9,7 @@ npm workspaces monorepo: `infra` (AWS CDK), `api` (Apollo Server on Lambda), `we
 - Scrutinize every change before reporting it complete - re-read the diff, check for stale imports left behind by moves/renames, and grep for references you might have missed rather than assuming an edit was self-contained.
 - After deploying a schema/resolver change to a service backed by real persisted data (DynamoDB), test directly against the live endpoint before calling it done - a mock/dev-server smoke test only proves the new code path works against freshly-shaped data, not against rows written before the change existed. This caught a real production outage: adding a non-nullable field to `ShoppingListEntry` broke every pre-existing row, since GraphQL null-propagates a missing non-null field to fail the whole containing list, not just that one item.
 - When adding a non-nullable field to a GraphQL type backed by persisted data, the read path must backfill a default for rows written before the field existed (see `getSettings()`'s `{ ...DEFAULT_SETTINGS, ...stored }` merge, and `getShoppingList()`'s equivalent) - don't just cast stored data straight to the type and assume old rows have every current field.
+- When the same string/number literal is referenced from multiple call sites (e.g. an X-Ray subsegment name passed to `traced()` from several projects), extract it to a named constant instead of repeating the literal - see `ANTHROPIC_API_SEGMENT_NAME` in `api/src/shared/xray.ts`.
 
 ## `api` workspace structure
 

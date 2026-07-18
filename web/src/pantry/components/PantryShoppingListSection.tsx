@@ -9,6 +9,7 @@ import {
   RECORD_PURCHASE_MUTATION,
   REMOVE_FROM_SHOPPING_LIST_MUTATION,
   UPDATE_SHOPPING_LIST_ENTRY_MUTATION,
+  StorageLocation,
   type AddToShoppingListResult,
   type InventoryItem,
   type PantrySettings,
@@ -111,7 +112,7 @@ export default function PantryShoppingListSection({
       await runPantryQuery<RecordPurchaseResult>(RECORD_PURCHASE_MUTATION, {
         input: {
           name: entry.name,
-          location: matchingItem?.location ?? "PANTRY",
+          location: matchingItem?.location ?? StorageLocation.Pantry,
           quantity: draft.quantity.trim() ? Number(draft.quantity) : (entry.quantity ?? 1),
           unit: draft.unit || entry.unit,
           purchasedAt: today(),
@@ -420,17 +421,23 @@ export default function PantryShoppingListSection({
                         <span className="pantry-shopping-recipe-tag"> · {entry.recipeTag}</span>
                       )}
                       {entry.trackPrice && (
-                        <span className="pantry-item-last-known-price" title={entry.lastKnownPrice?.note ?? undefined}>
+                        <span
+                          className="pantry-item-last-known-price"
+                          title={entry.lastKnownPrice?.note ?? undefined}
+                        >
                           {" · "}
                           {formatLastKnownPrice(entry.lastKnownPrice)}
                         </span>
                       )}
-                      {!settings.shoppingSimple && entry.trackPrice && settings.nerdModeShoppingList && entry.lastKnownPrice && (
-                        <span className="pantry-nerd-debug-info">
-                          {" · "}
-                          {formatDebugInfo(entry.lastKnownPrice.debugInfo)}
-                        </span>
-                      )}
+                      {!settings.shoppingSimple &&
+                        entry.trackPrice &&
+                        settings.nerdModeShoppingList &&
+                        entry.lastKnownPrice && (
+                          <span className="pantry-nerd-debug-info">
+                            {" · "}
+                            {formatDebugInfo(entry.lastKnownPrice.debugInfo)}
+                          </span>
+                        )}
                     </span>
                     <span className="pantry-shopping-item-actions">
                       {!settings.shoppingSimple && (
@@ -508,7 +515,9 @@ export default function PantryShoppingListSection({
                         entry={entry}
                         busy={busyId === entry.id}
                         categories={settings.categories}
-                        onAddCategory={(name) => onSettingsChange({ categories: [...settings.categories, name] })}
+                        onAddCategory={(name) =>
+                          onSettingsChange({ categories: [...settings.categories, name] })
+                        }
                         onClose={() => setShowEditId(null)}
                         onSave={(input) => saveEditModal(entry.id, input)}
                       />

@@ -1,8 +1,8 @@
 import { UpdateCommand } from "@aws-sdk/lib-dynamodb";
-import * as AWSXRay from "aws-xray-sdk-core";
 import type Anthropic from "@anthropic-ai/sdk";
 import { typeDefs } from "../../schema";
 import { getAnthropicClient } from "@shared/anthropic-client";
+import { traced, ANTHROPIC_API_SEGMENT_NAME } from "@shared/xray";
 import { assertNotRateLimited } from "../util/rate-limit";
 import { ddb, TABLE_NAME } from "../aws/ddb";
 import type { Context } from "../../context";
@@ -115,23 +115,6 @@ async function callAnswerAnthropic(
   return textBlock ? textBlock.text.trim() : null;
 }
 
-// Not an AWS SDK call, so X-Ray can't auto-instrument it - wrap it in its own
-// subsegment so the trace breakdown shows how much of the latency is actually
-// Anthropic vs. our own code.
-async function traced<T>(name: string, fn: () => Promise<T>): Promise<T> {
-  if (!process.env.AWS_LAMBDA_FUNCTION_NAME) return fn();
-  return AWSXRay.captureAsyncFunc(name, async (subsegment) => {
-    try {
-      const res = await fn();
-      subsegment?.close();
-      return res;
-    } catch (err) {
-      subsegment?.close(err instanceof Error ? err : undefined);
-      throw err;
-    }
-  });
-}
-
 export async function generateQuery(
   prompt: string,
   sourceIp: string | undefined,
@@ -147,7 +130,7 @@ export async function generateQuery(
 
   const client = await getAnthropicClient();
 
-  const response = await traced("Anthropic API", () => callAnthropic(client, trimmed));
+  const response = await traced(ANTHROPIC_API_SEGMENT_NAME, () => callAnthropic(client, trimmed));
   const parsed = response.parsed_output as RawGeneratedQuery | null;
   if (!parsed) throw new Error("Claude didn't return a valid response - try rephrasing.");
 
@@ -168,6 +151,8 @@ export async function generateQuery(
     return { ...parsed, answer: null };
   }
 
-  const answer = await traced("Anthropic API (answer)", () => callAnswerAnthropic(client, trimmed, data));
+  const answer = await traced(`${ANTHROPIC_API_SEGMENT_NAME} (answer)`, () =>
+    callAnswerAnthropic(client, trimmed, data)
+  );
   return { ...parsed, answer };
 }

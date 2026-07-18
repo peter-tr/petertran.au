@@ -1,7 +1,17 @@
 import { createGraphQLClient } from "../../shared/graphqlClient";
-import type { Link } from "./types";
+import type {
+  FooterQuery,
+  GenerateQueryQuery,
+  HeroQuery,
+  SendMessageMutation,
+  SystemStatsQuery,
+  TraceBreakdownQuery,
+} from "./graphql.generated";
 
-export const ENDPOINT = import.meta.env.VITE_GRAPHQL_ENDPOINT as string | undefined;
+// See pantry/api.ts's identical guard for why this optional-chains `env`
+// even though Vite always defines it - api/scripts/validate-schemas.ts
+// requires this module outside Vite to validate the queries below.
+export const ENDPOINT = import.meta.env?.VITE_GRAPHQL_ENDPOINT as string | undefined;
 
 export const runQuery = createGraphQLClient(ENDPOINT, "VITE_GRAPHQL_ENDPOINT");
 
@@ -76,10 +86,7 @@ export const HERO_QUERY = /* GraphQL */ `
   }
 `;
 
-export interface HeroQueryResult {
-  person: { name: string; links: Link[] };
-  experience: { role: string; company: string }[];
-}
+export type HeroQueryResult = HeroQuery;
 
 export const SEND_MESSAGE_MUTATION = /* GraphQL */ `
   mutation SendMessage($input: ContactInput!) {
@@ -90,9 +97,7 @@ export const SEND_MESSAGE_MUTATION = /* GraphQL */ `
   }
 `;
 
-export interface SendMessageResult {
-  sendMessage: { success: boolean; message: string };
-}
+export type SendMessageResult = SendMessageMutation;
 
 export const GENERATE_QUERY_QUERY = /* GraphQL */ `
   query GenerateQuery($prompt: String!) {
@@ -106,9 +111,7 @@ export const GENERATE_QUERY_QUERY = /* GraphQL */ `
   }
 `;
 
-export interface GenerateQueryResult {
-  meta: { generateQuery: { query: string | null; message: string | null; answer: string | null } };
-}
+export type GenerateQueryResult = GenerateQueryQuery;
 
 export const SYSTEM_STATS_QUERY = /* GraphQL */ `
   query SystemStats {
@@ -143,14 +146,7 @@ export const SYSTEM_STATS_QUERY = /* GraphQL */ `
   }
 `;
 
-export interface OperationStat {
-  name: string;
-  count: number;
-  avgDurationMs: number;
-  lastQuery: string | null;
-  lastVariables: string | null;
-  lastTraceId: string | null;
-}
+export type OperationStat = SystemStatsQuery["meta"]["systemStats"]["operations"][number];
 
 export const TRACE_BREAKDOWN_QUERY = /* GraphQL */ `
   query TraceBreakdown($traceId: String!) {
@@ -164,15 +160,9 @@ export const TRACE_BREAKDOWN_QUERY = /* GraphQL */ `
   }
 `;
 
-export interface TraceSegment {
-  name: string;
-  startOffsetMs: number;
-  durationMs: number;
-}
+export type TraceSegment = TraceBreakdownQuery["meta"]["traceBreakdown"][number];
 
-export interface TraceBreakdownResult {
-  meta: { traceBreakdown: TraceSegment[] };
-}
+export type TraceBreakdownResult = TraceBreakdownQuery;
 
 // Deliberately its own tiny query rather than reusing SYSTEM_STATS_QUERY:
 // systemStats' resolver does a batch of CloudWatch/DynamoDB work regardless
@@ -192,26 +182,8 @@ export const FOOTER_QUERY = /* GraphQL */ `
   }
 `;
 
-export interface FooterQueryResult {
-  person: { email: string };
-  meta: { awsCostUsd: number; anthropicCostUsd: number; totalCostUsd: number };
-}
+export type FooterQueryResult = FooterQuery;
 
-export interface DailyCount {
-  timestamp: string;
-  count: number;
-}
+export type DailyCount = SystemStatsQuery["meta"]["systemStats"]["requestsByDay"][number];
 
-export interface SystemStatsResult {
-  meta: {
-    systemStats: {
-      requestsTotal: number;
-      avgDurationMs: number;
-      aiQueriesTotal: number;
-      uniqueVisitorsTotal: number;
-      operations: OperationStat[];
-      operationsLast30Days: OperationStat[];
-      requestsByDay: DailyCount[];
-    };
-  };
-}
+export type SystemStatsResult = SystemStatsQuery;
