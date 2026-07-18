@@ -1,8 +1,8 @@
 import { UpdateCommand } from "@aws-sdk/lib-dynamodb";
-import * as AWSXRay from "aws-xray-sdk-core";
 import type Anthropic from "@anthropic-ai/sdk";
 import { typeDefs } from "../../schema";
 import { getAnthropicClient } from "@shared/anthropic-client";
+import { traced } from "@shared/xray";
 import { assertNotRateLimited } from "../util/rate-limit";
 import { ddb, TABLE_NAME } from "../aws/ddb";
 import type { Context } from "../../context";
@@ -113,23 +113,6 @@ async function callAnswerAnthropic(
   });
   const textBlock = response.content.find((block) => block.type === "text");
   return textBlock ? textBlock.text.trim() : null;
-}
-
-// Not an AWS SDK call, so X-Ray can't auto-instrument it - wrap it in its own
-// subsegment so the trace breakdown shows how much of the latency is actually
-// Anthropic vs. our own code.
-async function traced<T>(name: string, fn: () => Promise<T>): Promise<T> {
-  if (!process.env.AWS_LAMBDA_FUNCTION_NAME) return fn();
-  return AWSXRay.captureAsyncFunc(name, async (subsegment) => {
-    try {
-      const res = await fn();
-      subsegment?.close();
-      return res;
-    } catch (err) {
-      subsegment?.close(err instanceof Error ? err : undefined);
-      throw err;
-    }
-  });
 }
 
 export async function generateQuery(

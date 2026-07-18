@@ -59,6 +59,7 @@ export class GamesStack extends Stack {
         TABLE_NAME: table.tableName,
         ANTHROPIC_SECRET_ARN: anthropicSecret.secretArn,
       },
+      tracing: lambda.Tracing.ACTIVE,
     });
     table.grantReadWriteData(imposterFn);
     anthropicSecret.grantRead(imposterFn);
