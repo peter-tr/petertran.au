@@ -668,6 +668,18 @@ type ParsedCommand {
   """
   message: String
   """
+  Set alongside offerPriceCheckList when the answer just offered to check
+  Coles right now for an item with nothing on file yet - lets the client
+  show a "check now" button that calls checkPriceNow(id, list) instead of
+  guessing at one. Null otherwise.
+  """
+  offerPriceCheckItemId: ID
+  """
+  Set alongside offerPriceCheckItemId - "inventory" or "shoppingList",
+  whichever list the item is actually in. Null otherwise.
+  """
+  offerPriceCheckList: String
+  """
   Cost/duration info for the Anthropic call that parsed this command - only
   meaningful to show when nerdModeCommandBar is on. searchesUsed/fetchesUsed
   are always 0 here since command parsing doesn't use those
