@@ -37,19 +37,21 @@ export interface ImposterGame {
 }
 
 const IMPOSTER_GAME_FIELDS = /* GraphQL */ `
-  gameId
-  categoryLabel
-  hintEnabled
-  phase
-  players {
-    id
-    name
-    hasRevealed
+  fragment ImposterGameFields on ImposterGame {
+    gameId
+    categoryLabel
+    hintEnabled
+    phase
+    players {
+      id
+      name
+      hasRevealed
+    }
+    imposterPlayerIds
+    civilianWord
+    imposterWord
+    createdAt
   }
-  imposterPlayerIds
-  civilianWord
-  imposterWord
-  createdAt
 `;
 
 export const IMPOSTER_CATEGORIES_QUERY = /* GraphQL */ `
@@ -68,9 +70,10 @@ export interface ImposterCategoriesResult {
 export const IMPOSTER_GAME_QUERY = /* GraphQL */ `
   query ImposterGameState($gameId: String!) {
     imposterGame(gameId: $gameId) {
-      ${IMPOSTER_GAME_FIELDS}
+      ...ImposterGameFields
     }
   }
+  ${IMPOSTER_GAME_FIELDS}
 `;
 
 export interface ImposterGameResult {
@@ -80,9 +83,10 @@ export interface ImposterGameResult {
 export const LIVE_IMPOSTER_GAMES_QUERY = /* GraphQL */ `
   query LiveImposterGames {
     liveImposterGames {
-      ${IMPOSTER_GAME_FIELDS}
+      ...ImposterGameFields
     }
   }
+  ${IMPOSTER_GAME_FIELDS}
 `;
 
 export interface LiveImposterGamesResult {
@@ -110,9 +114,10 @@ export const CREATE_IMPOSTER_GAME_MUTATION = /* GraphQL */ `
       difficulty: $difficulty
       hideCategory: $hideCategory
     ) {
-      ${IMPOSTER_GAME_FIELDS}
+      ...ImposterGameFields
     }
   }
+  ${IMPOSTER_GAME_FIELDS}
 `;
 
 export interface CreateImposterGameVariables {
@@ -136,10 +141,11 @@ export const REVEAL_IMPOSTER_WORD_MUTATION = /* GraphQL */ `
       word
       isImposter
       game {
-        ${IMPOSTER_GAME_FIELDS}
+        ...ImposterGameFields
       }
     }
   }
+  ${IMPOSTER_GAME_FIELDS}
 `;
 
 export interface RevealImposterWordResult {
@@ -149,9 +155,10 @@ export interface RevealImposterWordResult {
 export const REVEAL_IMPOSTER_MUTATION = /* GraphQL */ `
   mutation RevealImposter($gameId: String!) {
     revealImposter(gameId: $gameId) {
-      ${IMPOSTER_GAME_FIELDS}
+      ...ImposterGameFields
     }
   }
+  ${IMPOSTER_GAME_FIELDS}
 `;
 
 export interface RevealImposterResult {

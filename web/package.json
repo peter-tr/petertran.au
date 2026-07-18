@@ -4,7 +4,10 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "codegen": "graphql-codegen --config codegen.ts",
+    "predev": "npm run codegen",
     "dev": "vite",
+    "prebuild": "npm run codegen",
     "build": "tsc -b && vite build && npm run prerender",
     "prerender": "tsx scripts/prerender.tsx",
     "preview": "vite preview"
@@ -23,6 +26,9 @@
     "react-router-dom": "^7.18.1"
   },
   "devDependencies": {
+    "@graphql-codegen/cli": "^7.2.0",
+    "@graphql-codegen/typescript": "^6.1.0",
+    "@graphql-codegen/typescript-operations": "^6.1.0",
     "@types/node": "^20.14.0",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
