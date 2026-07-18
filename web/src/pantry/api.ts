@@ -23,10 +23,12 @@ export interface AiCallDebugInfo {
 }
 
 const AI_CALL_DEBUG_INFO_FIELDS = /* GraphQL */ `
-  costUsd
-  durationMs
-  searchesUsed
-  fetchesUsed
+  fragment AiCallDebugInfoFields on AiCallDebugInfo {
+    costUsd
+    durationMs
+    searchesUsed
+    fetchesUsed
+  }
 `;
 
 export interface LastKnownPrice {
@@ -72,44 +74,55 @@ export interface AddInventoryItemInput {
   trackPrice?: boolean | null;
 }
 
-const INVENTORY_ITEM_FIELDS = /* GraphQL */ `
-  id
-  name
-  category
-  location
-  quantity
-  unit
-  price
-  purchasedAt
-  expiresAt
-  isStaple
-  lowPriority
-  nearlyEmpty
-  trackPrice
-  lastKnownPrice {
+const LAST_KNOWN_PRICE_FIELDS = /* GraphQL */ `
+  fragment LastKnownPriceFields on LastKnownPrice {
     colesPrice
     productUrl
     note
     checkedAt
     debugInfo {
-      ${AI_CALL_DEBUG_INFO_FIELDS}
+      ...AiCallDebugInfoFields
     }
   }
-  purchases {
-    date
-    price
+  ${AI_CALL_DEBUG_INFO_FIELDS}
+`;
+
+const INVENTORY_ITEM_FIELDS = /* GraphQL */ `
+  fragment InventoryItemFields on InventoryItem {
+    id
+    name
+    category
+    location
     quantity
+    unit
+    price
+    purchasedAt
+    expiresAt
+    isStaple
+    lowPriority
+    nearlyEmpty
+    trackPrice
+    lastKnownPrice {
+      ...LastKnownPriceFields
+    }
+    purchases {
+      date
+      price
+      quantity
+    }
+    addedAt
+    updatedAt
   }
-  addedAt
-  updatedAt
+  ${LAST_KNOWN_PRICE_FIELDS}
 `;
 
 export const INVENTORY_QUERY = /* GraphQL */ `
   query Inventory {
     inventory {
-      ${INVENTORY_ITEM_FIELDS}
+      ...InventoryItemFields
     }
   }
+  ${INVENTORY_ITEM_FIELDS}
 `;
 
 export interface InventoryQueryResult {
@@ -119,9 +132,10 @@ export interface InventoryQueryResult {
 export const ADD_INVENTORY_ITEM_MUTATION = /* GraphQL */ `
   mutation AddInventoryItem($input: AddInventoryItemInput!) {
     addInventoryItem(input: $input) {
-      ${INVENTORY_ITEM_FIELDS}
+      ...InventoryItemFields
     }
   }
+  ${INVENTORY_ITEM_FIELDS}
 `;
 
 export interface AddInventoryItemResult {
@@ -134,9 +148,10 @@ export interface AddInventoryItemResult {
 export const RECORD_PURCHASE_MUTATION = /* GraphQL */ `
   mutation RecordPurchase($input: AddInventoryItemInput!) {
     recordPurchase(input: $input) {
-      ${INVENTORY_ITEM_FIELDS}
+      ...InventoryItemFields
     }
   }
+  ${INVENTORY_ITEM_FIELDS}
 `;
 
 export interface RecordPurchaseResult {
@@ -146,9 +161,10 @@ export interface RecordPurchaseResult {
 export const UPDATE_INVENTORY_ITEM_MUTATION = /* GraphQL */ `
   mutation UpdateInventoryItem($id: ID!, $input: UpdateInventoryItemInput!) {
     updateInventoryItem(id: $id, input: $input) {
-      ${INVENTORY_ITEM_FIELDS}
+      ...InventoryItemFields
     }
   }
+  ${INVENTORY_ITEM_FIELDS}
 `;
 
 export interface UpdateInventoryItemResult {
@@ -184,34 +200,32 @@ export interface ShoppingListEntry {
 // editing one list, not hunting down every place ShoppingListEntry is
 // selected - the same class of drift that bit the inventory add form.
 const SHOPPING_LIST_ENTRY_FIELDS = /* GraphQL */ `
-  id
-  name
-  quantity
-  unit
-  note
-  isStaple
-  category
-  recipeTag
-  urgent
-  trackPrice
-  lastKnownPrice {
-    colesPrice
-    productUrl
+  fragment ShoppingListEntryFields on ShoppingListEntry {
+    id
+    name
+    quantity
+    unit
     note
-    checkedAt
-    debugInfo {
-      ${AI_CALL_DEBUG_INFO_FIELDS}
+    isStaple
+    category
+    recipeTag
+    urgent
+    trackPrice
+    lastKnownPrice {
+      ...LastKnownPriceFields
     }
+    addedAt
   }
-  addedAt
+  ${LAST_KNOWN_PRICE_FIELDS}
 `;
 
 export const SHOPPING_LIST_QUERY = /* GraphQL */ `
   query ShoppingList {
     shoppingList {
-      ${SHOPPING_LIST_ENTRY_FIELDS}
+      ...ShoppingListEntryFields
     }
   }
+  ${SHOPPING_LIST_ENTRY_FIELDS}
 `;
 
 export interface ShoppingListQueryResult {
@@ -249,9 +263,10 @@ export const ADD_TO_SHOPPING_LIST_MUTATION = /* GraphQL */ `
       recipeTag: $recipeTag
       urgent: $urgent
     ) {
-      ${SHOPPING_LIST_ENTRY_FIELDS}
+      ...ShoppingListEntryFields
     }
   }
+  ${SHOPPING_LIST_ENTRY_FIELDS}
 `;
 
 export interface AddToShoppingListResult {
@@ -273,9 +288,10 @@ export interface UpdateShoppingListEntryInput {
 export const UPDATE_SHOPPING_LIST_ENTRY_MUTATION = /* GraphQL */ `
   mutation UpdateShoppingListEntry($id: ID!, $input: UpdateShoppingListEntryInput!) {
     updateShoppingListEntry(id: $id, input: $input) {
-      ${SHOPPING_LIST_ENTRY_FIELDS}
+      ...ShoppingListEntryFields
     }
   }
+  ${SHOPPING_LIST_ENTRY_FIELDS}
 `;
 
 export interface UpdateShoppingListEntryResult {
@@ -312,38 +328,41 @@ export interface PantrySettings {
 export type PantrySettingsInput = Partial<PantrySettings>;
 
 const SETTINGS_FIELDS = /* GraphQL */ `
-  view
-  sort
-  simple
-  optionsCollapsed
-  collapsedGroups
-  commonItems
-  shoppingListCollapsed
-  showLowPriority
-  categoryFilter
-  categories
-  addItemDetailsShown
-  addItemCollapsed
-  commonItemsCollapsed
-  shoppingCategoryFilter
-  shoppingRecipeFilter
-  shoppingUrgentOnly
-  shoppingOptionsCollapsed
-  shoppingSort
-  shoppingSimple
-  digestEnabled
-  digestHour
-  nerdModeInventory
-  nerdModeShoppingList
-  nerdModeCommandBar
+  fragment SettingsFields on PantrySettings {
+    view
+    sort
+    simple
+    optionsCollapsed
+    collapsedGroups
+    commonItems
+    shoppingListCollapsed
+    showLowPriority
+    categoryFilter
+    categories
+    addItemDetailsShown
+    addItemCollapsed
+    commonItemsCollapsed
+    shoppingCategoryFilter
+    shoppingRecipeFilter
+    shoppingUrgentOnly
+    shoppingOptionsCollapsed
+    shoppingSort
+    shoppingSimple
+    digestEnabled
+    digestHour
+    nerdModeInventory
+    nerdModeShoppingList
+    nerdModeCommandBar
+  }
 `;
 
 export const SETTINGS_QUERY = /* GraphQL */ `
   query PantrySettingsQuery {
     settings {
-      ${SETTINGS_FIELDS}
+      ...SettingsFields
     }
   }
+  ${SETTINGS_FIELDS}
 `;
 
 export interface SettingsQueryResult {
@@ -353,9 +372,10 @@ export interface SettingsQueryResult {
 export const UPDATE_SETTINGS_MUTATION = /* GraphQL */ `
   mutation UpdateSettings($input: PantrySettingsInput!) {
     updateSettings(input: $input) {
-      ${SETTINGS_FIELDS}
+      ...SettingsFields
     }
   }
+  ${SETTINGS_FIELDS}
 `;
 
 export interface UpdateSettingsResult {
@@ -484,7 +504,7 @@ export const PARSE_COMMAND_QUERY = /* GraphQL */ `
       answerItems
       message
       debugInfo {
-        ${AI_CALL_DEBUG_INFO_FIELDS}
+        ...AiCallDebugInfoFields
       }
       offerPriceCheckItemId
       offerPriceCheckList
@@ -514,6 +534,7 @@ export const PARSE_COMMAND_QUERY = /* GraphQL */ `
       }
     }
   }
+  ${AI_CALL_DEBUG_INFO_FIELDS}
 `;
 
 export interface ParseCommandResult {
