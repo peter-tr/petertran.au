@@ -953,10 +953,17 @@
 
 /* Fixed-width name column (not content-sized) so the meta text and controls
    line up at the same x position on every row, regardless of how long any
-   given item's name is. */
+   given item's name is. 14rem (not the original 9rem) - the info column has
+   to hold the name plus a category badge plus 4 single-char toggle icons
+   (star/down-arrow/bang/dollar), and 9rem left next to nothing for the name
+   itself once those were accounted for, ellipsis-truncating even short
+   names down to a single letter (e.g. "Asahi beer" as "A…"). 14rem fits
+   typical item names (up to ~15 chars) plus a typical category without
+   truncating; a long name paired with a long category will still ellipsis,
+   same as before, just far less often. */
 .pantry-item-row {
   display: grid;
-  grid-template-columns: 9rem 1fr auto;
+  grid-template-columns: 14rem 1fr auto;
   grid-template-areas: "info meta controls";
   align-items: center;
   column-gap: 1.1rem;
@@ -1374,17 +1381,21 @@
     width: 3.6rem;
   }
 
-  /* 2 visual rows, not 3 - meta and controls share the second row instead
-     of each getting a full-width row of their own, which on a real phone
-     left a card that was mostly empty space around a short "1 · today" and
-     three small buttons. */
+  /* 3 full-width stacked rows (info / meta / controls), not the 2-row
+     "meta and controls share a row" layout this used to have - controls can
+     hold up to 5 buttons (-, qty, +, edit, delete, plus a Coles link when
+     trackPrice is on), which adds up to ~20rem of fixed-width content that
+     doesn't fit in an "auto" column squeezed next to meta text on a 375px
+     screen: the row was overflowing horizontally instead of wrapping.
+     flex-wrap on .pantry-item-controls below is a safety net for the rarer
+     case where even a full-width row can't fit every control on one line. */
   .pantry-item-row {
-    grid-template-columns: 1fr auto;
+    grid-template-columns: 1fr;
     grid-template-areas:
-      "info info"
-      "meta controls";
-    row-gap: 0.3rem;
-    column-gap: 0.6rem;
+      "info"
+      "meta"
+      "controls";
+    row-gap: 0.35rem;
     padding: 0.5rem 0.6rem;
   }
 
@@ -1406,8 +1417,9 @@
   }
 
   .pantry-item-controls {
-    justify-self: end;
-    justify-content: flex-end;
+    justify-self: stretch;
+    justify-content: flex-start;
+    flex-wrap: wrap;
     gap: 0.4rem;
   }
 
