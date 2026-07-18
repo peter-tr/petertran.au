@@ -31,7 +31,13 @@ import type {
 // Separate endpoint, separate service - the pantry API (api/src/pantry/) is
 // its own Lambda/Function URL, deployed independently of the resume API this
 // site otherwise runs on, even though its source lives in the same workspace.
-export const PANTRY_ENDPOINT = import.meta.env.VITE_PANTRY_GRAPHQL_ENDPOINT as string | undefined;
+// Optional chaining on `env` looks redundant under Vite (it's always
+// defined there) but isn't - api/scripts/validate-schemas.ts requires this
+// module from plain Node/tsx to validate the query strings below against
+// the schema, and `import.meta.env` doesn't exist outside a Vite-processed
+// build, so accessing it un-guarded throws before that script even gets to
+// the queries it's there to check.
+export const PANTRY_ENDPOINT = import.meta.env?.VITE_PANTRY_GRAPHQL_ENDPOINT as string | undefined;
 
 export const runPantryQuery = createGraphQLClient(PANTRY_ENDPOINT, "VITE_PANTRY_GRAPHQL_ENDPOINT");
 
