@@ -1,5 +1,5 @@
 import { getAnthropicClient } from "@shared/anthropic-client";
-import { traced } from "@shared/xray";
+import { traced, ANTHROPIC_API_SEGMENT_NAME } from "@shared/xray";
 import { getAllItems, setLastKnownPrice, type LastKnownPrice } from "../../services/inventory";
 import { getShoppingList, setShoppingListLastKnownPrice } from "../../services/shopping-list";
 import { startPriceSync, recordPriceCheckProgress, finishPriceSync } from "../../services/price-sync-status";
@@ -87,7 +87,7 @@ async function checkPricesBatch(
   const timeoutMs = Math.min(30_000 + names.length * 15_000, 300_000);
   const maxTokens = Math.min(400 + names.length * 200, 4096);
 
-  const response = await traced("Anthropic API", () =>
+  const response = await traced(ANTHROPIC_API_SEGMENT_NAME, () =>
     client.messages.parse(
       {
         model: "claude-haiku-4-5",

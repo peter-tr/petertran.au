@@ -1,5 +1,5 @@
 import { getAnthropicClient } from "@shared/anthropic-client";
-import { traced } from "@shared/xray";
+import { traced, ANTHROPIC_API_SEGMENT_NAME } from "@shared/xray";
 import { assertNotRateLimited } from "../util/rate-limit";
 import { WORD_CATEGORIES, randomPair, type WordDifficulty } from "../words";
 
@@ -43,7 +43,7 @@ export interface AiWordPair {
 
 async function callAnthropic(userMessage: string, difficulty: WordDifficulty) {
   const client = await getAnthropicClient();
-  const response = await traced("Anthropic API", () =>
+  const response = await traced(ANTHROPIC_API_SEGMENT_NAME, () =>
     client.messages.parse({
       model: "claude-haiku-4-5",
       max_tokens: 256,

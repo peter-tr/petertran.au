@@ -2,7 +2,7 @@ import { UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import type Anthropic from "@anthropic-ai/sdk";
 import { typeDefs } from "../../schema";
 import { getAnthropicClient } from "@shared/anthropic-client";
-import { traced } from "@shared/xray";
+import { traced, ANTHROPIC_API_SEGMENT_NAME } from "@shared/xray";
 import { assertNotRateLimited } from "../util/rate-limit";
 import { ddb, TABLE_NAME } from "../aws/ddb";
 import type { Context } from "../../context";
@@ -130,7 +130,7 @@ export async function generateQuery(
 
   const client = await getAnthropicClient();
 
-  const response = await traced("Anthropic API", () => callAnthropic(client, trimmed));
+  const response = await traced(ANTHROPIC_API_SEGMENT_NAME, () => callAnthropic(client, trimmed));
   const parsed = response.parsed_output as RawGeneratedQuery | null;
   if (!parsed) throw new Error("Claude didn't return a valid response - try rephrasing.");
 
@@ -151,6 +151,8 @@ export async function generateQuery(
     return { ...parsed, answer: null };
   }
 
-  const answer = await traced("Anthropic API (answer)", () => callAnswerAnthropic(client, trimmed, data));
+  const answer = await traced(`${ANTHROPIC_API_SEGMENT_NAME} (answer)`, () =>
+    callAnswerAnthropic(client, trimmed, data)
+  );
   return { ...parsed, answer };
 }

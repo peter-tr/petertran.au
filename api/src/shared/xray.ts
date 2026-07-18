@@ -1,5 +1,10 @@
 import * as AWSXRay from "aws-xray-sdk-core";
 
+// Shared subsegment name for every project's Anthropic call(s), so the trace
+// breakdown groups them consistently instead of each project inventing its
+// own label.
+export const ANTHROPIC_API_SEGMENT_NAME = "Anthropic API";
+
 // Not an AWS SDK call, so X-Ray can't auto-instrument it - wrap it in its own
 // subsegment so the trace breakdown shows how much of the latency is actually
 // the wrapped call (e.g. Anthropic) vs. our own code. Same Lambda-only guard
