@@ -32,6 +32,7 @@
       "outputs": ["dist/**"]
     },
     "//#lint": {
+      "inputs": ["$TURBO_DEFAULT$", "!**/*.md"],
       "outputs": []
     },
     "//#format:check": {
