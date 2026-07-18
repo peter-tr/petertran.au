@@ -16,11 +16,17 @@ import type { CodegenConfig } from "@graphql-codegen/cli";
 // own `*-schema-types.generated.ts` via `typescript` alone, and the
 // operations file uses `typescript-operations` with `importSchemaTypesFrom`
 // pointing back at it instead of re-emitting those types itself.
-function serviceConfig(schemaPath: string, documentsGlob: string, schemaTypesImportPath: string) {
+function serviceConfig(
+  schemaPath: string,
+  documentsGlob: string,
+  schemaTypesImportPath: string,
+  schemaTypesConfig: Record<string, unknown> = {}
+) {
   return {
     schemaTypes: {
       schema: schemaPath,
       plugins: ["typescript"],
+      config: schemaTypesConfig,
     },
     operations: {
       schema: schemaPath,
@@ -38,10 +44,19 @@ const portfolio = serviceConfig(
   "src/portfolio/**/*.{ts,tsx}",
   "src/portfolio/lib/graphql-schema-types.generated.ts"
 );
+// enumsAsTypes: pantry's hand-written types (now aliased to these generated
+// ones in api.ts) always modeled StorageLocation/PantryActionType as plain
+// string literal unions, e.g. `location: "FRIDGE"`. The plugin's default is a
+// real TS enum, which - unlike a literal union - isn't structurally
+// compatible with a bare string literal, so every existing `"FRIDGE"`/
+// `"ADD_TO_SHOPPING_LIST"` call site would need rewriting to `StorageLocation.Fridge`
+// just to satisfy the type checker. A literal union keeps those call sites as
+// they are while remaining just as schema-accurate.
 const pantry = serviceConfig(
   "../api/src/pantry/schema.graphql",
   "src/pantry/**/*.{ts,tsx}",
-  "src/pantry/api-schema-types.generated.ts"
+  "src/pantry/api-schema-types.generated.ts",
+  { enumsAsTypes: true }
 );
 const imposter = serviceConfig(
   "../api/src/games/imposter/schema.graphql",
