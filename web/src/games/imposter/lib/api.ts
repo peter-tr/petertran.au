@@ -19,10 +19,12 @@ import type {
 
 // See pantry/api.ts's identical guard for why this optional-chains `env`
 // even though Vite always defines it - api/scripts/validate-schemas.ts
-// requires this module outside Vite to validate the queries below.
-const ENDPOINT = import.meta.env?.VITE_IMPOSTER_GRAPHQL_ENDPOINT as string | undefined;
+// requires this module outside Vite to validate the queries below. Exported
+// (unlike originally) so the portfolio home page can warm this Lambda on
+// load - see web/src/portfolio/Home.tsx.
+export const IMPOSTER_ENDPOINT = import.meta.env?.VITE_IMPOSTER_GRAPHQL_ENDPOINT as string | undefined;
 
-export const runImposterQuery = createGraphQLClient(ENDPOINT, "VITE_IMPOSTER_GRAPHQL_ENDPOINT");
+export const runImposterQuery = createGraphQLClient(IMPOSTER_ENDPOINT, "VITE_IMPOSTER_GRAPHQL_ENDPOINT");
 
 export { ImposterPhase, ImposterWordSource, ImposterDifficulty };
 

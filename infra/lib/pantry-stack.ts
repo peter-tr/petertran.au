@@ -21,6 +21,10 @@ export interface PantryStackProps extends StackProps {
  * separation doesn't require a separate workspace, same as GamesStack.
  */
 export class PantryStack extends Stack {
+  // Exposed so PetertranWarmupStack can schedule a keep-warm ping against it
+  // without this stack needing to know anything about warmup at all.
+  public readonly apiFn: lambda.Function;
+
   constructor(scope: Construct, id: string, props: PantryStackProps) {
     super(scope, id, props);
 
@@ -69,6 +73,7 @@ export class PantryStack extends Stack {
     });
     table.grantReadWriteData(apiFn);
     anthropicSecret.grantRead(apiFn);
+    this.apiFn = apiFn;
 
     const fnUrl = apiFn.addFunctionUrl({
       authType: lambda.FunctionUrlAuthType.NONE,

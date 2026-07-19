@@ -17,7 +17,9 @@ petertran.au/
 │   └── src/
 │       ├── portfolio/       this resume/API site
 │       ├── pantry/          AI-assisted grocery inventory + shopping list
-│       └── games/imposter/  a Werewolf/Mafia-style party game
+│       ├── games/imposter/  a Werewolf/Mafia-style party game
+│       ├── zero-trust-lab/  edge/domain gateway + token-exchange learning exercise (docs/zero-trust-lab.md)
+│       └── warmup/          keeps every project's Lambda warm on a schedule, toggleable from /settings
 ├── infra/    AWS CDK (TypeScript) - Lambda, DynamoDB, S3 + CloudFront, Route 53, ACM, SES, Secrets Manager
 └── .github/  CI/CD via GitHub Actions, authenticating to AWS via OIDC (no long-lived access keys)
 ```
