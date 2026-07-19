@@ -30,6 +30,9 @@ export class PantryStack extends Stack {
     super(scope, id, props);
 
     const table = new dynamodb.Table(this, "PantryTable", {
+      // Explicit, so it reads clearly in the X-Ray trace map instead of
+      // CloudFormation's auto-generated name.
+      tableName: "pantry",
       partitionKey: { name: "pk", type: dynamodb.AttributeType.STRING },
       sortKey: { name: "sk", type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,

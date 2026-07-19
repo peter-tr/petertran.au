@@ -36,6 +36,9 @@ export function createWarmupSchedules(
   namePrefix: string
 ): WarmupSchedulesResult {
   const role = new iam.Role(scope, "WarmupSchedulerRole", {
+    // Explicit, so it reads clearly in the IAM console instead of
+    // CloudFormation's auto-generated name.
+    roleName: "warmup-scheduler-role",
     assumedBy: new iam.ServicePrincipal("scheduler.amazonaws.com"),
   });
   targets.forEach(({ fn }) => fn.grantInvoke(role));

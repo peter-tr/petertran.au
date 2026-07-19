@@ -33,6 +33,9 @@ export class SiteStack extends Stack {
 
     // --- Data layer: resume content ---
     const table = new dynamodb.Table(this, "ResumeTable", {
+      // Explicit, so it reads clearly in the X-Ray trace map instead of
+      // CloudFormation's auto-generated "PetertranSiteStack-ResumeTable...-..." name.
+      tableName: "resume",
       partitionKey: { name: "pk", type: dynamodb.AttributeType.STRING },
       sortKey: { name: "sk", type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
@@ -166,6 +169,14 @@ export class SiteStack extends Stack {
 
     // --- Static site: S3 (private, OAC) + CloudFront ---
     const siteBucket = new s3.Bucket(this, "SiteBucket", {
+      // Explicit, so it reads clearly in the S3 console instead of
+      // CloudFormation's auto-generated name. Account-suffixed since bucket
+      // names are globally unique across all of AWS, not just this account -
+      // same reasoning as the Cognito domainPrefix in zero-trust-lab-stack.ts.
+      // Safe to replace despite autoDeleteObjects/DESTROY below: deploy.sh
+      // re-syncs web/dist into the (new) bucket right after `cdk deploy`
+      // finishes, so nothing is lost for longer than that one deploy.
+      bucketName: `petertran-au-site-${this.account}`,
       removalPolicy: RemovalPolicy.DESTROY,
       autoDeleteObjects: true,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
@@ -204,6 +215,9 @@ export class SiteStack extends Stack {
     // guest role, scoped to nothing but sending telemetry for this one
     // app monitor.
     const rumIdentityPool = new cognito.CfnIdentityPool(this, "RumIdentityPool", {
+      // Explicit, so it reads clearly in the Cognito console instead of
+      // CloudFormation's auto-generated name.
+      identityPoolName: "petertran_au_rum",
       allowUnauthenticatedIdentities: true,
     });
 
@@ -215,6 +229,9 @@ export class SiteStack extends Stack {
     const rumAppMonitorArn = `arn:aws:rum:${this.region}:${this.account}:appmonitor/${rumAppMonitorName}`;
 
     const rumGuestRole = new iam.Role(this, "RumGuestRole", {
+      // Explicit, so it reads clearly in the IAM console instead of
+      // CloudFormation's auto-generated name.
+      roleName: "rum-guest-role",
       assumedBy: new iam.FederatedPrincipal(
         "cognito-identity.amazonaws.com",
         {

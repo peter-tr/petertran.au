@@ -46,6 +46,9 @@ export class ZeroTrustLabStack extends Stack {
     super(scope, id, props);
 
     const table = new dynamodb.Table(this, "ZeroTrustSessionsTable", {
+      // Explicit, so it reads clearly in the X-Ray trace map instead of
+      // CloudFormation's auto-generated name.
+      tableName: "ztl-sessions",
       partitionKey: { name: "pk", type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       removalPolicy: RemovalPolicy.DESTROY,
@@ -55,10 +58,15 @@ export class ZeroTrustLabStack extends Stack {
     // RSA, not EC - see lib/jwt.ts for why (KMS's RSA signature bytes are
     // usable as a JWS signature directly, no DER->raw conversion needed).
     const signingKey = new kms.Key(this, "JwtSigningKey", {
+      description: "Zero-trust-lab: signs/verifies the internal JWTs InternalSts issues",
       keySpec: kms.KeySpec.RSA_2048,
       keyUsage: kms.KeyUsage.SIGN_VERIFY,
       removalPolicy: RemovalPolicy.DESTROY,
     });
+    // Alias is a separate resource, not a property of the key itself - adding
+    // one doesn't touch the key, so it's a purely additive way to make it
+    // read clearly in the KMS console instead of by its bare key ID.
+    signingKey.addAlias("ztl-jwt-signing");
 
     // --- IdpBridge: real external identity (Cognito) -> this lab's opaque token ---
     const idpBridgeFn = new lambda.Function(this, "IdpBridgeFunction", {
@@ -92,6 +100,10 @@ export class ZeroTrustLabStack extends Stack {
     // below is a fresh string so the new Domain doesn't collide with the
     // old one still existing mid-replacement.
     const userPool = new cognito.UserPool(this, "ZeroTrustUserPoolV2", {
+      // Explicit, so it reads clearly in the Cognito console instead of
+      // CloudFormation's auto-generated name. Safe to add without a
+      // replacement - unlike UsernameAttributes, UserPoolName updates in place.
+      userPoolName: "ztl-users",
       selfSignUpEnabled: false,
       signInAliases: { username: true },
       passwordPolicy: {
