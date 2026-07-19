@@ -17,7 +17,9 @@ petertran.au/
 │   └── src/
 │       ├── portfolio/       this resume/API site
 │       ├── pantry/          AI-assisted grocery inventory + shopping list
-│       └── games/imposter/  a Werewolf/Mafia-style party game
+│       ├── games/imposter/  a Werewolf/Mafia-style party game
+│       ├── zero-trust-lab/  edge/domain gateway + token-exchange learning exercise (docs/zero-trust-lab.md)
+│       └── warmup/          keeps every project's Lambda warm on a schedule, toggleable from /settings
 ├── infra/    AWS CDK (TypeScript) - Lambda, DynamoDB, S3 + CloudFront, Route 53, ACM, SES, Secrets Manager
 └── .github/  CI/CD via GitHub Actions, authenticating to AWS via OIDC (no long-lived access keys)
 ```
@@ -52,6 +54,9 @@ DynamoDB.
 ## Other commands
 
 ```bash
+npm run typecheck     # tsc across api + web, via turbo (cached, parallel)
+npm run build         # build api + web + infra, via turbo (cached, parallel)
+npm run verify        # lint + format:check + typecheck + build, all via turbo
 npm run lint          # eslint across the whole monorepo
 npm run format        # prettier --write
 npm run format:check  # prettier --check
@@ -65,6 +70,15 @@ npm run test:e2e --workspace=api          # boot each service's real dev server 
 `validate-schemas` and `test:e2e` also run as parallel CI jobs the `deploy`
 job depends on - see `.github/workflows/deploy.yml`.
 
+`dev`, `typecheck`, and `build` are orchestrated by
+[Turborepo](https://turbo.build) (`turbo.json`) rather than plain npm-workspace
+chaining: each task is content-hashed per package (including `web`'s generated
+GraphQL types against the `api` schema files they're generated from), so an
+unchanged package replays its cached result instead of re-running, and
+independent packages build in parallel instead of sequentially. In CI, turbo's
+local cache (`.turbo/cache`) is persisted across runs via `actions/cache` (see
+`deploy.yml`) so this pays off there too, not just locally.
+
 ## Deploying
 
 Deploys run automatically via GitHub Actions on push to `main`. To deploy
@@ -74,4 +88,5 @@ manually (requires AWS credentials for the target account):
 npm run deploy
 ```
 
-This builds `api` and `web`, then runs `cdk deploy` from `infra`.
+This builds `api`, `web`, and `infra` (via turbo, in parallel and cached),
+then runs `cdk deploy` from `infra`.

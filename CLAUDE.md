@@ -30,3 +30,11 @@ Before writing something in one project that's the same as (or a near-copy of) s
 - If it's genuinely identical with no per-project variation (e.g. the schema.graphql loader), share it as-is.
 - Don't let one project reach directly into another project's `lib/` via a relative path (e.g. `../../../portfolio/lib/ddb`) - that's a sign the code belongs in `shared/`, not that the import path needs fixing.
 - esbuild and `tsx` both resolve `@shared/*` natively via `api/tsconfig.json`'s `paths` - each Lambda bundles its own copy of shared code at build time, so there's no runtime cross-Lambda dependency.
+- The same convention applies on the infra side at `infra/lib/shared/` (plain relative imports, no path alias needed since CDK code isn't bundled per-Lambda) - e.g. `createWarmupSchedules` in `infra/lib/shared/warmup-schedule.ts`, used by `warmup-stack.ts`.
+
+### Learning-exercise / ops peer projects
+
+Two more peer directories under `api/src/` exist alongside `portfolio`/`pantry`/`games/imposter`, but don't follow their GraphQL layout - they're plain-HTTP Lambdas, not Apollo servers:
+
+- `zero-trust-lab/` - a personal learning exercise: an edge gateway -> internal STS -> domain gateway pattern (opaque token at the edge, exchanged for a short-lived KMS-signed JWT before it reaches an internal service). Deployed via `infra/lib/zero-trust-lab-stack.ts`, fully isolated from the real site - own Cognito User Pool, own DynamoDB table, own HttpApis. See `docs/zero-trust-lab.md` for the full design writeup and what's built vs. deferred.
+- `warmup/` - keeps every project's Lambda (portfolio, pantry, imposter, and zero-trust-lab's own) warm on an EventBridge Scheduler rate, toggleable from the portfolio site's `/settings` page. Deployed via `infra/lib/warmup-stack.ts` - deliberately its own stack, not folded into any producing stack, since warming is an operational/cost concern that cuts across all of them, not something specific to any one project. Every handler recognizes a fixed `{warmup: true}` invoke payload (`api/src/shared/warmup.ts`'s `isWarmupPing`) and returns immediately, before any real resolver/KMS/DynamoDB/Cognito work runs.
