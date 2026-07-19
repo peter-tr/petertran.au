@@ -1,6 +1,7 @@
 import type { ApolloServerPlugin } from "@apollo/server";
 import { UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import * as AWSXRay from "aws-xray-sdk-core";
+import { emitOperationCountMetric } from "api-shared/operation-metrics";
 import { ddb, TABLE_NAME } from "../aws/ddb";
 import type { Context } from "../../context";
 
@@ -124,6 +125,8 @@ export const operationStatsPlugin: ApolloServerPlugin<Context> = {
 
         const name = requestContext.operationName ?? "Anonymous";
         if (IGNORED_OPERATIONS.has(name)) return;
+
+        emitOperationCountMetric("portfolio", name, requestContext.operation?.operation ?? "unknown");
 
         const isMutation = requestContext.operation?.operation === "mutation";
         const sample = isMutation

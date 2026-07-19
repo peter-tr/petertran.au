@@ -9,12 +9,26 @@ import type {
 import { typeDefs } from "./schema";
 import { resolvers } from "./resolvers/resolvers";
 import { isWarmupPing, type WarmupPing } from "api-shared/warmup";
+import { createOperationMetricsPlugin } from "api-shared/operation-metrics";
+import { ddb, TABLE_NAME, PK } from "./lib/aws/ddb";
 import type { Context } from "./context";
 
 const server = new ApolloServer<Context>({
   typeDefs,
   resolvers,
   introspection: true,
+  plugins: [
+    // pantry keeps everything under a single pk ("PANTRY", see PK) and
+    // varies only the sk prefix per item type - "STATS#OP#" here matches
+    // that convention rather than introducing a dedicated "STATS" pk.
+    createOperationMetricsPlugin<Context>({
+      project: "pantry",
+      ddb,
+      tableName: TABLE_NAME,
+      pk: PK,
+      skPrefix: "STATS#OP#",
+    }),
+  ],
 });
 
 const apolloHandler = startServerAndCreateLambdaHandler(
