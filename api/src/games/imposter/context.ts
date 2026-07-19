@@ -1,1 +1,1 @@
-export type { Context } from "@shared/context";
+export type { Context } from "api-shared/context";

@@ -5,6 +5,10 @@
   "workspaces": [
     "infra",
     "api",
+    "api/src/shared",
+    "api/src/portfolio",
+    "api/src/pantry",
+    "api/src/games/imposter",
     "web"
   ],
   "overrides": {
