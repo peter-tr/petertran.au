@@ -45,7 +45,7 @@ its own in-memory mock resolvers - see `api/src/{portfolio,pantry,games/imposter
 To run just one, use its workspace script directly, e.g.
 `npm run dev:portfolio --workspace=api` or `npm run dev --workspace=web`.
 
-The frontend expects each API at a URL configured in `web/.env` (see
+The frontend expects each API at a URL configured in `web/.env.development` (see
 `web/src/portfolio/lib/graphql.ts`, `web/src/pantry/api.ts`, and
 `web/src/games/imposter/lib/api.ts` for the defaults). Local dev doesn't need
 real AWS credentials - every API's dev server runs against mock data, not
