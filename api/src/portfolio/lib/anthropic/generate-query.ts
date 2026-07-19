@@ -119,7 +119,8 @@ async function callAnswerAnthropic(
 export async function generateQuery(
   prompt: string,
   sourceIp: string | undefined,
-  runInternalQuery: Context["runInternalQuery"]
+  runInternalQuery: Context["runInternalQuery"],
+  xraySegment: Context["xraySegment"]
 ): Promise<GenerateQueryResult> {
   const trimmed = prompt.trim();
   if (!trimmed) throw new Error("prompt is required.");
@@ -131,7 +132,11 @@ export async function generateQuery(
 
   const client = await getAnthropicClient();
 
-  const response = await traced(ANTHROPIC_API_SEGMENT_NAME, () => callAnthropic(client, trimmed));
+  const response = await traced(
+    ANTHROPIC_API_SEGMENT_NAME,
+    () => callAnthropic(client, trimmed),
+    xraySegment
+  );
   const parsed = response.parsed_output as RawGeneratedQuery | null;
   if (!parsed) throw new Error("Claude didn't return a valid response - try rephrasing.");
 
@@ -152,8 +157,10 @@ export async function generateQuery(
     return { ...parsed, answer: null };
   }
 
-  const answer = await traced(`${ANTHROPIC_API_SEGMENT_NAME} (answer)`, () =>
-    callAnswerAnthropic(client, trimmed, data)
+  const answer = await traced(
+    `${ANTHROPIC_API_SEGMENT_NAME} (answer)`,
+    () => callAnswerAnthropic(client, trimmed, data),
+    xraySegment
   );
 
   return { ...parsed, answer };

@@ -67,7 +67,7 @@ export function createImposterResolvers(store: ImposterStore, stats: ImposterSta
         },
         context: Context
       ) => {
-        const content = await buildNewGameContent(args, context.sourceIp);
+        const content = await buildNewGameContent(args, context.sourceIp, context.xraySegment);
         const game = await store.createGame((gameId) => ({ ...content, gameId }));
         stats.recordGameCreated().catch((err) => console.error("recordGameCreated failed:", err));
 

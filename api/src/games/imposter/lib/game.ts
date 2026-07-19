@@ -4,6 +4,7 @@
 import { randomUUID } from "node:crypto";
 import { WORD_CATEGORIES, findWordCategory, randomPair, type WordDifficulty } from "./words";
 import { generateAiWordPair } from "./anthropic/ai";
+import type { Context } from "../context";
 
 export type { WordDifficulty };
 
@@ -104,7 +105,8 @@ export interface NewGameOptions {
 // word selection.
 export async function buildNewGameContent(
   options: NewGameOptions,
-  sourceIp: string | undefined
+  sourceIp: string | undefined,
+  xraySegment: Context["xraySegment"]
 ): Promise<Omit<GameRecord, "gameId">> {
   const names = options.playerNames.map((n) => n.trim()).filter(Boolean);
   if (names.length < MIN_PLAYERS || names.length > MAX_PLAYERS) {
@@ -129,7 +131,7 @@ export async function buildNewGameContent(
   let categoryLabel: string;
 
   if (options.wordSource === "AI") {
-    const pair = await generateAiWordPair(customCategory, difficulty, sourceIp);
+    const pair = await generateAiWordPair(customCategory, difficulty, sourceIp, xraySegment);
     civilianWord = pair.civilian;
     imposterWord = pair.imposter;
     // Named by the model itself rather than echoing the user's input verbatim
