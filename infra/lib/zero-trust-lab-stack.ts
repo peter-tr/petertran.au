@@ -74,22 +74,42 @@ export class ZeroTrustLabStack extends Stack {
 
     // Cognito User Pool + Hosted UI is the actual external IdP - real
     // password storage and a ready-made login page, so nothing here hand-
-    // rolls credential handling. Single-user lab, so email sign-in is enough.
-    const userPool = new cognito.UserPool(this, "ZeroTrustUserPool", {
+    // rolls credential handling. Plain username (not email) sign-in and a
+    // relaxed password policy - this is a single-user personal lab, not
+    // something that needs Cognito's default complexity requirements.
+    // signInAliases (via UsernameAttributes) is immutable - CloudFormation
+    // rejects an in-place update outright ("Updates are not allowed for
+    // property - UsernameAttributes"), it's not just a replacement CDK can
+    // orchestrate automatically. Forced by renaming this construct's id
+    // (ZeroTrustUserPool -> ZeroTrustUserPoolV2), which changes the logical
+    // ID and makes CloudFormation create a new Pool/Domain/Client and delete
+    // the old ones, rather than trying to update in place. domainPrefix
+    // below is a fresh string so the new Domain doesn't collide with the
+    // old one still existing mid-replacement.
+    const userPool = new cognito.UserPool(this, "ZeroTrustUserPoolV2", {
       selfSignUpEnabled: false,
-      signInAliases: { email: true },
+      signInAliases: { username: true },
+      passwordPolicy: {
+        // 6 is Cognito's hard floor for minLength - can't go lower even with
+        // every complexity requirement disabled.
+        minLength: 6,
+        requireLowercase: false,
+        requireUppercase: false,
+        requireDigits: false,
+        requireSymbols: false,
+      },
       removalPolicy: RemovalPolicy.DESTROY,
     });
 
     const userPoolDomain = userPool.addDomain("ZeroTrustUserPoolDomain", {
-      cognitoDomain: { domainPrefix: `petertran-ztl-${this.account}` },
+      cognitoDomain: { domainPrefix: `petertran-ztl2-${this.account}` },
     });
 
     const userPoolClient = userPool.addClient("ZeroTrustUserPoolClient", {
       generateSecret: true,
       oAuth: {
         flows: { authorizationCodeGrant: true },
-        scopes: [cognito.OAuthScope.OPENID, cognito.OAuthScope.EMAIL],
+        scopes: [cognito.OAuthScope.OPENID],
         callbackUrls: [`${idpBridgeFnUrl.url}callback`],
       },
     });
@@ -218,7 +238,7 @@ export class ZeroTrustLabStack extends Stack {
     edgeProxyFn.addEnvironment("DOMAIN_A_URL", domainAApi.apiEndpoint);
 
     new CfnOutput(this, "HostedUiLoginUrl", {
-      value: `https://${userPoolDomain.domainName}.auth.${this.region}.amazoncognito.com/login?client_id=${userPoolClient.userPoolClientId}&response_type=code&scope=openid+email&redirect_uri=${idpBridgeFnUrl.url}callback`,
+      value: `https://${userPoolDomain.domainName}.auth.${this.region}.amazoncognito.com/login?client_id=${userPoolClient.userPoolClientId}&response_type=code&scope=openid&redirect_uri=${idpBridgeFnUrl.url}callback`,
     });
     new CfnOutput(this, "IdpBridgeUrl", { value: idpBridgeFnUrl.url });
     new CfnOutput(this, "InternalStsUrl", { value: internalStsFnUrl.url });
