@@ -26,6 +26,9 @@ export class GamesStack extends Stack {
     super(scope, id, props);
 
     const table = new dynamodb.Table(this, "GamesTable", {
+      // Explicit, so it reads clearly in the X-Ray trace map instead of
+      // CloudFormation's auto-generated name.
+      tableName: "games",
       partitionKey: { name: "pk", type: dynamodb.AttributeType.STRING },
       sortKey: { name: "sk", type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
