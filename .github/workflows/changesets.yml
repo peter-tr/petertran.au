@@ -31,6 +31,14 @@ jobs:
       # and just tags each bumped package as `<name>@<version>` and pushes
       # the tag. createGithubReleases (default true) then creates a matching
       # GitHub Release per tag from that package's CHANGELOG.md entry.
+      #
+      # GITHUB_TOKEN here is CHANGESET_PAT, not the default token: this
+      # action uses whatever token it's given for both its git push (the
+      # version-bump commit) and its PR create/update API call - with the
+      # default GITHUB_TOKEN, the resulting pull_request run lands in an
+      # approval-required state (same issue changeset-check.yml's checkout
+      # hit), permanently stuck needing a manual "approve and run" on the
+      # Version Packages PR every time it updates.
       - name: Create Version Packages PR / tag releases
         uses: changesets/action@v1
         with:
@@ -39,4 +47,4 @@ jobs:
           commit: "chore: version packages"
           title: "chore: version packages"
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.CHANGESET_PAT }}
