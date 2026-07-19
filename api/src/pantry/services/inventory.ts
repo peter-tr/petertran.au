@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { QueryCommand, GetCommand, PutCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
 import { ddb, TABLE_NAME, PK } from "../lib/aws/ddb";
 import { normalizeUnit } from "../lib/util/normalize";
 import type { AiCallDebugInfo } from "../lib/anthropic/debug-info";
+import { DynamoRepository } from "./dynamo-repository";
 
 const ITEM_PREFIX = "ITEM#";
 
@@ -90,46 +90,32 @@ function withInventoryDefaults(item: InventoryItem): InventoryItem {
   };
 }
 
-export async function getItem(id: string): Promise<InventoryItem | null> {
-  const res = await ddb.send(
-    new GetCommand({ TableName: TABLE_NAME, Key: { pk: PK, sk: `${ITEM_PREFIX}${id}` } })
-  );
-  const item = res.Item?.data as InventoryItem | undefined;
+class InventoryRepository extends DynamoRepository<InventoryItem> {
+  constructor() {
+    super({ ddb, tableName: TABLE_NAME, pk: PK, skPrefix: ITEM_PREFIX, itemType: "ITEM" });
+  }
 
-  return item ? withInventoryDefaults(item) : null;
+  protected applyDefaults(item: InventoryItem): InventoryItem {
+    return withInventoryDefaults(item);
+  }
+}
+
+const inventoryRepository = new InventoryRepository();
+
+export async function getItem(id: string): Promise<InventoryItem | null> {
+  return inventoryRepository.get(id);
 }
 
 export async function getAllItems(): Promise<InventoryItem[]> {
-  const res = await ddb.send(
-    new QueryCommand({
-      TableName: TABLE_NAME,
-      KeyConditionExpression: "pk = :pk AND begins_with(sk, :prefix)",
-      ExpressionAttributeValues: { ":pk": PK, ":prefix": ITEM_PREFIX },
-    })
-  );
-
-  return (res.Items ?? []).map((i) => withInventoryDefaults(i.data as InventoryItem));
+  return inventoryRepository.getAll();
 }
 
 export async function putItem(item: InventoryItem): Promise<void> {
-  await ddb.send(
-    new PutCommand({
-      TableName: TABLE_NAME,
-      Item: { pk: PK, sk: `${ITEM_PREFIX}${item.id}`, type: "ITEM", data: item },
-    })
-  );
+  return inventoryRepository.put(item);
 }
 
 export async function deleteItem(id: string): Promise<boolean> {
-  const res = await ddb.send(
-    new DeleteCommand({
-      TableName: TABLE_NAME,
-      Key: { pk: PK, sk: `${ITEM_PREFIX}${id}` },
-      ReturnValues: "ALL_OLD",
-    })
-  );
-
-  return res.Attributes !== undefined;
+  return inventoryRepository.delete(id);
 }
 
 // Called only by the price-check Lambda (lib/anthropic/check-prices.ts), not

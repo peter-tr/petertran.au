@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { QueryCommand, GetCommand, PutCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
 import { ddb, TABLE_NAME, PK } from "../lib/aws/ddb";
 import { normalizeItemName, normalizeUnit } from "../lib/util/normalize";
 import { UNKNOWN_DEBUG_INFO, type LastKnownPrice } from "./inventory";
+import { DynamoRepository } from "./dynamo-repository";
 
 const SHOPLIST_PREFIX = "SHOPLIST#";
 
@@ -56,48 +56,34 @@ function withShoppingListDefaults(entry: ShoppingListEntry): ShoppingListEntry {
   };
 }
 
-export async function getShoppingListEntry(id: string): Promise<ShoppingListEntry | null> {
-  const res = await ddb.send(
-    new GetCommand({ TableName: TABLE_NAME, Key: { pk: PK, sk: `${SHOPLIST_PREFIX}${id}` } })
-  );
-  const entry = res.Item?.data as ShoppingListEntry | undefined;
+class ShoppingListRepository extends DynamoRepository<ShoppingListEntry> {
+  constructor() {
+    super({ ddb, tableName: TABLE_NAME, pk: PK, skPrefix: SHOPLIST_PREFIX, itemType: "SHOPLIST" });
+  }
 
-  return entry ? withShoppingListDefaults(entry) : null;
+  protected applyDefaults(entry: ShoppingListEntry): ShoppingListEntry {
+    return withShoppingListDefaults(entry);
+  }
+}
+
+const shoppingListRepository = new ShoppingListRepository();
+
+export async function getShoppingListEntry(id: string): Promise<ShoppingListEntry | null> {
+  return shoppingListRepository.get(id);
 }
 
 // Exported for the digest Lambda (lib/aws/send-digest.ts), which needs the
 // same query outside of any GraphQL resolver context.
 export async function getShoppingList(): Promise<ShoppingListEntry[]> {
-  const res = await ddb.send(
-    new QueryCommand({
-      TableName: TABLE_NAME,
-      KeyConditionExpression: "pk = :pk AND begins_with(sk, :prefix)",
-      ExpressionAttributeValues: { ":pk": PK, ":prefix": SHOPLIST_PREFIX },
-    })
-  );
-
-  return (res.Items ?? []).map((i) => withShoppingListDefaults(i.data as ShoppingListEntry));
+  return shoppingListRepository.getAll();
 }
 
 export async function putShoppingListEntry(entry: ShoppingListEntry): Promise<void> {
-  await ddb.send(
-    new PutCommand({
-      TableName: TABLE_NAME,
-      Item: { pk: PK, sk: `${SHOPLIST_PREFIX}${entry.id}`, type: "SHOPLIST", data: entry },
-    })
-  );
+  return shoppingListRepository.put(entry);
 }
 
 export async function deleteShoppingListEntry(id: string): Promise<boolean> {
-  const res = await ddb.send(
-    new DeleteCommand({
-      TableName: TABLE_NAME,
-      Key: { pk: PK, sk: `${SHOPLIST_PREFIX}${id}` },
-      ReturnValues: "ALL_OLD",
-    })
-  );
-
-  return res.Attributes !== undefined;
+  return shoppingListRepository.delete(id);
 }
 
 // Called only by the price-check Lambda (lib/anthropic/check-prices.ts), not
