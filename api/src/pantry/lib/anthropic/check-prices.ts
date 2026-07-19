@@ -142,7 +142,10 @@ export interface CheckPriceResult {
 // checked interactively. Deliberately just a batch of one rather than a
 // separate prompt/schema to maintain - same rules, same verification-via-
 // fetch behavior, one prompt to keep in sync instead of two.
-export async function checkPrice(itemName: string, xraySegment: Context["xraySegment"]): Promise<CheckPriceResult> {
+export async function checkPrice(
+  itemName: string,
+  xraySegment: Context["xraySegment"]
+): Promise<CheckPriceResult> {
   const { results, debugInfo } = await checkPricesBatch([itemName], xraySegment);
   const entry = results.get(itemName);
   return {

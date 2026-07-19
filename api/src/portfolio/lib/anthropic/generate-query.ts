@@ -131,7 +131,11 @@ export async function generateQuery(
 
   const client = await getAnthropicClient();
 
-  const response = await traced(ANTHROPIC_API_SEGMENT_NAME, () => callAnthropic(client, trimmed), xraySegment);
+  const response = await traced(
+    ANTHROPIC_API_SEGMENT_NAME,
+    () => callAnthropic(client, trimmed),
+    xraySegment
+  );
   const parsed = response.parsed_output as RawGeneratedQuery | null;
   if (!parsed) throw new Error("Claude didn't return a valid response - try rephrasing.");
 

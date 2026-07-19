@@ -42,7 +42,11 @@ export interface AiWordPair {
   imposter: string;
 }
 
-async function callAnthropic(userMessage: string, difficulty: WordDifficulty, xraySegment: Context["xraySegment"]) {
+async function callAnthropic(
+  userMessage: string,
+  difficulty: WordDifficulty,
+  xraySegment: Context["xraySegment"]
+) {
   const client = await getAnthropicClient();
   const response = await traced(
     ANTHROPIC_API_SEGMENT_NAME,
