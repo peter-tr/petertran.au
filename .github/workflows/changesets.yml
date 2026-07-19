@@ -25,13 +25,17 @@ jobs:
 
       - run: npm ci
 
-      # No `publish` input: these are private, internally-deployed apps (not
-      # npm packages), so this only opens/updates a "Version Packages" PR
-      # that bumps versions and writes CHANGELOGs - it never runs `npm publish`.
-      - name: Create Version Packages PR
+      # `publish: npx changeset tag` never touches npm - these are private,
+      # internally-deployed apps, not published packages. It only runs once
+      # a Version Packages PR has been merged (no pending changesets left),
+      # and just tags each bumped package as `<name>@<version>` and pushes
+      # the tag. createGithubReleases (default true) then creates a matching
+      # GitHub Release per tag from that package's CHANGELOG.md entry.
+      - name: Create Version Packages PR / tag releases
         uses: changesets/action@v1
         with:
           version: npm run version-packages
+          publish: npx changeset tag
           commit: "chore: version packages"
           title: "chore: version packages"
         env:
