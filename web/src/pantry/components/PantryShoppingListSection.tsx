@@ -392,7 +392,10 @@ export default function PantryShoppingListSection({
                     </span>
                   </li>
                 ) : (
-                  <li key={entry.id} className="pantry-shopping-item">
+                  <li
+                    key={entry.id}
+                    className={`pantry-shopping-item ${settings.shoppingSimple ? "pantry-shopping-item-simple" : ""}`}
+                  >
                     <span
                       className={`pantry-shopping-item-name ${entry.urgent ? "pantry-shopping-item-urgent" : ""}`}
                       role="button"
