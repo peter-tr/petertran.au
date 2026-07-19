@@ -93,6 +93,14 @@ export class SiteStack extends Stack {
 
     // --- GraphQL API (Lambda + Function URL, no API Gateway needed) ---
     const apiFn = new lambda.Function(this, "GraphQLFunction", {
+      // Fixed, not CloudFormation-generated - so PetertranWarmupStack can
+      // reference it by a plain string (functionName below) instead of a
+      // live construct reference, which would create a CloudFormation
+      // cross-stack export. An export blocks this function from ever being
+      // replaced (e.g. a property change CloudFormation can't update in
+      // place) while WarmupStack still has it imported - hit exactly this
+      // deploying warmup for the first time.
+      functionName: "petertran-portfolio-graphql",
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "portfolio/handler.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/dist")),

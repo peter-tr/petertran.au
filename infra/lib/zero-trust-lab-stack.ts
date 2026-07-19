@@ -61,6 +61,9 @@ export class ZeroTrustLabStack extends Stack {
 
     // --- IdpBridge: real external identity (Cognito) -> this lab's opaque token ---
     const idpBridgeFn = new lambda.Function(this, "IdpBridgeFunction", {
+      // Fixed - see site-stack.ts's identical comment on GraphQLFunction for
+      // why (avoids a CloudFormation cross-stack export lock with WarmupStack).
+      functionName: "petertran-ztl-idp-bridge",
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "zero-trust-lab/idp-bridge/handler.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/dist")),
@@ -143,6 +146,7 @@ export class ZeroTrustLabStack extends Stack {
 
     // --- InternalSts: the actual token-exchange / signing service ---
     const internalStsFn = new lambda.Function(this, "InternalStsFunction", {
+      functionName: "petertran-ztl-internal-sts",
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "zero-trust-lab/internal-sts/handler.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/dist")),
@@ -165,6 +169,7 @@ export class ZeroTrustLabStack extends Stack {
 
     // --- Edge gateway ---
     const edgeAuthorizerFn = new lambda.Function(this, "EdgeAuthorizerFunction", {
+      functionName: "petertran-ztl-edge-authorizer",
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "zero-trust-lab/edge/authorizer.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/dist")),
@@ -187,6 +192,7 @@ export class ZeroTrustLabStack extends Stack {
     this.edgeAuthorizerFn = edgeAuthorizerFn;
 
     const edgeProxyFn = new lambda.Function(this, "EdgeProxyFunction", {
+      functionName: "petertran-ztl-edge-proxy",
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "zero-trust-lab/edge/proxy.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/dist")),

@@ -50,6 +50,9 @@ export class GamesStack extends Stack {
     );
 
     const imposterFn = new lambda.Function(this, "ImposterFunction", {
+      // Fixed - see site-stack.ts's identical comment on GraphQLFunction for
+      // why (avoids a CloudFormation cross-stack export lock with WarmupStack).
+      functionName: "petertran-imposter",
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "games/imposter/handler.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/dist")),

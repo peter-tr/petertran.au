@@ -47,6 +47,9 @@ export class PantryStack extends Stack {
     );
 
     const apiFn = new lambda.Function(this, "PantryGraphQLFunction", {
+      // Fixed - see site-stack.ts's identical comment on GraphQLFunction for
+      // why (avoids a CloudFormation cross-stack export lock with WarmupStack).
+      functionName: "petertran-pantry-graphql",
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "pantry/handler.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/dist")),
