@@ -3,6 +3,9 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "scripts": {
+    "build": "tsx scripts/build.ts"
+  },
   "dependencies": {
     "api-shared": "*",
     "@apollo/server": "^4.11.0",

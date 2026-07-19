@@ -51,8 +51,8 @@ export class PantryStack extends Stack {
       // CloudFormation's auto-generated name.
       functionName: "pantry-graphql",
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: "pantry/handler.handler",
-      code: lambda.Code.fromAsset(path.join(__dirname, "../../api/dist")),
+      handler: "handler.handler",
+      code: lambda.Code.fromAsset(path.join(__dirname, "../../api/src/pantry/dist")),
       // 512, not the other Lambdas' 256 - this is the one on the user-facing
       // request path (Function URL), and Lambda cold-start CPU scales with
       // memory: the bundle pulls in @apollo/server + AWS SDK v3 +
@@ -116,8 +116,8 @@ export class PantryStack extends Stack {
     const digestFn = new lambda.Function(this, "PantryDigestFunction", {
       functionName: "pantry-digest",
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: "pantry/digest-handler.handler",
-      code: lambda.Code.fromAsset(path.join(__dirname, "../../api/dist")),
+      handler: "digest-handler.handler",
+      code: lambda.Code.fromAsset(path.join(__dirname, "../../api/src/pantry/dist")),
       memorySize: 256,
       timeout: Duration.seconds(30),
       environment: {
@@ -150,8 +150,8 @@ export class PantryStack extends Stack {
     const priceCheckFn = new lambda.Function(this, "PantryPriceCheckFunction", {
       functionName: "pantry-price-check",
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: "pantry/price-check-handler.handler",
-      code: lambda.Code.fromAsset(path.join(__dirname, "../../api/dist")),
+      handler: "price-check-handler.handler",
+      code: lambda.Code.fromAsset(path.join(__dirname, "../../api/src/pantry/dist")),
       memorySize: 256,
       // Generous per-item ceiling (web_search + web_fetch round trips), but
       // each individual Anthropic call is itself capped at 30s client-side

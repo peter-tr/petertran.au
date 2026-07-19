@@ -54,8 +54,8 @@ export class GamesStack extends Stack {
       // CloudFormation's auto-generated name.
       functionName: "imposter-graphql",
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: "games/imposter/handler.handler",
-      code: lambda.Code.fromAsset(path.join(__dirname, "../../api/dist")),
+      handler: "handler.handler",
+      code: lambda.Code.fromAsset(path.join(__dirname, "../../api/src/games/imposter/dist")),
       // 512, not the default 256 - same reasoning as pantry's/portfolio's
       // GraphQLFunction: this is a synchronous Function URL on a user-facing
       // request path, so cold-start CPU (which scales with memory) is
