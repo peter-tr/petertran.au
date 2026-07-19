@@ -12,6 +12,7 @@ async function getAnthropicAdminApiKey(): Promise<string | null> {
   if (cachedAdminApiKey) return cachedAdminApiKey;
   if (process.env.ANTHROPIC_ADMIN_API_KEY) {
     cachedAdminApiKey = process.env.ANTHROPIC_ADMIN_API_KEY;
+
     return cachedAdminApiKey;
   }
 
@@ -23,6 +24,7 @@ async function getAnthropicAdminApiKey(): Promise<string | null> {
   if (!res.SecretString) return null;
 
   cachedAdminApiKey = res.SecretString;
+
   return cachedAdminApiKey;
 }
 
@@ -62,6 +64,7 @@ export async function getAnthropicAllTimeCostUsd(): Promise<number> {
   inFlight = fetchAnthropicAllTimeCostUsd().finally(() => {
     inFlight = null;
   });
+
   return inFlight;
 }
 
@@ -133,6 +136,7 @@ async function fetchAnthropicAllTimeCostUsd(): Promise<number> {
         })
       )
       .catch(() => {});
+
     return cachedAmountUsd ?? 0;
   }
 

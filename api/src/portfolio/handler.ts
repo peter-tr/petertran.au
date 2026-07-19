@@ -34,13 +34,16 @@ const apolloHandler = startServerAndCreateLambdaHandler(
           if (res.body.kind !== "single") {
             return { data: null, errors: ["Unexpected multi-part GraphQL response."] };
           }
+
           const { data, errors } = res.body.singleResult;
+
           return {
             data: (data ?? null) as Record<string, unknown> | null,
             errors: errors?.map((e) => e.message),
           };
         },
       };
+
       return baseContext;
     },
   }
@@ -55,5 +58,6 @@ export const handler = async (
   context: LambdaContext
 ): Promise<APIGatewayProxyStructuredResultV2 | void> => {
   if (isWarmupPing(event)) return { statusCode: 200, body: "warm" };
+
   return apolloHandler(event, context, () => {});
 };

@@ -32,6 +32,7 @@ export async function getAwsAllTimeCostUsd(): Promise<number> {
   inFlight = fetchAwsAllTimeCostUsd().finally(() => {
     inFlight = null;
   });
+
   return inFlight;
 }
 

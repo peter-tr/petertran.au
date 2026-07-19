@@ -95,6 +95,7 @@ export async function getItem(id: string): Promise<InventoryItem | null> {
     new GetCommand({ TableName: TABLE_NAME, Key: { pk: PK, sk: `${ITEM_PREFIX}${id}` } })
   );
   const item = res.Item?.data as InventoryItem | undefined;
+
   return item ? withInventoryDefaults(item) : null;
 }
 
@@ -106,6 +107,7 @@ export async function getAllItems(): Promise<InventoryItem[]> {
       ExpressionAttributeValues: { ":pk": PK, ":prefix": ITEM_PREFIX },
     })
   );
+
   return (res.Items ?? []).map((i) => withInventoryDefaults(i.data as InventoryItem));
 }
 
@@ -126,6 +128,7 @@ export async function deleteItem(id: string): Promise<boolean> {
       ReturnValues: "ALL_OLD",
     })
   );
+
   return res.Attributes !== undefined;
 }
 
@@ -142,6 +145,7 @@ export async function setLastKnownPrice(id: string, price: LastKnownPrice): Prom
 export function createItem(input: AddInventoryItemInput): InventoryItem {
   const now = new Date().toISOString();
   const purchasedAt = input.purchasedAt ?? null;
+
   return {
     id: randomUUID(),
     name: input.name,

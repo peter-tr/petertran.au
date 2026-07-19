@@ -97,6 +97,7 @@ function readEnvVar(name: string): string {
   const envFile = readFileSync(path.resolve(import.meta.dirname, "../.env.production"), "utf-8");
   const match = envFile.match(new RegExp(`^${name}=(.+)$`, "m"));
   if (!match) throw new Error(`${name} not found in web/.env.production`);
+
   return match[1].trim();
 }
 
@@ -126,6 +127,7 @@ function injectIntoShell(shellHtml: string, bodyHtml: string, title?: string, de
   if (description) {
     html = html.replace(/(<meta\s+name="description"\s+content=")[^"]*(")/s, `$1${description}$2`);
   }
+
   return html;
 }
 

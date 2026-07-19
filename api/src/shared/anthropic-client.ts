@@ -8,6 +8,7 @@ export async function getAnthropicClient(): Promise<Anthropic> {
 
   const apiKey = process.env.ANTHROPIC_API_KEY ?? (await fetchApiKeyFromSecretsManager());
   cachedClient = new Anthropic({ apiKey });
+
   return cachedClient;
 }
 
@@ -22,5 +23,6 @@ async function fetchApiKeyFromSecretsManager(): Promise<string> {
   if (!res.SecretString) {
     throw new Error("Anthropic API key secret has no string value.");
   }
+
   return res.SecretString;
 }

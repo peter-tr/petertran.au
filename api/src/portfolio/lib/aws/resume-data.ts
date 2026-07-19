@@ -15,6 +15,7 @@ async function queryResumePartition(): Promise<ResumeItem[]> {
       ExpressionAttributeValues: { ":pk": PK },
     })
   );
+
   return (res.Items ?? []) as ResumeItem[];
 }
 
@@ -25,5 +26,6 @@ async function queryResumePartition(): Promise<ResumeItem[]> {
 // resolved root fields share that one call instead of each firing their own.
 export function createResumePartitionLoader(): () => Promise<ResumeItem[]> {
   let cached: Promise<ResumeItem[]> | null = null;
+
   return () => (cached ??= queryResumePartition());
 }

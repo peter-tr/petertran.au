@@ -37,6 +37,7 @@ async function getGamesTotal(): Promise<number> {
   const res = await ddb.send(
     new GetCommand({ TableName: TABLE_NAME, Key: { pk: STATS_PK, sk: "GAMES_TOTAL" } })
   );
+
   return (res.Item?.count as number | undefined) ?? 0;
 }
 
@@ -44,6 +45,7 @@ async function getGamesCompleted(): Promise<{ count: number; totalDurationMs: nu
   const res = await ddb.send(
     new GetCommand({ TableName: TABLE_NAME, Key: { pk: STATS_PK, sk: "GAMES_COMPLETED" } })
   );
+
   return {
     count: (res.Item?.count as number | undefined) ?? 0,
     totalDurationMs: (res.Item?.totalDurationMs as number | undefined) ?? 0,

@@ -61,6 +61,7 @@ export async function getShoppingListEntry(id: string): Promise<ShoppingListEntr
     new GetCommand({ TableName: TABLE_NAME, Key: { pk: PK, sk: `${SHOPLIST_PREFIX}${id}` } })
   );
   const entry = res.Item?.data as ShoppingListEntry | undefined;
+
   return entry ? withShoppingListDefaults(entry) : null;
 }
 
@@ -74,6 +75,7 @@ export async function getShoppingList(): Promise<ShoppingListEntry[]> {
       ExpressionAttributeValues: { ":pk": PK, ":prefix": SHOPLIST_PREFIX },
     })
   );
+
   return (res.Items ?? []).map((i) => withShoppingListDefaults(i.data as ShoppingListEntry));
 }
 
@@ -94,6 +96,7 @@ export async function deleteShoppingListEntry(id: string): Promise<boolean> {
       ReturnValues: "ALL_OLD",
     })
   );
+
   return res.Attributes !== undefined;
 }
 
@@ -155,5 +158,6 @@ export async function upsertShoppingListEntry(
       };
 
   await putShoppingListEntry(entry);
+
   return entry;
 }

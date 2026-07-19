@@ -38,7 +38,9 @@ export default function LiveGames() {
     }
 
     load();
+
     const interval = setInterval(load, POLL_INTERVAL_MS);
+
     return () => {
       cancelled = true;
       clearInterval(interval);

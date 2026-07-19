@@ -25,6 +25,7 @@ export default function PantryInlineAddToggle({
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+
     const trimmed = value.trim();
     if (!trimmed) return;
     setBusy(true);

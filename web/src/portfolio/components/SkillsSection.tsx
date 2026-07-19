@@ -29,7 +29,9 @@ export default function SkillsSection({ skills }: { skills: SkillCategory[] }) {
                   </span>
                 );
               }
+
               const { Icon } = cert;
+
               return (
                 <a key={item} className="chip chip-cert" href={cert.url} target="_blank" rel="noreferrer">
                   <Icon aria-hidden="true" />

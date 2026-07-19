@@ -15,6 +15,7 @@ import type { AiCallDebugInfo, LastKnownPrice } from "../api";
 export function formatLastKnownPrice(price: LastKnownPrice | null): string {
   if (!price) return "price check pending";
   if (price.colesPrice === null) return "$ N/A";
+
   return `${price.note ? "~" : ""}$${price.colesPrice.toFixed(2)}`;
 }
 
@@ -28,6 +29,7 @@ export function colesLinkFor(name: string, price: LastKnownPrice | null): string
   if (!price) return null;
   if (price.productUrl) return price.productUrl;
   if (price.colesPrice === null) return null;
+
   return `https://www.coles.com.au/search?q=${encodeURIComponent(name)}`;
 }
 
@@ -38,5 +40,6 @@ export function formatDebugInfo(info: AiCallDebugInfo): string {
   const parts = [`$${info.costUsd.toFixed(4)}`, `${(info.durationMs / 1000).toFixed(1)}s`];
   if (info.searchesUsed > 0) parts.push(`${info.searchesUsed} search${info.searchesUsed === 1 ? "" : "es"}`);
   if (info.fetchesUsed > 0) parts.push(`${info.fetchesUsed} fetch${info.fetchesUsed === 1 ? "" : "es"}`);
+
   return parts.join(" · ");
 }

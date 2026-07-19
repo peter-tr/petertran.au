@@ -64,6 +64,7 @@ export function generateGameId(): string {
   for (let i = 0; i < GAME_ID_LENGTH; i++) {
     id += GAME_ID_CHARS[Math.floor(Math.random() * GAME_ID_CHARS.length)];
   }
+
   return id;
 }
 
@@ -83,6 +84,7 @@ function pickImposterIndexes(playerCount: number, imposterCount: number): number
     const j = Math.floor(Math.random() * (i + 1));
     [indexes[i], indexes[j]] = [indexes[j], indexes[i]];
   }
+
   return indexes.slice(0, imposterCount);
 }
 
@@ -136,8 +138,10 @@ export async function buildNewGameContent(
     categoryLabel = pair.category;
   } else {
     if (!options.categoryId) throw new Error("A category is required for built-in word pairs.");
+
     const category = findWordCategory(options.categoryId);
     if (!category) throw new Error(`Unknown category "${options.categoryId}".`);
+
     const pair = randomPair(category, difficulty);
     civilianWord = pair.civilian;
     imposterWord = pair.imposter;
@@ -165,6 +169,7 @@ export async function buildNewGameContent(
 // anything for anyone glancing at the network tab.
 export function toPublicGame(game: GameRecord): PublicGame {
   const revealed = game.phase === "RESULTS";
+
   return {
     gameId: game.gameId,
     categoryLabel: !game.hideCategory || revealed ? game.categoryLabel : null,
@@ -217,5 +222,6 @@ export function applyRevealImposter(game: GameRecord): GameRecord {
   if (game.phase !== "DISCUSSION") {
     throw new Error("The imposter can only be revealed after everyone's had their turn.");
   }
+
   return { ...game, phase: "RESULTS" };
 }
