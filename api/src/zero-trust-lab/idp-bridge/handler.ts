@@ -28,6 +28,7 @@ function decodeIdTokenClaims(idToken: string): { sub: string; email?: string } {
   // HTTPS in the previous line, not from an untrusted client - there's
   // nothing to verify it against that we don't already trust.
   const payload = idToken.split(".")[1];
+
   return JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
 }
 
@@ -56,6 +57,7 @@ async function getClientCredentials(): Promise<{ clientId: string; clientSecret:
   if (!clientSecret) throw new Error("Cognito app client has no secret");
 
   cachedClientCredentials = { clientId, clientSecret };
+
   return cachedClientCredentials;
 }
 
@@ -136,6 +138,7 @@ async function handleLogout(event: APIGatewayProxyEventV2): Promise<APIGatewayPr
   if (!token) return { statusCode: 400, body: "missing token" };
 
   await ddb.send(new DeleteCommand({ TableName: TABLE_NAME, Key: { pk: token } }));
+
   return {
     statusCode: 200,
     headers: { "content-type": "application/json" },

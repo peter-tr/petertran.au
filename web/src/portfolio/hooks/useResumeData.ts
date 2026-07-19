@@ -15,6 +15,7 @@ function fetchResumeData(): Promise<ResumeData> {
       throw err;
     });
   }
+
   return cachedFetch;
 }
 

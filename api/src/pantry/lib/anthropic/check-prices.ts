@@ -140,6 +140,7 @@ export interface CheckPriceResult {
 export async function checkPrice(itemName: string): Promise<CheckPriceResult> {
   const { results, debugInfo } = await checkPricesBatch([itemName]);
   const entry = results.get(itemName);
+
   return {
     colesPrice: entry?.colesPrice ?? null,
     productUrl: entry?.productUrl ?? null,
@@ -188,6 +189,7 @@ export async function checkTrackedPrices(): Promise<void> {
 
   if (targets.length === 0) {
     console.log("No trackPrice items - skipping price check.");
+
     return;
   }
 

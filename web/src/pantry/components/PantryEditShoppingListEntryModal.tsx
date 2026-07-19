@@ -53,6 +53,7 @@ export default function PantryEditShoppingListEntryModal({
     const trimmedName = name.trim();
     if (!trimmedName) {
       setError("Name can't be empty.");
+
       return;
     }
     setError(null);

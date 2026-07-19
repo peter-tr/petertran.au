@@ -10,6 +10,7 @@ function readStoredValue(): boolean {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw === null) return true;
+
     return raw === "true";
   } catch {
     // Storage unavailable (private browsing, quota, etc.) -- just show the
@@ -28,6 +29,7 @@ export function useShowAlsoBuilt() {
       if (e.key === STORAGE_KEY) setShowAlsoBuiltState(readStoredValue());
     }
     window.addEventListener("storage", handleStorage);
+
     return () => window.removeEventListener("storage", handleStorage);
   }, []);
 

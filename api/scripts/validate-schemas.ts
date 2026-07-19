@@ -49,8 +49,10 @@ function countUnionParams(node: unknown): number {
   if (node && typeof node === "object") {
     let count = Array.isArray((node as { anyOf?: unknown }).anyOf) ? 1 : 0;
     for (const value of Object.values(node)) count += countUnionParams(value);
+
     return count;
   }
+
   return 0;
 }
 

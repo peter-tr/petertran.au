@@ -3,6 +3,7 @@
 export function daysBetween(dateStr: string): number {
   const target = new Date(`${dateStr}T00:00:00`).getTime();
   const today = new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00`).getTime();
+
   return Math.round((target - today) / 86_400_000);
 }
 
@@ -11,6 +12,7 @@ export function daysBetween(dateStr: string): number {
 export function formatPurchasedAt(dateStr: string): string {
   const daysAgo = -daysBetween(dateStr);
   if (daysAgo <= 0) return "today";
+
   return `${daysAgo}d ago`;
 }
 
@@ -18,5 +20,6 @@ export function formatExpiresAt(dateStr: string): string {
   const days = daysBetween(dateStr);
   if (days < 0) return `expired ${-days}d ago`;
   if (days === 0) return "expires today";
+
   return `expires in ${days}d`;
 }

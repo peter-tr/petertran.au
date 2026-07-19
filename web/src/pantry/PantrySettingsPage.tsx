@@ -17,6 +17,7 @@ const HOURS = Array.from({ length: 24 }, (_, h) => h);
 function formatHour(h: number): string {
   const period = h < 12 ? "am" : "pm";
   const display = h % 12 === 0 ? 12 : h % 12;
+
   return `${display}:00${period}`;
 }
 
@@ -27,6 +28,7 @@ const AVG_SECONDS_PER_ITEM = 8;
 
 function formatEstimate(seconds: number): string {
   if (seconds < 60) return `~${Math.max(1, Math.round(seconds))}s`;
+
   return `~${Math.round(seconds / 60)}m`;
 }
 
@@ -51,6 +53,7 @@ export default function PantrySettingsPage() {
   async function fetchStatus(): Promise<PriceSyncStatus | null> {
     try {
       const data = await runPantryQuery<PriceSyncStatusResult>(PRICE_SYNC_STATUS_QUERY);
+
       return data.priceSyncStatus;
     } catch {
       return null;
@@ -77,6 +80,7 @@ export default function PantrySettingsPage() {
       setSyncStatus(status);
       if (status?.running) startPolling();
     });
+
     return () => {
       ignore = true;
       stopPolling();

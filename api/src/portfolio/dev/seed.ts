@@ -14,6 +14,7 @@ function rows(): Row[] {
   projects.forEach((p, i) => out.push({ sk: `PROJECT#${i}`, type: "PROJECT", data: p }));
   skills.forEach((s, i) => out.push({ sk: `SKILL#${i}`, type: "SKILL", data: s }));
   programs.forEach((p, i) => out.push({ sk: `PROGRAM#${i}`, type: "PROGRAM", data: p }));
+
   return out;
 }
 

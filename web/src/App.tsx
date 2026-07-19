@@ -28,6 +28,7 @@ function ScrollManager() {
         window.scrollTo({ top: 0, behavior: "smooth" });
       }
     });
+
     return () => cancelAnimationFrame(raf);
   }, [location.pathname, location.hash]);
 

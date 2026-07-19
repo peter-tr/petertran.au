@@ -14,12 +14,14 @@ type Range = "7d" | "30d";
 // of an oversized chart.
 function niceAxisMax(max: number): number {
   if (max <= 0) return 1;
+
   const withHeadroom = max * 1.15;
   const magnitude = Math.pow(10, Math.floor(Math.log10(withHeadroom)));
   for (const step of [1, 2, 5, 10]) {
     const candidate = step * magnitude;
     if (candidate >= withHeadroom) return candidate;
   }
+
   return 10 * magnitude;
 }
 
@@ -76,6 +78,7 @@ export default function RequestsChart({ data }: { data: DailyCount[] }) {
           const barHeight = (d.count / axisMax) * CHART_HEIGHT;
           const x = i * barSlot + (barSlot - barWidth) / 2;
           const y = CHART_HEIGHT - barHeight;
+
           return (
             <rect
               key={d.timestamp}

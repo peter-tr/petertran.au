@@ -42,5 +42,6 @@ export const handler = async (
   context: LambdaContext
 ): Promise<APIGatewayProxyStructuredResultV2 | void> => {
   if (isWarmupPing(event)) return { statusCode: 200, body: "warm" };
+
   return apolloHandler(event, context, () => {});
 };

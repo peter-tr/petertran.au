@@ -70,6 +70,7 @@ export class ZeroTrustLabStack extends Stack {
     });
     table.grantReadWriteData(idpBridgeFn);
     this.idpBridgeFn = idpBridgeFn;
+
     const idpBridgeFnUrl = idpBridgeFn.addFunctionUrl({ authType: lambda.FunctionUrlAuthType.NONE });
 
     // Cognito User Pool + Hosted UI is the actual external IdP - real
@@ -153,6 +154,7 @@ export class ZeroTrustLabStack extends Stack {
     signingKey.grantSign(internalStsFn);
     signingKey.grant(internalStsFn, "kms:GetPublicKey");
     this.internalStsFn = internalStsFn;
+
     const internalStsFnUrl = internalStsFn.addFunctionUrl({ authType: lambda.FunctionUrlAuthType.NONE });
     // No ISSUER_URL env var here, deliberately - same self-reference problem
     // as CALLBACK_URL above (a Function can't depend on its own FunctionUrl).

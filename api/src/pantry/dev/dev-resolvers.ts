@@ -168,6 +168,7 @@ type AddInput = Omit<
 function createItem(input: AddInput): InventoryItem {
   const id = randomUUID();
   const now = new Date().toISOString();
+
   return {
     ...input,
     unit: normalizeUnit(input.unit),
@@ -224,6 +225,7 @@ function upsertShoppingListEntry(
         addedAt: new Date().toISOString(),
       };
   shoppingList.set(entry.id, entry);
+
   return entry;
 }
 
@@ -295,6 +297,7 @@ function mockParseCommand(input: string): MockParsedCommand {
       .filter((i): i is InventoryItem & { expiresAt: string } => !!i.expiresAt)
       .sort((a, b) => a.expiresAt.localeCompare(b.expiresAt))
       .slice(0, 5);
+
     return {
       answer: soon.length ? "Expiring soonest:" : "Nothing in your inventory has an expiry date set.",
       answerItems: soon.length ? soon.map((i) => `${i.name} (${i.expiresAt})`) : null,
@@ -309,6 +312,7 @@ function mockParseCommand(input: string): MockParsedCommand {
 
   if (text.includes("recipe") || text.includes("make") || text.includes("cook")) {
     const have = [...items.values()].slice(0, 3);
+
     return {
       answer: null,
       answerItems: null,
@@ -351,6 +355,7 @@ function mockParseCommand(input: string): MockParsedCommand {
 
   if (text.startsWith("add") || text.includes("buy") || text.includes("bought")) {
     const name = trimmed.replace(/^(add|buy|bought)\s+/i, "").trim() || "New item";
+
     return {
       answer: null,
       answerItems: null,
@@ -400,6 +405,7 @@ function mockParseCommand(input: string): MockParsedCommand {
         offerPriceCheckList: null,
       };
     }
+
     return {
       answer: null,
       answerItems: null,
@@ -437,6 +443,7 @@ export const devResolvers = {
   Query: {
     inventory: (_: unknown, args: { location?: InventoryItem["location"] }) => {
       const all = [...items.values()].sort((a, b) => b.addedAt.localeCompare(a.addedAt));
+
       return args.location ? all.filter((i) => i.location === args.location) : all;
     },
     inventoryItem: (_: unknown, args: { id: string }) => items.get(args.id) ?? null,
@@ -457,6 +464,7 @@ export const devResolvers = {
     addInventoryItem: (_: unknown, args: { input: AddInput }) => {
       const item = createItem(args.input);
       items.set(item.id, item);
+
       return item;
     },
     recordPurchase: (_: unknown, args: { input: AddInput }) => {
@@ -468,6 +476,7 @@ export const devResolvers = {
       if (!existing) {
         const item = createItem(args.input);
         items.set(item.id, item);
+
         return item;
       }
 
@@ -489,19 +498,23 @@ export const devResolvers = {
         updatedAt: new Date().toISOString(),
       };
       items.set(existing.id, updated);
+
       return updated;
     },
     updateInventoryItem: (_: unknown, args: { id: string; input: Partial<InventoryItem> }) => {
       const existing = items.get(args.id);
       if (!existing) throw new Error(`No inventory item found with id "${args.id}".`);
+
       const input = { ...args.input };
       if (input.unit !== undefined) input.unit = normalizeUnit(input.unit);
+
       const updated: InventoryItem = {
         ...existing,
         ...Object.fromEntries(Object.entries(input).filter(([, v]) => v !== undefined)),
         updatedAt: new Date().toISOString(),
       };
       items.set(args.id, updated);
+
       return updated;
     },
     removeInventoryItem: (_: unknown, args: { id: string }) => {
@@ -509,6 +522,7 @@ export const devResolvers = {
       if (existing?.isStaple) {
         upsertShoppingListEntry(existing.name, null, null, null, true, existing.category);
       }
+
       return items.delete(args.id);
     },
     addToShoppingList: (
@@ -553,13 +567,16 @@ export const devResolvers = {
     ) => {
       const existing = shoppingList.get(args.id);
       if (!existing) throw new Error(`No shopping list entry found with id "${args.id}".`);
+
       const input = { ...args.input };
       if (input.unit !== undefined) input.unit = normalizeUnit(input.unit);
+
       const updated: ShoppingListEntry = {
         ...existing,
         ...Object.fromEntries(Object.entries(input).filter(([, v]) => v !== undefined)),
       };
       shoppingList.set(args.id, updated);
+
       return updated;
     },
     removeFromShoppingList: (_: unknown, args: { id: string }) => shoppingList.delete(args.id),
@@ -568,6 +585,7 @@ export const devResolvers = {
         ...settings,
         ...Object.fromEntries(Object.entries(args.input).filter(([, v]) => v !== undefined)),
       };
+
       return settings;
     },
     // No Lambda to invoke locally - just acknowledges the click.

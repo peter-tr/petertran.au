@@ -70,7 +70,9 @@ const MAX_HISTORY_TURNS = 10;
 // the AI's flag as-is whenever the comparison can't be made safely.
 function isEffectivelyMissing(ing: RecipeIngredient, ratio: number, items: InventoryItem[]): boolean {
   if (!ing.haveInInventory) return true;
+
   const matched = ing.itemId ? (items.find((i) => i.id === ing.itemId) ?? null) : null;
+
   return checkSufficiency(ing.amount, ing.quantity, ratio, matched) === "insufficient";
 }
 
@@ -106,6 +108,7 @@ function buildRecipeShoppingActions(
           : amount
             ? `${amount} - for: ${recipe.name}`
             : `For: ${recipe.name}`;
+
       return {
         type: PantryActionType.AddToShoppingList,
         summary: `Add "${ing.name}"${amount ? ` (${amount})` : ""} to the shopping list (for: ${recipe.name})`,
@@ -221,6 +224,7 @@ export default function PantryCommandBar({ items, onChanged, nerdMode }: PantryC
     setTurns((prev) =>
       prev.map((t, i) => {
         if (i !== turnIndex || t.role !== "assistant" || !t.result.actions) return t;
+
         return {
           ...t,
           result: { ...t.result, actions: t.result.actions.filter((_, ai) => ai !== actionIndex) },
@@ -231,6 +235,7 @@ export default function PantryCommandBar({ items, onChanged, nerdMode }: PantryC
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+
     const trimmed = input.trim();
     if (!trimmed || thinking) return;
 
@@ -246,6 +251,7 @@ export default function PantryCommandBar({ items, onChanged, nerdMode }: PantryC
     // if it was never suggested for the rest of the conversation.
     const history: ConversationMessage[] = turns.slice(-MAX_HISTORY_TURNS).map((t) => {
       if (t.role === "user") return { role: "user", content: t.text };
+
       const content = t.result.recipes
         ? {
             ...t.result,
@@ -260,6 +266,7 @@ export default function PantryCommandBar({ items, onChanged, nerdMode }: PantryC
               .filter((_, ri) => !t.dismissedRecipes.has(ri)),
           }
         : t.result;
+
       return { role: "assistant", content: JSON.stringify(content) };
     });
 
@@ -296,9 +303,11 @@ export default function PantryCommandBar({ items, onChanged, nerdMode }: PantryC
     setTurns((prev) =>
       prev.map((t, i) => {
         if (i !== turnIndex || t.role !== "assistant") return t;
+
         const next = new Set(t.excludedIngredients);
         if (next.has(key)) next.delete(key);
         else next.add(key);
+
         return { ...t, excludedIngredients: next };
       })
     );
@@ -308,6 +317,7 @@ export default function PantryCommandBar({ items, onChanged, nerdMode }: PantryC
     setTurns((prev) =>
       prev.map((t, i) => {
         if (i !== turnIndex || t.role !== "assistant") return t;
+
         return { ...t, dismissedRecipes: new Set(t.dismissedRecipes).add(recipeIndex) };
       })
     );
@@ -327,6 +337,7 @@ export default function PantryCommandBar({ items, onChanged, nerdMode }: PantryC
   function handleAddMissingIngredients(turnIndex: number, recipe: RecipeSuggestion, recipeIndex: number) {
     const turn = turns[turnIndex];
     if (turn.role !== "assistant") return;
+
     const ratio = servingsFor(turn, recipeIndex, recipe) / recipe.baseServings;
     const actions = buildRecipeShoppingActions(recipe, recipeIndex, turn.excludedIngredients, ratio, items);
     if (actions.length === 0) return;
@@ -502,6 +513,7 @@ export default function PantryCommandBar({ items, onChanged, nerdMode }: PantryC
                     )}
                     {turn.result.recipes.map((recipe, ri) => {
                       if (turn.dismissedRecipes.has(ri)) return null;
+
                       const servings = servingsFor(turn, ri, recipe);
                       const ratio = servings / recipe.baseServings;
                       const missingCount = recipe.ingredients.filter(
@@ -513,6 +525,7 @@ export default function PantryCommandBar({ items, onChanged, nerdMode }: PantryC
                         (sum, ing) => sum + scalePrice(ing.estimatedPriceAud, ing.quantity, ratio),
                         0
                       );
+
                       return (
                         <div className="pantry-command-recipe" key={ri}>
                           <div className="pantry-command-recipe-header">
@@ -572,6 +585,7 @@ export default function PantryCommandBar({ items, onChanged, nerdMode }: PantryC
                               const amount = scaleAmount(ing.amount, ing.quantity, ratio);
                               const price = scalePrice(ing.estimatedPriceAud, ing.quantity, ratio);
                               const icon = !ing.haveInInventory ? "+" : insufficient ? "△" : "✓";
+
                               return (
                                 <li
                                   key={ii}

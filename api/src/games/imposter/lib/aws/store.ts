@@ -19,6 +19,7 @@ function liveIndexAttrs(game: GameRecord): Record<string, string> {
 
 export async function getGame(gameId: string): Promise<GameRecord | null> {
   const res = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: gameKey(gameId) }));
+
   return (res.Item?.data as GameRecord | undefined) ?? null;
 }
 
@@ -34,6 +35,7 @@ export async function listLiveGames(): Promise<GameRecord[]> {
       ScanIndexForward: false,
     })
   );
+
   return (res.Items ?? []).map((item) => item.data as GameRecord);
 }
 
@@ -60,6 +62,7 @@ export async function createGameWithUniqueId(build: (gameId: string) => GameReco
           ConditionExpression: "attribute_not_exists(pk)",
         })
       );
+
       return game;
     } catch (err) {
       if (err instanceof ConditionalCheckFailedException) continue;

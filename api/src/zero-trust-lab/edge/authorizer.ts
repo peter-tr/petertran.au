@@ -24,6 +24,7 @@ const DENY: APIGatewaySimpleAuthorizerWithContextResult<EdgeAuthContext> = {
 function audienceForPath(path: string): string | null {
   if (path.startsWith("/domain-a")) return "domain-a";
   if (path.startsWith("/domain-b")) return "domain-b";
+
   return null;
 }
 
@@ -45,6 +46,7 @@ export async function handler(
     body: JSON.stringify({ token: opaqueToken }),
   });
   if (!introspectResp.ok) return DENY;
+
   const introspection = (await introspectResp.json()) as { active: boolean; sub?: string; scope?: string };
   if (!introspection.active || !introspection.sub) return DENY;
 
@@ -61,6 +63,7 @@ export async function handler(
     })
   );
   if (!invokeResp.Payload) return DENY;
+
   const { jwt } = JSON.parse(Buffer.from(invokeResp.Payload).toString("utf8")) as { jwt?: string };
   if (!jwt) return DENY;
 

@@ -12,10 +12,12 @@ export const ANTHROPIC_API_SEGMENT_NAME = "Anthropic API";
 // to outside a real invocation.
 export async function traced<T>(name: string, fn: () => Promise<T>): Promise<T> {
   if (!process.env.AWS_LAMBDA_FUNCTION_NAME) return fn();
+
   return AWSXRay.captureAsyncFunc(name, async (subsegment) => {
     try {
       const res = await fn();
       subsegment?.close();
+
       return res;
     } catch (err) {
       subsegment?.close(err instanceof Error ? err : undefined);

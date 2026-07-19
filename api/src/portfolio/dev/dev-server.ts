@@ -17,13 +17,16 @@ const { url } = await startStandaloneServer(server, {
         if (res.body.kind !== "single") {
           return { data: null, errors: ["Unexpected multi-part GraphQL response."] };
         }
+
         const { data, errors } = res.body.singleResult;
+
         return {
           data: (data ?? null) as Record<string, unknown> | null,
           errors: errors?.map((e) => e.message),
         };
       },
     };
+
     return baseContext;
   },
 });

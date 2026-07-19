@@ -21,6 +21,7 @@ const MOCK_DAILY_COUNTS = [
 
 function mockRequestsByDay() {
   const now = Date.now();
+
   return MOCK_DAILY_COUNTS.map((count, i) => ({
     timestamp: new Date(now - (MOCK_DAILY_COUNTS.length - 1 - i) * 24 * 60 * 60 * 1000).toISOString(),
     count,
@@ -51,6 +52,7 @@ export const devResolvers = {
         items = items.filter((e) => e.company.toLowerCase().includes(needle));
       }
       if (args.currentOnly) items = items.filter((e) => e.endDate === null);
+
       return items;
     },
     projects: () => projects,
@@ -60,6 +62,7 @@ export const devResolvers = {
         const needle = args.category.toLowerCase();
         items = items.filter((s) => s.category.toLowerCase().includes(needle));
       }
+
       return items;
     },
     programs: () => programs,
@@ -163,6 +166,7 @@ export const devResolvers = {
     sendMessage: (_: unknown, args: { input: ContactInput }) => {
       validateContactInput(args.input);
       console.log("Mock sendMessage received:", args.input);
+
       return { success: true, message: CONTACT_CONFIRMATION_MESSAGE };
     },
   },

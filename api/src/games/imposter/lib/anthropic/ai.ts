@@ -66,6 +66,7 @@ async function callAnthropic(userMessage: string, difficulty: WordDifficulty) {
       },
     })
   );
+
   return response.parsed_output as AiWordPair | null;
 }
 
@@ -75,6 +76,7 @@ async function callAnthropic(userMessage: string, difficulty: WordDifficulty) {
 function fallbackPair(difficulty: WordDifficulty): AiWordPair {
   const category = WORD_CATEGORIES[Math.floor(Math.random() * WORD_CATEGORIES.length)];
   const pair = randomPair(category, difficulty);
+
   return { category: category.label, civilian: pair.civilian, imposter: pair.imposter };
 }
 

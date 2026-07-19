@@ -20,8 +20,10 @@ function readAll(): RecentGame[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
+
     const parsed = JSON.parse(raw) as RecentGame[];
     if (!Array.isArray(parsed)) return [];
+
     return parsed;
   } catch {
     return [];

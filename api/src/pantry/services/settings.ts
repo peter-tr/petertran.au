@@ -131,6 +131,7 @@ const DEFAULT_SETTINGS: PantrySettings = {
 // non-null check instead of just quietly defaulting.
 export async function getSettings(): Promise<PantrySettings> {
   const res = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { pk: PK, sk: SETTINGS_SK } }));
+
   return { ...DEFAULT_SETTINGS, ...(res.Item?.data as Partial<PantrySettings> | undefined) };
 }
 

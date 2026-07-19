@@ -81,6 +81,7 @@ async function runQuery(port: number, query: string): Promise<Record<string, unk
   if (json.errors?.length) {
     throw new Error(`GraphQL errors: ${json.errors.map((e) => e.message).join("; ")}`);
   }
+
   return json.data ?? {};
 }
 

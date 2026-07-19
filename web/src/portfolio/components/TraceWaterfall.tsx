@@ -7,6 +7,7 @@ function colorFor(name: string): string {
   if (name.includes("Lambda")) return "var(--signal)";
   if (name.includes("DynamoDB")) return "var(--string)";
   if (name.includes("Anthropic")) return "var(--type)";
+
   return "var(--muted)";
 }
 
@@ -20,6 +21,7 @@ export default function TraceWaterfall({ segments }: { segments: TraceSegment[] 
       {segments.map((segment, i) => {
         const leftPct = (segment.startOffsetMs / totalMs) * 100;
         const widthPct = Math.max((segment.durationMs / totalMs) * 100, 0.6);
+
         return (
           <div className="trace-row" key={`${segment.name}-${i}`}>
             <span className="trace-label">{segment.name}</span>

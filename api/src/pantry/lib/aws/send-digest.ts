@@ -16,6 +16,7 @@ function currentSydneyHour(): number {
   })
     .formatToParts(new Date())
     .find((p) => p.type === "hour")?.value;
+
   // ICU can format midnight as "24" with hour12: false - normalize back to 0.
   return Number(hourPart ?? "0") % 24;
 }
@@ -32,6 +33,7 @@ function escapeHtml(value: string): string {
 function formatEntryText(e: ShoppingListEntry): string {
   const amount = e.quantity != null ? ` (${e.quantity}${e.unit ? ` ${e.unit}` : ""})` : "";
   const category = e.category ? ` [${e.category}]` : "";
+
   return `- ${e.name}${amount}${category}`;
 }
 
@@ -43,6 +45,7 @@ function formatEntryHtml(e: ShoppingListEntry): string {
   const category = e.category
     ? ` <span style="color:#999; font-size:0.85em;">[${escapeHtml(e.category)}]</span>`
     : "";
+
   return `<li>${escapeHtml(e.name)}${amount}${category}</li>`;
 }
 
@@ -58,25 +61,30 @@ export async function sendShoppingListDigest(): Promise<void> {
   const to = process.env.CONTACT_TO_EMAIL;
   if (!from || !to) {
     console.log("CONTACT_FROM_EMAIL/CONTACT_TO_EMAIL not configured - skipping digest.");
+
     return;
   }
 
   const settings = await getSettings();
   if (!settings.digestEnabled) {
     console.log("Digest email disabled in settings - skipping.");
+
     return;
   }
+
   const hour = currentSydneyHour();
   if (hour !== settings.digestHour) {
     console.log(
       `Not the configured digest hour (now ${hour}, configured ${settings.digestHour}) - skipping.`
     );
+
     return;
   }
 
   const entries = (await getShoppingList()).filter((e) => e.urgent);
   if (entries.length === 0) {
     console.log("No urgent shopping list items - skipping digest.");
+
     return;
   }
 
