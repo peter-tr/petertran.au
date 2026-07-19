@@ -73,6 +73,11 @@ export default function PantrySettingsPage() {
   // "sync now" click, or a single-item auto-trigger from toggling
   // trackPrice - not just this page's own button, so opening Settings
   // while one happens to be running shows it immediately.
+  //
+  // startPolling/stopPolling are intentionally omitted from deps: they're
+  // plain functions (not useCallback-wrapped), so listing them would just
+  // re-run this effect every render since their identity changes each
+  // time - this should only run once, on mount.
   useEffect(() => {
     let ignore = false;
     fetchStatus().then((status) => {
@@ -85,6 +90,7 @@ export default function PantrySettingsPage() {
       ignore = true;
       stopPolling();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function handleSyncNow() {
