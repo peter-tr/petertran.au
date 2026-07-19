@@ -1,6 +1,7 @@
 import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
+import { captureAwsClient } from "api-shared/xray";
 
-const lambda = new LambdaClient({});
+const lambda = captureAwsClient(new LambdaClient({}));
 
 // Fire-and-forget invoke of the price-check Lambda (see price-check-handler.ts
 // / lib/anthropic/check-prices.ts) - InvocationType "Event" returns as soon

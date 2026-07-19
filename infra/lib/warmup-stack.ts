@@ -90,6 +90,7 @@ export class WarmupStack extends Stack {
       environment: {
         SCHEDULE_NAMES: targets.map((t) => `${SCHEDULE_NAME_PREFIX}-${t.name}`).join(","),
       },
+      tracing: lambda.Tracing.ACTIVE,
     });
     configFn.addToRolePolicy(
       new iam.PolicyStatement({

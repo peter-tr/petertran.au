@@ -1,8 +1,9 @@
 import { SESv2Client, SendEmailCommand } from "@aws-sdk/client-sesv2";
+import { captureAwsClient } from "api-shared/xray";
 import { getSettings } from "../../services/settings";
 import { getShoppingList, type ShoppingListEntry } from "../../services/shopping-list";
 
-const ses = new SESv2Client({});
+const ses = captureAwsClient(new SESv2Client({}));
 
 // The schedule itself fires once an hour (see infra/lib/pantry-stack.ts) -
 // the actual "what time" the user configured in Settings lives in app data,
