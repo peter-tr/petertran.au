@@ -65,6 +65,7 @@ export const person: Person = {
   location: "Sydney, Australia",
   clearance: "Negative Vetting 1 (Australian Security Clearance)",
   links: [
+    { label: "Website", url: "https://petertran.au" },
     { label: "LinkedIn", url: "https://linkedin.com/in/peter-k-tran" },
     { label: "GitHub", url: "https://github.com/peter-tr" },
   ],
