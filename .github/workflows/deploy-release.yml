@@ -1,0 +1,20 @@
+name: Deploy Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: >-
+          Release tag to redeploy, e.g. release-12. See the repo's Releases
+          page or `git tag -l 'release-*'` for available values.
+        required: true
+        type: string
+
+jobs:
+  build-and-deploy:
+    uses: ./.github/workflows/build-and-deploy.yml
+    with:
+      ref: ${{ inputs.release }}
+    permissions:
+      id-token: write
+      contents: read

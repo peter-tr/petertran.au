@@ -5,7 +5,10 @@
 | **PR Title Lint**      | [`pr-title-lint.yml`](./pr-title-lint.yml)     | PR opened / edited / synced | Enforces the PR title as a Conventional Commit (`type(scope): subject`), scope restricted to real workspaces/projects - see root [`commitlint.config.mjs`](../../commitlint.config.mjs). **Required to merge.**                                                                                                                                                                                                                                                                                                                                                            |
 | **Changeset Coverage** | [`changeset-check.yml`](./changeset-check.yml) | PR opened / synced          | First tries to auto-generate a changeset from the PR title (`feat`->minor, `!`->major, else->patch) covering every touched package, if none exists yet - commits it back onto the PR. Then diffs the PR against `main` and fails - naming exactly which package(s) - if anything touched still has no changeset (unparseable title, or an empty changeset explicitly declaring "no bump needed"). Skips both steps entirely for the Changelog workflow's own `changeset-release/*` PR, which consumes (deletes) changesets rather than adding them. **Required to merge.** |
 | **Changelog**          | [`changesets.yml`](./changesets.yml)           | Push to `main`              | If changesets are pending, opens/updates a "Version Packages" PR (bumps versions, writes `CHANGELOG.md`s). Once _that_ PR is merged (no changesets left pending), instead tags each bumped package as `<name>@<version>` and creates a GitHub Release per tag from its changelog entry. Never runs `npm publish` - every package here is private.                                                                                                                                                                                                                          |
-| **Deploy**             | [`deploy.yml`](./deploy.yml)                   | Push to `main`              | Validates GraphQL/Anthropic schemas and lints, boots each service's dev server as a smoke test, and - only if both pass - builds everything and deploys (`cdk deploy --all`, sync `web/dist` to S3, invalidate CloudFront).                                                                                                                                                                                                                                                                                                                                                |
+| **Deploy**             | [`deploy.yml`](./deploy.yml)                   | Push to `main`              | Calls **Build and Deploy** for `github.sha` (full bundle). If that succeeds _and_ the push was a Version Packages PR merge (branch `changeset-release/main`), also tags the commit `release-N` (auto-incrementing) and publishes a matching GitHub Release - a pinned snapshot of what every package looked like together, only ever created from a deploy that's already been verified to work.                                                                                                                                                                        |
+| **Deploy Release**     | [`deploy-release.yml`](./deploy-release.yml)   | Manual (`workflow_dispatch`) | Rollback, whole-site: takes a `release-N` tag as input and calls **Build and Deploy** for it - redeploys every stack + the web bundle exactly as they were at that release. Doesn't mint a new release itself.                                                                                                                                                                                                                                                                                                                                                              |
+| **Deploy Package**     | [`deploy-package.yml`](./deploy-package.yml)   | Manual (`workflow_dispatch`) | Rollback, single package: takes a `<package>@<version>` tag (the ones Changelog already creates), maps it to that package's CDK stack, and calls **Build and Deploy** scoped to just that stack - leaves every other package as currently deployed. `portfolio`/`web` both map to `PetertranSiteStack` (they share it - see `infra/lib/site-stack.ts`); only `web` also re-syncs S3/CloudFront.                                                                                                                                                                           |
+| **Build and Deploy**   | [`build-and-deploy.yml`](./build-and-deploy.yml) | Reusable (`workflow_call`)  | The actual pipeline shared by all three above: validate-schema (codegen, schema validation, lint) + e2e-smoke (boot each dev server) against the given `ref`, then - only if both pass - build and `cdk deploy` (`--all` or a specific `stacks` input), optionally sync `web/dist` to S3 and invalidate CloudFront (`sync-web` input).                                                                                                                                                                                                                                     |
 
 ## How they fit together
 
@@ -23,14 +26,24 @@ flowchart TD
     merge --> deploy_start["Deploy workflow"]
     merge --> changelog_start["Changelog workflow"]
 
-    subgraph deploy_start["Deploy"]
+    subgraph buildDeploy["Build and Deploy (reusable)"]
         direction TB
         d1["validate-schema\n(codegen, schema validation, lint)"]
         d2["e2e-smoke\n(boot each dev server)"]
-        d3["deploy\n(build -> cdk deploy --all\n-> sync S3 -> invalidate CloudFront)"]
+        d3["deploy\n(build -> cdk deploy [--all | stacks]\n-> optionally sync S3 -> invalidate CloudFront)"]
         d1 --> d3
         d2 --> d3
     end
+
+    subgraph deploy_start["Deploy"]
+        direction TB
+        call1["calls Build and Deploy\n(ref: github.sha)"]
+        relgate{"Deploy succeeded\nAND merge was\nchangeset-release/main?"}
+        reltag["tag release-N\n+ publish GitHub Release"]
+        call1 --> relgate
+        relgate -- yes --> reltag
+    end
+    call1 -.-> buildDeploy
 
     subgraph changelog_start["Changelog"]
         direction TB
@@ -40,6 +53,10 @@ flowchart TD
         pending -- yes --> vpr
         pending -- "no (this push\nwas that PR merging)" --> tag
     end
+
+    releaseDispatch["Deploy Release\n(manual dispatch:\nrelease-N)"] -.-> buildDeploy
+    packageDispatch["Deploy Package\n(manual dispatch:\npackage@version)"] --> resolve["resolve\n(package -> stack, sync-web)"]
+    resolve -.-> buildDeploy
 ```
 
 The Version Packages PR the bot opens is a normal PR - it goes through the exact same top loop (PR Title Lint, Changeset Coverage, merge) as any other PR before it lands and triggers the "no changesets pending" branch above.
@@ -56,6 +73,9 @@ Every check above has a local command you can run before pushing:
 - `npm run changeset` - add a changeset interactively (or a richer one than the auto-generated version would produce); `npx changeset add --empty` for the no-bump escape hatch.
 - `npm run version-packages` (`changeset version`) - apply pending changesets locally (bumps versions, writes changelogs) without needing a merged PR.
 - `npm run verify` (`turbo run lint format:check typecheck build`) - most of what `validate-schema`/`deploy`'s build step check, runnable in one shot.
+- `gh release list` / `git tag -l 'release-*'` - find a whole-site release to roll back to. `git tag -l '*@*'` - find a single package's version tag.
+- `gh workflow run deploy-release.yml -f release=release-12` - trigger a whole-site rollback from the CLI.
+- `gh workflow run deploy-package.yml -f tag=pantry@1.4.0` - trigger a single-package rollback from the CLI.
 
 ## Branch protection
 
