@@ -6,23 +6,7 @@
 // packages listed) is present as an explicit "no bump needed" declaration.
 import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-
-const PACKAGE_RULES = [
-  ["api/src/portfolio/", "portfolio"],
-  ["api/src/pantry/", "pantry"],
-  ["api/src/games/imposter/", "imposter"],
-  ["api/src/shared/", "api-shared"],
-  ["web/", "web"],
-  ["infra/", "infra"],
-  ["api/", "api"],
-];
-
-function packageForPath(filePath) {
-  for (const [prefix, pkg] of PACKAGE_RULES) {
-    if (filePath.startsWith(prefix)) return pkg;
-  }
-  return null;
-}
+import { packageForPath } from "./lib/tracked-packages.mjs";
 
 function parseChangesetPackages(content) {
   const match = content.match(/^---\n([\s\S]*?)\n---/);

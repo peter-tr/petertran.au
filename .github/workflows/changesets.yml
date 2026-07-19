@@ -14,8 +14,18 @@ jobs:
   version:
     runs-on: ubuntu-latest
     steps:
+      # Token here is CHANGESET_PAT, not the default: changesets/action uses
+      # `commitMode: git-cli` (its default), meaning its actual `git push`
+      # shells out and reuses whatever credential THIS checkout configured -
+      # its own `env: GITHUB_TOKEN` (set below) only covers its Octokit API
+      # calls (creating/updating the PR itself), not the underlying push.
+      # Confirmed the hard way: setting only the action's env still left the
+      # push attributed to github-actions[bot], landing every Version
+      # Packages PR update in GitHub's approval-required state for
+      # GITHUB_TOKEN-authored pull_request runs.
       - uses: actions/checkout@v4
         with:
+          token: ${{ secrets.CHANGESET_PAT }}
           fetch-depth: 0
 
       - uses: actions/setup-node@v4
@@ -39,4 +49,4 @@ jobs:
           commit: "chore: version packages"
           title: "chore: version packages"
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.CHANGESET_PAT }}
