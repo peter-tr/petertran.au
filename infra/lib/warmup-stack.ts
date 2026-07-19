@@ -60,7 +60,11 @@ export class WarmupStack extends Stack {
       },
       {
         name: "zero-trust-lab-edge-authorizer",
-        fn: lambda.Function.fromFunctionName(this, "ZtlEdgeAuthorizerFn", props.zeroTrustLabFnNames.edgeAuthorizer),
+        fn: lambda.Function.fromFunctionName(
+          this,
+          "ZtlEdgeAuthorizerFn",
+          props.zeroTrustLabFnNames.edgeAuthorizer
+        ),
       },
       {
         name: "zero-trust-lab-edge-proxy",
