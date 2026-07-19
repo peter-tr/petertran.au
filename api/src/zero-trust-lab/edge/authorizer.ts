@@ -3,7 +3,7 @@ import type {
   APIGatewaySimpleAuthorizerWithContextResult,
 } from "aws-lambda";
 import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
-import { isWarmupPing, type WarmupPing } from "@shared/warmup";
+import { isWarmupPing, type WarmupPing } from "api-shared/warmup";
 
 const lambda = new LambdaClient({});
 

@@ -1,5 +1,5 @@
-import { getAnthropicClient } from "@shared/anthropic-client";
-import { traced, ANTHROPIC_API_SEGMENT_NAME } from "@shared/xray";
+import { getAnthropicClient } from "api-shared/anthropic-client";
+import { traced, ANTHROPIC_API_SEGMENT_NAME } from "api-shared/xray";
 import { getAllItems, setLastKnownPrice, type LastKnownPrice } from "../../services/inventory";
 import { getShoppingList, setShoppingListLastKnownPrice } from "../../services/shopping-list";
 import { startPriceSync, recordPriceCheckProgress, finishPriceSync } from "../../services/price-sync-status";

@@ -1,5 +1,5 @@
-import { getAnthropicClient } from "@shared/anthropic-client";
-import { traced, ANTHROPIC_API_SEGMENT_NAME } from "@shared/xray";
+import { getAnthropicClient } from "api-shared/anthropic-client";
+import { traced, ANTHROPIC_API_SEGMENT_NAME } from "api-shared/xray";
 import { assertNotRateLimited } from "../util/rate-limit";
 import { WORD_CATEGORIES, randomPair, type WordDifficulty } from "../words";
 

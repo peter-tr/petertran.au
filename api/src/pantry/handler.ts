@@ -7,7 +7,7 @@ import type {
 } from "aws-lambda";
 import { typeDefs } from "./schema";
 import { resolvers } from "./resolvers/resolvers";
-import { isWarmupPing, type WarmupPing } from "@shared/warmup";
+import { isWarmupPing, type WarmupPing } from "api-shared/warmup";
 import type { Context } from "./context";
 
 const server = new ApolloServer<Context>({

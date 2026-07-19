@@ -9,7 +9,7 @@ import { typeDefs } from "./schema";
 import { createImposterResolvers } from "./resolvers/resolvers";
 import { getGame, listLiveGames, putGame, createGameWithUniqueId } from "./lib/aws/store";
 import { recordGameCreated, recordGameCompleted, getImposterStats } from "./lib/aws/stats";
-import { isWarmupPing, type WarmupPing } from "@shared/warmup";
+import { isWarmupPing, type WarmupPing } from "api-shared/warmup";
 import type { Context } from "./context";
 
 const resolvers = createImposterResolvers(

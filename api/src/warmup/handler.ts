@@ -1,7 +1,7 @@
 import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2 } from "aws-lambda";
 import { SchedulerClient, GetScheduleCommand, UpdateScheduleCommand } from "@aws-sdk/client-scheduler";
-import { parseJsonBody } from "@shared/http";
-import { isWarmupPing, type WarmupPing } from "@shared/warmup";
+import { parseJsonBody } from "api-shared/http";
+import { isWarmupPing, type WarmupPing } from "api-shared/warmup";
 
 const scheduler = new SchedulerClient({});
 // Every warmup schedule this toggle controls (portfolio, pantry, imposter,

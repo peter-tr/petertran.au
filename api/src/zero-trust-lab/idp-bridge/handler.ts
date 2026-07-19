@@ -5,11 +5,11 @@ import {
   ListUserPoolClientsCommand,
   DescribeUserPoolClientCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
-import { createDdbClient } from "@shared/ddb";
+import { createDdbClient } from "api-shared/ddb";
 import { generateOpaqueToken } from "../lib/opaque-token";
 import { normalizePath } from "../lib/http";
-import { parseJsonBody } from "@shared/http";
-import { isWarmupPing, type WarmupPing } from "@shared/warmup";
+import { parseJsonBody } from "api-shared/http";
+import { isWarmupPing, type WarmupPing } from "api-shared/warmup";
 
 const { ddb, TABLE_NAME } = createDdbClient({ defaultTableName: "ZeroTrustSessions" });
 const cognito = new CognitoIdentityProviderClient({});

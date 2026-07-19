@@ -1,7 +1,7 @@
 import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2 } from "aws-lambda";
 import { signJwt, getJwks, type JwtClaims } from "../lib/jwt";
 import { normalizePath } from "../lib/http";
-import { isWarmupPing, type WarmupPing } from "@shared/warmup";
+import { isWarmupPing, type WarmupPing } from "api-shared/warmup";
 
 const KMS_KEY_ID = process.env.KMS_KEY_ID!;
 const KID = "zero-trust-lab-key-1";

@@ -9,7 +9,7 @@ import { typeDefs } from "./schema";
 import { resolvers } from "./resolvers/resolvers";
 import { operationStatsPlugin } from "./lib/util/operation-stats-plugin";
 import { createResumePartitionLoader } from "./lib/aws/resume-data";
-import { isWarmupPing, type WarmupPing } from "@shared/warmup";
+import { isWarmupPing, type WarmupPing } from "api-shared/warmup";
 import type { Context } from "./context";
 
 const server = new ApolloServer<Context>({
