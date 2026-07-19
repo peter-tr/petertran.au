@@ -11,6 +11,8 @@ import { createImposterResolvers } from "./resolvers/resolvers";
 import { DynamoImposterStore } from "./lib/aws/store";
 import { DynamoImposterStatsTracker } from "./lib/aws/stats";
 import { isWarmupPing, type WarmupPing } from "api-shared/warmup";
+import { createOperationMetricsPlugin } from "api-shared/operation-metrics";
+import { ddb, TABLE_NAME } from "./lib/aws/ddb";
 import type { Context } from "./context";
 
 const resolvers = createImposterResolvers(new DynamoImposterStore(), new DynamoImposterStatsTracker());
@@ -19,6 +21,10 @@ const server = new ApolloServer<Context>({
   typeDefs,
   resolvers,
   introspection: true,
+  // "STATS" pk matches lib/aws/stats.ts's existing game-stats convention.
+  plugins: [
+    createOperationMetricsPlugin<Context>({ project: "imposter", ddb, tableName: TABLE_NAME, pk: "STATS" }),
+  ],
 });
 
 const apolloHandler = startServerAndCreateLambdaHandler(
