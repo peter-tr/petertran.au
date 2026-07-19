@@ -44,6 +44,8 @@ flowchart TD
 
 The Version Packages PR the bot opens is a normal PR - it goes through the exact same top loop (PR Title Lint, Changeset Coverage, merge) as any other PR before it lands and triggers the "no changesets pending" branch above.
 
+**Why Changeset Coverage checks out with `secrets.CHANGESET_PAT` instead of the default token**: a `pull_request` run whose triggering commit was authored via `GITHUB_TOKEN` always lands in an approval-required state - GitHub's guard against a workflow pushing code and having its own subsequent run silently satisfy a required status check with no human involved. Since the auto-generate step's whole point is to push a commit unattended, every one of those pushes would otherwise need a manual "approve and run" click before merging - using a real account's token instead sidesteps that gate entirely, since the push is then attributed to a person, not a bot.
+
 ## Local equivalents
 
 Every check above has a local command you can run before pushing:
