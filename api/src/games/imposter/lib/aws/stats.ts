@@ -55,10 +55,7 @@ export class DynamoImposterStatsTracker implements ImposterStatsTracker {
   }
 
   async getStats(): Promise<ImposterStats> {
-    const [gamesPlayedTotal, completed] = await Promise.all([
-      this.getGamesTotal(),
-      this.getGamesCompleted(),
-    ]);
+    const [gamesPlayedTotal, completed] = await Promise.all([this.getGamesTotal(), this.getGamesCompleted()]);
 
     return {
       gamesPlayedTotal,
