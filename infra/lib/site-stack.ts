@@ -13,6 +13,7 @@ import * as ses from "aws-cdk-lib/aws-ses";
 import * as cognito from "aws-cdk-lib/aws-cognito";
 import * as rum from "aws-cdk-lib/aws-rum";
 import * as path from "path";
+import { FUNCTION_NAMES } from "./shared/function-names";
 
 export interface SiteStackProps extends StackProps {
   domainName: string;
@@ -95,7 +96,11 @@ export class SiteStack extends Stack {
     const apiFn = new lambda.Function(this, "GraphQLFunction", {
       // Explicit, so it reads clearly in the X-Ray trace map instead of
       // CloudFormation's auto-generated "PetertranSiteStack-GraphQLFunction72B66DDD-..." name.
-      functionName: "portfolio-graphql",
+      // Also lets WarmupStack reference it by a plain string instead of a
+      // live construct reference, which would create a CloudFormation
+      // cross-stack export - an export blocks this function from ever being
+      // replaced while WarmupStack still has it imported.
+      functionName: FUNCTION_NAMES.portfolio,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "portfolio/handler.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/dist")),

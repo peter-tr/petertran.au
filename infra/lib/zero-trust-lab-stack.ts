@@ -13,6 +13,7 @@ import {
 } from "aws-cdk-lib/aws-apigatewayv2-authorizers";
 import { HttpLambdaIntegration } from "aws-cdk-lib/aws-apigatewayv2-integrations";
 import * as path from "path";
+import { FUNCTION_NAMES } from "./shared/function-names";
 
 export interface ZeroTrustLabStackProps extends StackProps {
   domainName: string;
@@ -61,6 +62,9 @@ export class ZeroTrustLabStack extends Stack {
 
     // --- IdpBridge: real external identity (Cognito) -> this lab's opaque token ---
     const idpBridgeFn = new lambda.Function(this, "IdpBridgeFunction", {
+      // Fixed - see site-stack.ts's identical comment on GraphQLFunction for
+      // why (avoids a CloudFormation cross-stack export lock with WarmupStack).
+      functionName: FUNCTION_NAMES.ztlIdpBridge,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "zero-trust-lab/idp-bridge/handler.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/dist")),
@@ -144,6 +148,7 @@ export class ZeroTrustLabStack extends Stack {
 
     // --- InternalSts: the actual token-exchange / signing service ---
     const internalStsFn = new lambda.Function(this, "InternalStsFunction", {
+      functionName: FUNCTION_NAMES.ztlInternalSts,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "zero-trust-lab/internal-sts/handler.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/dist")),
@@ -167,6 +172,7 @@ export class ZeroTrustLabStack extends Stack {
 
     // --- Edge gateway ---
     const edgeAuthorizerFn = new lambda.Function(this, "EdgeAuthorizerFunction", {
+      functionName: FUNCTION_NAMES.ztlEdgeAuthorizer,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "zero-trust-lab/edge/authorizer.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/dist")),
@@ -189,6 +195,7 @@ export class ZeroTrustLabStack extends Stack {
     this.edgeAuthorizerFn = edgeAuthorizerFn;
 
     const edgeProxyFn = new lambda.Function(this, "EdgeProxyFunction", {
+      functionName: FUNCTION_NAMES.ztlEdgeProxy,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "zero-trust-lab/edge/proxy.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/dist")),
@@ -215,6 +222,7 @@ export class ZeroTrustLabStack extends Stack {
 
     // --- Domain-A gateway ---
     const domainAFn = new lambda.Function(this, "DomainAFunction", {
+      functionName: FUNCTION_NAMES.ztlDomainA,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "zero-trust-lab/domain-a/handler.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/dist")),

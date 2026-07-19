@@ -5,21 +5,23 @@ import * as iam from "aws-cdk-lib/aws-iam";
 import * as path from "path";
 import { createWarmupSchedules, type WarmupTarget } from "./shared/warmup-schedule";
 
-export interface ZeroTrustLabWarmupFunctions {
-  idpBridge: lambda.IFunction;
-  internalSts: lambda.IFunction;
-  edgeAuthorizer: lambda.IFunction;
-  edgeProxy: lambda.IFunction;
-  domainA: lambda.IFunction;
+export interface ZeroTrustLabWarmupFunctionNames {
+  idpBridge: string;
+  internalSts: string;
+  edgeAuthorizer: string;
+  edgeProxy: string;
+  domainA: string;
 }
 
 export interface WarmupStackProps extends StackProps {
   domainName: string;
   alternateDomainNames?: string[];
-  portfolioFn: lambda.IFunction;
-  pantryFn: lambda.IFunction;
-  imposterFn: lambda.IFunction;
-  zeroTrustLabFns: ZeroTrustLabWarmupFunctions;
+  // Plain function *names* (not live lambda.IFunction references)
+  // deliberately - see the class doc comment below for why.
+  portfolioFnName: string;
+  pantryFnName: string;
+  imposterFnName: string;
+  zeroTrustLabFnNames: ZeroTrustLabWarmupFunctionNames;
 }
 
 const SCHEDULE_NAME_PREFIX = "warmup";
@@ -29,22 +31,49 @@ const SCHEDULE_NAME_PREFIX = "warmup";
  * the portfolio site's settings page. Deliberately its own stack, not folded
  * into any producing stack: warming is an operational/cost concern that cuts
  * across portfolio, pantry, imposter, and zero-trust-lab equally, so it
- * doesn't belong to any one of them. Each producing stack exposes its own
- * Lambda(s) as a public property and knows nothing about warmup at all.
+ * doesn't belong to any one of them.
+ *
+ * Takes each target's *function name* (a plain string, from each producing
+ * stack's explicit `functionName` prop), not a live construct reference. A
+ * live reference passed as a cross-stack prop becomes a real CloudFormation
+ * export - which then blocks the producing stack from ever replacing that
+ * Lambda (e.g. any property change CloudFormation can't update in place)
+ * for as long as this stack has it imported. Hit exactly this the first time
+ * this stack was built. `Function.fromFunctionName` below resolves the same
+ * function without creating that export.
  */
 export class WarmupStack extends Stack {
   constructor(scope: Construct, id: string, props: WarmupStackProps) {
     super(scope, id, props);
 
     const targets: WarmupTarget[] = [
-      { name: "portfolio", fn: props.portfolioFn },
-      { name: "pantry", fn: props.pantryFn },
-      { name: "imposter", fn: props.imposterFn },
-      { name: "zero-trust-lab-idp-bridge", fn: props.zeroTrustLabFns.idpBridge },
-      { name: "zero-trust-lab-internal-sts", fn: props.zeroTrustLabFns.internalSts },
-      { name: "zero-trust-lab-edge-authorizer", fn: props.zeroTrustLabFns.edgeAuthorizer },
-      { name: "zero-trust-lab-edge-proxy", fn: props.zeroTrustLabFns.edgeProxy },
-      { name: "zero-trust-lab-domain-a", fn: props.zeroTrustLabFns.domainA },
+      { name: "portfolio", fn: lambda.Function.fromFunctionName(this, "PortfolioFn", props.portfolioFnName) },
+      { name: "pantry", fn: lambda.Function.fromFunctionName(this, "PantryFn", props.pantryFnName) },
+      { name: "imposter", fn: lambda.Function.fromFunctionName(this, "ImposterFn", props.imposterFnName) },
+      {
+        name: "zero-trust-lab-idp-bridge",
+        fn: lambda.Function.fromFunctionName(this, "ZtlIdpBridgeFn", props.zeroTrustLabFnNames.idpBridge),
+      },
+      {
+        name: "zero-trust-lab-internal-sts",
+        fn: lambda.Function.fromFunctionName(this, "ZtlInternalStsFn", props.zeroTrustLabFnNames.internalSts),
+      },
+      {
+        name: "zero-trust-lab-edge-authorizer",
+        fn: lambda.Function.fromFunctionName(
+          this,
+          "ZtlEdgeAuthorizerFn",
+          props.zeroTrustLabFnNames.edgeAuthorizer
+        ),
+      },
+      {
+        name: "zero-trust-lab-edge-proxy",
+        fn: lambda.Function.fromFunctionName(this, "ZtlEdgeProxyFn", props.zeroTrustLabFnNames.edgeProxy),
+      },
+      {
+        name: "zero-trust-lab-domain-a",
+        fn: lambda.Function.fromFunctionName(this, "ZtlDomainAFn", props.zeroTrustLabFnNames.domainA),
+      },
     ];
 
     const { schedules, role } = createWarmupSchedules(this, targets, SCHEDULE_NAME_PREFIX);

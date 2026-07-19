@@ -7,6 +7,7 @@ import * as ses from "aws-cdk-lib/aws-ses";
 import { Schedule, ScheduleExpression } from "aws-cdk-lib/aws-scheduler";
 import { LambdaInvoke } from "aws-cdk-lib/aws-scheduler-targets";
 import * as path from "path";
+import { FUNCTION_NAMES } from "./shared/function-names";
 
 export interface PantryStackProps extends StackProps {
   domainName: string;
@@ -48,8 +49,10 @@ export class PantryStack extends Stack {
 
     const apiFn = new lambda.Function(this, "PantryGraphQLFunction", {
       // Explicit, so it reads clearly in the X-Ray trace map instead of
-      // CloudFormation's auto-generated name.
-      functionName: "pantry-graphql",
+      // CloudFormation's auto-generated name. Also lets WarmupStack
+      // reference it by a plain string - see site-stack.ts's identical
+      // comment on GraphQLFunction for why that matters.
+      functionName: FUNCTION_NAMES.pantry,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "pantry/handler.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/dist")),
