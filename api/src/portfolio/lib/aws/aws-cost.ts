@@ -1,10 +1,11 @@
 import { CostExplorerClient, GetCostAndUsageCommand } from "@aws-sdk/client-cost-explorer";
+import { captureAwsClient } from "api-shared/xray";
 import { ddb, TABLE_NAME } from "./ddb";
 import { CachedCostFetcher } from "./cached-cost-fetcher";
 
 // Cost Explorer is a global service only reachable via us-east-1, regardless
 // of which region the rest of the stack runs in.
-const costExplorer = new CostExplorerClient({ region: "us-east-1" });
+const costExplorer = captureAwsClient(new CostExplorerClient({ region: "us-east-1" }));
 
 function dateStr(date: Date): string {
   return date.toISOString().slice(0, 10);

@@ -1,7 +1,8 @@
 import { KMSClient, SignCommand, GetPublicKeyCommand } from "@aws-sdk/client-kms";
 import { createPublicKey } from "crypto";
+import { captureAwsClient } from "api-shared/xray";
 
-const kms = new KMSClient({});
+const kms = captureAwsClient(new KMSClient({}));
 
 // RSA (not EC) deliberately - KMS's RSASSA_PKCS1_V1_5_SHA_256 signature bytes
 // are already in the exact format a JWS RS256 signature needs. An EC key

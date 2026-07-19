@@ -1,8 +1,9 @@
 import { SESv2Client, SendEmailCommand } from "@aws-sdk/client-sesv2";
+import { captureAwsClient } from "api-shared/xray";
 import type { ContactInput } from "../util/contact";
 import { getLocationForIp } from "../util/geoip";
 
-const ses = new SESv2Client({});
+const ses = captureAwsClient(new SESv2Client({}));
 
 const AEST_FORMATTER = new Intl.DateTimeFormat("en-AU", {
   timeZone: "Australia/Sydney",

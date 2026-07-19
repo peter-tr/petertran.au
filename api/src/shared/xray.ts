@@ -45,3 +45,10 @@ export async function traced<T>(name: string, fn: () => Promise<T>, parentSegmen
     throw err;
   }
 }
+
+// Wraps an AWS SDK v3 client so its calls show up as X-Ray subsegments -
+// same guard as traced() above: outside Lambda (e.g. local dev) there's no
+// daemon/segment to attach to, so this is a no-op there.
+export function captureAwsClient<T extends Parameters<typeof AWSXRay.captureAWSv3Client>[0]>(client: T): T {
+  return process.env.AWS_LAMBDA_FUNCTION_NAME ? AWSXRay.captureAWSv3Client(client) : client;
+}

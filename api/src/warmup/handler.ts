@@ -2,8 +2,9 @@ import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2 } from "
 import { SchedulerClient, GetScheduleCommand, UpdateScheduleCommand } from "@aws-sdk/client-scheduler";
 import { parseJsonBody } from "api-shared/http";
 import { isWarmupPing, type WarmupPing } from "api-shared/warmup";
+import { captureAwsClient } from "api-shared/xray";
 
-const scheduler = new SchedulerClient({});
+const scheduler = captureAwsClient(new SchedulerClient({}));
 // Every warmup schedule this toggle controls (portfolio, pantry, imposter,
 // and zero-trust-lab's own Lambdas) - only ever flipped together, so reading
 // the state of just the first one is enough to answer "is warmup on".

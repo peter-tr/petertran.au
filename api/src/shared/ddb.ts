@@ -1,6 +1,6 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
-import * as AWSXRay from "aws-xray-sdk-core";
+import { captureAwsClient } from "./xray";
 
 export interface DdbClientConfig {
   defaultTableName: string;
@@ -12,13 +12,9 @@ export interface DdbClient {
   TABLE_NAME: string;
 }
 
-// X-Ray needs an active Lambda invocation to attach subsegments to -- wrapping
-// the client outside Lambda (e.g. local dev) would either no-op noisily or
-// throw depending on mode, so only instrument when actually running there.
 export function createDdbClient({ defaultTableName, xray = false }: DdbClientConfig): DdbClient {
   const rawClient = new DynamoDBClient({});
-  const client =
-    xray && process.env.AWS_LAMBDA_FUNCTION_NAME ? AWSXRay.captureAWSv3Client(rawClient) : rawClient;
+  const client = xray ? captureAwsClient(rawClient) : rawClient;
 
   return {
     ddb: DynamoDBDocumentClient.from(client),
