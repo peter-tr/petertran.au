@@ -4,6 +4,7 @@
 import { randomUUID } from "node:crypto";
 import { WORD_CATEGORIES, findWordCategory, randomPair, type WordDifficulty } from "./words";
 import { generateAiWordPair } from "./anthropic/ai";
+import type { Context } from "../context";
 
 export type { WordDifficulty };
 
@@ -64,6 +65,7 @@ export function generateGameId(): string {
   for (let i = 0; i < GAME_ID_LENGTH; i++) {
     id += GAME_ID_CHARS[Math.floor(Math.random() * GAME_ID_CHARS.length)];
   }
+
   return id;
 }
 
@@ -83,6 +85,7 @@ function pickImposterIndexes(playerCount: number, imposterCount: number): number
     const j = Math.floor(Math.random() * (i + 1));
     [indexes[i], indexes[j]] = [indexes[j], indexes[i]];
   }
+
   return indexes.slice(0, imposterCount);
 }
 
@@ -102,7 +105,8 @@ export interface NewGameOptions {
 // word selection.
 export async function buildNewGameContent(
   options: NewGameOptions,
-  sourceIp: string | undefined
+  sourceIp: string | undefined,
+  xraySegment: Context["xraySegment"]
 ): Promise<Omit<GameRecord, "gameId">> {
   const names = options.playerNames.map((n) => n.trim()).filter(Boolean);
   if (names.length < MIN_PLAYERS || names.length > MAX_PLAYERS) {
@@ -127,7 +131,7 @@ export async function buildNewGameContent(
   let categoryLabel: string;
 
   if (options.wordSource === "AI") {
-    const pair = await generateAiWordPair(customCategory, difficulty, sourceIp);
+    const pair = await generateAiWordPair(customCategory, difficulty, sourceIp, xraySegment);
     civilianWord = pair.civilian;
     imposterWord = pair.imposter;
     // Named by the model itself rather than echoing the user's input verbatim
@@ -136,8 +140,10 @@ export async function buildNewGameContent(
     categoryLabel = pair.category;
   } else {
     if (!options.categoryId) throw new Error("A category is required for built-in word pairs.");
+
     const category = findWordCategory(options.categoryId);
     if (!category) throw new Error(`Unknown category "${options.categoryId}".`);
+
     const pair = randomPair(category, difficulty);
     civilianWord = pair.civilian;
     imposterWord = pair.imposter;
@@ -165,6 +171,7 @@ export async function buildNewGameContent(
 // anything for anyone glancing at the network tab.
 export function toPublicGame(game: GameRecord): PublicGame {
   const revealed = game.phase === "RESULTS";
+
   return {
     gameId: game.gameId,
     categoryLabel: !game.hideCategory || revealed ? game.categoryLabel : null,
@@ -217,5 +224,6 @@ export function applyRevealImposter(game: GameRecord): GameRecord {
   if (game.phase !== "DISCUSSION") {
     throw new Error("The imposter can only be revealed after everyone's had their turn.");
   }
+
   return { ...game, phase: "RESULTS" };
 }

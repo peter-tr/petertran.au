@@ -1,4 +1,4 @@
-import { createRateLimiter } from "@shared/rate-limit";
+import { createRateLimiter } from "api-shared/rate-limit";
 import { ddb, TABLE_NAME } from "../aws/ddb";
 
 // Higher than the resume API's AI-query limiter since these are plain CRUD

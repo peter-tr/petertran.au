@@ -4,6 +4,7 @@ import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as path from "path";
+import { FUNCTION_NAMES } from "./shared/function-names";
 
 export interface GamesStackProps extends StackProps {
   domainName: string;
@@ -50,9 +51,11 @@ export class GamesStack extends Stack {
     );
 
     const imposterFn = new lambda.Function(this, "ImposterFunction", {
-      // Fixed - see site-stack.ts's identical comment on GraphQLFunction for
-      // why (avoids a CloudFormation cross-stack export lock with WarmupStack).
-      functionName: "petertran-imposter",
+      // Explicit, so it reads clearly in the X-Ray trace map instead of
+      // CloudFormation's auto-generated name. Also lets WarmupStack
+      // reference it by a plain string - see site-stack.ts's identical
+      // comment on GraphQLFunction for why that matters.
+      functionName: FUNCTION_NAMES.imposter,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "games/imposter/handler.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/dist")),

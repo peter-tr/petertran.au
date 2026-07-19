@@ -35,6 +35,7 @@ export default function ImposterGamePage() {
   // refresh. Stops once the game reaches RESULTS, since nothing more changes.
   useEffect(() => {
     if (!gameId || loading || game?.phase === "RESULTS") return;
+
     const interval = setInterval(() => {
       runImposterQuery<ImposterGameResult>(IMPOSTER_GAME_QUERY, { gameId })
         .then((res) => {
@@ -44,6 +45,7 @@ export default function ImposterGamePage() {
           // Transient polling failure - just keep showing the last good state.
         });
     }, POLL_INTERVAL_MS);
+
     return () => clearInterval(interval);
   }, [gameId, loading, game?.phase]);
 
@@ -59,6 +61,7 @@ export default function ImposterGamePage() {
     if (navigator.share) {
       try {
         await navigator.share({ title: "Join my Imposter game", url });
+
         return;
       } catch {
         // User dismissed the native share sheet - fall through to clipboard.

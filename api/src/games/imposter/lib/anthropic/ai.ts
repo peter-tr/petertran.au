@@ -1,7 +1,8 @@
-import { getAnthropicClient } from "@shared/anthropic-client";
-import { traced, ANTHROPIC_API_SEGMENT_NAME } from "@shared/xray";
+import { getAnthropicClient } from "api-shared/anthropic-client";
+import { traced, ANTHROPIC_API_SEGMENT_NAME } from "api-shared/xray";
 import { assertNotRateLimited } from "../util/rate-limit";
 import { WORD_CATEGORIES, randomPair, type WordDifficulty } from "../words";
+import type { Context } from "../../context";
 
 const MAX_THEME_LENGTH = 60;
 const MAX_ATTEMPTS = 3;
@@ -41,31 +42,39 @@ export interface AiWordPair {
   imposter: string;
 }
 
-async function callAnthropic(userMessage: string, difficulty: WordDifficulty) {
+async function callAnthropic(
+  userMessage: string,
+  difficulty: WordDifficulty,
+  xraySegment: Context["xraySegment"]
+) {
   const client = await getAnthropicClient();
-  const response = await traced(ANTHROPIC_API_SEGMENT_NAME, () =>
-    client.messages.parse({
-      model: "claude-haiku-4-5",
-      max_tokens: 256,
-      system: `${AI_PAIR_SYSTEM_PROMPT}\n\n${DIFFICULTY_INSTRUCTIONS[difficulty]}`,
-      messages: [{ role: "user", content: userMessage }],
-      output_config: {
-        format: {
-          type: "json_schema",
-          schema: {
-            type: "object",
-            properties: {
-              category: { type: "string" },
-              civilian: { type: "string" },
-              imposter: { type: "string" },
+  const response = await traced(
+    ANTHROPIC_API_SEGMENT_NAME,
+    () =>
+      client.messages.parse({
+        model: "claude-haiku-4-5",
+        max_tokens: 256,
+        system: `${AI_PAIR_SYSTEM_PROMPT}\n\n${DIFFICULTY_INSTRUCTIONS[difficulty]}`,
+        messages: [{ role: "user", content: userMessage }],
+        output_config: {
+          format: {
+            type: "json_schema",
+            schema: {
+              type: "object",
+              properties: {
+                category: { type: "string" },
+                civilian: { type: "string" },
+                imposter: { type: "string" },
+              },
+              required: ["category", "civilian", "imposter"],
+              additionalProperties: false,
             },
-            required: ["category", "civilian", "imposter"],
-            additionalProperties: false,
           },
         },
-      },
-    })
+      }),
+    xraySegment
   );
+
   return response.parsed_output as AiWordPair | null;
 }
 
@@ -75,13 +84,15 @@ async function callAnthropic(userMessage: string, difficulty: WordDifficulty) {
 function fallbackPair(difficulty: WordDifficulty): AiWordPair {
   const category = WORD_CATEGORIES[Math.floor(Math.random() * WORD_CATEGORIES.length)];
   const pair = randomPair(category, difficulty);
+
   return { category: category.label, civilian: pair.civilian, imposter: pair.imposter };
 }
 
 export async function generateAiWordPair(
   theme: string | undefined,
   difficulty: WordDifficulty,
-  sourceIp: string | undefined
+  sourceIp: string | undefined,
+  xraySegment: Context["xraySegment"]
 ): Promise<AiWordPair> {
   await assertNotRateLimited(sourceIp);
 
@@ -96,7 +107,7 @@ export async function generateAiWordPair(
   let acceptableFallback: AiWordPair | null = null;
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    const parsed = await callAnthropic(userMessage, difficulty);
+    const parsed = await callAnthropic(userMessage, difficulty, xraySegment);
     if (!parsed?.category || !parsed?.civilian || !parsed?.imposter) continue;
 
     const civilian = parsed.civilian.trim();

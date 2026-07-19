@@ -12,6 +12,7 @@ function readStoredValue(): boolean {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw === null) return true;
+
     return raw === "true";
   } catch {
     return true;
@@ -26,6 +27,7 @@ export function usePageLoadWarmup() {
       if (e.key === STORAGE_KEY) setPageLoadWarmupState(readStoredValue());
     }
     window.addEventListener("storage", handleStorage);
+
     return () => window.removeEventListener("storage", handleStorage);
   }, []);
 

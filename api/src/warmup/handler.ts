@@ -1,7 +1,7 @@
 import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2 } from "aws-lambda";
 import { SchedulerClient, GetScheduleCommand, UpdateScheduleCommand } from "@aws-sdk/client-scheduler";
-import { parseJsonBody } from "@shared/http";
-import { isWarmupPing, type WarmupPing } from "@shared/warmup";
+import { parseJsonBody } from "api-shared/http";
+import { isWarmupPing, type WarmupPing } from "api-shared/warmup";
 
 const scheduler = new SchedulerClient({});
 // Every warmup schedule this toggle controls (portfolio, pantry, imposter,
@@ -11,6 +11,7 @@ const SCHEDULE_NAMES = process.env.SCHEDULE_NAMES!.split(",");
 
 async function getEnabled(): Promise<boolean> {
   const { State } = await scheduler.send(new GetScheduleCommand({ Name: SCHEDULE_NAMES[0] }));
+
   return State === "ENABLED";
 }
 
@@ -51,6 +52,7 @@ export async function handler(
       };
     }
     await setEnabled(enabled);
+
     return {
       statusCode: 200,
       headers: { "content-type": "application/json" },
@@ -59,6 +61,7 @@ export async function handler(
   }
 
   const enabled = await getEnabled();
+
   return {
     statusCode: 200,
     headers: { "content-type": "application/json" },

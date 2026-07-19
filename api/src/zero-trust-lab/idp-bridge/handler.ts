@@ -5,11 +5,11 @@ import {
   ListUserPoolClientsCommand,
   DescribeUserPoolClientCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
-import { createDdbClient } from "@shared/ddb";
+import { createDdbClient } from "api-shared/ddb";
 import { generateOpaqueToken } from "../lib/opaque-token";
 import { normalizePath } from "../lib/http";
-import { parseJsonBody } from "@shared/http";
-import { isWarmupPing, type WarmupPing } from "@shared/warmup";
+import { parseJsonBody } from "api-shared/http";
+import { isWarmupPing, type WarmupPing } from "api-shared/warmup";
 
 const { ddb, TABLE_NAME } = createDdbClient({ defaultTableName: "ZeroTrustSessions" });
 const cognito = new CognitoIdentityProviderClient({});
@@ -28,6 +28,7 @@ function decodeIdTokenClaims(idToken: string): { sub: string; email?: string } {
   // HTTPS in the previous line, not from an untrusted client - there's
   // nothing to verify it against that we don't already trust.
   const payload = idToken.split(".")[1];
+
   return JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
 }
 
@@ -56,6 +57,7 @@ async function getClientCredentials(): Promise<{ clientId: string; clientSecret:
   if (!clientSecret) throw new Error("Cognito app client has no secret");
 
   cachedClientCredentials = { clientId, clientSecret };
+
   return cachedClientCredentials;
 }
 
@@ -136,6 +138,7 @@ async function handleLogout(event: APIGatewayProxyEventV2): Promise<APIGatewayPr
   if (!token) return { statusCode: 400, body: "missing token" };
 
   await ddb.send(new DeleteCommand({ TableName: TABLE_NAME, Key: { pk: token } }));
+
   return {
     statusCode: 200,
     headers: { "content-type": "application/json" },

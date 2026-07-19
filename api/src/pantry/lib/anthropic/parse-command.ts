@@ -1,8 +1,9 @@
-import { getAnthropicClient } from "@shared/anthropic-client";
-import { traced, ANTHROPIC_API_SEGMENT_NAME } from "@shared/xray";
+import { getAnthropicClient } from "api-shared/anthropic-client";
+import { traced, ANTHROPIC_API_SEGMENT_NAME } from "api-shared/xray";
 import { assertAiNotRateLimited } from "../util/ai-rate-limit";
 import type { InventoryItem } from "../../services/inventory";
 import type { ShoppingListEntry } from "../../services/shopping-list";
+import type { Context } from "../../context";
 import { buildDebugInfo, type AiCallDebugInfo } from "./debug-info";
 
 const MAX_INPUT_LENGTH = 200;
@@ -144,11 +145,13 @@ export interface ParsedCommandResult {
 function formatKnownPrice(price: InventoryItem["lastKnownPrice"]): string {
   if (!price) return "";
   if (price.colesPrice === null) return ` colesPriceCheckedButUnconfirmed=${price.checkedAt}`;
+
   return ` colesPrice=${price.colesPrice}(checked ${price.checkedAt}${price.note ? `, ${price.note}` : ""})`;
 }
 
 function formatInventoryForPrompt(inventory: InventoryItem[]): string {
   if (inventory.length === 0) return "(empty - no items currently tracked)";
+
   return inventory
     .map(
       (i) =>
@@ -161,6 +164,7 @@ function formatInventoryForPrompt(inventory: InventoryItem[]): string {
 
 function formatShoppingListForPrompt(shoppingList: ShoppingListEntry[]): string {
   if (shoppingList.length === 0) return "(empty)";
+
   return shoppingList
     .map(
       (e) =>
@@ -175,6 +179,7 @@ function buildSystemPrompt(
   categories: string[]
 ): string {
   const today = new Date().toISOString().slice(0, 10);
+
   return `You interpret natural-language commands for a household pantry/fridge inventory tracker. Today's date is ${today}. Earlier turns of this conversation, if any, are provided as prior messages - use them for context.
 
 Current inventory:
@@ -355,6 +360,7 @@ export const PARSE_COMMAND_SCHEMA = {
 function flagValue(a: RawAction, flag: RawFlag): boolean | null {
   if (a.flagsSet.includes(flag)) return true;
   if (a.flagsClear.includes(flag)) return false;
+
   return null;
 }
 
@@ -364,6 +370,7 @@ function flagValue(a: RawAction, flag: RawFlag): boolean | null {
 // and always null for every other type regardless of what Claude sent.
 function estimateFor(a: RawAction): number | null {
   if (a.type !== "RECORD_PURCHASE" && a.type !== "ADD_TO_SHOPPING_LIST") return null;
+
   return a.estimatedPriceAud > 0 ? a.estimatedPriceAud : null;
 }
 
@@ -372,6 +379,7 @@ function toProposedAction(a: RawAction): ProposedAction | null {
   switch (a.type) {
     case "RECORD_PURCHASE": {
       if (!a.name || !a.location || a.quantity == null) return null;
+
       return {
         type: a.type,
         summary: a.summary,
@@ -397,6 +405,7 @@ function toProposedAction(a: RawAction): ProposedAction | null {
     }
     case "UPDATE_INVENTORY_ITEM": {
       if (!a.itemId) return null;
+
       const input: Record<string, unknown> = {};
       if (a.name != null) input.name = a.name;
       if (a.location != null) input.location = a.location;
@@ -406,6 +415,7 @@ function toProposedAction(a: RawAction): ProposedAction | null {
       if (a.price != null) input.price = a.price;
       if (a.purchasedAt != null) input.purchasedAt = a.purchasedAt;
       if (a.expiresAt != null) input.expiresAt = a.expiresAt;
+
       const isStaple = flagValue(a, "STAPLE");
       const lowPriority = flagValue(a, "LOW_PRIORITY");
       const nearlyEmpty = flagValue(a, "NEARLY_EMPTY");
@@ -414,6 +424,7 @@ function toProposedAction(a: RawAction): ProposedAction | null {
       if (lowPriority != null) input.lowPriority = lowPriority;
       if (nearlyEmpty != null) input.nearlyEmpty = nearlyEmpty;
       if (trackPrice != null) input.trackPrice = trackPrice;
+
       return {
         type: a.type,
         summary: a.summary,
@@ -424,6 +435,7 @@ function toProposedAction(a: RawAction): ProposedAction | null {
     }
     case "REMOVE_INVENTORY_ITEM": {
       if (!a.itemId) return null;
+
       return {
         type: a.type,
         summary: a.summary,
@@ -434,6 +446,7 @@ function toProposedAction(a: RawAction): ProposedAction | null {
     }
     case "ADD_TO_SHOPPING_LIST": {
       if (!a.name) return null;
+
       return {
         type: a.type,
         summary: a.summary,
@@ -450,6 +463,7 @@ function toProposedAction(a: RawAction): ProposedAction | null {
     }
     case "REMOVE_FROM_SHOPPING_LIST": {
       if (!a.itemId) return null;
+
       return {
         type: a.type,
         summary: a.summary,
@@ -487,6 +501,7 @@ function buildActions(
   const validRaw = rawActions.filter((a) => hasValidItemId(a, inventoryIds, shoppingListIds));
   const droppedCount = rawActions.length - validRaw.length;
   const actions = validRaw.map(toProposedAction).filter((a): a is ProposedAction => a !== null);
+
   return { actions: actions.length ? actions : null, droppedCount };
 }
 
@@ -508,6 +523,7 @@ function sanitizeRecipes(recipes: RawRecipe[], inventoryIds: Set<string>): Recip
       // in the prompt) - only an itemId claim needs the hallucination
       // guard, not the flag itself.
       const validId = !!ing.itemId && inventoryIds.has(ing.itemId);
+
       return {
         name: ing.name,
         amount: ing.amount,
@@ -526,7 +542,8 @@ export async function parseCommand(
   inventory: InventoryItem[],
   shoppingList: ShoppingListEntry[],
   categories: string[],
-  sourceIp: string | undefined
+  sourceIp: string | undefined,
+  xraySegment: Context["xraySegment"]
 ): Promise<ParsedCommandResult> {
   const trimmed = input.trim();
   if (!trimmed) throw new Error("input is required.");
@@ -542,18 +559,21 @@ export async function parseCommand(
     content: m.content,
   }));
   const startedAt = Date.now();
-  const response = await traced(ANTHROPIC_API_SEGMENT_NAME, () =>
-    client.messages.parse({
-      model: "claude-haiku-4-5",
-      // Recipes mode can return up to 3 recipes, each with a full ingredient
-      // list plus nutrition/pricing fields per ingredient - 1536 was cutting
-      // that off mid-JSON on richer answers (SyntaxError: Unterminated
-      // string), so this needs real headroom.
-      max_tokens: 4096,
-      system: buildSystemPrompt(inventory, shoppingList, categories),
-      messages: [...priorMessages, { role: "user", content: trimmed }],
-      output_config: { format: { type: "json_schema", schema: PARSE_COMMAND_SCHEMA } },
-    })
+  const response = await traced(
+    ANTHROPIC_API_SEGMENT_NAME,
+    () =>
+      client.messages.parse({
+        model: "claude-haiku-4-5",
+        // Recipes mode can return up to 3 recipes, each with a full ingredient
+        // list plus nutrition/pricing fields per ingredient - 1536 was cutting
+        // that off mid-JSON on richer answers (SyntaxError: Unterminated
+        // string), so this needs real headroom.
+        max_tokens: 4096,
+        system: buildSystemPrompt(inventory, shoppingList, categories),
+        messages: [...priorMessages, { role: "user", content: trimmed }],
+        output_config: { format: { type: "json_schema", schema: PARSE_COMMAND_SCHEMA } },
+      }),
+    xraySegment
   );
   // searchesUsed/fetchesUsed are always 0 here - command parsing doesn't use
   // web_search/web_fetch, unlike check-prices.ts's call.
@@ -575,6 +595,7 @@ export async function parseCommand(
       (parsed.offerPriceCheckList === "inventory" ? inventoryIds : shoppingListIds).has(
         parsed.offerPriceCheckItemId
       );
+
     return {
       answer: parsed.answer,
       answerItems: parsed.answerItems.length ? parsed.answerItems : null,
@@ -592,6 +613,7 @@ export async function parseCommand(
     // "I have cinnamon already" both updates the recipe and needs a real
     // inventory action, so any actions the model included ride along too.
     const { actions, droppedCount } = buildActions(parsed.actions, inventoryIds, shoppingListIds);
+
     return {
       answer: null,
       answerItems: null,

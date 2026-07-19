@@ -7,5 +7,6 @@ import { dirname, join } from "node:path";
 // to this shared helper's own directory.
 export function loadTypeDefs(callerImportMetaUrl: string): string {
   const currentDir = dirname(fileURLToPath(callerImportMetaUrl));
+
   return readFileSync(join(currentDir, "schema.graphql"), "utf-8");
 }

@@ -7,6 +7,7 @@ import * as ses from "aws-cdk-lib/aws-ses";
 import { Schedule, ScheduleExpression } from "aws-cdk-lib/aws-scheduler";
 import { LambdaInvoke } from "aws-cdk-lib/aws-scheduler-targets";
 import * as path from "path";
+import { FUNCTION_NAMES } from "./shared/function-names";
 
 export interface PantryStackProps extends StackProps {
   domainName: string;
@@ -47,9 +48,11 @@ export class PantryStack extends Stack {
     );
 
     const apiFn = new lambda.Function(this, "PantryGraphQLFunction", {
-      // Fixed - see site-stack.ts's identical comment on GraphQLFunction for
-      // why (avoids a CloudFormation cross-stack export lock with WarmupStack).
-      functionName: "petertran-pantry-graphql",
+      // Explicit, so it reads clearly in the X-Ray trace map instead of
+      // CloudFormation's auto-generated name. Also lets WarmupStack
+      // reference it by a plain string - see site-stack.ts's identical
+      // comment on GraphQLFunction for why that matters.
+      functionName: FUNCTION_NAMES.pantry,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "pantry/handler.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/dist")),
@@ -114,6 +117,7 @@ export class PantryStack extends Stack {
     );
 
     const digestFn = new lambda.Function(this, "PantryDigestFunction", {
+      functionName: "pantry-digest",
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "pantry/digest-handler.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/dist")),
@@ -147,6 +151,7 @@ export class PantryStack extends Stack {
     // web_search/web_fetch tools, so it needs the same secret as the main
     // API Lambda.
     const priceCheckFn = new lambda.Function(this, "PantryPriceCheckFunction", {
+      functionName: "pantry-price-check",
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "pantry/price-check-handler.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/dist")),

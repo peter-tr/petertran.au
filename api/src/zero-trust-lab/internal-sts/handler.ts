@@ -1,7 +1,7 @@
 import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2 } from "aws-lambda";
 import { signJwt, getJwks, type JwtClaims } from "../lib/jwt";
 import { normalizePath } from "../lib/http";
-import { isWarmupPing, type WarmupPing } from "@shared/warmup";
+import { isWarmupPing, type WarmupPing } from "api-shared/warmup";
 
 const KMS_KEY_ID = process.env.KMS_KEY_ID!;
 const KID = "zero-trust-lab-key-1";
@@ -31,6 +31,7 @@ async function handleHttp(event: APIGatewayProxyEventV2): Promise<APIGatewayProx
   switch (normalizePath(event.rawPath)) {
     case "/.well-known/jwks.json": {
       const jwks = await getJwks(KMS_KEY_ID, KID);
+
       return { statusCode: 200, headers: { "content-type": "application/json" }, body: JSON.stringify(jwks) };
     }
     case "/.well-known/openid-configuration": {
@@ -52,6 +53,7 @@ async function handleExchange(request: ExchangeRequest): Promise<{ jwt: string }
     aud: request.audience,
     iss: request.issuer,
   };
+
   return { jwt: await signJwt(claims, KMS_KEY_ID, KID) };
 }
 
@@ -62,5 +64,6 @@ export async function handler(
   // as a real exchange request and make a real KMS Sign call.
   if (isWarmupPing(event)) return { warm: true };
   if (isHttpEvent(event)) return handleHttp(event);
+
   return handleExchange(event);
 }

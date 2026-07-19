@@ -12,6 +12,7 @@ export default function ExperienceSection({ experience }: { experience: Experien
       {experience.map((role, i) => {
         const key = `${role.company}-${role.role}-${i}`;
         const collapsed = isCollapsed(key);
+
         return (
           <div className={`role ${role.isCurrent ? "current" : ""}`} key={key}>
             <button type="button" className="role-top" aria-expanded={!collapsed} onClick={() => toggle(key)}>

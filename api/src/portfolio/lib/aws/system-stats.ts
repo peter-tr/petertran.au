@@ -48,6 +48,7 @@ async function getLambdaMetrics(functionName: string): Promise<LambdaMetrics> {
 
   const data = await fetchLambdaMetrics(functionName);
   metricsCache = { functionName, data, expiresAt: Date.now() + METRICS_CACHE_TTL_MS };
+
   return data;
 }
 
@@ -109,6 +110,7 @@ async function getAiQueriesTotal(): Promise<number> {
   const res = await ddb.send(
     new GetCommand({ TableName: TABLE_NAME, Key: { pk: "STATS", sk: "AI_QUERIES" } })
   );
+
   return (res.Item?.count as number | undefined) ?? 0;
 }
 
@@ -119,6 +121,7 @@ async function getTotalRequests(): Promise<number> {
   const res = await ddb.send(
     new GetCommand({ TableName: TABLE_NAME, Key: { pk: "STATS", sk: "TOTAL_REQUESTS" } })
   );
+
   return (res.Item?.count as number | undefined) ?? 0;
 }
 
@@ -131,6 +134,7 @@ async function getUniqueVisitorsTotal(): Promise<number> {
     new GetCommand({ TableName: TABLE_NAME, Key: { pk: "STATS", sk: "VISITORS_ALL_TIME" } })
   );
   const ips = (res.Item?.ips as Set<string> | string[] | undefined) ?? [];
+
   return [...ips].length;
 }
 

@@ -1,5 +1,6 @@
 import { ApolloServer } from "@apollo/server";
 import { startServerAndCreateLambdaHandler, handlers } from "@as-integrations/aws-lambda";
+import * as AWSXRay from "aws-xray-sdk-core";
 import type {
   APIGatewayProxyEventV2,
   APIGatewayProxyStructuredResultV2,
@@ -7,7 +8,7 @@ import type {
 } from "aws-lambda";
 import { typeDefs } from "./schema";
 import { resolvers } from "./resolvers/resolvers";
-import { isWarmupPing, type WarmupPing } from "@shared/warmup";
+import { isWarmupPing, type WarmupPing } from "api-shared/warmup";
 import type { Context } from "./context";
 
 const server = new ApolloServer<Context>({
@@ -22,6 +23,9 @@ const apolloHandler = startServerAndCreateLambdaHandler(
   {
     context: async ({ event }) => ({
       sourceIp: event.requestContext?.http?.sourceIp,
+      // Captured synchronously, as early as possible in the invocation -
+      // see xray.ts's traced() for why this can't be looked up later.
+      xraySegment: process.env.AWS_LAMBDA_FUNCTION_NAME ? AWSXRay.getSegment() : undefined,
     }),
   }
 );
@@ -35,5 +39,6 @@ export const handler = async (
   context: LambdaContext
 ): Promise<APIGatewayProxyStructuredResultV2 | void> => {
   if (isWarmupPing(event)) return { statusCode: 200, body: "warm" };
+
   return apolloHandler(event, context, () => {});
 };

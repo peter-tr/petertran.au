@@ -5,6 +5,10 @@
   "workspaces": [
     "infra",
     "api",
+    "api/src/shared",
+    "api/src/portfolio",
+    "api/src/pantry",
+    "api/src/games/imposter",
     "web"
   ],
   "overrides": {
@@ -21,9 +25,14 @@
     "typecheck": "turbo run typecheck",
     "build": "turbo run build",
     "verify": "turbo run lint format:check typecheck build",
-    "prepare": "husky"
+    "prepare": "husky",
+    "changeset": "changeset",
+    "version-packages": "changeset version"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.31.1",
+    "@commitlint/cli": "^21.2.1",
+    "@commitlint/config-conventional": "^21.2.0",
     "@eslint/js": "^10.0.1",
     "@graphql-eslint/eslint-plugin": "^4.4.0",
     "eslint": "^10.6.0",

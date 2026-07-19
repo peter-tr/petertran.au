@@ -16,6 +16,7 @@ function tokenize(source: string): Token[] {
     if (match.index > lastIndex) {
       tokens.push({ text: source.slice(lastIndex, match.index) });
     }
+
     const [full, comment, string, variable, keyword, name, punct] = match;
     let className: string | undefined;
     if (comment) className = "gql-comment";

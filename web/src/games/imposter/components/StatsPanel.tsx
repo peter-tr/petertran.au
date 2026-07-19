@@ -3,10 +3,12 @@ import { runImposterQuery, IMPOSTER_STATS_QUERY, type ImposterStatsResult } from
 
 function formatDuration(ms: number): string {
   if (ms <= 0) return "—";
+
   const totalSeconds = Math.round(ms / 1000);
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   if (minutes === 0) return `${seconds}s`;
+
   return `${minutes}m ${seconds}s`;
 }
 

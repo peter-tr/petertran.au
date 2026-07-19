@@ -5,5 +5,6 @@
 export function parseJsonBody<T>(event: { body?: string; isBase64Encoded?: boolean }): T {
   const raw = event.body ?? "{}";
   const decoded = event.isBase64Encoded ? Buffer.from(raw, "base64").toString("utf8") : raw;
+
   return JSON.parse(decoded) as T;
 }

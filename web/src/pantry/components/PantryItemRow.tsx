@@ -32,6 +32,7 @@ function formatMeta(item: InventoryItem): string {
   const parts = [item.unit ? `${item.quantity} ${item.unit}` : `${item.quantity}`];
   if (item.price !== null) parts.push(`$${item.price.toFixed(2)}`);
   if (item.purchasedAt) parts.push(formatPurchasedAt(item.purchasedAt));
+
   return parts.join(" · ");
 }
 
@@ -42,6 +43,7 @@ function expiryClass(expiresAt: string): string {
   const days = daysBetween(expiresAt);
   if (days < 0) return "pantry-item-expiry-expired";
   if (days <= 3) return "pantry-item-expiry-soon";
+
   return "";
 }
 
@@ -93,6 +95,7 @@ export default function PantryItemRow({
       } finally {
         setBusy(false);
       }
+
       return;
     }
     await saveField({ quantity: next });
@@ -116,6 +119,7 @@ export default function PantryItemRow({
     setEditingName(false);
     if (!trimmed || trimmed === item.name) {
       setDraftName(item.name);
+
       return;
     }
     saveField({ name: trimmed });
@@ -274,6 +278,7 @@ export default function PantryItemRow({
         {item.trackPrice &&
           (() => {
             const link = colesLinkFor(item.name, item.lastKnownPrice);
+
             return (
               link && (
                 <a

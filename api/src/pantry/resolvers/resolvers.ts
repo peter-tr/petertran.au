@@ -45,11 +45,13 @@ export const resolvers = {
       if (args.location) {
         items = items.filter((i) => i.location === args.location);
       }
+
       return items.sort((a, b) => b.addedAt.localeCompare(a.addedAt));
     },
     inventoryItem: (_: unknown, args: { id: string }) => getItem(args.id),
     shoppingList: async (): Promise<ShoppingListEntry[]> => {
       const entries = await getShoppingList();
+
       return entries.sort((a, b) => a.addedAt.localeCompare(b.addedAt));
     },
     settings: (): Promise<PantrySettings> => getSettings(),
@@ -64,13 +66,15 @@ export const resolvers = {
         getShoppingList(),
         getSettings(),
       ]);
+
       return parseCommand(
         args.input,
         args.history ?? [],
         inventory,
         shoppingList,
         settings.categories,
-        context.sourceIp
+        context.sourceIp,
+        context.xraySegment
       );
     },
   },
@@ -81,8 +85,10 @@ export const resolvers = {
       context: Context
     ): Promise<InventoryItem> => {
       await assertNotRateLimited(context.sourceIp);
+
       const item = createItem(args.input);
       await putItem(item);
+
       return item;
     },
 
@@ -102,6 +108,7 @@ export const resolvers = {
       if (!existing) {
         const item = createItem(args.input);
         await putItem(item);
+
         return item;
       }
 
@@ -123,6 +130,7 @@ export const resolvers = {
         updatedAt: new Date().toISOString(),
       };
       await putItem(updated);
+
       return updated;
     },
 
@@ -146,6 +154,7 @@ export const resolvers = {
       };
 
       await putItem(updated);
+
       return updated;
     },
 
@@ -175,6 +184,7 @@ export const resolvers = {
       context: Context
     ): Promise<ShoppingListEntry> => {
       await assertNotRateLimited(context.sourceIp);
+
       return upsertShoppingListEntry(
         args.name,
         args.quantity ?? null,
@@ -206,11 +216,13 @@ export const resolvers = {
       };
 
       await putShoppingListEntry(updated);
+
       return updated;
     },
 
     removeFromShoppingList: async (_: unknown, args: { id: string }, context: Context): Promise<boolean> => {
       await assertNotRateLimited(context.sourceIp);
+
       return deleteShoppingListEntry(args.id);
     },
 
@@ -227,12 +239,14 @@ export const resolvers = {
         ...Object.fromEntries(Object.entries(args.input).filter(([, v]) => v !== undefined)),
       };
       await putSettings(updated);
+
       return updated;
     },
 
     syncPricesNow: async (_: unknown, args: unknown, context: Context): Promise<boolean> => {
       await assertNotRateLimited(context.sourceIp);
       await triggerPriceSync();
+
       return true;
     },
 
@@ -257,13 +271,14 @@ export const resolvers = {
           `No ${args.list === "inventory" ? "inventory item" : "shopping list entry"} found with id "${args.id}".`
         );
 
-      const result = await checkPrice(name);
+      const result = await checkPrice(name, context.xraySegment);
       const price: LastKnownPrice = { ...result, checkedAt: new Date().toISOString() };
       if (args.list === "inventory") {
         await setLastKnownPrice(args.id, price);
       } else {
         await setShoppingListLastKnownPrice(args.id, price);
       }
+
       return true;
     },
   },

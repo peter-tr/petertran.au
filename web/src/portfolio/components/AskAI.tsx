@@ -46,6 +46,7 @@ export default function AskAI() {
     if (!question.trim()) {
       setError("Type a question first.");
       setNote(null);
+
       return;
     }
 
@@ -60,6 +61,7 @@ export default function AskAI() {
 
       if (!query) {
         setNote(message ?? "I couldn't turn that into a query against this schema.");
+
         return;
       }
       if (!queryEditor) throw new Error("Editor isn't ready yet - try again in a moment.");

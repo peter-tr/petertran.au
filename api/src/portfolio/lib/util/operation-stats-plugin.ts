@@ -104,6 +104,7 @@ async function recordVisitorAllTime(sourceIp: string): Promise<void> {
 export const operationStatsPlugin: ApolloServerPlugin<Context> = {
   async requestDidStart() {
     const start = Date.now();
+
     return {
       async willSendResponse(requestContext) {
         const sourceIp = requestContext.contextValue.sourceIp;

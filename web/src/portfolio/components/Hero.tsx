@@ -56,6 +56,7 @@ export default function Hero() {
         setTypingDone(true);
       }
     }, 14);
+
     return () => clearInterval(interval);
   }, []);
 
@@ -144,6 +145,7 @@ export default function Hero() {
         <div className="hero-links" style={{ marginTop: "1.6rem" }}>
           {result.links.map((link) => {
             const Icon = LINK_ICONS[link.label];
+
             return (
               <a key={link.url} href={link.url} target="_blank" rel="noreferrer">
                 {Icon && <Icon aria-hidden="true" />}

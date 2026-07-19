@@ -11,6 +11,7 @@ export function normalizeItemName(name: string): string {
   } else if (/s$/.test(n) && !/ss$/.test(n)) {
     n = n.slice(0, -1); // eggs -> egg (but not "glass")
   }
+
   return n;
 }
 
@@ -61,7 +62,9 @@ const UNIT_ALIASES: Record<string, string> = {
 // tidily rather than rejected.
 export function normalizeUnit(unit: string | null | undefined): string | null {
   if (!unit) return null;
+
   const trimmed = unit.trim();
   if (!trimmed) return null;
+
   return UNIT_ALIASES[trimmed.toLowerCase()] ?? trimmed;
 }

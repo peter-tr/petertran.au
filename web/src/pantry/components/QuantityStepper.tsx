@@ -57,6 +57,7 @@ export default function QuantityStepper({
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       debounceRef.current = null;
+
       const pending = pendingRef.current;
       pendingRef.current = null;
       if (pending !== null) onChange(pending);

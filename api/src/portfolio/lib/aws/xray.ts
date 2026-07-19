@@ -57,6 +57,7 @@ async function fetchBreakdown(traceId: string): Promise<TraceSegment[]> {
       if (sawLambda) continue;
       sawLambda = true;
     }
+
     const end = node.end_time ?? node.start_time;
     out.push({
       name,
@@ -111,5 +112,6 @@ export async function getTraceBreakdown(traceId: string): Promise<TraceSegment[]
     await sleep(delay);
     result = await fetchBreakdown(traceId);
   }
+
   return result;
 }

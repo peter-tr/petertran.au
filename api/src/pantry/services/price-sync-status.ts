@@ -38,6 +38,7 @@ const DEFAULT_STATUS: PriceSyncStatus = {
 // existed shouldn't trip a non-null check on read.
 export async function getPriceSyncStatus(): Promise<PriceSyncStatus> {
   const res = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { pk: PK, sk: STATUS_SK } }));
+
   return { ...DEFAULT_STATUS, ...(res.Item?.data as Partial<PriceSyncStatus> | undefined) };
 }
 

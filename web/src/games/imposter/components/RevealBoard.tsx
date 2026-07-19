@@ -92,6 +92,7 @@ export default function RevealBoard({ gameId, players: playersProp, onAllReveale
       <div className="imposter-board">
         {players.map((player) => {
           const status = player.hasRevealed ? "done" : "active";
+
           return (
             <button
               key={player.id}
