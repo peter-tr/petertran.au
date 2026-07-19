@@ -8,15 +8,12 @@ import type {
 } from "aws-lambda";
 import { typeDefs } from "./schema";
 import { createImposterResolvers } from "./resolvers/resolvers";
-import { getGame, listLiveGames, putGame, createGameWithUniqueId } from "./lib/aws/store";
-import { recordGameCreated, recordGameCompleted, getImposterStats } from "./lib/aws/stats";
+import { DynamoImposterStore } from "./lib/aws/store";
+import { DynamoImposterStatsTracker } from "./lib/aws/stats";
 import { isWarmupPing, type WarmupPing } from "api-shared/warmup";
 import type { Context } from "./context";
 
-const resolvers = createImposterResolvers(
-  { getGame, listLiveGames, saveGame: putGame, createGame: createGameWithUniqueId },
-  { recordGameCreated, recordGameCompleted, getStats: getImposterStats }
-);
+const resolvers = createImposterResolvers(new DynamoImposterStore(), new DynamoImposterStatsTracker());
 
 const server = new ApolloServer<Context>({
   typeDefs,
