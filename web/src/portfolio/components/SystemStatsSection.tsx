@@ -58,6 +58,7 @@ export default function SystemStatsSection() {
         .finally(() => setLoading(false));
     }
     window.addEventListener(QUERY_RAN_EVENT, onQueryRan);
+
     return () => window.removeEventListener(QUERY_RAN_EVENT, onQueryRan);
   }, []);
 
@@ -82,7 +83,9 @@ export default function SystemStatsSection() {
 
   const sortedOperations = useMemo(() => {
     if (!opsSort) return activeOperations;
+
     const { key, direction } = opsSort;
+
     return [...activeOperations].sort((a, b) => (direction === "desc" ? b[key] - a[key] : a[key] - b[key]));
   }, [activeOperations, opsSort]);
 
@@ -188,6 +191,7 @@ function SortableOpsHeader({
   onToggle: (key: OpsSortKey) => void;
 }) {
   const active = sort?.key === sortKey ? sort.direction : null;
+
   return (
     <th aria-sort={active === "desc" ? "descending" : active === "asc" ? "ascending" : "none"}>
       <button type="button" className="ops-sort-btn" onClick={() => onToggle(sortKey)}>

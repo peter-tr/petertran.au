@@ -13,6 +13,7 @@ import type { Education, Experience, Interests, Person, Program, Project, SkillC
 
 async function itemsOfType<T>(context: Context, type: string): Promise<T[]> {
   const items = await context.getResumePartition();
+
   return items.filter((item) => item.type === type).map((item) => item.data as T);
 }
 
@@ -23,6 +24,7 @@ const ANTHROPIC_COST_ADJUSTMENT_USD = 5;
 
 async function getAdjustedAnthropicCostUsd(): Promise<number> {
   const raw = await getAnthropicAllTimeCostUsd();
+
   return Math.max(0, raw - ANTHROPIC_COST_ADJUSTMENT_USD);
 }
 
@@ -32,6 +34,7 @@ export const resolvers = {
       const items = await context.getResumePartition();
       const item = items.find((i) => i.type === "PERSON");
       if (!item) throw new Error("Person record not found - has the table been seeded?");
+
       return item.data as Person;
     },
     education: (_: unknown, __: unknown, context: Context) => itemsOfType<Education>(context, "EDUCATION"),
@@ -44,6 +47,7 @@ export const resolvers = {
       if (args.currentOnly) {
         items = items.filter((e) => e.endDate === null);
       }
+
       return items;
     },
     projects: (_: unknown, __: unknown, context: Context) => itemsOfType<Project>(context, "PROJECT"),
@@ -53,6 +57,7 @@ export const resolvers = {
         const needle = args.category.toLowerCase();
         items = items.filter((s) => s.category.toLowerCase().includes(needle));
       }
+
       return items;
     },
     programs: (_: unknown, __: unknown, context: Context) => itemsOfType<Program>(context, "PROGRAM"),
@@ -60,6 +65,7 @@ export const resolvers = {
       const items = await context.getResumePartition();
       const item = items.find((i) => i.type === "PERSONAL");
       if (!item) throw new Error("Interests record not found - has the table been seeded?");
+
       return item.data as Interests;
     },
     meta: () => ({}),
@@ -73,12 +79,14 @@ export const resolvers = {
     anthropicCostUsd: () => getAdjustedAnthropicCostUsd(),
     totalCostUsd: async () => {
       const [aws, anthropic] = await Promise.all([getAwsAllTimeCostUsd(), getAdjustedAnthropicCostUsd()]);
+
       return aws + anthropic;
     },
   },
   Mutation: {
     sendMessage: async (_: unknown, args: { input: ContactInput }, context: Context) => {
       validateContactInput(args.input);
+
       const { name, email, message } = args.input;
       const receivedAt = new Date().toISOString();
 

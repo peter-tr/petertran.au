@@ -26,6 +26,7 @@ export function mergeSettings(prev: PantrySettings, partial: PantrySettingsInput
       (next as Record<string, unknown>)[key] = value;
     }
   }
+
   return next;
 }
 

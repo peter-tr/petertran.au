@@ -256,5 +256,6 @@ export function findWordCategory(categoryId: string): WordCategory | undefined {
 
 export function randomPair(category: WordCategory, difficulty: WordDifficulty): WordPair {
   const pairs = difficulty === "HARD" ? category.hardPairs : category.normalPairs;
+
   return pairs[Math.floor(Math.random() * pairs.length)];
 }

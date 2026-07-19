@@ -74,6 +74,7 @@ export default function ImposterSetup() {
     setImposterCountNotice(null);
     if (names.length >= MAX_PLAYERS) {
       setPlayerListNotice(`Imposter supports up to ${MAX_PLAYERS} players.`);
+
       return;
     }
     setPlayerListNotice(null);
@@ -84,6 +85,7 @@ export default function ImposterSetup() {
     setImposterCountNotice(null);
     if (names.length <= MIN_PLAYERS) {
       setPlayerListNotice(`Imposter needs at least ${MIN_PLAYERS} players.`);
+
       return;
     }
     setPlayerListNotice(null);
@@ -94,6 +96,7 @@ export default function ImposterSetup() {
     setImposterCountNotice(null);
     if (names.every((n) => n.trim() === "")) {
       setPlayerListNotice("No player names to clear yet.");
+
       return;
     }
     setPlayerListNotice(null);
@@ -106,6 +109,7 @@ export default function ImposterSetup() {
       setImposterCountNotice(
         `Add more players to allow more imposters (up to ${maxImposters} with ${effectiveNames.length} players).`
       );
+
       return;
     }
     setImposterCountNotice(null);

@@ -1,5 +1,5 @@
-import { getAnthropicClient } from "@shared/anthropic-client";
-import { traced, ANTHROPIC_API_SEGMENT_NAME } from "@shared/xray";
+import { getAnthropicClient } from "api-shared/anthropic-client";
+import { traced, ANTHROPIC_API_SEGMENT_NAME } from "api-shared/xray";
 import { assertNotRateLimited } from "../util/rate-limit";
 import { WORD_CATEGORIES, randomPair, type WordDifficulty } from "../words";
 import type { Context } from "../../context";
@@ -74,6 +74,7 @@ async function callAnthropic(
       }),
     xraySegment
   );
+
   return response.parsed_output as AiWordPair | null;
 }
 
@@ -83,6 +84,7 @@ async function callAnthropic(
 function fallbackPair(difficulty: WordDifficulty): AiWordPair {
   const category = WORD_CATEGORIES[Math.floor(Math.random() * WORD_CATEGORIES.length)];
   const pair = randomPair(category, difficulty);
+
   return { category: category.label, civilian: pair.civilian, imposter: pair.imposter };
 }
 

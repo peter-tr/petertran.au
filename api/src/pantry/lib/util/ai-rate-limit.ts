@@ -1,4 +1,4 @@
-import { createRateLimiter } from "@shared/rate-limit";
+import { createRateLimiter } from "api-shared/rate-limit";
 import { ddb, TABLE_NAME } from "../aws/ddb";
 
 // Separate limiter for parseCommand specifically, since it's the only pantry

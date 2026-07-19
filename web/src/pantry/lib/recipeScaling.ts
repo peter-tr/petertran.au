@@ -13,7 +13,9 @@ function formatNumber(n: number): string {
 // that's the intended, honest behavior, not a bug.
 export function scaleAmount(amount: string | null, quantity: number, ratio: number): string | null {
   if (!amount || quantity <= 0 || ratio === 1) return amount;
+
   const scaled = formatNumber(quantity * ratio);
+
   return amount.replace(/^[\d.]+/, scaled);
 }
 
@@ -68,6 +70,7 @@ function classify(unit: string): { group: UnitGroup; factor: number } {
   if (key in MASS_TO_GRAMS) return { group: "mass", factor: MASS_TO_GRAMS[key] };
   if (key in VOLUME_TO_ML) return { group: "volume", factor: VOLUME_TO_ML[key] };
   if (DOZEN_ALIASES.has(key)) return { group: "count", factor: 12 };
+
   return { group: "count", factor: 1 };
 }
 
@@ -94,10 +97,13 @@ export function checkSufficiency(
   matchedItem: { quantity: number; unit: string | null } | null
 ): Sufficiency {
   if (!amount || quantity <= 0 || !matchedItem) return "unknown";
+
   const recipeUnit = classify(trailingUnit(amount));
   const itemUnit = matchedItem.unit ? classify(matchedItem.unit) : { group: "count" as const, factor: 1 };
   if (recipeUnit.group !== itemUnit.group) return "unknown";
+
   const requiredBase = quantity * ratio * recipeUnit.factor;
   const haveBase = matchedItem.quantity * itemUnit.factor;
+
   return haveBase >= requiredBase ? "sufficient" : "insufficient";
 }

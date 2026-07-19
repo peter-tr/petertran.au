@@ -45,9 +45,11 @@ function sortEntries(entries: ShoppingListEntry[], sort: string): ShoppingListEn
   if (sort === "urgent") {
     return copy.sort((a, b) => {
       if (a.urgent !== b.urgent) return a.urgent ? -1 : 1;
+
       return b.addedAt.localeCompare(a.addedAt);
     });
   }
+
   return copy.sort((a, b) => b.addedAt.localeCompare(a.addedAt));
 }
 
@@ -204,6 +206,7 @@ export default function PantryShoppingListSection({
       if (settings.shoppingCategoryFilter && e.category !== settings.shoppingCategoryFilter) return false;
       if (settings.shoppingRecipeFilter && e.recipeTag !== settings.shoppingRecipeFilter) return false;
       if (settings.shoppingUrgentOnly && !e.urgent) return false;
+
       return true;
     }),
     settings.shoppingSort
@@ -472,6 +475,7 @@ export default function PantryShoppingListSection({
                         entry.trackPrice &&
                         (() => {
                           const link = colesLinkFor(entry.name, entry.lastKnownPrice);
+
                           return (
                             link && (
                               <a

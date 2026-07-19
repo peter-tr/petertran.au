@@ -1,8 +1,8 @@
 import { UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import type Anthropic from "@anthropic-ai/sdk";
 import { typeDefs } from "../../schema";
-import { getAnthropicClient } from "@shared/anthropic-client";
-import { traced, ANTHROPIC_API_SEGMENT_NAME } from "@shared/xray";
+import { getAnthropicClient } from "api-shared/anthropic-client";
+import { traced, ANTHROPIC_API_SEGMENT_NAME } from "api-shared/xray";
 import { assertNotRateLimited } from "../util/rate-limit";
 import { ddb, TABLE_NAME } from "../aws/ddb";
 import type { Context } from "../../context";
@@ -112,6 +112,7 @@ async function callAnswerAnthropic(
     messages: [{ role: "user", content: `Question: ${prompt}\n\nData:\n${JSON.stringify(data)}` }],
   });
   const textBlock = response.content.find((block) => block.type === "text");
+
   return textBlock ? textBlock.text.trim() : null;
 }
 
@@ -161,5 +162,6 @@ export async function generateQuery(
     () => callAnswerAnthropic(client, trimmed, data),
     xraySegment
   );
+
   return { ...parsed, answer };
 }

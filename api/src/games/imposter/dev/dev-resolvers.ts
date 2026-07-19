@@ -24,8 +24,10 @@ export const devResolvers = createImposterResolvers(
     createGame: async (build) => {
       let gameId = generateGameId();
       while (devGames.has(gameId)) gameId = generateGameId();
+
       const game = build(gameId);
       devGames.set(gameId, game);
+
       return game;
     },
   },

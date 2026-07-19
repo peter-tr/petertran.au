@@ -1,5 +1,5 @@
 import type { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyStructuredResultV2 } from "aws-lambda";
-import { isWarmupPing, type WarmupPing } from "@shared/warmup";
+import { isWarmupPing, type WarmupPing } from "api-shared/warmup";
 
 export async function handler(
   event: APIGatewayProxyEventV2WithJWTAuthorizer | WarmupPing

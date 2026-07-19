@@ -8,7 +8,7 @@ import type {
 } from "aws-lambda";
 import { typeDefs } from "./schema";
 import { resolvers } from "./resolvers/resolvers";
-import { isWarmupPing, type WarmupPing } from "@shared/warmup";
+import { isWarmupPing, type WarmupPing } from "api-shared/warmup";
 import type { Context } from "./context";
 
 const server = new ApolloServer<Context>({
@@ -39,5 +39,6 @@ export const handler = async (
   context: LambdaContext
 ): Promise<APIGatewayProxyStructuredResultV2 | void> => {
   if (isWarmupPing(event)) return { statusCode: 200, body: "warm" };
+
   return apolloHandler(event, context, () => {});
 };

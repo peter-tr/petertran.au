@@ -30,6 +30,7 @@ export interface ImposterStatsTracker {
 async function requireGame(store: ImposterStore, gameId: string): Promise<GameRecord> {
   const game = await store.getGame(gameId);
   if (!game) throw new Error("That game code wasn't found - double check it and try again.");
+
   return game;
 }
 
@@ -41,10 +42,12 @@ export function createImposterResolvers(store: ImposterStore, stats: ImposterSta
       imposterCategories: () => listCategories(),
       imposterGame: async (_: unknown, args: { gameId: string }) => {
         const game = await store.getGame(args.gameId.toUpperCase());
+
         return game ? toPublicGame(game) : null;
       },
       liveImposterGames: async () => {
         const games = await store.listLiveGames();
+
         return games.map(toPublicGame);
       },
       imposterStats: () => stats.getStats(),
@@ -67,22 +70,26 @@ export function createImposterResolvers(store: ImposterStore, stats: ImposterSta
         const content = await buildNewGameContent(args, context.sourceIp, context.xraySegment);
         const game = await store.createGame((gameId) => ({ ...content, gameId }));
         stats.recordGameCreated().catch((err) => console.error("recordGameCreated failed:", err));
+
         return toPublicGame(game);
       },
       revealImposterWord: async (_: unknown, args: { gameId: string; playerId: string }) => {
         const game = await requireGame(store, args.gameId.toUpperCase());
         const { game: updated, word, isImposter } = applyReveal(game, args.playerId);
         await store.saveGame(updated);
+
         return { game: toPublicGame(updated), word, isImposter };
       },
       revealImposter: async (_: unknown, args: { gameId: string }) => {
         const game = await requireGame(store, args.gameId.toUpperCase());
         const updated = applyRevealImposter(game);
         await store.saveGame(updated);
+
         const durationMs = Date.now() - new Date(game.createdAt).getTime();
         stats
           .recordGameCompleted(durationMs)
           .catch((err) => console.error("recordGameCompleted failed:", err));
+
         return toPublicGame(updated);
       },
     },

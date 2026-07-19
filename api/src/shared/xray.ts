@@ -38,6 +38,7 @@ export async function traced<T>(name: string, fn: () => Promise<T>, parentSegmen
   try {
     const res = await fn();
     subsegment.close();
+
     return res;
   } catch (err) {
     subsegment.close(err instanceof Error ? err : undefined);

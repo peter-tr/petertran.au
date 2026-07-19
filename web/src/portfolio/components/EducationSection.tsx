@@ -17,6 +17,7 @@ export default function EducationSection({
     <Section id="education" typeName="Education">
       {education.map((e) => {
         const collapsed = isCollapsed(e.institution);
+
         return (
           <div className="fact" key={e.institution}>
             <button
@@ -38,6 +39,7 @@ export default function EducationSection({
       })}
       {programs.map((p) => {
         const collapsed = isCollapsed(p.name);
+
         return (
           <div className="fact" key={p.name}>
             <button

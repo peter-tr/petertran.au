@@ -30,6 +30,7 @@ function sortItems(items: InventoryItem[], sort: SortMode): InventoryItem[] {
         if (!a.expiresAt && !b.expiresAt) return 0;
         if (!a.expiresAt) return 1;
         if (!b.expiresAt) return -1;
+
         return a.expiresAt.localeCompare(b.expiresAt);
       });
     case "quantity":
@@ -59,6 +60,7 @@ function groupItems(items: InventoryItem[], view: ViewMode, sort: SortMode): Gro
       if (!byCategory.has(key)) byCategory.set(key, []);
       byCategory.get(key)!.push(item);
     }
+
     return [...byCategory.entries()]
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([key, groupItems]) => ({ key, label: key, items: sortItems(groupItems, sort) }));
@@ -71,6 +73,7 @@ function groupItems(items: InventoryItem[], view: ViewMode, sort: SortMode): Gro
     // "needs attention" already, so a second empty group would be noise.
     const attention = items.filter((i) => !i.lowPriority);
     const low = items.filter((i) => i.lowPriority);
+
     return [
       { key: "attention", label: "Needs attention", items: sortItems(attention, sort) },
       { key: "low", label: "Low priority", items: sortItems(low, sort) },
@@ -258,6 +261,7 @@ export default function PantryInventorySection({
         groups.map((group) => {
           const groupId = `${view}:${group.key}`;
           const isCollapsed = collapsed.has(groupId);
+
           return (
             <div key={group.key} className="pantry-location-group">
               <button

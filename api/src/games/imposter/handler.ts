@@ -10,7 +10,7 @@ import { typeDefs } from "./schema";
 import { createImposterResolvers } from "./resolvers/resolvers";
 import { getGame, listLiveGames, putGame, createGameWithUniqueId } from "./lib/aws/store";
 import { recordGameCreated, recordGameCompleted, getImposterStats } from "./lib/aws/stats";
-import { isWarmupPing, type WarmupPing } from "@shared/warmup";
+import { isWarmupPing, type WarmupPing } from "api-shared/warmup";
 import type { Context } from "./context";
 
 const resolvers = createImposterResolvers(
@@ -46,5 +46,6 @@ export const handler = async (
   context: LambdaContext
 ): Promise<APIGatewayProxyStructuredResultV2 | void> => {
   if (isWarmupPing(event)) return { statusCode: 200, body: "warm" };
+
   return apolloHandler(event, context, () => {});
 };

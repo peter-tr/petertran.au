@@ -47,6 +47,7 @@ export default function OperationRow({ op }: { op: OperationStat }) {
     runQuery<TraceBreakdownResult>(TRACE_BREAKDOWN_QUERY, { traceId })
       .then((result) => {
         if (unmounted.current) return;
+
         const segments = result.meta.traceBreakdown;
         setTrace(segments);
         if (segments.length <= 1 && pollAttempt.current < MAX_CLIENT_POLL_ATTEMPTS) {

@@ -1,5 +1,5 @@
-import { getAnthropicClient } from "@shared/anthropic-client";
-import { traced, ANTHROPIC_API_SEGMENT_NAME } from "@shared/xray";
+import { getAnthropicClient } from "api-shared/anthropic-client";
+import { traced, ANTHROPIC_API_SEGMENT_NAME } from "api-shared/xray";
 import { getAllItems, setLastKnownPrice, type LastKnownPrice } from "../../services/inventory";
 import { getShoppingList, setShoppingListLastKnownPrice } from "../../services/shopping-list";
 import { startPriceSync, recordPriceCheckProgress, finishPriceSync } from "../../services/price-sync-status";
@@ -148,6 +148,7 @@ export async function checkPrice(
 ): Promise<CheckPriceResult> {
   const { results, debugInfo } = await checkPricesBatch([itemName], xraySegment);
   const entry = results.get(itemName);
+
   return {
     colesPrice: entry?.colesPrice ?? null,
     productUrl: entry?.productUrl ?? null,
@@ -196,6 +197,7 @@ export async function checkTrackedPrices(xraySegment: Context["xraySegment"]): P
 
   if (targets.length === 0) {
     console.log("No trackPrice items - skipping price check.");
+
     return;
   }
 

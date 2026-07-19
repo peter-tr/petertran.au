@@ -3,7 +3,7 @@ import type {
   APIGatewayProxyStructuredResultV2,
 } from "aws-lambda";
 import type { EdgeAuthContext } from "./authorizer";
-import { isWarmupPing, type WarmupPing } from "@shared/warmup";
+import { isWarmupPing, type WarmupPing } from "api-shared/warmup";
 
 const DOMAIN_A_URL = process.env.DOMAIN_A_URL!;
 const DOMAIN_B_URL = process.env.DOMAIN_B_URL;

@@ -9,6 +9,7 @@ import "./portfolio.css";
 
 export default function Resume() {
   const { data, error } = useResumeData();
+
   return (
     <>
       <header className="page-head">
