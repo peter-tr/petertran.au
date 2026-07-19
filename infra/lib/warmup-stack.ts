@@ -50,6 +50,9 @@ export class WarmupStack extends Stack {
     const { schedules, role } = createWarmupSchedules(this, targets, SCHEDULE_NAME_PREFIX);
 
     const configFn = new lambda.Function(this, "WarmupConfigFunction", {
+      // Explicit, so it reads clearly in the X-Ray trace map instead of
+      // CloudFormation's auto-generated name.
+      functionName: "warmup-config",
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "warmup/handler.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/dist")),
