@@ -102,8 +102,8 @@ export class SiteStack extends Stack {
       // replaced while WarmupStack still has it imported.
       functionName: FUNCTION_NAMES.portfolio,
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: "portfolio/handler.handler",
-      code: lambda.Code.fromAsset(path.join(__dirname, "../../api/dist")),
+      handler: "handler.handler",
+      code: lambda.Code.fromAsset(path.join(__dirname, "../../api/src/portfolio/dist")),
       // 512, not the default 256 - same reasoning as pantry's GraphQLFunction:
       // this is a synchronous Function URL on a user-facing request path, so
       // cold-start CPU (which scales with memory) is latency a real visitor

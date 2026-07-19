@@ -3,6 +3,9 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "scripts": {
+    "build": "esbuild handler.ts --bundle --platform=node --target=node20 --format=esm --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url);\" --outfile=dist/handler.mjs --external:@aws-sdk/* && cp schema.graphql dist/schema.graphql"
+  },
   "dependencies": {
     "api-shared": "*",
     "@apollo/server": "^4.11.0",
