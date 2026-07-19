@@ -1,0 +1,60 @@
+name: Deploy Package
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: >-
+          Package version tag to redeploy, e.g. pantry@1.4.0. See the repo's
+          Releases page or `git tag -l '*@*'` for available values.
+        required: true
+        type: string
+
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    outputs:
+      stacks: ${{ steps.map.outputs.stacks }}
+      sync-web: ${{ steps.map.outputs.sync-web }}
+    steps:
+      - id: map
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          PACKAGE="${TAG%@*}"
+          case "$PACKAGE" in
+            pantry)
+              echo "stacks=PetertranPantryStack" >> "$GITHUB_OUTPUT"
+              echo "sync-web=false" >> "$GITHUB_OUTPUT"
+              ;;
+            imposter)
+              echo "stacks=PetertranGamesStack" >> "$GITHUB_OUTPUT"
+              echo "sync-web=false" >> "$GITHUB_OUTPUT"
+              ;;
+            portfolio)
+              # Portfolio's Lambda lives in the same stack as web hosting
+              # (infra/lib/site-stack.ts), but redeploying it doesn't need a
+              # web asset sync.
+              echo "stacks=PetertranSiteStack" >> "$GITHUB_OUTPUT"
+              echo "sync-web=false" >> "$GITHUB_OUTPUT"
+              ;;
+            web)
+              echo "stacks=PetertranSiteStack" >> "$GITHUB_OUTPUT"
+              echo "sync-web=true" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "Unknown package '$PACKAGE' in tag '$TAG' - expected one of pantry, imposter, portfolio, web." >&2
+              exit 1
+              ;;
+          esac
+
+  build-and-deploy:
+    needs: resolve
+    uses: ./.github/workflows/build-and-deploy.yml
+    with:
+      ref: ${{ inputs.tag }}
+      stacks: ${{ needs.resolve.outputs.stacks }}
+      sync-web: ${{ needs.resolve.outputs.sync-web == 'true' }}
+    permissions:
+      id-token: write
+      contents: read
