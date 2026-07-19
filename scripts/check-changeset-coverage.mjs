@@ -35,6 +35,15 @@ function parseChangesetPackages(content) {
   return packages;
 }
 
+// The Changesets bot's own "Version Packages" PR (branch `changeset-release/<base>`,
+// see changesets/action's src/run.ts) bumps package.json/CHANGELOG.md files by
+// *consuming* (deleting) existing changesets rather than adding new ones - it
+// would otherwise permanently fail this exact check on every run.
+if (process.env.GITHUB_HEAD_REF?.startsWith("changeset-release/")) {
+  console.log("Changesets release PR - skipping coverage check.");
+  process.exit(0);
+}
+
 const baseRef = process.env.CHANGESET_CHECK_BASE_REF ?? "origin/main";
 
 const changedFiles = execSync(`git diff --name-only --diff-filter=AM ${baseRef}...HEAD`, {
