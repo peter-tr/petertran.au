@@ -34,7 +34,7 @@ const certStack = new CertStack(app, "PetertranCertStack", {
 });
 
 // Everything else runs in Sydney, close to the actual audience.
-new SiteStack(app, "PetertranSiteStack", {
+const siteStack = new SiteStack(app, "PetertranSiteStack", {
   domainName,
   alternateDomainNames,
   certificate: certStack.certificate,
@@ -46,19 +46,19 @@ new SiteStack(app, "PetertranSiteStack", {
 
 // Games and other misc side-projects - deployed independently of the resume
 // site/API above, with their own Lambda(s) and table.
-new GamesStack(app, "PetertranGamesStack", {
+const gamesStack = new GamesStack(app, "PetertranGamesStack", {
   env: { account, region: "ap-southeast-2" },
 });
 // Separate service from the resume site above - own table, own Lambda, own
 // schema. See infra/lib/pantry-stack.ts for why.
-new PantryStack(app, "PetertranPantryStack", {
+const pantryStack = new PantryStack(app, "PetertranPantryStack", {
   env: { account, region: "ap-southeast-2" },
 });
 
 // Personal learning exercise: edge gateway + internal STS + domain
 // gateway(s), fully isolated from the stacks above - own table, own
 // Lambdas, own HttpApis. See infra/lib/zero-trust-lab-stack.ts.
-new ZeroTrustLabStack(app, "PetertranZeroTrustLabStack", {
+const zeroTrustLabStack = new ZeroTrustLabStack(app, "PetertranZeroTrustLabStack", {
   domainName,
   alternateDomainNames,
   env: { account, region: "ap-southeast-2" },
@@ -78,9 +78,10 @@ const zeroTrustLabFnNames = {
 // stack. Doesn't depend on the stacks above at the CDK/CloudFormation level
 // at all (FUNCTION_NAMES are plain string literals, not read off those
 // stacks' constructs) - see warmup-stack.ts's doc comment for why that
-// matters. Still deployed after them in practice since the actual Lambdas
-// need to exist under these names first.
-new WarmupStack(app, "PetertranWarmupStack", {
+// matters. Safe to deploy in any order relative to them - EventBridge
+// Scheduler targets and IAM policies are just ARN strings/JSON documents,
+// neither validated against a live resource at creation time.
+const warmupStack = new WarmupStack(app, "PetertranWarmupStack", {
   portfolioFnName: FUNCTION_NAMES.portfolio,
   pantryFnName: FUNCTION_NAMES.pantry,
   imposterFnName: FUNCTION_NAMES.imposter,
@@ -90,14 +91,21 @@ new WarmupStack(app, "PetertranWarmupStack", {
 
 // Scheduled Provisioned Concurrency for portfolio/pantry/imposter's and
 // zero-trust-lab's `live` aliases, 8am-7pm Sydney - deliberately its own
-// stack, same reasoning as WarmupStack above. See infra/lib/pc-config-stack.ts.
-new ProvisionedConcurrencyStack(app, "PetertranProvisionedConcurrencyStack", {
-  portfolioFnName: FUNCTION_NAMES.portfolio,
-  pantryFnName: FUNCTION_NAMES.pantry,
-  imposterFnName: FUNCTION_NAMES.imposter,
-  zeroTrustLabFnNames,
-  env: { account, region: "ap-southeast-2" },
-});
+// stack, same reasoning as WarmupStack above. Also safe to deploy in any
+// order relative to the producing stacks, for the same reason (its own IAM
+// policy referencing those aliases doesn't require them to already exist).
+// See infra/lib/pc-config-stack.ts.
+const provisionedConcurrencyStack = new ProvisionedConcurrencyStack(
+  app,
+  "PetertranProvisionedConcurrencyStack",
+  {
+    portfolioFnName: FUNCTION_NAMES.portfolio,
+    pantryFnName: FUNCTION_NAMES.pantry,
+    imposterFnName: FUNCTION_NAMES.imposter,
+    zeroTrustLabFnNames,
+    env: { account, region: "ap-southeast-2" },
+  }
+);
 
 // Shared HttpApi in front of portfolio/pantry/imposter/warmup-config/
 // pc-config, giving them one stable domain (api.petertran.au) instead of
@@ -106,7 +114,7 @@ new ProvisionedConcurrencyStack(app, "PetertranProvisionedConcurrencyStack", {
 // deliberately does NOT cover zero-trust-lab's own edge/domain gateways,
 // which stay isolated per that stack's own design intent. See
 // infra/lib/api-gateway-stack.ts.
-new ApiGatewayStack(app, "PetertranApiGatewayStack", {
+const apiGatewayStack = new ApiGatewayStack(app, "PetertranApiGatewayStack", {
   domainName,
   alternateDomainNames,
   hostedZoneId,
@@ -118,6 +126,24 @@ new ApiGatewayStack(app, "PetertranApiGatewayStack", {
   pcConfigFnName: FUNCTION_NAMES.pcConfig,
   env: { account, region: "ap-southeast-2" },
 });
+
+// Explicit deployment-order-only dependencies (no live construct reference,
+// so still none of the CloudFormation-export lock-in the plain-string
+// FUNCTION_NAMES convention above exists to avoid - see Stack.addDependency's
+// own docs). Unlike WarmupStack/ProvisionedConcurrencyStack, ApiGatewayStack's
+// AWS::Lambda::Permission resources call Lambda's AddPermission API, which
+// DOES require the target alias/function to already exist - with `cdk deploy
+// --all --concurrency 4` (see build-and-deploy.yml), CDK is otherwise free to
+// start this stack before the ones below finish creating their aliases/
+// functions, which fails deployment with "Cannot find alias/function ...".
+// Hit exactly this in production the first time this stack shipped alongside
+// the `live` alias additions.
+apiGatewayStack.addDependency(siteStack);
+apiGatewayStack.addDependency(pantryStack);
+apiGatewayStack.addDependency(gamesStack);
+apiGatewayStack.addDependency(zeroTrustLabStack);
+apiGatewayStack.addDependency(warmupStack);
+apiGatewayStack.addDependency(provisionedConcurrencyStack);
 
 // On-demand test environment (test.petertran.au / api.test.petertran.au) for
 // testing big changes (e.g. Apollo Router/Federation) without touching prod -
