@@ -1,11 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-// Read as module-level consts at import time in proxy.ts, so these must be
-// set before the module is first imported below.
+// Read as module-level consts at import time in proxy.ts. A static `import`
+// is hoisted above these assignments regardless of where it's written
+// textually (ES module semantics), so a dynamic import is used here instead
+// to guarantee the env vars are set first.
 process.env.DOMAIN_A_URL = "https://domain-a.example.com/";
 process.env.DOMAIN_B_URL = "https://domain-b.example.com";
 
-import { handler } from "./proxy";
+const { handler } = await import("./proxy");
 import type { APIGatewayProxyEventV2WithLambdaAuthorizer } from "aws-lambda";
 import type { EdgeAuthContext } from "./authorizer";
 

@@ -60,12 +60,14 @@ describe("getAnthropicAllTimeCostUsd", () => {
       ok: true,
       json: async () => ({ data: [{ results: [{ amount: "100" }] }], has_more: false, next_page: null }),
     });
+
     const getAnthropicAllTimeCostUsd = await importGetAnthropicAllTimeCostUsd();
 
     const result = await getAnthropicAllTimeCostUsd();
 
     expect(result).toBe(1);
     expect(secretsManagerMock.calls()).toHaveLength(0);
+
     const [, options] = fetchMock.mock.calls[0];
     expect((options.headers as Record<string, string>)["x-api-key"]).toBe("sk-admin-direct");
   });
@@ -79,11 +81,13 @@ describe("getAnthropicAllTimeCostUsd", () => {
       ok: true,
       json: async () => ({ data: [], has_more: false, next_page: null }),
     });
+
     const getAnthropicAllTimeCostUsd = await importGetAnthropicAllTimeCostUsd();
 
     await getAnthropicAllTimeCostUsd();
 
     expect(secretsManagerMock.calls()).toHaveLength(1);
+
     const [, options] = fetchMock.mock.calls[0];
     expect((options.headers as Record<string, string>)["x-api-key"]).toBe("sk-from-secrets");
   });
@@ -91,6 +95,7 @@ describe("getAnthropicAllTimeCostUsd", () => {
   it("returns 0 when the secret exists but has no SecretString", async () => {
     process.env.ANTHROPIC_ADMIN_SECRET_ARN = "arn:aws:secretsmanager:...:admin-key";
     secretsManagerMock.on(GetSecretValueCommand).resolves({ SecretString: undefined });
+
     const getAnthropicAllTimeCostUsd = await importGetAnthropicAllTimeCostUsd();
 
     const result = await getAnthropicAllTimeCostUsd();
@@ -107,6 +112,7 @@ describe("getAnthropicAllTimeCostUsd", () => {
       ok: true,
       json: async () => ({ data: [], has_more: false, next_page: null }),
     });
+
     const getAnthropicAllTimeCostUsd = await importGetAnthropicAllTimeCostUsd();
 
     await getAnthropicAllTimeCostUsd();
@@ -137,12 +143,14 @@ describe("getAnthropicAllTimeCostUsd", () => {
         ok: true,
         json: async () => ({ data: [{ results: [{ amount: "300" }] }], has_more: false, next_page: null }),
       });
+
     const getAnthropicAllTimeCostUsd = await importGetAnthropicAllTimeCostUsd();
 
     const result = await getAnthropicAllTimeCostUsd();
 
     expect(result).toBe(5); // (150 + 50 + 300) cents = 500 cents = $5
     expect(fetchMock).toHaveBeenCalledTimes(2);
+
     const secondCallUrl = new URL(fetchMock.mock.calls[1][0] as string);
     expect(secondCallUrl.searchParams.get("page")).toBe("page-2");
   });
@@ -154,6 +162,7 @@ describe("getAnthropicAllTimeCostUsd", () => {
     });
     ddbMock.on(PutCommand).resolves({});
     fetchMock.mockResolvedValue({ ok: false, status: 500, json: async () => ({}) });
+
     const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const getAnthropicAllTimeCostUsd = await importGetAnthropicAllTimeCostUsd();
 
@@ -172,6 +181,7 @@ describe("getAnthropicAllTimeCostUsd", () => {
     ddbMock.on(GetCommand).resolves({
       Item: { pk: "STATS", sk: "ANTHROPIC_COST", amountUsd: 3.25, fetchedAt: "2026-06-15T11:30:00.000Z" },
     });
+
     const getAnthropicAllTimeCostUsd = await importGetAnthropicAllTimeCostUsd();
 
     const result = await getAnthropicAllTimeCostUsd();

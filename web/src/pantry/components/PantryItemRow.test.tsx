@@ -228,7 +228,7 @@ describe("PantryItemRow (full mode)", () => {
         { date: "2026-02-01", price: 3.5, quantity: 2 },
       ],
     });
-    render(
+    const { container } = render(
       <ul>
         <PantryItemRow item={item} simple={false} nerdMode={false} categories={[]} {...noop} />
       </ul>
@@ -236,7 +236,7 @@ describe("PantryItemRow (full mode)", () => {
 
     fireEvent.click(screen.getByTitle("Click for purchase history"));
 
-    const historyItems = screen.getAllByRole("listitem").filter((li) => li.textContent?.includes("—"));
+    const historyItems = container.querySelectorAll(".pantry-purchase-history li");
     expect(historyItems[0]).toHaveTextContent("2026-02-01");
     expect(historyItems[1]).toHaveTextContent("2026-01-01");
   });

@@ -2,13 +2,15 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mockClient } from "aws-sdk-client-mock";
 import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
 
-// Read as module-level consts at import time in authorizer.ts, so these must
-// be set before the module is first imported below.
+// Read as module-level consts at import time in authorizer.ts. A static
+// `import` is hoisted above these assignments regardless of where it's
+// written textually (ES module semantics), so a dynamic import is used here
+// instead to guarantee the env vars are set first.
 process.env.IDP_BRIDGE_URL = "https://idp-bridge.example.com/";
 process.env.INTERNAL_STS_FUNCTION_NAME = "internal-sts-fn";
 process.env.INTERNAL_STS_ISSUER_URL = "https://internal-sts.example.com/";
 
-import { handler } from "./authorizer";
+const { handler } = await import("./authorizer");
 import type { APIGatewayRequestAuthorizerEventV2 } from "aws-lambda";
 
 const lambdaMock = mockClient(LambdaClient);

@@ -7,12 +7,14 @@ import {
   DescribeUserPoolClientCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
 
-// Read as module-level consts at import time in handler.ts, so these must be
-// set before the module is first imported below.
+// Read as module-level consts at import time in handler.ts. A static
+// `import` is hoisted above these assignments regardless of where it's
+// written textually (ES module semantics), so a dynamic import is used here
+// instead to guarantee the env vars are set first.
 process.env.COGNITO_DOMAIN = "https://cognito.example.com";
 process.env.USER_POOL_ID = "test-user-pool-id";
 
-import { handler } from "./handler";
+const { handler } = await import("./handler");
 import type { APIGatewayProxyEventV2 } from "aws-lambda";
 
 const ddbMock = mockClient(DynamoDBDocumentClient);
