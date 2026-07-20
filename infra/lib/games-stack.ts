@@ -4,7 +4,8 @@ import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as path from "path";
-import { FUNCTION_NAMES, LIVE_ALIAS_NAME } from "./shared/function-names";
+import { FUNCTION_NAMES } from "./shared/function-names";
+import { createLiveAlias } from "./shared/live-alias";
 
 export type GamesStackProps = StackProps;
 
@@ -81,9 +82,6 @@ export class GamesStack extends Stack {
 
     // Qualifier ApiGatewayStack/WarmupStack target and ProvisionedConcurrencyStack
     // applies PC to - see LIVE_ALIAS_NAME's doc comment.
-    new lambda.Alias(this, "LiveAlias", {
-      aliasName: LIVE_ALIAS_NAME,
-      version: imposterFn.currentVersion,
-    });
+    createLiveAlias(this, "LiveAlias", imposterFn);
   }
 }

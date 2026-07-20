@@ -13,7 +13,8 @@ import {
 } from "aws-cdk-lib/aws-apigatewayv2-authorizers";
 import { HttpLambdaIntegration } from "aws-cdk-lib/aws-apigatewayv2-integrations";
 import * as path from "path";
-import { FUNCTION_NAMES, LIVE_ALIAS_NAME } from "./shared/function-names";
+import { FUNCTION_NAMES } from "./shared/function-names";
+import { createLiveAlias } from "./shared/live-alias";
 
 export interface ZeroTrustLabStackProps extends StackProps {
   domainName: string;
@@ -99,10 +100,7 @@ export class ZeroTrustLabStack extends Stack {
     // downstream reference to it (Cognito's callbackUrls, IdpBridge's own
     // dynamically-derived redirect URI) - resolves to the qualified,
     // PC-eligible endpoint.
-    const idpBridgeAlias = new lambda.Alias(this, "IdpBridgeLiveAlias", {
-      aliasName: LIVE_ALIAS_NAME,
-      version: idpBridgeFn.currentVersion,
-    });
+    const idpBridgeAlias = createLiveAlias(this, "IdpBridgeLiveAlias", idpBridgeFn);
     const idpBridgeFnUrl = idpBridgeAlias.addFunctionUrl({ authType: lambda.FunctionUrlAuthType.NONE });
 
     // Cognito User Pool + Hosted UI is the actual external IdP - real
@@ -199,10 +197,7 @@ export class ZeroTrustLabStack extends Stack {
     // PC to - see LIVE_ALIAS_NAME's doc comment. Same "build the Function
     // URL off the alias" reasoning as IdpBridge above - this URL is also
     // what DomainAJwtAuthorizer below uses as the JWT issuer/JWKS source.
-    const internalStsAlias = new lambda.Alias(this, "InternalStsLiveAlias", {
-      aliasName: LIVE_ALIAS_NAME,
-      version: internalStsFn.currentVersion,
-    });
+    const internalStsAlias = createLiveAlias(this, "InternalStsLiveAlias", internalStsFn);
     const internalStsFnUrl = internalStsAlias.addFunctionUrl({ authType: lambda.FunctionUrlAuthType.NONE });
     // No ISSUER_URL env var here, deliberately - same self-reference problem
     // as CALLBACK_URL above (a Function can't depend on its own FunctionUrl).
@@ -243,10 +238,7 @@ export class ZeroTrustLabStack extends Stack {
 
     // Qualifier real traffic targets and ProvisionedConcurrencyStack applies
     // PC to - see LIVE_ALIAS_NAME's doc comment.
-    const edgeAuthorizerAlias = new lambda.Alias(this, "EdgeAuthorizerLiveAlias", {
-      aliasName: LIVE_ALIAS_NAME,
-      version: edgeAuthorizerFn.currentVersion,
-    });
+    const edgeAuthorizerAlias = createLiveAlias(this, "EdgeAuthorizerLiveAlias", edgeAuthorizerFn);
 
     const edgeProxyFn = new lambda.Function(this, "EdgeProxyFunction", {
       functionName: FUNCTION_NAMES.ztlEdgeProxy,
@@ -263,10 +255,7 @@ export class ZeroTrustLabStack extends Stack {
 
     // Qualifier real traffic targets and ProvisionedConcurrencyStack applies
     // PC to - see LIVE_ALIAS_NAME's doc comment.
-    const edgeProxyAlias = new lambda.Alias(this, "EdgeProxyLiveAlias", {
-      aliasName: LIVE_ALIAS_NAME,
-      version: edgeProxyFn.currentVersion,
-    });
+    const edgeProxyAlias = createLiveAlias(this, "EdgeProxyLiveAlias", edgeProxyFn);
 
     const edgeAuthorizer = new HttpLambdaAuthorizer("EdgeLambdaAuthorizer", edgeAuthorizerAlias, {
       responseTypes: [HttpLambdaResponseType.SIMPLE],
@@ -298,10 +287,7 @@ export class ZeroTrustLabStack extends Stack {
 
     // Qualifier real traffic targets and ProvisionedConcurrencyStack applies
     // PC to - see LIVE_ALIAS_NAME's doc comment.
-    const domainAAlias = new lambda.Alias(this, "DomainALiveAlias", {
-      aliasName: LIVE_ALIAS_NAME,
-      version: domainAFn.currentVersion,
-    });
+    const domainAAlias = createLiveAlias(this, "DomainALiveAlias", domainAFn);
 
     const domainAApi = new apigwv2.HttpApi(this, "DomainAHttpApi");
     domainAApi.addRoutes({

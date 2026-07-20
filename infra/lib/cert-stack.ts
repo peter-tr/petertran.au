@@ -1,6 +1,7 @@
-import { Stack, StackProps, CfnOutput } from "aws-cdk-lib";
+import { Stack, StackProps } from "aws-cdk-lib";
 import { Construct } from "constructs";
 import * as acm from "aws-cdk-lib/aws-certificatemanager";
+import { createSiteCertificate } from "./shared/site-certificate";
 
 export interface CertStackProps extends StackProps {
   domainName: string;
@@ -18,12 +19,12 @@ export class CertStack extends Stack {
   constructor(scope: Construct, id: string, props: CertStackProps) {
     super(scope, id, props);
 
-    this.certificate = new acm.Certificate(this, "SiteCertificate", {
+    this.certificate = createSiteCertificate(this, {
+      certificateId: "SiteCertificate",
+      outputId: "CertificateArn",
       domainName: props.domainName,
-      subjectAlternativeNames: props.alternateDomainNames,
+      alternateDomainNames: props.alternateDomainNames,
       validation: acm.CertificateValidation.fromDns(),
     });
-
-    new CfnOutput(this, "CertificateArn", { value: this.certificate.certificateArn });
   }
 }

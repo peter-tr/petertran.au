@@ -7,7 +7,8 @@ import * as ses from "aws-cdk-lib/aws-ses";
 import { Schedule, ScheduleExpression } from "aws-cdk-lib/aws-scheduler";
 import { LambdaInvoke } from "aws-cdk-lib/aws-scheduler-targets";
 import * as path from "path";
-import { FUNCTION_NAMES, LIVE_ALIAS_NAME } from "./shared/function-names";
+import { FUNCTION_NAMES } from "./shared/function-names";
+import { createLiveAlias } from "./shared/live-alias";
 
 export type PantryStackProps = StackProps;
 
@@ -87,10 +88,7 @@ export class PantryStack extends Stack {
 
     // Qualifier ApiGatewayStack/WarmupStack target and ProvisionedConcurrencyStack
     // applies PC to - see LIVE_ALIAS_NAME's doc comment.
-    new lambda.Alias(this, "LiveAlias", {
-      aliasName: LIVE_ALIAS_NAME,
-      version: apiFn.currentVersion,
-    });
+    createLiveAlias(this, "LiveAlias", apiFn);
 
     new CfnOutput(this, "PantryTableName", { value: table.tableName });
 

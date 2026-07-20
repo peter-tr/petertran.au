@@ -1,7 +1,8 @@
-import { Stack, StackProps, CfnOutput } from "aws-cdk-lib";
+import { Stack, StackProps } from "aws-cdk-lib";
 import { Construct } from "constructs";
 import * as acm from "aws-cdk-lib/aws-certificatemanager";
 import * as route53 from "aws-cdk-lib/aws-route53";
+import { createSiteCertificate } from "./shared/site-certificate";
 
 export interface TestCertStackProps extends StackProps {
   hostedZoneId: string;
@@ -26,11 +27,11 @@ export class TestCertStack extends Stack {
       zoneName: props.hostedZoneName,
     });
 
-    this.certificate = new acm.Certificate(this, "TestSiteCertificate", {
+    this.certificate = createSiteCertificate(this, {
+      certificateId: "TestSiteCertificate",
+      outputId: "TestCertificateArn",
       domainName: `test.${props.hostedZoneName}`,
       validation: acm.CertificateValidation.fromDns(hostedZone),
     });
-
-    new CfnOutput(this, "TestCertificateArn", { value: this.certificate.certificateArn });
   }
 }
