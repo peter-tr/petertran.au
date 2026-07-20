@@ -75,11 +75,11 @@ export default function SystemStatsSection() {
     }
   }
 
-  const activeOperations = stats
-    ? opsRange === "recent"
-      ? stats.operationsLast30Days
-      : stats.operations
-    : [];
+  const activeOperations = useMemo(() => {
+    if (!stats) return [];
+
+    return opsRange === "recent" ? stats.operationsLast30Days : stats.operations;
+  }, [stats, opsRange]);
 
   const sortedOperations = useMemo(() => {
     if (!opsSort) return activeOperations;
