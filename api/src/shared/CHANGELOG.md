@@ -1,5 +1,11 @@
 # api-shared
 
+## 1.1.1
+
+### Patch Changes
+
+- 342c866: add Vitest unit test suites across all workspaces
+
 ## 1.1.0
 
 ### Minor Changes

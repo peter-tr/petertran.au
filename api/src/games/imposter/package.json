@@ -1,14 +1,14 @@
 {
   "name": "imposter",
   "private": true,
-  "version": "1.2.0",
+  "version": "1.2.1",
   "type": "module",
   "scripts": {
     "build": "esbuild handler.ts --bundle --platform=node --target=node20 --format=esm --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url);\" --outfile=dist/handler.mjs --external:@aws-sdk/* && cp schema.graphql dist/schema.graphql",
     "test": "vitest run"
   },
   "dependencies": {
-    "api-shared": "1.1.0",
+    "api-shared": "1.1.1",
     "@apollo/server": "^4.11.0",
     "@as-integrations/aws-lambda": "^3.1.0",
     "@aws-sdk/client-dynamodb": "^3.658.0",
