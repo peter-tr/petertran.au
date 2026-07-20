@@ -1,0 +1,97 @@
+name: Refresh Test Env Data
+
+on:
+  workflow_dispatch:
+    inputs:
+      service:
+        description: >-
+          Which test-env DynamoDB table(s) to refresh with a fresh snapshot
+          of prod data (pantry-test/games-test/resume-test from
+          pantry/games/resume respectively).
+        required: true
+        type: choice
+        options: [pantry, games, resume, all]
+        default: pantry
+
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    outputs:
+      services: ${{ steps.resolve.outputs.services }}
+    steps:
+      - id: resolve
+        run: |
+          if [ "${{ inputs.service }}" = "all" ]; then
+            echo 'services=["pantry","games","resume"]' >> "$GITHUB_OUTPUT"
+          else
+            echo "services=[\"${{ inputs.service }}\"]" >> "$GITHUB_OUTPUT"
+          fi
+
+  refresh:
+    needs: resolve
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: ${{ fromJSON(needs.resolve.outputs.services) }}
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::275695104296:role/petertran-au-github-actions-deploy
+          aws-region: ap-southeast-2
+
+      # DynamoDB restore-table-from-backup always creates a brand-new table -
+      # it can't restore in place into an existing one - so this backs up
+      # prod, restores to a throwaway temp table, copies that data into the
+      # CDK-managed `-test` table (via refresh-test-table.ts, which wipes the
+      # test table's existing items first), then deletes the temp table and
+      # backup. Keeps the test table's identity (and the test Lambda's
+      # TABLE_NAME env var) stable across every refresh - only the contents
+      # change.
+      - name: Snapshot prod data into the test table
+        working-directory: infra
+        env:
+          SERVICE: ${{ matrix.service }}
+        run: |
+          set -euo pipefail
+          RUN_ID="${{ github.run_id }}-${{ github.run_attempt }}"
+          BACKUP_NAME="${SERVICE}-test-refresh-${RUN_ID}"
+          TEMP_TABLE="${SERVICE}-test-restore-${RUN_ID}"
+          DEST_TABLE="${SERVICE}-test"
+
+          echo "Backing up $SERVICE..."
+          BACKUP_ARN=$(aws dynamodb create-backup --table-name "$SERVICE" --backup-name "$BACKUP_NAME" \
+            --query "BackupDetails.BackupArn" --output text)
+
+          echo "Waiting for backup to become available..."
+          until [ "$(aws dynamodb describe-backup --backup-arn "$BACKUP_ARN" \
+            --query "BackupDescription.BackupDetails.BackupStatus" --output text)" = "AVAILABLE" ]; do
+            sleep 5
+          done
+
+          echo "Restoring backup to temporary table $TEMP_TABLE..."
+          aws dynamodb restore-table-from-backup --backup-arn "$BACKUP_ARN" --target-table-name "$TEMP_TABLE" > /dev/null
+
+          echo "Waiting for $TEMP_TABLE to become active..."
+          until [ "$(aws dynamodb describe-table --table-name "$TEMP_TABLE" \
+            --query "Table.TableStatus" --output text 2>/dev/null)" = "ACTIVE" ]; do
+            sleep 5
+          done
+
+          echo "Copying $TEMP_TABLE into $DEST_TABLE..."
+          npm run refresh-test-table --workspace=infra -- "$TEMP_TABLE" "$DEST_TABLE"
+
+          echo "Cleaning up temporary table and backup..."
+          aws dynamodb delete-table --table-name "$TEMP_TABLE" > /dev/null
+          aws dynamodb delete-backup --backup-arn "$BACKUP_ARN" > /dev/null
