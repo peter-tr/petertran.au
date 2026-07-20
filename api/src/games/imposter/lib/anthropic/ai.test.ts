@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const parse = vi.fn();
 const getAnthropicClient = vi.fn(async () => ({ messages: { parse } }));
-const assertNotRateLimited = vi.fn(async () => {});
+const assertNotRateLimited = vi.fn<(sourceIp: string | undefined) => Promise<void>>(async () => {});
 
 // vi.mock calls are hoisted above imports by vitest's transform, so ai.ts
 // (imported below) picks up these mocks instead of ever constructing a real

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const createDdbClient = vi.fn(() => ({
+const createDdbClient = vi.fn<(config: { defaultTableName: string; xray?: boolean }) => unknown>(() => ({
   ddb: "the-ddb-client",
   TABLE_NAME: "the-table-name",
 }));
