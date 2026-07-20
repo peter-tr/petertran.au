@@ -1,10 +1,14 @@
 import { ApolloServer } from "@apollo/server";
 import { startStandaloneServer } from "@apollo/server/standalone";
+import { buildSubgraphSchema } from "@apollo/subgraph";
+import { parse } from "graphql";
 import { typeDefs } from "../schema";
 import { devResolvers } from "./dev-resolvers";
 import type { Context } from "../context";
 
-const server = new ApolloServer<Context>({ typeDefs, resolvers: devResolvers });
+const server = new ApolloServer<Context>({
+  schema: buildSubgraphSchema([{ typeDefs: parse(typeDefs), resolvers: devResolvers }]),
+});
 const { url } = await startStandaloneServer(server, {
   listen: { port: 4000 },
   context: async () => {

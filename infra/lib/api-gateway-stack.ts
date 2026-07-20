@@ -32,6 +32,10 @@ export interface ApiGatewayStackProps extends StackProps {
   // entirely rather than pointed at a Lambda that doesn't exist there.
   warmupConfigFnName?: string;
   pcConfigFnName?: string;
+  // The reverse of the two above: omitted for prod, only passed by the
+  // test-env instantiation - see supergraph-stack.ts's doc comment for why
+  // it's test-only for now.
+  supergraphFnName?: string;
 }
 
 /**
@@ -43,7 +47,7 @@ export interface ApiGatewayStackProps extends StackProps {
  * isolated per that stack's own design intent (see zero-trust-lab-stack.ts).
  *
  * Reused as-is for the on-demand test environment (see infra/bin/app.ts),
- * fronting just portfolio/pantry/imposter under api.test.petertran.au -
+ * fronting portfolio/pantry/imposter/supergraph under api.test.petertran.au -
  * warmupConfigFnName/pcConfigFnName omitted, apiSubdomain overridden.
  */
 export class ApiGatewayStack extends Stack {
@@ -108,6 +112,16 @@ export class ApiGatewayStack extends Stack {
         : []),
       ...(props.pcConfigFnName
         ? [{ id: "PcConfig", path: "/pc-config", functionName: props.pcConfigFnName }]
+        : []),
+      ...(props.supergraphFnName
+        ? [
+            {
+              id: "Supergraph",
+              path: "/graphql",
+              functionName: props.supergraphFnName,
+              aliasName: LIVE_ALIAS_NAME,
+            },
+          ]
         : []),
     ];
 

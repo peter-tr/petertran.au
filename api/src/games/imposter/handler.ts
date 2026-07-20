@@ -1,5 +1,7 @@
 import { ApolloServer } from "@apollo/server";
 import { startServerAndCreateLambdaHandler, handlers } from "@as-integrations/aws-lambda";
+import { buildSubgraphSchema } from "@apollo/subgraph";
+import { parse } from "graphql";
 import * as AWSXRay from "aws-xray-sdk-core";
 import type {
   APIGatewayProxyEventV2,
@@ -18,8 +20,7 @@ import type { Context } from "./context";
 const resolvers = createImposterResolvers(new DynamoImposterStore(), new DynamoImposterStatsTracker());
 
 const server = new ApolloServer<Context>({
-  typeDefs,
-  resolvers,
+  schema: buildSubgraphSchema([{ typeDefs: parse(typeDefs), resolvers }]),
   introspection: true,
   // "STATS" pk matches lib/aws/stats.ts's existing game-stats convention.
   plugins: [

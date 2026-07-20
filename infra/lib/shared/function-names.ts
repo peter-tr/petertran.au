@@ -28,11 +28,14 @@ export const FUNCTION_NAMES = {
 // collide with the real prod Lambdas they're testing changes against,
 // since the test env deploys alongside prod, not instead of it - no
 // zero-trust-lab/warmup/pc-config counterparts, since those aren't part of
-// what the test env exists to validate.
+// what the test env exists to validate. `supergraph` is test-env-only in
+// the other direction - no prod FUNCTION_NAMES entry yet (see
+// supergraph-stack.ts's doc comment).
 export const TEST_FUNCTION_NAMES = {
   portfolio: "portfolio-graphql-test",
   pantry: "pantry-graphql-test",
   imposter: "imposter-graphql-test",
+  supergraph: "supergraph-graphql-test",
 } as const;
 
 // Alias name portfolio/pantry/imposter each publish a "live" Lambda Alias

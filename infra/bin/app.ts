@@ -9,6 +9,7 @@ import { ZeroTrustLabStack } from "../lib/zero-trust-lab-stack";
 import { WarmupStack } from "../lib/warmup-stack";
 import { ApiGatewayStack } from "../lib/api-gateway-stack";
 import { ProvisionedConcurrencyStack } from "../lib/pc-config-stack";
+import { SupergraphStack } from "../lib/supergraph-stack";
 import { FUNCTION_NAMES, TEST_FUNCTION_NAMES } from "../lib/shared/function-names";
 
 const app = new App();
@@ -195,6 +196,14 @@ if (process.env.DEPLOY_TEST_ENV === "true") {
     env: { account, region: "ap-southeast-2" },
   });
 
+  // Federation gateway composing the three test subgraphs above - test-env
+  // only for now, see supergraph-stack.ts's doc comment.
+  const testSupergraphStack = new SupergraphStack(app, "PetertranTestSupergraphStack", {
+    apiBaseUrl: `https://api.test.${hostedZoneName}`,
+    functionName: TEST_FUNCTION_NAMES.supergraph,
+    env: { account, region: "ap-southeast-2" },
+  });
+
   const testApiGatewayStack = new ApiGatewayStack(app, "PetertranTestApiGatewayStack", {
     domainName: testDomainName,
     alternateDomainNames: testAlternateDomainNames,
@@ -204,6 +213,7 @@ if (process.env.DEPLOY_TEST_ENV === "true") {
     portfolioFnName: TEST_FUNCTION_NAMES.portfolio,
     pantryFnName: TEST_FUNCTION_NAMES.pantry,
     imposterFnName: TEST_FUNCTION_NAMES.imposter,
+    supergraphFnName: TEST_FUNCTION_NAMES.supergraph,
     env: { account, region: "ap-southeast-2" },
   });
   // Same fix as prod's apiGatewayStack.addDependency calls above, and even
@@ -215,4 +225,5 @@ if (process.env.DEPLOY_TEST_ENV === "true") {
   testApiGatewayStack.addDependency(testSiteStack);
   testApiGatewayStack.addDependency(testPantryStack);
   testApiGatewayStack.addDependency(testGamesStack);
+  testApiGatewayStack.addDependency(testSupergraphStack);
 }

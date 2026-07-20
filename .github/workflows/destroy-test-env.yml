@@ -27,19 +27,19 @@ jobs:
 
       # DEPLOY_TEST_ENV=true so infra/bin/app.ts registers the test stacks at
       # all - cdk destroy can't target a stack that isn't in the synthesized
-      # app. Tears down all 5 (3 test Lambdas, 3 test tables, the test
+      # app. Tears down all 6 (4 test Lambdas, 3 test tables, the test
       # HttpApi + its own cert, the test S3 bucket + CloudFront distribution
       # + its own cert) - nothing else to clean up, RemovalPolicy.DESTROY +
       # autoDeleteObjects handle the tables/bucket. PantryStack/GamesStack/
-      # ApiGatewayStack don't reference each other's or SiteStack's
-      # CloudFormation outputs (see api-gateway-stack.ts's doc comment on
-      # why), but SiteStack does depend on CertStack's live certificate
-      # reference, same as prod - cdk destroy resolves that real dependency
-      # itself regardless of the order listed here.
+      # SupergraphStack/ApiGatewayStack don't reference each other's or
+      # SiteStack's CloudFormation outputs (see api-gateway-stack.ts's doc
+      # comment on why), but SiteStack does depend on CertStack's live
+      # certificate reference, same as prod - cdk destroy resolves that real
+      # dependency itself regardless of the order listed here.
       - name: Destroy test environment stacks
         working-directory: infra
         env:
           DEPLOY_TEST_ENV: "true"
         run: >
-          npx cdk destroy PetertranTestApiGatewayStack PetertranTestGamesStack PetertranTestPantryStack
-          PetertranTestSiteStack PetertranTestCertStack --force
+          npx cdk destroy PetertranTestApiGatewayStack PetertranTestSupergraphStack PetertranTestGamesStack
+          PetertranTestPantryStack PetertranTestSiteStack PetertranTestCertStack --force
