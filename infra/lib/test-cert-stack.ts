@@ -28,6 +28,10 @@ export class TestCertStack extends Stack {
 
     this.certificate = new acm.Certificate(this, "TestSiteCertificate", {
       domainName: `test.${props.hostedZoneName}`,
+      // Mirrors prod's www+apex coverage (CertStack's domainName/alternateDomainNames) -
+      // without this, www.test.petertran.au has no cert SAN and fails TLS
+      // even once DNS resolves it.
+      subjectAlternativeNames: [`www.test.${props.hostedZoneName}`],
       validation: acm.CertificateValidation.fromDns(hostedZone),
     });
 

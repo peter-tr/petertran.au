@@ -225,7 +225,10 @@ export class TestEnvStack extends Stack {
 
     const siteDistribution = new cloudfront.Distribution(this, "TestSiteDistribution", {
       defaultRootObject: "index.html",
-      domainNames: [`test.${props.hostedZoneName}`],
+      // www.test, not just the bare test subdomain - mirrors prod's
+      // www+apex coverage (SiteStack's domainNames), see TestCertStack's
+      // matching SAN.
+      domainNames: [`test.${props.hostedZoneName}`, `www.test.${props.hostedZoneName}`],
       certificate: props.certificate,
       defaultBehavior: {
         origin: origins.S3BucketOrigin.withOriginAccessControl(siteBucket),
@@ -259,6 +262,16 @@ export class TestEnvStack extends Stack {
     new route53.AaaaRecord(this, "TestSiteAliasRecordV6", {
       zone: hostedZone,
       recordName: "test",
+      target: siteAliasTarget,
+    });
+    new route53.ARecord(this, "TestSiteWwwAliasRecordV4", {
+      zone: hostedZone,
+      recordName: "www.test",
+      target: siteAliasTarget,
+    });
+    new route53.AaaaRecord(this, "TestSiteWwwAliasRecordV6", {
+      zone: hostedZone,
+      recordName: "www.test",
       target: siteAliasTarget,
     });
 
