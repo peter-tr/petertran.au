@@ -1,0 +1,101 @@
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { act, renderHook, waitFor } from "@testing-library/react";
+
+describe("useWarmupSchedule", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.unstubAllEnvs();
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  it("reports unavailable and never fetches when no endpoint is configured", async () => {
+    vi.stubEnv("VITE_WARMUP_CONFIG_ENDPOINT", "");
+
+    const { useWarmupSchedule } = await import("./useWarmupSchedule");
+
+    const { result } = renderHook(() => useWarmupSchedule());
+
+    expect(result.current.available).toBe(false);
+    expect(result.current.enabled).toBeNull();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("loads the enabled status from the endpoint on mount when available", async () => {
+    vi.stubEnv("VITE_WARMUP_CONFIG_ENDPOINT", "https://api.test/warmup-config");
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ json: async () => ({ enabled: true }) });
+
+    const { useWarmupSchedule } = await import("./useWarmupSchedule");
+
+    const { result } = renderHook(() => useWarmupSchedule());
+
+    expect(result.current.available).toBe(true);
+    await waitFor(() => expect(result.current.enabled).toBe(true));
+    expect(fetch).toHaveBeenCalledWith("https://api.test/warmup-config");
+  });
+
+  it("surfaces an error when the initial load fails", async () => {
+    vi.stubEnv("VITE_WARMUP_CONFIG_ENDPOINT", "https://api.test/warmup-config");
+    (fetch as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("network down"));
+
+    const { useWarmupSchedule } = await import("./useWarmupSchedule");
+
+    const { result } = renderHook(() => useWarmupSchedule());
+
+    await waitFor(() => expect(result.current.error).toBe("Couldn't load warmup status"));
+  });
+
+  it("setEnabled POSTs the new value and updates state from the response", async () => {
+    vi.stubEnv("VITE_WARMUP_CONFIG_ENDPOINT", "https://api.test/warmup-config");
+    (fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({ json: async () => ({ enabled: false }) })
+      .mockResolvedValueOnce({ json: async () => ({ enabled: true }) });
+
+    const { useWarmupSchedule } = await import("./useWarmupSchedule");
+
+    const { result } = renderHook(() => useWarmupSchedule());
+    await waitFor(() => expect(result.current.enabled).toBe(false));
+
+    act(() => {
+      result.current.setEnabled(true);
+    });
+
+    expect(result.current.pending).toBe(true);
+    await waitFor(() => expect(result.current.enabled).toBe(true));
+    expect(result.current.pending).toBe(false);
+
+    const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[1];
+    expect(init).toMatchObject({ method: "POST", headers: { "content-type": "application/json" } });
+    expect(JSON.parse(init.body)).toEqual({ enabled: true });
+  });
+
+  it("setEnabled surfaces an error and clears pending on failure", async () => {
+    vi.stubEnv("VITE_WARMUP_CONFIG_ENDPOINT", "https://api.test/warmup-config");
+    (fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({ json: async () => ({ enabled: false }) })
+      .mockRejectedValueOnce(new Error("network down"));
+
+    const { useWarmupSchedule } = await import("./useWarmupSchedule");
+
+    const { result } = renderHook(() => useWarmupSchedule());
+    await waitFor(() => expect(result.current.enabled).toBe(false));
+
+    act(() => {
+      result.current.setEnabled(true);
+    });
+
+    await waitFor(() => expect(result.current.error).toBe("Couldn't update warmup status"));
+    expect(result.current.pending).toBe(false);
+  });
+
+  it("setEnabled is a no-op when unavailable", async () => {
+    vi.stubEnv("VITE_WARMUP_CONFIG_ENDPOINT", "");
+
+    const { useWarmupSchedule } = await import("./useWarmupSchedule");
+
+    const { result } = renderHook(() => useWarmupSchedule());
+    act(() => result.current.setEnabled(true));
+
+    expect(fetch).not.toHaveBeenCalled();
+    expect(result.current.pending).toBe(false);
+  });
+});
