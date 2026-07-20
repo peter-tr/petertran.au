@@ -82,6 +82,7 @@ async function reconcileTarget(functionName: string, shouldBeWarm: boolean): Pro
           ProvisionedConcurrentExecutions: 1,
         })
       );
+
       return;
     }
 
@@ -140,6 +141,7 @@ export async function handler(
         }),
       };
     }
+
     const key = body.function as PcFunctionKey;
 
     const flags = await getFlags();
