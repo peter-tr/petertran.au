@@ -7,7 +7,9 @@ import globals from "globals";
 import graphqlPlugin from "@graphql-eslint/eslint-plugin";
 
 export default tseslint.config(
-  { ignores: ["**/dist/**", "**/cdk.out/**", "**/node_modules/**", ".claude/worktrees/**"] },
+  {
+    ignores: ["**/dist/**", "**/cdk.out/**", "**/node_modules/**", ".claude/worktrees/**", "**/.tsbuild/**"],
+  },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

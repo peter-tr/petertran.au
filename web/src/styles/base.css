@@ -91,6 +91,13 @@ a {
 }
 
 @media (max-width: 640px) {
+  /* Matches .nav-inner's own mobile padding below - without this, page
+     content (Hero/Pantry/Imposter, all rendered inside .wrap) sits 8px
+     further from the screen edge than the nav bar above it. */
+  .wrap {
+    padding: 0 1rem;
+  }
+
   .nav-inner {
     padding: 0.8rem 1rem;
   }

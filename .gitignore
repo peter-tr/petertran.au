@@ -9,3 +9,6 @@ cdk.out/
 .prettiercache
 *.generated.ts
 .turbo/
+test-results/
+playwright-report/
+blob-report/
