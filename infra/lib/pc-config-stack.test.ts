@@ -22,7 +22,7 @@ afterAll(() => {
 });
 
 describe("ProvisionedConcurrencyStack", () => {
-  it("synthesizes with the pc-config Lambda, its SSM parameter, and the hourly reconcile schedule", () => {
+  it("synthesizes with the pc-config Lambda, its SSM parameter, and 8 on/off schedules plus the backstop reconcile", () => {
     const app = new App();
     const stack = new ProvisionedConcurrencyStack(app, "TestProvisionedConcurrencyStack", {
       portfolioFnName: "portfolio-graphql",
@@ -45,6 +45,8 @@ describe("ProvisionedConcurrencyStack", () => {
       FunctionName: "pc-config",
     });
     template.resourceCountIs("AWS::SSM::Parameter", 1);
-    template.resourceCountIs("AWS::Scheduler::Schedule", 1);
+    // 2 (on/off) per project (portfolio, pantry, imposter, zeroTrustLab) plus
+    // the one backstop reconcile schedule.
+    template.resourceCountIs("AWS::Scheduler::Schedule", 9);
   });
 });

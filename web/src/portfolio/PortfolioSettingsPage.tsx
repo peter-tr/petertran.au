@@ -1,8 +1,8 @@
 import { Link } from "react-router-dom";
 import { useShowAlsoBuilt } from "./hooks/useShowAlsoBuilt";
-import { useWarmupSchedule } from "./hooks/useWarmupSchedule";
 import { usePageLoadWarmup } from "./hooks/usePageLoadWarmup";
 import { usePcConfig, type PcFunctionKey } from "./hooks/usePcConfig";
+import PcProjectSchedule from "./components/PcProjectSchedule";
 import "./portfolio.css";
 
 const PC_FUNCTION_LABELS: Record<PcFunctionKey, string> = {
@@ -14,19 +14,12 @@ const PC_FUNCTION_LABELS: Record<PcFunctionKey, string> = {
 
 export default function PortfolioSettingsPage() {
   const { showAlsoBuilt, setShowAlsoBuilt } = useShowAlsoBuilt();
-  const {
-    enabled: scheduleEnabled,
-    pending: schedulePending,
-    error: scheduleError,
-    setEnabled: setScheduleEnabled,
-    available: scheduleAvailable,
-  } = useWarmupSchedule();
   const { pageLoadWarmup, setPageLoadWarmup } = usePageLoadWarmup();
   const {
-    flags: pcFlags,
+    config: pcConfig,
     pending: pcPending,
     error: pcError,
-    setEnabled: setPcEnabled,
+    setSchedule: setPcSchedule,
     available: pcAvailable,
   } = usePcConfig();
 
@@ -61,40 +54,23 @@ export default function PortfolioSettingsPage() {
         </label>
       </div>
 
-      {scheduleAvailable && (
-        <div className="form-row">
-          <label className="form-label" htmlFor="warmup-schedule">
-            <input
-              id="warmup-schedule"
-              type="checkbox"
-              checked={scheduleEnabled ?? false}
-              disabled={scheduleEnabled === null || schedulePending}
-              onChange={(e) => setScheduleEnabled(e.target.checked)}
-            />{" "}
-            Keep the site's Lambdas warm on a schedule (pings every 10 minutes, cheaper, helps every visitor)
-          </label>
-          {scheduleError && <p className="section-hint">{scheduleError}</p>}
-        </div>
-      )}
-
       {pcAvailable && (
         <div className="form-row">
           <p className="form-label">
-            Keep warm 8am-7pm (Sydney) with provisioned concurrency - no cold starts for real visitors during
-            those hours, ~$1.58/mo each
+            Keep warm with provisioned concurrency (Sydney time) - no cold starts for real visitors during the
+            window you set below, ~$1.58/mo each at 11h/day, 256MB
           </p>
-          {(Object.keys(PC_FUNCTION_LABELS) as PcFunctionKey[]).map((fn) => (
-            <label className="form-label" htmlFor={`pc-${fn}`} key={fn}>
-              <input
-                id={`pc-${fn}`}
-                type="checkbox"
-                checked={pcFlags?.[fn] ?? false}
-                disabled={pcFlags === null || pcPending}
-                onChange={(e) => setPcEnabled(fn, e.target.checked)}
-              />{" "}
-              {PC_FUNCTION_LABELS[fn]}
-            </label>
-          ))}
+          {pcConfig &&
+            (Object.keys(PC_FUNCTION_LABELS) as PcFunctionKey[]).map((fn) => (
+              <PcProjectSchedule
+                key={fn}
+                fn={fn}
+                label={PC_FUNCTION_LABELS[fn]}
+                schedule={pcConfig[fn]}
+                pending={pcPending}
+                onSave={(schedule) => setPcSchedule(fn, schedule)}
+              />
+            ))}
           {pcError && <p className="section-hint">{pcError}</p>}
         </div>
       )}

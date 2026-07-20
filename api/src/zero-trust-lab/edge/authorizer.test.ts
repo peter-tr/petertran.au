@@ -53,17 +53,6 @@ beforeEach(() => {
 });
 
 describe("edge authorizer handler", () => {
-  it("denies a warmup ping without evaluating any real path (no fetch, no invoke)", async () => {
-    const fetchSpy = vi.fn();
-    vi.stubGlobal("fetch", fetchSpy);
-
-    const result = await handler({ warmup: true });
-
-    expect(result.isAuthorized).toBe(false);
-    expect(fetchSpy).not.toHaveBeenCalled();
-    expect(lambdaMock.commandCalls(InvokeCommand)).toHaveLength(0);
-  });
-
   it("denies when the Authorization header is missing", async () => {
     const result = await handler(authEvent({ rawPath: "/domain-a/foo" }));
     expect(result).toEqual({ isAuthorized: false, context: { jwt: "", sub: "" } });

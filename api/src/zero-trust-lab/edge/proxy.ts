@@ -3,18 +3,13 @@ import type {
   APIGatewayProxyStructuredResultV2,
 } from "aws-lambda";
 import type { EdgeAuthContext } from "./authorizer";
-import { isWarmupPing, type WarmupPing } from "api-shared/warmup";
 
 const DOMAIN_A_URL = process.env.DOMAIN_A_URL!;
 const DOMAIN_B_URL = process.env.DOMAIN_B_URL;
 
 export async function handler(
-  event: APIGatewayProxyEventV2WithLambdaAuthorizer<EdgeAuthContext> | WarmupPing
+  event: APIGatewayProxyEventV2WithLambdaAuthorizer<EdgeAuthContext>
 ): Promise<APIGatewayProxyStructuredResultV2> {
-  // Checked first - a warmup payload has no requestContext, and destructuring
-  // it below would throw, not just no-op.
-  if (isWarmupPing(event)) return { statusCode: 200, body: "warm" };
-
   const { jwt } = event.requestContext.authorizer.lambda;
 
   const [prefix, ...rest] = event.rawPath.split("/").filter(Boolean);

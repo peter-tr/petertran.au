@@ -1,11 +1,8 @@
 import type { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyStructuredResultV2 } from "aws-lambda";
-import { isWarmupPing, type WarmupPing } from "api-shared/warmup";
 
 export async function handler(
-  event: APIGatewayProxyEventV2WithJWTAuthorizer | WarmupPing
+  event: APIGatewayProxyEventV2WithJWTAuthorizer
 ): Promise<APIGatewayProxyStructuredResultV2> {
-  if (isWarmupPing(event)) return { statusCode: 200, body: "warm" };
-
   return {
     statusCode: 200,
     headers: { "content-type": "application/json" },

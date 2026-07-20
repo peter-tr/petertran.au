@@ -48,8 +48,8 @@ function recordNameFor(domain: string, hostedZoneName: string): string {
 }
 
 export class SiteStack extends Stack {
-  // Exposed so PetertranWarmupStack can schedule a keep-warm ping against it
-  // without this stack needing to know anything about warmup at all.
+  // Exposed so ApiGatewayStack/ProvisionedConcurrencyStack can target it
+  // without this stack needing to know anything about either.
   public readonly apiFn: lambda.Function;
 
   constructor(scope: Construct, id: string, props: SiteStackProps) {
@@ -146,10 +146,11 @@ export class SiteStack extends Stack {
     const apiFn = new lambda.Function(this, "GraphQLFunction", {
       // Explicit, so it reads clearly in the X-Ray trace map instead of
       // CloudFormation's auto-generated "PetertranSiteStack-GraphQLFunction72B66DDD-..." name.
-      // Also lets WarmupStack reference it by a plain string instead of a
-      // live construct reference, which would create a CloudFormation
-      // cross-stack export - an export blocks this function from ever being
-      // replaced while WarmupStack still has it imported.
+      // Also lets ApiGatewayStack/ProvisionedConcurrencyStack reference it by
+      // a plain string instead of a live construct reference, which would
+      // create a CloudFormation cross-stack export - an export blocks this
+      // function from ever being replaced while that stack still has it
+      // imported.
       functionName: props.functionName ?? FUNCTION_NAMES.portfolio,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "handler.handler",
@@ -183,7 +184,7 @@ export class SiteStack extends Stack {
     emailIdentity.grantSendEmail(apiFn);
     recipientIdentity.grantSendEmail(apiFn);
 
-    // Qualifier ApiGatewayStack/WarmupStack target and ProvisionedConcurrencyStack
+    // Qualifier ApiGatewayStack targets and ProvisionedConcurrencyStack
     // applies PC to - see LIVE_ALIAS_NAME's doc comment.
     new lambda.Alias(this, "LiveAlias", {
       aliasName: LIVE_ALIAS_NAME,

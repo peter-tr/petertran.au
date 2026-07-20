@@ -6,22 +6,41 @@ import {
   ResourceNotFoundException,
 } from "@aws-sdk/client-lambda";
 import { SSMClient, GetParameterCommand, PutParameterCommand } from "@aws-sdk/client-ssm";
+import { SchedulerClient, GetScheduleCommand, UpdateScheduleCommand } from "@aws-sdk/client-scheduler";
 import { parseJsonBody } from "api-shared/http";
 
 const lambdaClient = new LambdaClient({});
 const ssm = new SSMClient({});
+const scheduler = new SchedulerClient({});
 
 const ALIAS_NAME = process.env.LIVE_ALIAS_NAME!;
 const PARAM_NAME = process.env.PC_CONFIG_PARAM_NAME!;
+// CDK-provided map of each project's on/off EventBridge Schedule names -
+// see infra/lib/pc-config-stack.ts.
+const SCHEDULE_NAMES: Record<PcFunctionKey, { on: string; off: string }> = JSON.parse(
+  process.env.PC_SCHEDULE_NAMES!
+);
 
 type PcFunctionKey = "portfolio" | "pantry" | "imposter" | "zeroTrustLab";
+type Weekday = "MON" | "TUE" | "WED" | "THU" | "FRI" | "SAT" | "SUN";
 
-// One flag can cover more than one target function - zero-trust-lab's 5
-// Lambdas only work as a pipeline (edge-authorizer needs internal-sts warm
+interface PcSchedule {
+  enabled: boolean;
+  days: Weekday[];
+  start: string; // "HH:MM", 24h, Sydney-local
+  end: string; // "HH:MM", must be > start - same-day windows only
+}
+
+type PcConfig = Record<PcFunctionKey, PcSchedule>;
+
+const ALL_WEEKDAYS: Weekday[] = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+
+// One flag/schedule can cover more than one target function - zero-trust-lab's
+// 5 Lambdas only work as a pipeline (edge-authorizer needs internal-sts warm
 // too, domain-a's JWT verification needs internal-sts's JWKS endpoint
-// reachable), so they reconcile together under a single flag rather than
+// reachable), so they reconcile together under a single project rather than
 // drifting independently.
-const TARGETS_BY_FLAG: Record<PcFunctionKey, string[]> = {
+const TARGETS_BY_PROJECT: Record<PcFunctionKey, string[]> = {
   portfolio: [process.env.PORTFOLIO_FN_NAME!],
   pantry: [process.env.PANTRY_FN_NAME!],
   imposter: [process.env.IMPOSTER_FN_NAME!],
@@ -34,47 +53,74 @@ const TARGETS_BY_FLAG: Record<PcFunctionKey, string[]> = {
   ],
 };
 
-type PcFlags = Record<PcFunctionKey, boolean>;
+// On (business-hours PC scheduling active) by default, 8am-7pm every day -
+// matches how warmup's schedules used to be ENABLED at creation, and this
+// stack's original fixed window.
+const DEFAULT_SCHEDULE: PcSchedule = { enabled: true, days: ALL_WEEKDAYS, start: "08:00", end: "19:00" };
+const DEFAULT_CONFIG: PcConfig = {
+  portfolio: DEFAULT_SCHEDULE,
+  pantry: DEFAULT_SCHEDULE,
+  imposter: DEFAULT_SCHEDULE,
+  zeroTrustLab: DEFAULT_SCHEDULE,
+};
 
-// On (business-hours PC scheduling active) by default - matches how
-// warmup's schedules are also ENABLED at creation.
-const DEFAULT_FLAGS: PcFlags = { portfolio: true, pantry: true, imposter: true, zeroTrustLab: true };
-
-async function getFlags(): Promise<PcFlags> {
+async function getConfig(): Promise<PcConfig> {
   const { Parameter } = await ssm.send(new GetParameterCommand({ Name: PARAM_NAME }));
-  if (!Parameter?.Value) return DEFAULT_FLAGS;
+  if (!Parameter?.Value) return DEFAULT_CONFIG;
 
-  // Merge over the default so a flag added after this parameter was first
-  // written still gets a sane value, same reasoning as getSettings()'s
+  // Merge per-project over the default (not just top-level) so a project
+  // added after this parameter was first written, or a stored value that
+  // predates a field being added to PcSchedule, still gets a complete,
+  // sane schedule - same reasoning as getSettings()'s
   // {...DEFAULT_SETTINGS, ...stored} merge elsewhere in this codebase.
-  return { ...DEFAULT_FLAGS, ...(JSON.parse(Parameter.Value) as Partial<PcFlags>) };
+  const stored = JSON.parse(Parameter.Value) as Partial<Record<PcFunctionKey, Partial<PcSchedule>>>;
+  const merged = {} as PcConfig;
+  for (const key of Object.keys(DEFAULT_CONFIG) as PcFunctionKey[]) {
+    merged[key] = { ...DEFAULT_CONFIG[key], ...stored[key] };
+  }
+
+  return merged;
 }
 
-async function setFlags(flags: PcFlags): Promise<void> {
+async function setConfig(config: PcConfig): Promise<void> {
   await ssm.send(
-    new PutParameterCommand({ Name: PARAM_NAME, Value: JSON.stringify(flags), Overwrite: true })
+    new PutParameterCommand({ Name: PARAM_NAME, Value: JSON.stringify(config), Overwrite: true })
   );
 }
 
-// 8am-7pm Australia/Sydney, every day - the one window Provisioned
-// Concurrency is allowed to be on for, regardless of what the per-function
-// flag says.
-function isWithinSydneyBusinessHours(now: Date): boolean {
-  const hour = Number(
-    new Intl.DateTimeFormat("en-AU", { timeZone: "Australia/Sydney", hour: "numeric", hour12: false }).format(
-      now
-    )
-  );
+// Sydney weekday + "HH:MM" for `now`, so an enabled schedule with `days`/
+// `start`/`end` can be checked against the current moment.
+function sydneyNow(now: Date): { weekday: Weekday; time: string } {
+  const parts = new Intl.DateTimeFormat("en-AU", {
+    timeZone: "Australia/Sydney",
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(now);
 
-  return hour >= 8 && hour < 19;
+  const weekday = parts
+    .find((p) => p.type === "weekday")!
+    .value.toUpperCase()
+    .slice(0, 3) as Weekday;
+  const hour = parts.find((p) => p.type === "hour")!.value;
+  const minute = parts.find((p) => p.type === "minute")!.value;
+
+  return { weekday, time: `${hour}:${minute}` };
+}
+
+function isWithinWindow(schedule: PcSchedule, now: Date): boolean {
+  if (!schedule.enabled) return false;
+
+  const { weekday, time } = sydneyNow(now);
+
+  return schedule.days.includes(weekday) && schedule.start <= time && time < schedule.end;
 }
 
 // Never throws - applying PC is best-effort. The flag itself (what the user
 // asked for) is already durably saved in SSM by the time this runs; if AWS
 // can't actually grant PC right now (e.g. the account's concurrency quota
-// has no room - seen live, since this account's quota is pinned at 10, the
-// bare minimum AWS allows before refusing any Provisioned Concurrency at
-// all), that's a transient infra condition, not a reason to fail the
+// has no room), that's a transient infra condition, not a reason to fail the
 // request or the other targets' reconciliation in the same tick.
 async function reconcileTarget(functionName: string, shouldBeWarm: boolean): Promise<void> {
   try {
@@ -100,13 +146,67 @@ async function reconcileTarget(functionName: string, shouldBeWarm: boolean): Pro
   }
 }
 
-// Idempotent - safe to call redundantly. Called both by the hourly
-// {reconcile: true} tick (for every flag every hour) and directly by the
-// POST handler below (for just the one flag that changed), so a toggle
-// takes effect immediately instead of waiting for the next hourly tick.
-async function reconcileFlag(key: PcFunctionKey, enabled: boolean, now: Date): Promise<void> {
-  const shouldBeWarm = enabled && isWithinSydneyBusinessHours(now);
-  await Promise.all(TARGETS_BY_FLAG[key].map((functionName) => reconcileTarget(functionName, shouldBeWarm)));
+async function reconcileProjectTo(key: PcFunctionKey, shouldBeWarm: boolean): Promise<void> {
+  await Promise.all(
+    TARGETS_BY_PROJECT[key].map((functionName) => reconcileTarget(functionName, shouldBeWarm))
+  );
+}
+
+// Idempotent - safe to call redundantly. Called by the periodic backstop
+// {reconcile: true} tick (for every project every ~30min), by the exact
+// on/off trigger for just the project whose window opened/closed, and
+// directly by the POST handler for just the project that changed, so an
+// edit takes effect immediately instead of waiting for the next trigger.
+async function reconcileProject(key: PcFunctionKey, schedule: PcSchedule, now: Date): Promise<void> {
+  await reconcileProjectTo(key, isWithinWindow(schedule, now));
+}
+
+// Builds the AWS cron fields for a project's on/off EventBridge Schedule
+// from its configured days + a "HH:MM" time.
+function cronFieldsFor(days: Weekday[], time: string): { minute: string; hour: string; weekDay: string } {
+  const [hour, minute] = time.split(":");
+
+  return { minute, hour, weekDay: days.join(",") };
+}
+
+// EventBridge Scheduler has no partial-patch call - Update requires
+// resending the full schedule definition, so each edit re-fetches its own
+// current definition first and only changes ScheduleExpression/State. Same
+// idiom the old warmup-config Lambda used to toggle just State.
+async function updateProjectSchedules(key: PcFunctionKey, schedule: PcSchedule): Promise<void> {
+  const state = schedule.enabled ? "ENABLED" : "DISABLED";
+  const { on, off } = SCHEDULE_NAMES[key];
+  const onCron = cronFieldsFor(schedule.days, schedule.start);
+  const offCron = cronFieldsFor(schedule.days, schedule.end);
+
+  await Promise.all([
+    (async () => {
+      const current = await scheduler.send(new GetScheduleCommand({ Name: on }));
+      await scheduler.send(
+        new UpdateScheduleCommand({
+          Name: on,
+          ScheduleExpression: `cron(${onCron.minute} ${onCron.hour} ? * ${onCron.weekDay} *)`,
+          ScheduleExpressionTimezone: "Australia/Sydney",
+          FlexibleTimeWindow: current.FlexibleTimeWindow,
+          Target: current.Target,
+          State: state,
+        })
+      );
+    })(),
+    (async () => {
+      const current = await scheduler.send(new GetScheduleCommand({ Name: off }));
+      await scheduler.send(
+        new UpdateScheduleCommand({
+          Name: off,
+          ScheduleExpression: `cron(${offCron.minute} ${offCron.hour} ? * ${offCron.weekDay} *)`,
+          ScheduleExpressionTimezone: "Australia/Sydney",
+          FlexibleTimeWindow: current.FlexibleTimeWindow,
+          Target: current.Target,
+          State: state,
+        })
+      );
+    })(),
+  ]);
 }
 
 interface ReconcilePing {
@@ -117,42 +217,89 @@ function isReconcilePing(event: unknown): event is ReconcilePing {
   return typeof event === "object" && event !== null && (event as { reconcile?: unknown }).reconcile === true;
 }
 
+interface PcTrigger {
+  project: PcFunctionKey;
+  action: "on" | "off";
+}
+
+function isPcTrigger(event: unknown): event is PcTrigger {
+  return (
+    typeof event === "object" &&
+    event !== null &&
+    typeof (event as { project?: unknown }).project === "string" &&
+    ((event as { action?: unknown }).action === "on" || (event as { action?: unknown }).action === "off")
+  );
+}
+
+function isValidSchedule(value: unknown): value is PcSchedule {
+  if (typeof value !== "object" || value === null) return false;
+
+  const s = value as Partial<PcSchedule>;
+
+  return (
+    typeof s.enabled === "boolean" &&
+    Array.isArray(s.days) &&
+    s.days.every((d) => ALL_WEEKDAYS.includes(d as Weekday)) &&
+    (!s.enabled || s.days.length > 0) &&
+    typeof s.start === "string" &&
+    typeof s.end === "string" &&
+    /^\d{2}:\d{2}$/.test(s.start) &&
+    /^\d{2}:\d{2}$/.test(s.end) &&
+    s.start < s.end
+  );
+}
+
 export async function handler(
-  event: APIGatewayProxyEventV2 | ReconcilePing
+  event: APIGatewayProxyEventV2 | ReconcilePing | PcTrigger
 ): Promise<APIGatewayProxyStructuredResultV2> {
   if (isReconcilePing(event)) {
-    const flags = await getFlags();
+    const config = await getConfig();
     const now = new Date();
     await Promise.all(
-      (Object.keys(TARGETS_BY_FLAG) as PcFunctionKey[]).map((key) => reconcileFlag(key, flags[key], now))
+      (Object.keys(TARGETS_BY_PROJECT) as PcFunctionKey[]).map((key) =>
+        reconcileProject(key, config[key], now)
+      )
     );
 
     return { statusCode: 200, body: "reconciled" };
   }
 
+  if (isPcTrigger(event)) {
+    // Trust the trigger - the schedule's own State is kept in sync with
+    // schedule.enabled on every settings save, so there's no need to
+    // re-derive "should be on" from the stored config here.
+    await reconcileProjectTo(event.project, event.action === "on");
+
+    return { statusCode: 200, body: "reconciled" };
+  }
+
   if (event.requestContext.http.method === "POST") {
-    const body = parseJsonBody<{ function?: string; enabled?: boolean }>(event);
-    if (!body.function || !(body.function in TARGETS_BY_FLAG) || typeof body.enabled !== "boolean") {
+    const body = parseJsonBody<{ project?: string; schedule?: unknown }>(event);
+    if (!body.project || !(body.project in TARGETS_BY_PROJECT) || !isValidSchedule(body.schedule)) {
       return {
         statusCode: 400,
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          error: "function must be one of portfolio/pantry/imposter/zeroTrustLab, enabled must be a boolean",
+          error:
+            "project must be one of portfolio/pantry/imposter/zeroTrustLab, schedule must be a valid " +
+            "{ enabled, days, start, end }",
         }),
       };
     }
 
-    const key = body.function as PcFunctionKey;
+    const key = body.project as PcFunctionKey;
+    const schedule = body.schedule;
 
-    const flags = await getFlags();
-    flags[key] = body.enabled;
-    await setFlags(flags);
-    await reconcileFlag(key, body.enabled, new Date());
+    const config = await getConfig();
+    config[key] = schedule;
+    await setConfig(config);
+    await updateProjectSchedules(key, schedule);
+    await reconcileProject(key, schedule, new Date());
 
-    return { statusCode: 200, headers: { "content-type": "application/json" }, body: JSON.stringify(flags) };
+    return { statusCode: 200, headers: { "content-type": "application/json" }, body: JSON.stringify(config) };
   }
 
-  const flags = await getFlags();
+  const config = await getConfig();
 
-  return { statusCode: 200, headers: { "content-type": "application/json" }, body: JSON.stringify(flags) };
+  return { statusCode: 200, headers: { "content-type": "application/json" }, body: JSON.stringify(config) };
 }

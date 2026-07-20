@@ -1011,6 +1011,56 @@
   }
 }
 
+/* ---------- settings: PC schedule editor ---------- */
+
+.pc-schedule {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.8rem 0;
+  border-top: 1px solid var(--rule);
+}
+
+.pc-days {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.pc-day-btn {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--muted);
+  background: none;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  padding: 0.25rem 0.7rem;
+  cursor: pointer;
+}
+
+.pc-day-btn.active {
+  color: var(--ink);
+  background: var(--signal);
+  border-color: var(--signal);
+}
+
+.pc-times {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.pc-times .form-input {
+  width: auto;
+}
+
+.pc-times-sep {
+  color: var(--muted-dim);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+}
+
 /* ---------- states (reduced motion) ---------- */
 
 @media (prefers-reduced-motion: reduce) {
