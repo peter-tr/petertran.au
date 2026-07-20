@@ -35,9 +35,34 @@ describe("PantryStack", () => {
     template.resourceCountIs("AWS::DynamoDB::Table", 1);
     template.hasResourceProperties("AWS::DynamoDB::Table", {
       TableName: "pantry",
+      DeletionProtectionEnabled: true,
     });
     // Hourly digest + hourly-tick isn't here - PantryDigestSchedule is the
     // only scheduler:: Schedule this stack creates.
     template.resourceCountIs("AWS::Scheduler::Schedule", 1);
+  });
+
+  it("isTestEnv: skips the digest/price-check Lambdas and schedule, drops table protection", () => {
+    const app = new App();
+    const stack = new PantryStack(app, "TestEnvPantryStack", {
+      tableName: "pantry-test",
+      functionName: "pantry-graphql-test",
+      isTestEnv: true,
+      env: { account: "123456789012", region: "ap-southeast-2" },
+    });
+
+    const template = Template.fromStack(stack);
+
+    // Just PantryGraphQLFunction - no digest/price-check Lambdas, neither
+    // of which is part of what the test env exists to validate.
+    template.resourceCountIs("AWS::Lambda::Function", 1);
+    template.hasResourceProperties("AWS::Lambda::Function", {
+      FunctionName: "pantry-graphql-test",
+    });
+    template.resourceCountIs("AWS::Scheduler::Schedule", 0);
+    template.hasResourceProperties("AWS::DynamoDB::Table", {
+      TableName: "pantry-test",
+      DeletionProtectionEnabled: false,
+    });
   });
 });

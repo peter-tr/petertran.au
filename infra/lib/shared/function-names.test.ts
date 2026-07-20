@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { FUNCTION_NAMES, LIVE_ALIAS_NAME, liveAliasArn } from "./function-names";
+import { FUNCTION_NAMES, TEST_FUNCTION_NAMES, LIVE_ALIAS_NAME, liveAliasArn } from "./function-names";
 
 describe("liveAliasArn", () => {
   it("builds a qualified Lambda alias ARN from region/account/function name", () => {
@@ -18,5 +18,14 @@ describe("FUNCTION_NAMES", () => {
   it("has no duplicate literal values - each Lambda needs a distinct name", () => {
     const values = Object.values(FUNCTION_NAMES);
     expect(new Set(values).size).toBe(values.length);
+  });
+});
+
+describe("TEST_FUNCTION_NAMES", () => {
+  it("shares no literal value with FUNCTION_NAMES - the test env deploys alongside prod, not instead of it", () => {
+    const prodValues = new Set<string>(Object.values(FUNCTION_NAMES));
+    for (const testValue of Object.values(TEST_FUNCTION_NAMES)) {
+      expect(prodValues.has(testValue)).toBe(false);
+    }
   });
 });

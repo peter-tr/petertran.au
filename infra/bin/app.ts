@@ -9,9 +9,7 @@ import { ZeroTrustLabStack } from "../lib/zero-trust-lab-stack";
 import { WarmupStack } from "../lib/warmup-stack";
 import { ApiGatewayStack } from "../lib/api-gateway-stack";
 import { ProvisionedConcurrencyStack } from "../lib/pc-config-stack";
-import { TestCertStack } from "../lib/test-cert-stack";
-import { TestEnvStack } from "../lib/test-env-stack";
-import { FUNCTION_NAMES } from "../lib/shared/function-names";
+import { FUNCTION_NAMES, TEST_FUNCTION_NAMES } from "../lib/shared/function-names";
 
 const app = new App();
 
@@ -123,19 +121,63 @@ new ApiGatewayStack(app, "PetertranApiGatewayStack", {
 // testing big changes (e.g. Apollo Router/Federation) without touching prod -
 // gated behind an env var so it never shows up in a normal `cdk deploy --all`
 // (see .github/workflows/deploy-test-env.yml, which is the only caller that
-// sets this). See infra/lib/test-env-stack.ts for what it deliberately omits.
+// sets this). Reuses the exact same stack classes as prod above - own
+// domain, own tables, own Lambda names - instead of a hand-maintained
+// parallel copy, so it can't silently drift from whatever prod actually
+// deploys (see each class's isTestEnv-guarded branches for what's
+// deliberately omitted: SES/RUM domain-wide singletons stay owned by prod's
+// invocation, and warmup/pc-config/zero-trust-lab aren't part of what the
+// test env exists to validate).
 if (process.env.DEPLOY_TEST_ENV === "true") {
-  const testCertStack = new TestCertStack(app, "PetertranTestCertStack", {
+  const testDomainName = `test.${hostedZoneName}`;
+  const testAlternateDomainNames = [`www.test.${hostedZoneName}`];
+
+  const testCertStack = new CertStack(app, "PetertranTestCertStack", {
+    domainName: testDomainName,
+    alternateDomainNames: testAlternateDomainNames,
     hostedZoneId,
     hostedZoneName,
     env: { account, region: "us-east-1" },
     crossRegionReferences: true,
   });
-  new TestEnvStack(app, "PetertranTestEnvStack", {
+
+  new SiteStack(app, "PetertranTestSiteStack", {
+    domainName: testDomainName,
+    alternateDomainNames: testAlternateDomainNames,
     certificate: testCertStack.certificate,
     hostedZoneId,
     hostedZoneName,
+    tableName: "resume-test",
+    bucketName: `petertran-au-site-test-${account}`,
+    functionName: TEST_FUNCTION_NAMES.portfolio,
+    isTestEnv: true,
     env: { account, region: "ap-southeast-2" },
     crossRegionReferences: true,
+  });
+
+  new PantryStack(app, "PetertranTestPantryStack", {
+    tableName: "pantry-test",
+    functionName: TEST_FUNCTION_NAMES.pantry,
+    isTestEnv: true,
+    env: { account, region: "ap-southeast-2" },
+  });
+
+  new GamesStack(app, "PetertranTestGamesStack", {
+    tableName: "games-test",
+    functionName: TEST_FUNCTION_NAMES.imposter,
+    isTestEnv: true,
+    env: { account, region: "ap-southeast-2" },
+  });
+
+  new ApiGatewayStack(app, "PetertranTestApiGatewayStack", {
+    domainName: testDomainName,
+    alternateDomainNames: testAlternateDomainNames,
+    hostedZoneId,
+    hostedZoneName,
+    apiSubdomain: "api.test",
+    portfolioFnName: TEST_FUNCTION_NAMES.portfolio,
+    pantryFnName: TEST_FUNCTION_NAMES.pantry,
+    imposterFnName: TEST_FUNCTION_NAMES.imposter,
+    env: { account, region: "ap-southeast-2" },
   });
 }

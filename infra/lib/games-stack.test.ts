@@ -36,9 +36,30 @@ describe("GamesStack", () => {
     template.resourceCountIs("AWS::DynamoDB::Table", 1);
     template.hasResourceProperties("AWS::DynamoDB::Table", {
       TableName: "games",
+      DeletionProtectionEnabled: true,
     });
     template.hasResourceProperties("AWS::Lambda::Alias", {
       Name: "live",
+    });
+  });
+
+  it("isTestEnv: uses the given table/function names and drops table protection", () => {
+    const app = new App();
+    const stack = new GamesStack(app, "TestEnvGamesStack", {
+      tableName: "games-test",
+      functionName: "imposter-graphql-test",
+      isTestEnv: true,
+      env: { account: "123456789012", region: "ap-southeast-2" },
+    });
+
+    const template = Template.fromStack(stack);
+
+    template.hasResourceProperties("AWS::DynamoDB::Table", {
+      TableName: "games-test",
+      DeletionProtectionEnabled: false,
+    });
+    template.hasResourceProperties("AWS::Lambda::Function", {
+      FunctionName: "imposter-graphql-test",
     });
   });
 });

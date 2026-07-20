@@ -13,6 +13,11 @@ export interface ApiGatewayStackProps extends StackProps {
   alternateDomainNames?: string[];
   hostedZoneId: string;
   hostedZoneName: string;
+  // Subdomain this stack's HttpApi lives under - defaults to "api"
+  // (api.petertran.au). The on-demand test environment (see
+  // infra/bin/app.ts) passes "api.test" instead, so both invocations can
+  // deploy into the same hosted zone without colliding.
+  apiSubdomain?: string;
   // Plain function *names* (not live lambda.IFunction references) - same
   // reasoning as WarmupStack (see its doc comment): a live reference passed
   // cross-stack becomes a CloudFormation export that blocks the producing
@@ -21,8 +26,12 @@ export interface ApiGatewayStackProps extends StackProps {
   portfolioFnName: string;
   pantryFnName: string;
   imposterFnName: string;
-  warmupConfigFnName: string;
-  pcConfigFnName: string;
+  // Omitted (not just empty-string) for the test env - warmup/PC are
+  // operational concerns that don't apply to a disposable environment (see
+  // warmup-stack.ts/pc-config-stack.ts), so their routes are skipped
+  // entirely rather than pointed at a Lambda that doesn't exist there.
+  warmupConfigFnName?: string;
+  pcConfigFnName?: string;
 }
 
 /**
@@ -32,6 +41,10 @@ export interface ApiGatewayStackProps extends StackProps {
  * never needs to track a CloudFormation-generated URL again. Deliberately
  * does NOT cover zero-trust-lab's own edge/domain gateways - those stay
  * isolated per that stack's own design intent (see zero-trust-lab-stack.ts).
+ *
+ * Reused as-is for the on-demand test environment (see infra/bin/app.ts),
+ * fronting just portfolio/pantry/imposter under api.test.petertran.au -
+ * warmupConfigFnName/pcConfigFnName omitted, apiSubdomain overridden.
  */
 export class ApiGatewayStack extends Stack {
   constructor(scope: Construct, id: string, props: ApiGatewayStackProps) {
@@ -42,7 +55,7 @@ export class ApiGatewayStack extends Stack {
       zoneName: props.hostedZoneName,
     });
 
-    const apiDomain = `api.${props.hostedZoneName}`;
+    const apiDomain = `${props.apiSubdomain ?? "api"}.${props.hostedZoneName}`;
 
     // Unlike CertStack's cert (validated manually - no zone passed to
     // fromDns), this one imports the zone directly, so CDK auto-manages the
@@ -90,8 +103,12 @@ export class ApiGatewayStack extends Stack {
       },
       { id: "Pantry", path: "/pantry", functionName: props.pantryFnName, aliasName: LIVE_ALIAS_NAME },
       { id: "Imposter", path: "/imposter", functionName: props.imposterFnName, aliasName: LIVE_ALIAS_NAME },
-      { id: "Warmup", path: "/warmup", functionName: props.warmupConfigFnName },
-      { id: "PcConfig", path: "/pc-config", functionName: props.pcConfigFnName },
+      ...(props.warmupConfigFnName
+        ? [{ id: "Warmup", path: "/warmup", functionName: props.warmupConfigFnName }]
+        : []),
+      ...(props.pcConfigFnName
+        ? [{ id: "PcConfig", path: "/pc-config", functionName: props.pcConfigFnName }]
+        : []),
     ];
 
     for (const route of routes) {
@@ -122,12 +139,12 @@ export class ApiGatewayStack extends Stack {
     );
     new route53.ARecord(this, "ApiAliasRecordV4", {
       zone: hostedZone,
-      recordName: "api",
+      recordName: props.apiSubdomain ?? "api",
       target: aliasTarget,
     });
     new route53.AaaaRecord(this, "ApiAliasRecordV6", {
       zone: hostedZone,
-      recordName: "api",
+      recordName: props.apiSubdomain ?? "api",
       target: aliasTarget,
     });
 

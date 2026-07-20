@@ -6,7 +6,16 @@ import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as path from "path";
 import { FUNCTION_NAMES, LIVE_ALIAS_NAME } from "./shared/function-names";
 
-export type GamesStackProps = StackProps;
+export interface GamesStackProps extends StackProps {
+  // Optional, defaults to prod's current values - only the on-demand test
+  // environment (see infra/bin/app.ts) passes any of these.
+  tableName?: string;
+  functionName?: string;
+  // True only for the disposable test-env instantiation - drops the
+  // table's deletion protection/PITR so `cdk destroy` can actually tear it
+  // down (see destroy-test-env.yml).
+  isTestEnv?: boolean;
+}
 
 /**
  * Small side-project games and other misc one-offs that live alongside
@@ -25,14 +34,14 @@ export class GamesStack extends Stack {
     const table = new dynamodb.Table(this, "GamesTable", {
       // Explicit, so it reads clearly in the X-Ray trace map instead of
       // CloudFormation's auto-generated name.
-      tableName: "games",
+      tableName: props.tableName ?? "games",
       partitionKey: { name: "pk", type: dynamodb.AttributeType.STRING },
       sortKey: { name: "sk", type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       removalPolicy: RemovalPolicy.DESTROY,
       timeToLiveAttribute: "ttl",
-      pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
-      deletionProtection: true,
+      pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: !props.isTestEnv },
+      deletionProtection: !props.isTestEnv,
     });
 
     // Sparse index for "list live games" - only games still in REVEAL or
@@ -57,7 +66,7 @@ export class GamesStack extends Stack {
       // CloudFormation's auto-generated name. Also lets WarmupStack
       // reference it by a plain string - see site-stack.ts's identical
       // comment on GraphQLFunction for why that matters.
-      functionName: FUNCTION_NAMES.imposter,
+      functionName: props.functionName ?? FUNCTION_NAMES.imposter,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "handler.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/src/games/imposter/dist")),
