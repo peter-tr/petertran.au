@@ -31,6 +31,6 @@ describe("portfolio graphql query constants", () => {
   });
 
   it("reads the GraphQL endpoint from VITE_GRAPHQL_ENDPOINT", () => {
-    expect(ENDPOINT).toBe("https://api.test.petertran.au/portfolio");
+    expect(ENDPOINT).toBe("https://api.test.petertran.au/graphql");
   });
 });
