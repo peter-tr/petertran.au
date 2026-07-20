@@ -1,5 +1,16 @@
 # web
 
+## 1.2.0
+
+### Minor Changes
+
+- 553f6a6: scheduled Provisioned Concurrency for portfolio/pantry/imposter + zero-trust-lab
+- 8856b38: add Playwright visual e2e tests for portfolio/pantry/imposter
+
+### Patch Changes
+
+- 342c866: add Vitest unit test suites across all workspaces
+
 ## 1.1.0
 
 ### Minor Changes
