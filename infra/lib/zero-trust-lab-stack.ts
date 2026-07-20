@@ -58,6 +58,8 @@ export class ZeroTrustLabStack extends Stack {
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       removalPolicy: RemovalPolicy.DESTROY,
       timeToLiveAttribute: "ttl",
+      pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
+      deletionProtection: true,
     });
 
     // RSA, not EC - see lib/jwt.ts for why (KMS's RSA signature bytes are

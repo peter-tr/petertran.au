@@ -1,13 +1,14 @@
 {
   "name": "web",
   "private": true,
-  "version": "1.0.2",
+  "version": "1.1.0",
   "type": "module",
   "scripts": {
     "codegen": "graphql-codegen --config codegen.ts",
     "dev": "vite",
     "typecheck": "tsc -b",
     "build": "tsc -b && vite build && npm run prerender",
+    "build:test": "tsc -b && vite build --mode test && npm run prerender",
     "prerender": "tsx scripts/prerender.tsx",
     "preview": "vite preview"
   },

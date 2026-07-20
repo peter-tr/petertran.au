@@ -35,6 +35,8 @@ export class PantryStack extends Stack {
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       removalPolicy: RemovalPolicy.DESTROY,
       timeToLiveAttribute: "ttl",
+      pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
+      deletionProtection: true,
     });
 
     // Reuses the same Anthropic key as the resume API and Imposter - it's

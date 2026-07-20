@@ -1,19 +1,23 @@
 {
   "name": "infra",
   "private": true,
-  "version": "1.0.1",
+  "version": "1.1.0",
   "scripts": {
     "cdk": "cdk",
-    "build": "tsc --noEmit"
+    "build": "tsc --noEmit",
+    "refresh-test-table": "tsx scripts/refresh-test-table.ts"
   },
   "dependencies": {
     "aws-cdk-lib": "^2.160.0",
     "constructs": "^10.3.0",
-    "source-map-support": "^0.5.21"
+    "source-map-support": "^0.5.21",
+    "@aws-sdk/client-dynamodb": "^3.658.0",
+    "@aws-sdk/lib-dynamodb": "^3.658.0"
   },
   "devDependencies": {
     "aws-cdk": "^2.160.0",
     "ts-node": "^10.9.2",
+    "tsx": "^4.19.0",
     "typescript": "^5.6.0",
     "@types/node": "^20.14.0"
   }
