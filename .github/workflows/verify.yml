@@ -56,9 +56,14 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-chromium-${{ runner.os }}-${{ hashFiles('web/package-lock.json', 'package-lock.json') }}
 
-      - name: Install Playwright Chromium (+ OS deps)
+      # EXPERIMENT: dropping --with-deps to test whether ubuntu-latest
+      # already has Chromium's required shared libs preinstalled (it ships
+      # Google Chrome, which needs mostly the same ones) - --with-deps'
+      # apt-get step costs ~39s on every run regardless of the browser
+      # binary cache above. Will revert if this breaks.
+      - name: Install Playwright Chromium
         working-directory: web
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install chromium
 
       # Boots each project's real dev server (same in-memory mock used for
       # local `npm run dev`) plus the Vite dev server, and takes visual
