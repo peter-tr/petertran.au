@@ -3,11 +3,6 @@ import { handler } from "./handler";
 import type { APIGatewayProxyEventV2WithJWTAuthorizer } from "aws-lambda";
 
 describe("domain-a handler", () => {
-  it("short-circuits a warmup ping", async () => {
-    const result = await handler({ warmup: true });
-    expect(result).toEqual({ statusCode: 200, body: "warm" });
-  });
-
   it("echoes the validated JWT claims from the requestContext authorizer", async () => {
     const event = {
       requestContext: {

@@ -1,7 +1,6 @@
 import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2 } from "aws-lambda";
 import { signJwt, getJwks, type JwtClaims } from "../lib/jwt";
 import { normalizePath } from "../lib/http";
-import { isWarmupPing, type WarmupPing } from "api-shared/warmup";
 
 const KMS_KEY_ID = process.env.KMS_KEY_ID!;
 const KID = "zero-trust-lab-key-1";
@@ -58,11 +57,8 @@ async function handleExchange(request: ExchangeRequest): Promise<{ jwt: string }
 }
 
 export async function handler(
-  event: APIGatewayProxyEventV2 | ExchangeRequest | WarmupPing
-): Promise<APIGatewayProxyStructuredResultV2 | { jwt: string } | { warm: true }> {
-  // Checked first, deliberately - handleExchange would otherwise treat this
-  // as a real exchange request and make a real KMS Sign call.
-  if (isWarmupPing(event)) return { warm: true };
+  event: APIGatewayProxyEventV2 | ExchangeRequest
+): Promise<APIGatewayProxyStructuredResultV2 | { jwt: string }> {
   if (isHttpEvent(event)) return handleHttp(event);
 
   return handleExchange(event);

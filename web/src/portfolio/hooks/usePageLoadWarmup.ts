@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 
 // Per-browser preference (like useShowAlsoBuilt) for whether Home fires its
-// warmUp() pings on load - see web/src/shared/warmUp.ts. Independent of the
-// server-side schedule (useWarmupSchedule): this one only tightens the
-// timing for *this* visitor, right before they're likely to navigate to
-// /pantry or /imposter, rather than relying on the schedule's up-to-10-minute
-// gap. Defaults to on, matching the original unconditional behavior.
+// warmUp() pings on load - see web/src/shared/warmUp.ts. Independent of
+// Provisioned Concurrency (usePcConfig): this one only tightens the timing
+// for *this* visitor, right before they're likely to navigate to
+// /pantry or /imposter, rather than relying on PC's scheduled window.
+// Defaults to on, matching the original unconditional behavior.
 const STORAGE_KEY = "portfolio:pageLoadWarmup";
 
 function readStoredValue(): boolean {

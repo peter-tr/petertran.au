@@ -10,7 +10,6 @@ import { typeDefs } from "./schema";
 import { resolvers } from "./resolvers/resolvers";
 import { operationStatsPlugin } from "./lib/util/operation-stats-plugin";
 import { createResumePartitionLoader } from "./lib/aws/resume-data";
-import { isWarmupPing, type WarmupPing } from "api-shared/warmup";
 import type { Context } from "./context";
 
 const server = new ApolloServer<Context>({
@@ -54,15 +53,9 @@ const apolloHandler = startServerAndCreateLambdaHandler(
   }
 );
 
-// The warmup schedule invokes this function directly (bypassing API
-// Gateway) with a fixed {warmup: true} payload - short-circuit before
-// Apollo ever sees it, so a scheduled ping never resolves a real query or
-// touches DynamoDB/Anthropic.
 export const handler = async (
-  event: APIGatewayProxyEventV2 | WarmupPing,
+  event: APIGatewayProxyEventV2,
   context: LambdaContext
 ): Promise<APIGatewayProxyStructuredResultV2 | void> => {
-  if (isWarmupPing(event)) return { statusCode: 200, body: "warm" };
-
   return apolloHandler(event, context, () => {});
 };

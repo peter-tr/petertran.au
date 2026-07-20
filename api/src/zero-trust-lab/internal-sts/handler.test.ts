@@ -14,8 +14,8 @@ const { signJwtMock, getJwksMock } = vi.hoisted(() => ({
 // internal-sts/handler.ts only orchestrates routing/dispatch around
 // signJwt/getJwks - the KMS-signing logic itself is covered directly in
 // lib/jwt.test.ts, so mock the module here to isolate the handler's own
-// branching (warmup short-circuit, HTTP vs. direct-invoke routing, path
-// dispatch, and how it shapes the exchange claims).
+// branching (HTTP vs. direct-invoke routing, path dispatch, and how it
+// shapes the exchange claims).
 vi.mock("../lib/jwt", () => ({
   signJwt: signJwtMock,
   getJwks: getJwksMock,
@@ -43,13 +43,6 @@ beforeEach(() => {
 });
 
 describe("internal-sts handler", () => {
-  it("short-circuits a warmup ping without calling KMS", async () => {
-    const result = await handler({ warmup: true });
-    expect(result).toEqual({ warm: true });
-    expect(signJwtMock).not.toHaveBeenCalled();
-    expect(getJwksMock).not.toHaveBeenCalled();
-  });
-
   it("serves the JWKS document over the Function URL route", async () => {
     const result = await handler(httpEvent("/.well-known/jwks.json"));
     expect(result).toMatchObject({ statusCode: 200, headers: { "content-type": "application/json" } });

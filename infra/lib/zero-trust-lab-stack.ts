@@ -28,19 +28,19 @@ export interface ZeroTrustLabStackProps extends StackProps {
  * site/pantry/games stacks. See infra/../../plans/buzzing-herding-willow.md
  * (or the PR description) for the full design writeup.
  *
- * Keep-warm scheduling and scheduled Provisioned Concurrency for this
- * stack's Lambdas live in PetertranWarmupStack/PetertranProvisionedConcurrencyStack,
- * not here - both are operational/cost concerns that apply equally to
- * portfolio/pantry/imposter's Lambdas, not something specific to the
- * zero-trust/token-exchange pattern this stack exists to teach. Each of the
- * 5 Lambdas here still gets its own `live` alias (see LIVE_ALIAS_NAME) so
- * those stacks - and every real entry point below (Function URLs, the
- * direct-invoke exchange, the HttpApi authorizers/integrations) - have a
- * PC-eligible qualifier to target instead of `$LATEST`.
+ * Scheduled Provisioned Concurrency for this stack's Lambdas lives in
+ * PetertranProvisionedConcurrencyStack, not here - an operational/cost
+ * concern that applies equally to portfolio/pantry/imposter's Lambdas, not
+ * something specific to the zero-trust/token-exchange pattern this stack
+ * exists to teach. Each of the 5 Lambdas here still gets its own `live`
+ * alias (see LIVE_ALIAS_NAME) so that stack - and every real entry point
+ * below (Function URLs, the direct-invoke exchange, the HttpApi
+ * authorizers/integrations) - have a PC-eligible qualifier to target instead
+ * of `$LATEST`.
  */
 export class ZeroTrustLabStack extends Stack {
-  // Exposed so PetertranWarmupStack can schedule a keep-warm ping against
-  // each of them without this stack needing to know anything about warmup.
+  // Exposed so ProvisionedConcurrencyStack can target each of them without
+  // this stack needing to know anything about PC.
   public readonly idpBridgeFn: lambda.Function;
   public readonly internalStsFn: lambda.Function;
   public readonly edgeAuthorizerFn: lambda.Function;
@@ -78,7 +78,8 @@ export class ZeroTrustLabStack extends Stack {
     // --- IdpBridge: real external identity (Cognito) -> this lab's opaque token ---
     const idpBridgeFn = new lambda.Function(this, "IdpBridgeFunction", {
       // Fixed - see site-stack.ts's identical comment on GraphQLFunction for
-      // why (avoids a CloudFormation cross-stack export lock with WarmupStack).
+      // why (avoids a CloudFormation cross-stack export lock with
+      // ProvisionedConcurrencyStack).
       functionName: FUNCTION_NAMES.ztlIdpBridge,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "zero-trust-lab/idp-bridge/handler.handler",
