@@ -81,7 +81,10 @@ beforeEach(() => {
   lambdaMock.on(DeleteProvisionedConcurrencyConfigCommand).resolves({});
   schedulerMock.on(GetScheduleCommand).resolves({
     FlexibleTimeWindow: { Mode: "OFF" },
-    Target: { Arn: "arn:aws:lambda:ap-southeast-2:123456789012:function:pc-config" },
+    Target: {
+      Arn: "arn:aws:lambda:ap-southeast-2:123456789012:function:pc-config",
+      RoleArn: "arn:aws:iam::123456789012:role/pc-scheduler-role",
+    },
   });
   schedulerMock.on(UpdateScheduleCommand).resolves({});
 });
