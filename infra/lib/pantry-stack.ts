@@ -9,15 +9,12 @@ import { LambdaInvoke } from "aws-cdk-lib/aws-scheduler-targets";
 import * as path from "path";
 import { FUNCTION_NAMES } from "./shared/function-names";
 
-export interface PantryStackProps extends StackProps {
-  domainName: string;
-  alternateDomainNames?: string[];
-}
+export type PantryStackProps = StackProps;
 
 /**
  * Fully separate service from SiteStack: own table, own Lambda, own
- * Function URL, own schema - deliberately, so it can evolve (and be reasoned
- * about) independently of the resume API. Source lives at api/src/pantry/,
+ * schema - deliberately, so it can evolve (and be reasoned about)
+ * independently of the resume API. Source lives at api/src/pantry/,
  * alongside the resume API and games in the same npm workspace - deployment
  * separation doesn't require a separate workspace, same as GamesStack.
  */
@@ -57,8 +54,8 @@ export class PantryStack extends Stack {
       handler: "handler.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/src/pantry/dist")),
       // 512, not the other Lambdas' 256 - this is the one on the user-facing
-      // request path (Function URL), and Lambda cold-start CPU scales with
-      // memory: the bundle pulls in @apollo/server + AWS SDK v3 +
+      // request path (behind ApiGatewayStack), and Lambda cold-start CPU
+      // scales with memory: the bundle pulls in @apollo/server + AWS SDK v3 +
       // @anthropic-ai/sdk (parse-command/check-prices import it eagerly even
       // though the client itself inits lazily), so init time was a real
       // contributor to the ~2-3s first-load-of-the-day latency.
@@ -73,30 +70,15 @@ export class PantryStack extends Stack {
         ANTHROPIC_SECRET_ARN: anthropicSecret.secretArn,
       },
       // Traces every invocation to X-Ray, same as the portfolio GraphQL
-      // Lambda - without this the Function URL never gets a trace since
-      // there's no upstream (API Gateway etc.) to originate one.
+      // Lambda - without this the invocation never gets a trace, since
+      // ApiGatewayStack's HttpApi doesn't have X-Ray tracing enabled on
+      // its own stage.
       tracing: lambda.Tracing.ACTIVE,
     });
     table.grantReadWriteData(apiFn);
     anthropicSecret.grantRead(apiFn);
     this.apiFn = apiFn;
 
-    const fnUrl = apiFn.addFunctionUrl({
-      authType: lambda.FunctionUrlAuthType.NONE,
-      cors: {
-        allowedOrigins: [
-          `https://${props.domainName}`,
-          ...(props.alternateDomainNames ?? []).map((d) => `https://${d}`),
-          "http://localhost:5173",
-          "http://localhost:3000",
-        ],
-        allowedMethods: [lambda.HttpMethod.GET, lambda.HttpMethod.POST],
-        allowedHeaders: ["content-type", "apollo-require-preflight"],
-        maxAge: Duration.hours(1),
-      },
-    });
-
-    new CfnOutput(this, "PantryGraphQLEndpoint", { value: fnUrl.url });
     new CfnOutput(this, "PantryTableName", { value: table.tableName });
 
     // --- Daily urgent-items digest email, 4pm Australia/Sydney ---
@@ -107,8 +89,8 @@ export class PantryStack extends Stack {
     // works the same as if this stack had created them itself. The domain
     // identity is the bare root domain ("petertran.au", matching
     // SiteStack's hostedZoneName and the contact@petertran.au FROM address)
-    // - deliberately not props.domainName, which is "www.petertran.au" and
-    // would import a non-existent identity.
+    // - deliberately not SiteStack's props.domainName, which is
+    // "www.petertran.au" and would import a non-existent identity.
     const emailIdentity = ses.EmailIdentity.fromEmailIdentityName(this, "SesDomainIdentity", "petertran.au");
     const recipientIdentity = ses.EmailIdentity.fromEmailIdentityName(
       this,

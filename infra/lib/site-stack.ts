@@ -92,7 +92,7 @@ export class SiteStack extends Stack {
       values: ["v=DMARC1; p=none; rua=mailto:peter2002tran@outlook.com"],
     });
 
-    // --- GraphQL API (Lambda + Function URL, no API Gateway needed) ---
+    // --- GraphQL API (Lambda, fronted by the shared ApiGatewayStack) ---
     const apiFn = new lambda.Function(this, "GraphQLFunction", {
       // Explicit, so it reads clearly in the X-Ray trace map instead of
       // CloudFormation's auto-generated "PetertranSiteStack-GraphQLFunction72B66DDD-..." name.
@@ -105,9 +105,10 @@ export class SiteStack extends Stack {
       handler: "handler.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/src/portfolio/dist")),
       // 512, not the default 256 - same reasoning as pantry's GraphQLFunction:
-      // this is a synchronous Function URL on a user-facing request path, so
-      // cold-start CPU (which scales with memory) is latency a real visitor
-      // waits on, not a background job nobody's watching.
+      // this is a synchronous Lambda on a user-facing request path (behind
+      // ApiGatewayStack), so cold-start CPU (which scales with memory) is
+      // latency a real visitor waits on, not a background job nobody's
+      // watching.
       memorySize: 512,
       // 30s (not the default 15s) to leave headroom for the all-time cost
       // fields on a cold cache: Anthropic's cost report caps at 31 days per
@@ -148,21 +149,6 @@ export class SiteStack extends Stack {
     );
 
     this.apiFn = apiFn;
-
-    const fnUrl = apiFn.addFunctionUrl({
-      authType: lambda.FunctionUrlAuthType.NONE,
-      cors: {
-        allowedOrigins: [
-          `https://${props.domainName}`,
-          ...(props.alternateDomainNames ?? []).map((d) => `https://${d}`),
-          "http://localhost:5173",
-          "http://localhost:3000",
-        ],
-        allowedMethods: [lambda.HttpMethod.GET, lambda.HttpMethod.POST],
-        allowedHeaders: ["content-type", "apollo-require-preflight"],
-        maxAge: Duration.hours(1),
-      },
-    });
 
     // --- Static site: S3 (private, OAC) + CloudFront ---
     const siteBucket = new s3.Bucket(this, "SiteBucket", {
@@ -259,7 +245,6 @@ export class SiteStack extends Stack {
     new CfnOutput(this, "CloudFrontDomainName", { value: distribution.distributionDomainName });
     new CfnOutput(this, "DistributionId", { value: distribution.distributionId });
     new CfnOutput(this, "BucketName", { value: siteBucket.bucketName });
-    new CfnOutput(this, "GraphQLEndpoint", { value: fnUrl.url });
     new CfnOutput(this, "TableName", { value: table.tableName });
     new CfnOutput(this, "RumAppMonitorId", { value: rumAppMonitor.attrId });
     new CfnOutput(this, "RumIdentityPoolId", { value: rumIdentityPool.ref });

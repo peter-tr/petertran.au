@@ -1,4 +1,4 @@
-import { Stack, StackProps, CfnOutput, Duration, RemovalPolicy } from "aws-cdk-lib";
+import { Stack, StackProps, Duration, RemovalPolicy } from "aws-cdk-lib";
 import { Construct } from "constructs";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
@@ -6,10 +6,7 @@ import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as path from "path";
 import { FUNCTION_NAMES } from "./shared/function-names";
 
-export interface GamesStackProps extends StackProps {
-  domainName: string;
-  alternateDomainNames?: string[];
-}
+export type GamesStackProps = StackProps;
 
 /**
  * Small side-project games and other misc one-offs that live alongside
@@ -60,9 +57,10 @@ export class GamesStack extends Stack {
       handler: "handler.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/src/games/imposter/dist")),
       // 512, not the default 256 - same reasoning as pantry's/portfolio's
-      // GraphQLFunction: this is a synchronous Function URL on a user-facing
-      // request path, so cold-start CPU (which scales with memory) is
-      // latency a real visitor waits on, not a background job.
+      // GraphQLFunction: this is a synchronous Lambda on a user-facing
+      // request path (behind ApiGatewayStack), so cold-start CPU (which
+      // scales with memory) is latency a real visitor waits on, not a
+      // background job.
       memorySize: 512,
       timeout: Duration.seconds(15),
       environment: {
@@ -74,22 +72,5 @@ export class GamesStack extends Stack {
     table.grantReadWriteData(imposterFn);
     anthropicSecret.grantRead(imposterFn);
     this.imposterFn = imposterFn;
-
-    const imposterFnUrl = imposterFn.addFunctionUrl({
-      authType: lambda.FunctionUrlAuthType.NONE,
-      cors: {
-        allowedOrigins: [
-          `https://${props.domainName}`,
-          ...(props.alternateDomainNames ?? []).map((d) => `https://${d}`),
-          "http://localhost:5173",
-          "http://localhost:3000",
-        ],
-        allowedMethods: [lambda.HttpMethod.GET, lambda.HttpMethod.POST],
-        allowedHeaders: ["content-type", "apollo-require-preflight"],
-        maxAge: Duration.hours(1),
-      },
-    });
-
-    new CfnOutput(this, "ImposterGraphQLEndpoint", { value: imposterFnUrl.url });
   }
 }

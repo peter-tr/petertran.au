@@ -7,12 +7,18 @@ import { GamesStack } from "../lib/games-stack";
 import { PantryStack } from "../lib/pantry-stack";
 import { ZeroTrustLabStack } from "../lib/zero-trust-lab-stack";
 import { WarmupStack } from "../lib/warmup-stack";
+import { ApiGatewayStack } from "../lib/api-gateway-stack";
 import { FUNCTION_NAMES } from "../lib/shared/function-names";
 
 const app = new App();
 
 const domainName = "www.petertran.au";
 const alternateDomainNames = ["petertran.au"];
+// Route 53 zone was created manually (see the Route 53 migration), not by
+// any stack -- referenced by ID/name wherever a stack needs to add records
+// to it (SiteStack's SES DKIM/DMARC, ApiGatewayStack's api.petertran.au).
+const hostedZoneId = "Z0088163WL3F617J73T";
+const hostedZoneName = "petertran.au";
 const account = process.env.CDK_DEFAULT_ACCOUNT;
 
 // CloudFront certificates must live in us-east-1 regardless of where the
@@ -29,10 +35,8 @@ new SiteStack(app, "PetertranSiteStack", {
   domainName,
   alternateDomainNames,
   certificate: certStack.certificate,
-  // Route 53 zone was created manually (see the Route 53 migration), not by
-  // this stack -- referenced by ID/name so SES can add DKIM records to it.
-  hostedZoneId: "Z0088163WL3F617J73T",
-  hostedZoneName: "petertran.au",
+  hostedZoneId,
+  hostedZoneName,
   env: { account, region: "ap-southeast-2" },
   crossRegionReferences: true,
 });
@@ -40,15 +44,11 @@ new SiteStack(app, "PetertranSiteStack", {
 // Games and other misc side-projects - deployed independently of the resume
 // site/API above, with their own Lambda(s) and table.
 new GamesStack(app, "PetertranGamesStack", {
-  domainName,
-  alternateDomainNames,
   env: { account, region: "ap-southeast-2" },
 });
 // Separate service from the resume site above - own table, own Lambda, own
-// Function URL, own schema. See infra/lib/pantry-stack.ts for why.
+// schema. See infra/lib/pantry-stack.ts for why.
 new PantryStack(app, "PetertranPantryStack", {
-  domainName,
-  alternateDomainNames,
   env: { account, region: "ap-southeast-2" },
 });
 
@@ -68,8 +68,6 @@ new ZeroTrustLabStack(app, "PetertranZeroTrustLabStack", {
 // matters. Still deployed after them in practice since the actual Lambdas
 // need to exist under these names first.
 new WarmupStack(app, "PetertranWarmupStack", {
-  domainName,
-  alternateDomainNames,
   portfolioFnName: FUNCTION_NAMES.portfolio,
   pantryFnName: FUNCTION_NAMES.pantry,
   imposterFnName: FUNCTION_NAMES.imposter,
@@ -80,5 +78,23 @@ new WarmupStack(app, "PetertranWarmupStack", {
     edgeProxy: FUNCTION_NAMES.ztlEdgeProxy,
     domainA: FUNCTION_NAMES.ztlDomainA,
   },
+  env: { account, region: "ap-southeast-2" },
+});
+
+// Shared HttpApi in front of portfolio/pantry/imposter/warmup-config, giving
+// them one stable domain (api.petertran.au) instead of each its own
+// CloudFormation-generated Function URL. Same "plain function names, no
+// live cross-stack reference" reasoning as WarmupStack above - deliberately
+// does NOT cover zero-trust-lab's own edge/domain gateways, which stay
+// isolated per that stack's own design intent. See infra/lib/api-gateway-stack.ts.
+new ApiGatewayStack(app, "PetertranApiGatewayStack", {
+  domainName,
+  alternateDomainNames,
+  hostedZoneId,
+  hostedZoneName,
+  portfolioFnName: FUNCTION_NAMES.portfolio,
+  pantryFnName: FUNCTION_NAMES.pantry,
+  imposterFnName: FUNCTION_NAMES.imposter,
+  warmupConfigFnName: FUNCTION_NAMES.warmupConfig,
   env: { account, region: "ap-southeast-2" },
 });
