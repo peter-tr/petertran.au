@@ -99,6 +99,19 @@ function seed(
   });
 }
 
+// Relative to whenever the dev server actually starts, not a fixed calendar
+// date - PantryItemRow renders purchasedAt/expiresAt as "Nd ago" / "expired
+// Nd ago", so a hardcoded date (e.g. "2026-07-14") drifts further into the
+// past every day the seed itself isn't updated, silently breaking the
+// pantry visual snapshot (web/e2e/pantry.spec.ts) on some future date for a
+// reason that has nothing to do with an actual regression.
+function daysAgo(days: number): string {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() - days);
+
+  return d.toISOString().slice(0, 10);
+}
+
 seed({
   name: "Milk",
   category: "Dairy",
@@ -106,8 +119,8 @@ seed({
   quantity: 2,
   unit: "L",
   price: 4.5,
-  purchasedAt: "2026-07-05",
-  expiresAt: "2026-07-14",
+  purchasedAt: daysAgo(15),
+  expiresAt: daysAgo(6),
 });
 seed({
   name: "Chicken breast",
@@ -116,7 +129,7 @@ seed({
   quantity: 1,
   unit: "kg",
   price: 12.0,
-  purchasedAt: "2026-07-01",
+  purchasedAt: daysAgo(19),
   expiresAt: null,
 });
 seed({
@@ -126,7 +139,7 @@ seed({
   quantity: 5,
   unit: "kg",
   price: 8.0,
-  purchasedAt: "2026-06-20",
+  purchasedAt: daysAgo(30),
   expiresAt: null,
 });
 
@@ -228,6 +241,10 @@ function upsertShoppingListEntry(
 
   return entry;
 }
+
+upsertShoppingListEntry("Eggs", 1, "dozen", null, true, "Dairy", null, true);
+upsertShoppingListEntry("Bread", 1, "loaf", null, false, "Bread", null, false);
+upsertShoppingListEntry("Coffee", null, null, "The good beans, not the instant stuff", true, "Beverages");
 
 interface MockProposedAction {
   type: string;

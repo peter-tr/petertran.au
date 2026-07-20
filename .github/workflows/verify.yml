@@ -29,3 +29,52 @@ jobs:
 
       - name: Lint, format:check, typecheck (same as .husky/pre-push)
         run: npx turbo run lint format:check typecheck
+
+  visual-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      # Needed before the app can boot - web/src/*/lib/api.ts imports real
+      # (non-type-only) values like generated enums from *.generated.ts,
+      # which don't exist until codegen has run (same reason validate-schema,
+      # in build-and-deploy.yml, runs it before importing those modules).
+      - name: Generate GraphQL types
+        run: npx turbo run codegen
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ hashFiles('web/package-lock.json', 'package-lock.json') }}
+
+      - name: Install Playwright Chromium (+ OS deps)
+        working-directory: web
+        run: npx playwright install --with-deps chromium
+
+      # Boots each project's real dev server (same in-memory mock used for
+      # local `npm run dev`) plus the Vite dev server, and takes visual
+      # snapshots of the portfolio home, pantry, and imposter setup pages at
+      # both a desktop and a mobile (Pixel 7 viewport, still Chromium - no
+      # second browser to install) size - deterministic since the mock
+      # resolvers return fixed fixture data, no live AWS/production
+      # dependency.
+      - name: Run Playwright visual smoke tests
+        working-directory: web
+        run: npm run test:e2e
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: web/playwright-report/
+          retention-days: 7

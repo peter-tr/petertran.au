@@ -10,7 +10,9 @@
     "build": "tsc -b && vite build && npm run prerender",
     "build:test": "tsc -b && vite build --mode test && npm run prerender",
     "prerender": "tsx scripts/prerender.tsx",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:e2e": "playwright test",
+    "test:e2e:update": "playwright test --update-snapshots"
   },
   "dependencies": {
     "@graphiql/plugin-doc-explorer": "^0.4.2",
@@ -31,6 +33,7 @@
     "@graphql-codegen/cli": "^7.2.0",
     "@graphql-codegen/typescript": "^6.1.0",
     "@graphql-codegen/typescript-operations": "^6.1.0",
+    "@playwright/test": "^1.61.1",
     "@types/node": "^20.14.0",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
