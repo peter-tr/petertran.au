@@ -167,7 +167,7 @@ if (process.env.DEPLOY_TEST_ENV === "true") {
     crossRegionReferences: true,
   });
 
-  new SiteStack(app, "PetertranTestSiteStack", {
+  const testSiteStack = new SiteStack(app, "PetertranTestSiteStack", {
     domainName: testDomainName,
     alternateDomainNames: testAlternateDomainNames,
     certificate: testCertStack.certificate,
@@ -181,21 +181,21 @@ if (process.env.DEPLOY_TEST_ENV === "true") {
     crossRegionReferences: true,
   });
 
-  new PantryStack(app, "PetertranTestPantryStack", {
+  const testPantryStack = new PantryStack(app, "PetertranTestPantryStack", {
     tableName: "pantry-test",
     functionName: TEST_FUNCTION_NAMES.pantry,
     isTestEnv: true,
     env: { account, region: "ap-southeast-2" },
   });
 
-  new GamesStack(app, "PetertranTestGamesStack", {
+  const testGamesStack = new GamesStack(app, "PetertranTestGamesStack", {
     tableName: "games-test",
     functionName: TEST_FUNCTION_NAMES.imposter,
     isTestEnv: true,
     env: { account, region: "ap-southeast-2" },
   });
 
-  new ApiGatewayStack(app, "PetertranTestApiGatewayStack", {
+  const testApiGatewayStack = new ApiGatewayStack(app, "PetertranTestApiGatewayStack", {
     domainName: testDomainName,
     alternateDomainNames: testAlternateDomainNames,
     hostedZoneId,
@@ -206,4 +206,13 @@ if (process.env.DEPLOY_TEST_ENV === "true") {
     imposterFnName: TEST_FUNCTION_NAMES.imposter,
     env: { account, region: "ap-southeast-2" },
   });
+  // Same fix as prod's apiGatewayStack.addDependency calls above, and even
+  // more load-bearing here: on a from-scratch deploy the test env's
+  // Site/Pantry/Games Lambdas and `live` aliases don't exist at all yet, so
+  // this isn't just a "wins the race sometimes" bug - without an explicit
+  // dependency, ApiGatewayStack's AddPermission calls 404 against aliases
+  // that haven't been created yet on every single first deploy.
+  testApiGatewayStack.addDependency(testSiteStack);
+  testApiGatewayStack.addDependency(testPantryStack);
+  testApiGatewayStack.addDependency(testGamesStack);
 }
