@@ -1,6 +1,7 @@
 import { assertNotRateLimited } from "../lib/util/rate-limit";
 import { assertAiNotRateLimited } from "../lib/util/ai-rate-limit";
-import { normalizeItemName, normalizeUnit } from "../lib/util/normalize";
+import { normalizeUnit } from "../lib/util/normalize";
+import { mergeDefined } from "../lib/util/merge";
 import { parseCommand, type ParsedCommandResult } from "../lib/anthropic/parse-command";
 import { checkPrice } from "../lib/anthropic/check-prices";
 import {
@@ -9,6 +10,7 @@ import {
   putItem,
   deleteItem,
   createItem,
+  recordPurchase,
   setLastKnownPrice,
   type InventoryItem,
   type AddInventoryItemInput,
@@ -99,39 +101,7 @@ export const resolvers = {
     ): Promise<InventoryItem> => {
       await assertNotRateLimited(context.sourceIp);
 
-      const needle = normalizeItemName(args.input.name);
-      const all = await getAllItems();
-      const existing = all.find(
-        (i) => i.location === args.input.location && normalizeItemName(i.name) === needle
-      );
-
-      if (!existing) {
-        const item = createItem(args.input);
-        await putItem(item);
-
-        return item;
-      }
-
-      const purchasedAt = args.input.purchasedAt ?? null;
-      const updated: InventoryItem = {
-        ...existing,
-        quantity: existing.quantity + args.input.quantity,
-        purchasedAt:
-          purchasedAt && (!existing.purchasedAt || purchasedAt > existing.purchasedAt)
-            ? purchasedAt
-            : existing.purchasedAt,
-        price: args.input.price ?? existing.price,
-        purchases: purchasedAt
-          ? [
-              ...existing.purchases,
-              { date: purchasedAt, price: args.input.price ?? null, quantity: args.input.quantity },
-            ]
-          : existing.purchases,
-        updatedAt: new Date().toISOString(),
-      };
-      await putItem(updated);
-
-      return updated;
+      return recordPurchase(args.input);
     },
 
     updateInventoryItem: async (
@@ -148,8 +118,7 @@ export const resolvers = {
       if (input.unit !== undefined) input.unit = normalizeUnit(input.unit);
 
       const updated: InventoryItem = {
-        ...existing,
-        ...Object.fromEntries(Object.entries(input).filter(([, v]) => v !== undefined)),
+        ...mergeDefined(existing, input),
         updatedAt: new Date().toISOString(),
       };
 
@@ -210,10 +179,7 @@ export const resolvers = {
       const input = { ...args.input };
       if (input.unit !== undefined) input.unit = normalizeUnit(input.unit);
 
-      const updated: ShoppingListEntry = {
-        ...existing,
-        ...Object.fromEntries(Object.entries(input).filter(([, v]) => v !== undefined)),
-      };
+      const updated: ShoppingListEntry = mergeDefined(existing, input);
 
       await putShoppingListEntry(updated);
 
@@ -234,10 +200,7 @@ export const resolvers = {
       await assertNotRateLimited(context.sourceIp);
 
       const existing = await getSettings();
-      const updated: PantrySettings = {
-        ...existing,
-        ...Object.fromEntries(Object.entries(args.input).filter(([, v]) => v !== undefined)),
-      };
+      const updated: PantrySettings = mergeDefined(existing, args.input);
       await putSettings(updated);
 
       return updated;

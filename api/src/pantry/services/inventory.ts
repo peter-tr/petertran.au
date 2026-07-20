@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { ddb, TABLE_NAME, PK } from "../lib/aws/ddb";
-import { normalizeUnit } from "../lib/util/normalize";
+import { normalizeItemName, normalizeUnit } from "../lib/util/normalize";
 import type { AiCallDebugInfo } from "../lib/anthropic/debug-info";
 import { DynamoRepository } from "./dynamo-repository";
 
@@ -155,4 +155,47 @@ export function createItem(input: AddInventoryItemInput): InventoryItem {
     addedAt: now,
     updatedAt: now,
   };
+}
+
+// Pure merge rules for folding a purchase into an already-existing item -
+// exported so dev/dev-resolvers.ts's in-memory mock can share this instead
+// of reimplementing the same arithmetic against its own Map-backed store.
+export function mergePurchaseIntoItem(existing: InventoryItem, input: AddInventoryItemInput): InventoryItem {
+  const purchasedAt = input.purchasedAt ?? null;
+
+  return {
+    ...existing,
+    quantity: existing.quantity + input.quantity,
+    purchasedAt:
+      purchasedAt && (!existing.purchasedAt || purchasedAt > existing.purchasedAt)
+        ? purchasedAt
+        : existing.purchasedAt,
+    price: input.price ?? existing.price,
+    purchases: purchasedAt
+      ? [...existing.purchases, { date: purchasedAt, price: input.price ?? null, quantity: input.quantity }]
+      : existing.purchases,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+// Looks up an existing item by normalized name + location and merges the
+// purchase into it, or creates a new item if there's no match - mirrors
+// shopping-list.ts's upsertShoppingListEntry (lookup + merge + persist
+// lives in the service, not the resolver).
+export async function recordPurchase(input: AddInventoryItemInput): Promise<InventoryItem> {
+  const needle = normalizeItemName(input.name);
+  const all = await getAllItems();
+  const existing = all.find((i) => i.location === input.location && normalizeItemName(i.name) === needle);
+
+  if (!existing) {
+    const item = createItem(input);
+    await putItem(item);
+
+    return item;
+  }
+
+  const updated = mergePurchaseIntoItem(existing, input);
+  await putItem(updated);
+
+  return updated;
 }

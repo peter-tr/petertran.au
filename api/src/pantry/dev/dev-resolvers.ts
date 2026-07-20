@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { normalizeItemName, normalizeUnit } from "../lib/util/normalize";
-import type { InventoryItem } from "../services/inventory";
+import { mergeDefined } from "../lib/util/merge";
+import { mergePurchaseIntoItem, type InventoryItem } from "../services/inventory";
 import type { ShoppingListEntry } from "../services/shopping-list";
 import type { PantrySettings } from "../services/settings";
 
@@ -497,23 +498,7 @@ export const devResolvers = {
         return item;
       }
 
-      const purchasedAt = args.input.purchasedAt ?? null;
-      const updated: InventoryItem = {
-        ...existing,
-        quantity: existing.quantity + args.input.quantity,
-        purchasedAt:
-          purchasedAt && (!existing.purchasedAt || purchasedAt > existing.purchasedAt)
-            ? purchasedAt
-            : existing.purchasedAt,
-        price: args.input.price ?? existing.price,
-        purchases: purchasedAt
-          ? [
-              ...existing.purchases,
-              { date: purchasedAt, price: args.input.price ?? null, quantity: args.input.quantity },
-            ]
-          : existing.purchases,
-        updatedAt: new Date().toISOString(),
-      };
+      const updated = mergePurchaseIntoItem(existing, args.input);
       items.set(existing.id, updated);
 
       return updated;
@@ -526,8 +511,7 @@ export const devResolvers = {
       if (input.unit !== undefined) input.unit = normalizeUnit(input.unit);
 
       const updated: InventoryItem = {
-        ...existing,
-        ...Object.fromEntries(Object.entries(input).filter(([, v]) => v !== undefined)),
+        ...mergeDefined(existing, input),
         updatedAt: new Date().toISOString(),
       };
       items.set(args.id, updated);
@@ -588,20 +572,14 @@ export const devResolvers = {
       const input = { ...args.input };
       if (input.unit !== undefined) input.unit = normalizeUnit(input.unit);
 
-      const updated: ShoppingListEntry = {
-        ...existing,
-        ...Object.fromEntries(Object.entries(input).filter(([, v]) => v !== undefined)),
-      };
+      const updated: ShoppingListEntry = mergeDefined(existing, input);
       shoppingList.set(args.id, updated);
 
       return updated;
     },
     removeFromShoppingList: (_: unknown, args: { id: string }) => shoppingList.delete(args.id),
     updateSettings: (_: unknown, args: { input: Partial<PantrySettings> }) => {
-      settings = {
-        ...settings,
-        ...Object.fromEntries(Object.entries(args.input).filter(([, v]) => v !== undefined)),
-      };
+      settings = mergeDefined(settings, args.input);
 
       return settings;
     },
