@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
-const createDdbClient = vi.fn(() => ({ ddb: { fake: true }, TABLE_NAME: "resolved-table" }));
+const createDdbClient = vi.fn<(...args: unknown[]) => { ddb: unknown; TABLE_NAME: string }>(() => ({
+  ddb: { fake: true },
+  TABLE_NAME: "resolved-table",
+}));
 
 vi.mock("api-shared/ddb", () => ({
   createDdbClient: (...args: unknown[]) => createDdbClient(...args),

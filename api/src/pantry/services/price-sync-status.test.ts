@@ -94,7 +94,9 @@ describe("recordPriceCheckProgress", () => {
 
     await recordPriceCheckProgress();
 
-    const putInput = ddbMock.commandCalls(PutCommand)[0].args[0].input as { Item: { data: PriceSyncStatus } };
+    const putInput = ddbMock.commandCalls(PutCommand)[0].args[0].input as unknown as {
+      Item: { data: PriceSyncStatus };
+    };
     expect(putInput.Item.data.checkedItems).toBe(2);
     expect(putInput.Item.data.errors).toEqual([]);
   });
@@ -113,7 +115,9 @@ describe("recordPriceCheckProgress", () => {
       occurredAt: "2026-01-01T00:00:00.000Z",
     });
 
-    const putInput = ddbMock.commandCalls(PutCommand)[0].args[0].input as { Item: { data: PriceSyncStatus } };
+    const putInput = ddbMock.commandCalls(PutCommand)[0].args[0].input as unknown as {
+      Item: { data: PriceSyncStatus };
+    };
     expect(putInput.Item.data.checkedItems).toBe(2);
     expect(putInput.Item.data.errors).toEqual([
       { itemName: "Milk", message: "boom", occurredAt: "2026-01-01T00:00:00.000Z" },
@@ -142,7 +146,9 @@ describe("recordPriceCheckProgress", () => {
 
     await recordPriceCheckProgress({ itemName: "New Item", message: "newest", occurredAt: "t-new" });
 
-    const putInput = ddbMock.commandCalls(PutCommand)[0].args[0].input as { Item: { data: PriceSyncStatus } };
+    const putInput = ddbMock.commandCalls(PutCommand)[0].args[0].input as unknown as {
+      Item: { data: PriceSyncStatus };
+    };
     expect(putInput.Item.data.errors).toHaveLength(10);
     // The oldest ("Item 0") was dropped, the newest is now at the end.
     expect(putInput.Item.data.errors[0].itemName).toBe("Item 1");
@@ -172,7 +178,9 @@ describe("finishPriceSync", () => {
 
     await finishPriceSync();
 
-    const putInput = ddbMock.commandCalls(PutCommand)[0].args[0].input as { Item: { data: PriceSyncStatus } };
+    const putInput = ddbMock.commandCalls(PutCommand)[0].args[0].input as unknown as {
+      Item: { data: PriceSyncStatus };
+    };
     expect(putInput.Item.data.running).toBe(false);
     expect(putInput.Item.data.finishedAt).not.toBeNull();
     expect(putInput.Item.data.startedAt).toBe("t0");

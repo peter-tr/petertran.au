@@ -4,7 +4,7 @@ import type { ShoppingListEntry } from "../../services/shopping-list";
 
 const messagesParse = vi.fn();
 const getAnthropicClient = vi.fn(async () => ({ messages: { parse: messagesParse } }));
-const assertAiNotRateLimited = vi.fn(async () => undefined);
+const assertAiNotRateLimited = vi.fn<(ip: string | undefined) => Promise<void>>(async () => undefined);
 
 vi.mock("api-shared/anthropic-client", () => ({
   getAnthropicClient: () => getAnthropicClient(),

@@ -198,7 +198,7 @@ describe("setShoppingListLastKnownPrice", () => {
 
     await setShoppingListLastKnownPrice("entry-1", price);
 
-    const putInput = ddbMock.commandCalls(PutCommand)[0].args[0].input as {
+    const putInput = ddbMock.commandCalls(PutCommand)[0].args[0].input as unknown as {
       Item: { data: ShoppingListEntry };
     };
     expect(putInput.Item.data.lastKnownPrice).toEqual(price);

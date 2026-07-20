@@ -1,8 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ContactInput } from "../lib/util/contact";
 
+// Declared via vi.hoisted (and referenced directly in tests, rather than
+// round-tripped through vi.mocked(ddb.send)) so it isn't typed against the
+// real DynamoDBDocumentClient.send's overloaded signature - that overload
+// resolution otherwise picks a branch typed to return Promise<void>, which
+// rejects a plain object from mockResolvedValue({}).
+const { ddbSendMock } = vi.hoisted(() => ({ ddbSendMock: vi.fn() }));
+
 vi.mock("../lib/aws/ddb", () => ({
-  ddb: { send: vi.fn() },
+  ddb: { send: ddbSendMock },
   TABLE_NAME: "petertran-au-resume",
   PK: "RESUME",
 }));
@@ -31,7 +38,7 @@ vi.mock("../lib/aws/email", () => ({
   sendContactNotification: vi.fn(),
 }));
 
-import { ddb, PK } from "../lib/aws/ddb";
+import { PK } from "../lib/aws/ddb";
 import { generateQuery } from "../lib/anthropic/generate-query";
 import { getSystemStats } from "../lib/aws/system-stats";
 import { getTraceBreakdown } from "../lib/aws/xray";
@@ -57,7 +64,7 @@ function makeContext(items: ResumeItem[], overrides: Partial<Context> = {}): Con
 
 describe("portfolio resolvers", () => {
   beforeEach(() => {
-    vi.mocked(ddb.send).mockReset().mockResolvedValue({});
+    ddbSendMock.mockReset().mockResolvedValue({});
     vi.mocked(generateQuery).mockReset();
     vi.mocked(getSystemStats).mockReset();
     vi.mocked(getTraceBreakdown).mockReset();
@@ -292,7 +299,7 @@ describe("portfolio resolvers", () => {
         resolvers.Mutation.sendMessage({}, { input: { name: "", email: "", message: "" } }, context)
       ).rejects.toThrow("name, email, and message are all required.");
 
-      expect(ddb.send).not.toHaveBeenCalled();
+      expect(ddbSendMock).not.toHaveBeenCalled();
     });
 
     it("stores the message and returns a success confirmation", async () => {
@@ -301,9 +308,9 @@ describe("portfolio resolvers", () => {
       const result = await resolvers.Mutation.sendMessage({}, { input: validInput }, context);
 
       expect(result).toEqual({ success: true, message: "Thanks - you'll hear back from me soon." });
-      expect(ddb.send).toHaveBeenCalledOnce();
+      expect(ddbSendMock).toHaveBeenCalledOnce();
 
-      const putCommand = vi.mocked(ddb.send).mock.calls[0][0] as { input: Record<string, unknown> };
+      const putCommand = ddbSendMock.mock.calls[0][0] as { input: Record<string, unknown> };
       expect(putCommand.input.TableName).toBe("petertran-au-resume");
 
       const item = putCommand.input.Item as { pk: string; sk: string; type: string; data: unknown };

@@ -105,7 +105,21 @@ describe("pc-config handler - flags GET/POST", () => {
   it("POST persists the updated flag set to SSM and reconciles only the changed target", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(WITHIN_BUSINESS_HOURS);
-    ssmMock.on(GetParameterCommand).resolves({});
+    // Deliberately an explicit stored Parameter rather than an empty response
+    // - getFlags() returns its DEFAULT_FLAGS constant *by reference* when
+    // there's no stored Parameter (see handler.ts's `if (!Parameter?.Value)
+    // return DEFAULT_FLAGS;`), and the POST handler below mutates the object
+    // it gets back (`flags[key] = body.enabled`). Hitting that branch here
+    // would corrupt the shared DEFAULT_FLAGS singleton for every other test
+    // in this file that also hits it (e.g. the reconcile-ping tests further
+    // down, which rely on DEFAULT_FLAGS staying all-true). Giving an
+    // explicit stored value forces getFlags() through its other branch,
+    // which builds a fresh `{ ...DEFAULT_FLAGS, ...stored }` object instead.
+    ssmMock.on(GetParameterCommand).resolves({
+      Parameter: {
+        Value: JSON.stringify({ portfolio: true, pantry: true, imposter: true, zeroTrustLab: true }),
+      },
+    });
 
     const result = await handler(httpEvent("POST", { function: "pantry", enabled: false }));
     expect(result.statusCode).toBe(200);
@@ -144,16 +158,6 @@ describe("pc-config handler - reconcile ping", () => {
     expect(result).toEqual({ statusCode: 200, body: "reconciled" });
 
     const putCalls = lambdaMock.commandCalls(PutProvisionedConcurrencyConfigCommand);
-    console.log(
-      "DEBUG put",
-      putCalls.map((c) => c.args[0].input.FunctionName)
-    );
-    console.log(
-      "DEBUG delete",
-      lambdaMock
-        .commandCalls(DeleteProvisionedConcurrencyConfigCommand)
-        .map((c) => c.args[0].input.FunctionName)
-    );
     expect(putCalls.map((c) => c.args[0].input.FunctionName).sort()).toEqual([...ALL_TARGETS].sort());
     for (const call of putCalls) {
       expect(call.args[0].input.Qualifier).toBe("live");

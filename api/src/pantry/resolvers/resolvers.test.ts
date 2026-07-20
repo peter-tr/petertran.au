@@ -5,25 +5,27 @@ import type { PantrySettings } from "../services/settings";
 import type { PriceSyncStatus } from "../services/price-sync-status";
 import type { Context } from "../context";
 
-const assertNotRateLimited = vi.fn(async () => undefined);
-const assertAiNotRateLimited = vi.fn(async () => undefined);
+const assertNotRateLimited = vi.fn<(ip: string | undefined) => Promise<void>>(async () => undefined);
+const assertAiNotRateLimited = vi.fn<(ip: string | undefined) => Promise<void>>(async () => undefined);
 
 const getItem = vi.fn<(id: string) => Promise<InventoryItem | null>>();
 const getAllItems = vi.fn<() => Promise<InventoryItem[]>>();
-const putItem = vi.fn(async () => undefined);
+const putItem = vi.fn<(item: unknown) => Promise<void>>(async () => undefined);
 const deleteItem = vi.fn<(id: string) => Promise<boolean>>();
 const createItem = vi.fn();
-const setLastKnownPrice = vi.fn(async () => undefined);
+const setLastKnownPrice = vi.fn<(id: string, price: unknown) => Promise<void>>(async () => undefined);
 
 const getShoppingListEntry = vi.fn<(id: string) => Promise<ShoppingListEntry | null>>();
 const getShoppingList = vi.fn<() => Promise<ShoppingListEntry[]>>();
-const putShoppingListEntry = vi.fn(async () => undefined);
+const putShoppingListEntry = vi.fn<(entry: unknown) => Promise<void>>(async () => undefined);
 const deleteShoppingListEntry = vi.fn<(id: string) => Promise<boolean>>();
 const upsertShoppingListEntry = vi.fn();
-const setShoppingListLastKnownPrice = vi.fn(async () => undefined);
+const setShoppingListLastKnownPrice = vi.fn<(id: string, price: unknown) => Promise<void>>(
+  async () => undefined
+);
 
 const getSettings = vi.fn<() => Promise<PantrySettings>>();
-const putSettings = vi.fn(async () => undefined);
+const putSettings = vi.fn<(settings: unknown) => Promise<void>>(async () => undefined);
 
 const getPriceSyncStatus = vi.fn<() => Promise<PriceSyncStatus>>();
 const triggerPriceSync = vi.fn(async () => undefined);

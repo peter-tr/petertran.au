@@ -217,7 +217,9 @@ describe("setLastKnownPrice", () => {
 
     await setLastKnownPrice("item-1", price);
 
-    const putInput = ddbMock.commandCalls(PutCommand)[0].args[0].input as { Item: { data: InventoryItem } };
+    const putInput = ddbMock.commandCalls(PutCommand)[0].args[0].input as unknown as {
+      Item: { data: InventoryItem };
+    };
     expect(putInput.Item.data.lastKnownPrice).toEqual(price);
     expect(putInput.Item.data.name).toBe("Milk");
   });
