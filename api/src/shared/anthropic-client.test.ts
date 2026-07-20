@@ -56,9 +56,7 @@ describe("getAnthropicClient", () => {
 
     const calls = secretsManagerMock.commandCalls(GetSecretValueCommand);
     expect(calls).toHaveLength(1);
-    expect(calls[0].args[0].input.SecretId).toBe(
-      "arn:aws:secretsmanager:us-east-1:123:secret:anthropic-key"
-    );
+    expect(calls[0].args[0].input.SecretId).toBe("arn:aws:secretsmanager:us-east-1:123:secret:anthropic-key");
   });
 
   it("caches the client across calls - only constructs Anthropic once", async () => {

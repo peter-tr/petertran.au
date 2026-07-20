@@ -29,9 +29,9 @@ describe("assertNotRateLimited (pantry CRUD limiter)", () => {
   });
 
   it("throws a friendly error when the conditional check fails (limit exceeded)", async () => {
-    ddbMock.on(UpdateCommand).rejects(
-      new ConditionalCheckFailedException({ message: "cond failed", $metadata: {} })
-    );
+    ddbMock
+      .on(UpdateCommand)
+      .rejects(new ConditionalCheckFailedException({ message: "cond failed", $metadata: {} }));
 
     await expect(assertNotRateLimited("1.2.3.4")).rejects.toThrow(
       "Too many requests - please wait a moment and try again."

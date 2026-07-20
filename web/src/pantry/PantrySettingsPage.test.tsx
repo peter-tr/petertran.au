@@ -143,7 +143,11 @@ describe("PantrySettingsPage", () => {
 
   it("uses singular 'item' when totalItems is 1", async () => {
     mockRunPantryQuery.mockResolvedValueOnce({ settings: makeSettings() }).mockResolvedValueOnce({
-      priceSyncStatus: makeSyncStatus({ finishedAt: "2026-07-01T00:00:00.000Z", totalItems: 1, checkedItems: 1 }),
+      priceSyncStatus: makeSyncStatus({
+        finishedAt: "2026-07-01T00:00:00.000Z",
+        totalItems: 1,
+        checkedItems: 1,
+      }),
     });
 
     renderPage();
@@ -168,7 +172,9 @@ describe("PantrySettingsPage", () => {
       .mockResolvedValueOnce({ settings: makeSettings() })
       .mockResolvedValueOnce({ priceSyncStatus: makeSyncStatus() })
       .mockResolvedValueOnce({ syncPricesNow: true })
-      .mockResolvedValueOnce({ priceSyncStatus: makeSyncStatus({ running: true, totalItems: 3, checkedItems: 0 }) });
+      .mockResolvedValueOnce({
+        priceSyncStatus: makeSyncStatus({ running: true, totalItems: 3, checkedItems: 0 }),
+      });
 
     renderPage();
     await screen.findByText("Sync prices now");
@@ -182,7 +188,12 @@ describe("PantrySettingsPage", () => {
 
     // Polling picks up completion after the interval fires.
     mockRunPantryQuery.mockResolvedValueOnce({
-      priceSyncStatus: makeSyncStatus({ running: false, totalItems: 3, checkedItems: 3, finishedAt: "2026-07-01T00:00:00.000Z" }),
+      priceSyncStatus: makeSyncStatus({
+        running: false,
+        totalItems: 3,
+        checkedItems: 3,
+        finishedAt: "2026-07-01T00:00:00.000Z",
+      }),
     });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(2000);

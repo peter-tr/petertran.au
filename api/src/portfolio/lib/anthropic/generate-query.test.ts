@@ -14,6 +14,9 @@ vi.mock("api-shared/anthropic-client", () => ({
 vi.mock("api-shared/xray", () => ({
   ANTHROPIC_API_SEGMENT_NAME: "Anthropic API",
   traced: vi.fn((_name: string, fn: () => Promise<unknown>) => fn()),
+  // ddb.ts (transitively imported via "../aws/ddb") also pulls captureAwsClient
+  // from this module, so the mock factory needs to provide it too.
+  captureAwsClient: vi.fn((client: unknown) => client),
 }));
 
 import { assertNotRateLimited } from "../util/rate-limit";
@@ -106,7 +109,8 @@ describe("generateQuery", () => {
 
   it("returns answer: null for the ReachOut mutation draft, without running it", async () => {
     const client = makeAnthropicClient({
-      query: 'mutation ReachOut {\n  sendMessage(input: { name: "", email: "", message: "" }) { success message }\n}',
+      query:
+        'mutation ReachOut {\n  sendMessage(input: { name: "", email: "", message: "" }) { success message }\n}',
       message: "I've filled in the form below.",
     });
     vi.mocked(getAnthropicClient).mockResolvedValue(client as never);
@@ -154,7 +158,10 @@ describe("generateQuery", () => {
   });
 
   it("answers in natural language when the query runs successfully", async () => {
-    const client = makeAnthropicClient({ query: "query FunFact { person { name } }", message: null }, "Peter's name is Ada.");
+    const client = makeAnthropicClient(
+      { query: "query FunFact { person { name } }", message: null },
+      "Peter's name is Ada."
+    );
     vi.mocked(getAnthropicClient).mockResolvedValue(client as never);
     runInternalQuery.mockResolvedValue({ data: { person: { name: "Ada" } } });
 

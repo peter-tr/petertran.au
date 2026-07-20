@@ -154,7 +154,9 @@ describe("sendShoppingListDigest", () => {
 
     const input = sesMock.call(0).args[0].input as {
       Destination: { ToAddresses: string[] };
-      Content: { Simple: { Subject: { Data: string }; Body: { Text: { Data: string }; Html: { Data: string } } } };
+      Content: {
+        Simple: { Subject: { Data: string }; Body: { Text: { Data: string }; Html: { Data: string } } };
+      };
     };
     expect(input.Destination.ToAddresses).toEqual(["to@example.com"]);
     expect(input.Content.Simple.Subject.Data).toBe("Pantry: 2 urgent items to buy");
@@ -184,7 +186,9 @@ describe("sendShoppingListDigest", () => {
 
     await sendShoppingListDigest();
 
-    const input = sesMock.call(0).args[0].input as { Content: { Simple: { Body: { Html: { Data: string } } } } };
+    const input = sesMock.call(0).args[0].input as {
+      Content: { Simple: { Body: { Html: { Data: string } } } };
+    };
     expect(input.Content.Simple.Body.Html.Data).not.toContain("<script>");
     expect(input.Content.Simple.Body.Html.Data).toContain("&lt;script&gt;");
     expect(input.Content.Simple.Body.Html.Data).toContain("A &amp; B");

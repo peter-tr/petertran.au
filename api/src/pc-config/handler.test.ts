@@ -8,8 +8,10 @@ import {
 } from "@aws-sdk/client-lambda";
 import { SSMClient, GetParameterCommand, PutParameterCommand } from "@aws-sdk/client-ssm";
 
-// Read as module-level consts at import time in handler.ts, so these must be
-// set before the module is first imported below.
+// Read as module-level consts at import time in handler.ts. A static
+// `import` is hoisted above these assignments regardless of where it's
+// written textually (ES module semantics), so a dynamic import is used here
+// instead to guarantee the env vars are set first.
 process.env.LIVE_ALIAS_NAME = "live";
 process.env.PC_CONFIG_PARAM_NAME = "/pc-config/flags";
 process.env.PORTFOLIO_FN_NAME = "portfolio-fn";
@@ -21,7 +23,7 @@ process.env.ZTL_EDGE_AUTHORIZER_FN_NAME = "ztl-edge-authorizer-fn";
 process.env.ZTL_EDGE_PROXY_FN_NAME = "ztl-edge-proxy-fn";
 process.env.ZTL_DOMAIN_A_FN_NAME = "ztl-domain-a-fn";
 
-import { handler } from "./handler";
+const { handler } = await import("./handler");
 import type { APIGatewayProxyEventV2 } from "aws-lambda";
 
 const lambdaMock = mockClient(LambdaClient);
@@ -142,6 +144,16 @@ describe("pc-config handler - reconcile ping", () => {
     expect(result).toEqual({ statusCode: 200, body: "reconciled" });
 
     const putCalls = lambdaMock.commandCalls(PutProvisionedConcurrencyConfigCommand);
+    console.log(
+      "DEBUG put",
+      putCalls.map((c) => c.args[0].input.FunctionName)
+    );
+    console.log(
+      "DEBUG delete",
+      lambdaMock
+        .commandCalls(DeleteProvisionedConcurrencyConfigCommand)
+        .map((c) => c.args[0].input.FunctionName)
+    );
     expect(putCalls.map((c) => c.args[0].input.FunctionName).sort()).toEqual([...ALL_TARGETS].sort());
     for (const call of putCalls) {
       expect(call.args[0].input.Qualifier).toBe("live");
@@ -165,7 +177,9 @@ describe("pc-config handler - reconcile ping", () => {
   it("tears down just the disabled flag's targets while granting PC to the rest within business hours", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(WITHIN_BUSINESS_HOURS);
-    ssmMock.on(GetParameterCommand).resolves({ Parameter: { Value: JSON.stringify({ zeroTrustLab: false }) } });
+    ssmMock
+      .on(GetParameterCommand)
+      .resolves({ Parameter: { Value: JSON.stringify({ zeroTrustLab: false }) } });
 
     await handler({ reconcile: true });
 
@@ -182,14 +196,12 @@ describe("pc-config handler - reconcile ping", () => {
     vi.useFakeTimers();
     vi.setSystemTime(OUTSIDE_BUSINESS_HOURS);
     ssmMock.on(GetParameterCommand).resolves({});
-    lambdaMock
-      .on(DeleteProvisionedConcurrencyConfigCommand)
-      .rejects(
-        new ResourceNotFoundException({
-          message: "no provisioned concurrency config found",
-          $metadata: {},
-        })
-      );
+    lambdaMock.on(DeleteProvisionedConcurrencyConfigCommand).rejects(
+      new ResourceNotFoundException({
+        message: "no provisioned concurrency config found",
+        $metadata: {},
+      })
+    );
 
     const result = await handler({ reconcile: true });
     expect(result).toEqual({ statusCode: 200, body: "reconciled" });

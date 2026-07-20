@@ -59,7 +59,9 @@ describe("getItem backfill", () => {
 
   it("preserves true booleans already stored, rather than always defaulting to false", async () => {
     ddbMock.on(GetCommand).resolves({
-      Item: { data: oldShapedRow({ isStaple: true, lowPriority: true, nearlyEmpty: true, trackPrice: true }) },
+      Item: {
+        data: oldShapedRow({ isStaple: true, lowPriority: true, nearlyEmpty: true, trackPrice: true }),
+      },
     });
 
     const item = await getItem("item-1");
@@ -95,7 +97,13 @@ describe("getItem backfill", () => {
     ddbMock.on(GetCommand).resolves({
       Item: {
         data: oldShapedRow({
-          lastKnownPrice: { colesPrice: 3.5, productUrl: null, note: null, checkedAt: "2026-01-05", debugInfo },
+          lastKnownPrice: {
+            colesPrice: 3.5,
+            productUrl: null,
+            note: null,
+            checkedAt: "2026-01-05",
+            debugInfo,
+          },
         }),
       },
     });
@@ -121,7 +129,15 @@ describe("getAllItems backfill", () => {
     ddbMock.on(QueryCommand).resolves({
       Items: [
         { data: oldShapedRow({ id: "old" }) },
-        { data: oldShapedRow({ id: "new", isStaple: true, lowPriority: false, nearlyEmpty: false, trackPrice: false }) },
+        {
+          data: oldShapedRow({
+            id: "new",
+            isStaple: true,
+            lowPriority: false,
+            nearlyEmpty: false,
+            trackPrice: false,
+          }),
+        },
       ],
     });
 
@@ -231,7 +247,13 @@ describe("createItem", () => {
   });
 
   it("logs an initial purchase batch only when purchasedAt is given", () => {
-    const withDate = createItem({ name: "Milk", location: "FRIDGE", quantity: 2, price: 4, purchasedAt: "2026-01-01" });
+    const withDate = createItem({
+      name: "Milk",
+      location: "FRIDGE",
+      quantity: 2,
+      price: 4,
+      purchasedAt: "2026-01-01",
+    });
     expect(withDate.purchases).toEqual([{ date: "2026-01-01", price: 4, quantity: 2 }]);
 
     const withoutDate = createItem({ name: "Milk", location: "FRIDGE", quantity: 2 });

@@ -198,7 +198,9 @@ describe("setShoppingListLastKnownPrice", () => {
 
     await setShoppingListLastKnownPrice("entry-1", price);
 
-    const putInput = ddbMock.commandCalls(PutCommand)[0].args[0].input as { Item: { data: ShoppingListEntry } };
+    const putInput = ddbMock.commandCalls(PutCommand)[0].args[0].input as {
+      Item: { data: ShoppingListEntry };
+    };
     expect(putInput.Item.data.lastKnownPrice).toEqual(price);
     expect(putInput.Item.data.name).toBe("Eggs");
   });
@@ -213,7 +215,16 @@ describe("upsertShoppingListEntry", () => {
     ddbMock.on(QueryCommand).resolves({ Items: [] });
     ddbMock.on(PutCommand).resolves({});
 
-    const entry = await upsertShoppingListEntry("Milk", 2, "liters", "for pancakes", true, "Dairy", "Pancakes", true);
+    const entry = await upsertShoppingListEntry(
+      "Milk",
+      2,
+      "liters",
+      "for pancakes",
+      true,
+      "Dairy",
+      "Pancakes",
+      true
+    );
 
     expect(entry.name).toBe("Milk");
     expect(entry.quantity).toBe(2);

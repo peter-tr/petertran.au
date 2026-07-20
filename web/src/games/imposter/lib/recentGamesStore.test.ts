@@ -72,7 +72,9 @@ describe("addRecentGame", () => {
 
   it("caps the list at 20 entries, dropping the oldest-inserted first", () => {
     for (let i = 0; i < 25; i++) {
-      addRecentGame(makeGame({ gameId: `game-${i}`, createdAt: `2026-01-01T00:00:${String(i).padStart(2, "0")}.000Z` }));
+      addRecentGame(
+        makeGame({ gameId: `game-${i}`, createdAt: `2026-01-01T00:00:${String(i).padStart(2, "0")}.000Z` })
+      );
     }
 
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY)!) as RecentGame[];

@@ -64,7 +64,9 @@ describe("edge authorizer handler", () => {
   });
 
   it("denies when the path doesn't map to a known audience", async () => {
-    const result = await handler(authEvent({ rawPath: "/unknown/foo", authorization: "Bearer opaque-token" }));
+    const result = await handler(
+      authEvent({ rawPath: "/unknown/foo", authorization: "Bearer opaque-token" })
+    );
     expect(result.isAuthorized).toBe(false);
   });
 
@@ -84,21 +86,27 @@ describe("edge authorizer handler", () => {
   it("denies when introspection responds with a non-ok status", async () => {
     mockIntrospectResponse({}, false);
 
-    const result = await handler(authEvent({ rawPath: "/domain-a/foo", authorization: "Bearer opaque-token" }));
+    const result = await handler(
+      authEvent({ rawPath: "/domain-a/foo", authorization: "Bearer opaque-token" })
+    );
     expect(result.isAuthorized).toBe(false);
   });
 
   it("denies when introspection reports the token as inactive", async () => {
     mockIntrospectResponse({ active: false });
 
-    const result = await handler(authEvent({ rawPath: "/domain-a/foo", authorization: "Bearer opaque-token" }));
+    const result = await handler(
+      authEvent({ rawPath: "/domain-a/foo", authorization: "Bearer opaque-token" })
+    );
     expect(result.isAuthorized).toBe(false);
   });
 
   it("denies when introspection is active but has no sub", async () => {
     mockIntrospectResponse({ active: true });
 
-    const result = await handler(authEvent({ rawPath: "/domain-a/foo", authorization: "Bearer opaque-token" }));
+    const result = await handler(
+      authEvent({ rawPath: "/domain-a/foo", authorization: "Bearer opaque-token" })
+    );
     expect(result.isAuthorized).toBe(false);
   });
 
@@ -106,7 +114,9 @@ describe("edge authorizer handler", () => {
     mockIntrospectResponse({ active: true, sub: "user-1" });
     lambdaMock.on(InvokeCommand).resolves({});
 
-    const result = await handler(authEvent({ rawPath: "/domain-a/foo", authorization: "Bearer opaque-token" }));
+    const result = await handler(
+      authEvent({ rawPath: "/domain-a/foo", authorization: "Bearer opaque-token" })
+    );
     expect(result.isAuthorized).toBe(false);
   });
 
@@ -114,7 +124,9 @@ describe("edge authorizer handler", () => {
     mockIntrospectResponse({ active: true, sub: "user-1" });
     mockInvokePayload({});
 
-    const result = await handler(authEvent({ rawPath: "/domain-a/foo", authorization: "Bearer opaque-token" }));
+    const result = await handler(
+      authEvent({ rawPath: "/domain-a/foo", authorization: "Bearer opaque-token" })
+    );
     expect(result.isAuthorized).toBe(false);
   });
 
@@ -122,7 +134,9 @@ describe("edge authorizer handler", () => {
     mockIntrospectResponse({ active: true, sub: "user-42", scope: "read" });
     mockInvokePayload({ jwt: "minted-jwt" });
 
-    const result = await handler(authEvent({ rawPath: "/domain-a/foo", authorization: "Bearer opaque-token" }));
+    const result = await handler(
+      authEvent({ rawPath: "/domain-a/foo", authorization: "Bearer opaque-token" })
+    );
     expect(result).toEqual({ isAuthorized: true, context: { jwt: "minted-jwt", sub: "user-42" } });
   });
 

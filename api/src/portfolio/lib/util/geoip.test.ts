@@ -19,14 +19,20 @@ describe("getLocationForIp", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it.each(["127.0.0.1", "10.0.0.5", "192.168.1.1", "172.16.0.1", "172.31.255.255", "::1", "fc00::1", "fe80::1"])(
-    "returns null and never calls fetch for the private/loopback address %s",
-    async (ip) => {
-      const result = await getLocationForIp(ip);
-      expect(result).toBeNull();
-      expect(fetchMock).not.toHaveBeenCalled();
-    }
-  );
+  it.each([
+    "127.0.0.1",
+    "10.0.0.5",
+    "192.168.1.1",
+    "172.16.0.1",
+    "172.31.255.255",
+    "::1",
+    "fc00::1",
+    "fe80::1",
+  ])("returns null and never calls fetch for the private/loopback address %s", async (ip) => {
+    const result = await getLocationForIp(ip);
+    expect(result).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 
   it("does not treat a public address in the 172.32+ range as private", async () => {
     fetchMock.mockResolvedValue({
@@ -42,7 +48,12 @@ describe("getLocationForIp", () => {
   it("calls ip-api.com for a public IP and joins city/region/country", async () => {
     fetchMock.mockResolvedValue({
       ok: true,
-      json: async () => ({ status: "success", city: "Brisbane", regionName: "Queensland", country: "Australia" }),
+      json: async () => ({
+        status: "success",
+        city: "Brisbane",
+        regionName: "Queensland",
+        country: "Australia",
+      }),
     });
 
     const result = await getLocationForIp("8.8.8.8");
@@ -57,7 +68,12 @@ describe("getLocationForIp", () => {
   it("omits missing fields when joining the location", async () => {
     fetchMock.mockResolvedValue({
       ok: true,
-      json: async () => ({ status: "success", city: undefined, regionName: "Queensland", country: "Australia" }),
+      json: async () => ({
+        status: "success",
+        city: undefined,
+        regionName: "Queensland",
+        country: "Australia",
+      }),
     });
 
     const result = await getLocationForIp("8.8.8.8");

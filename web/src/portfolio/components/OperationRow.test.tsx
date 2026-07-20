@@ -82,9 +82,7 @@ describe("OperationRow", () => {
     const { rerender } = render(
       <table>
         <tbody>
-          <OperationRow
-            op={baseOp({ lastQuery: "query Foo { foo }", lastVariables: '{"id":"1"}' })}
-          />
+          <OperationRow op={baseOp({ lastQuery: "query Foo { foo }", lastVariables: '{"id":"1"}' })} />
         </tbody>
       </table>
     );

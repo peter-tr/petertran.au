@@ -102,7 +102,11 @@ describe("createImposterResolvers", () => {
   describe("Query.imposterStats", () => {
     it("delegates directly to the stats tracker", async () => {
       const stats = makeStats({
-        getStats: vi.fn(async () => ({ gamesPlayedTotal: 5, gamesCompletedTotal: 2, avgGameDurationMs: 100 })),
+        getStats: vi.fn(async () => ({
+          gamesPlayedTotal: 5,
+          gamesCompletedTotal: 2,
+          avgGameDurationMs: 100,
+        })),
       });
       const { Query } = createImposterResolvers(makeStore(), stats);
 
@@ -155,7 +159,11 @@ describe("createImposterResolvers", () => {
       const { Mutation } = createImposterResolvers(makeStore(), makeStats());
 
       await expect(
-        Mutation.createImposterGame(null, { wordSource: "BUILTIN", categoryId: "animals", playerNames: ["Alice"] }, context)
+        Mutation.createImposterGame(
+          null,
+          { wordSource: "BUILTIN", categoryId: "animals", playerNames: ["Alice"] },
+          context
+        )
       ).rejects.toThrow(/between 3 and 12 players/);
     });
   });

@@ -92,14 +92,26 @@ describe("PantryItemRow (full mode)", () => {
   it("shows the low-stock badge only when nearlyEmpty is set", () => {
     const { rerender } = render(
       <ul>
-        <PantryItemRow item={makeItem({ nearlyEmpty: false })} simple={false} nerdMode={false} categories={[]} {...noop} />
+        <PantryItemRow
+          item={makeItem({ nearlyEmpty: false })}
+          simple={false}
+          nerdMode={false}
+          categories={[]}
+          {...noop}
+        />
       </ul>
     );
     expect(screen.queryByText("low stock")).not.toBeInTheDocument();
 
     rerender(
       <ul>
-        <PantryItemRow item={makeItem({ nearlyEmpty: true })} simple={false} nerdMode={false} categories={[]} {...noop} />
+        <PantryItemRow
+          item={makeItem({ nearlyEmpty: true })}
+          simple={false}
+          nerdMode={false}
+          categories={[]}
+          {...noop}
+        />
       </ul>
     );
     expect(screen.getByText("low stock")).toBeInTheDocument();
@@ -126,7 +138,13 @@ describe("PantryItemRow (full mode)", () => {
     const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
     render(
       <ul>
-        <PantryItemRow item={makeItem({ expiresAt: yesterday })} simple={false} nerdMode={false} categories={[]} {...noop} />
+        <PantryItemRow
+          item={makeItem({ expiresAt: yesterday })}
+          simple={false}
+          nerdMode={false}
+          categories={[]}
+          {...noop}
+        />
       </ul>
     );
 
@@ -136,14 +154,26 @@ describe("PantryItemRow (full mode)", () => {
   it("only renders the last-known-price line when trackPrice is set", () => {
     const { rerender } = render(
       <ul>
-        <PantryItemRow item={makeItem({ trackPrice: false })} simple={false} nerdMode={false} categories={[]} {...noop} />
+        <PantryItemRow
+          item={makeItem({ trackPrice: false })}
+          simple={false}
+          nerdMode={false}
+          categories={[]}
+          {...noop}
+        />
       </ul>
     );
     expect(screen.queryByText("price check pending")).not.toBeInTheDocument();
 
     rerender(
       <ul>
-        <PantryItemRow item={makeItem({ trackPrice: true, lastKnownPrice: null })} simple={false} nerdMode={false} categories={[]} {...noop} />
+        <PantryItemRow
+          item={makeItem({ trackPrice: true, lastKnownPrice: null })}
+          simple={false}
+          nerdMode={false}
+          categories={[]}
+          {...noop}
+        />
       </ul>
     );
     expect(screen.getByText("price check pending")).toBeInTheDocument();
@@ -171,10 +201,10 @@ describe("PantryItemRow (full mode)", () => {
     fireEvent.click(screen.getByTitle("Mark as a staple item"));
 
     await waitFor(() =>
-      expect(mockRunPantryQuery).toHaveBeenCalledWith(
-        expect.stringContaining("UpdateInventoryItem"),
-        { id: "item-1", input: { isStaple: true } }
-      )
+      expect(mockRunPantryQuery).toHaveBeenCalledWith(expect.stringContaining("UpdateInventoryItem"), {
+        id: "item-1",
+        input: { isStaple: true },
+      })
     );
     await waitFor(() => expect(onChanged).toHaveBeenCalled());
   });
@@ -214,7 +244,13 @@ describe("PantryItemRow (full mode)", () => {
 
     rerender(
       <ul>
-        <PantryItemRow item={makeItem({ purchases: [] })} simple={false} nerdMode={false} categories={[]} {...noop} />
+        <PantryItemRow
+          item={makeItem({ purchases: [] })}
+          simple={false}
+          nerdMode={false}
+          categories={[]}
+          {...noop}
+        />
       </ul>
     );
     expect(screen.queryByTitle("Click for purchase history")).not.toBeInTheDocument();

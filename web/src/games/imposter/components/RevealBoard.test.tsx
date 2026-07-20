@@ -72,12 +72,19 @@ describe("RevealBoard", () => {
 
     await waitFor(() => expect(screen.getByText("Tiger")).toBeInTheDocument());
     expect(screen.getByText("You are the IMPOSTER")).toBeInTheDocument();
-    expect(runImposterQueryMock).toHaveBeenCalledWith(expect.any(String), { gameId: "abcde", playerId: "p1" });
+    expect(runImposterQueryMock).toHaveBeenCalledWith(expect.any(String), {
+      gameId: "abcde",
+      playerId: "p1",
+    });
   });
 
   it("shows the 'no hint' message when the reveal returns a null word", async () => {
     runImposterQueryMock.mockResolvedValue({
-      revealImposterWord: { word: null, isImposter: true, game: { gameId: "abcde", phase: "REVEAL" } as never },
+      revealImposterWord: {
+        word: null,
+        isImposter: true,
+        game: { gameId: "abcde", phase: "REVEAL" } as never,
+      },
     } as never);
     renderBoard(makePlayers());
 

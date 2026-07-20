@@ -42,9 +42,7 @@ function makeSettings(overrides: Partial<PantrySettings> = {}): PantrySettings {
   };
 }
 
-function makeHomeResult(
-  overrides: Partial<PantryHomeQueryResult> = {}
-): PantryHomeQueryResult {
+function makeHomeResult(overrides: Partial<PantryHomeQueryResult> = {}): PantryHomeQueryResult {
   return {
     inventory: [] as InventoryItem[],
     shoppingList: [] as ShoppingListEntry[],

@@ -8,10 +8,10 @@ const assertNotRateLimited = vi.fn(async () => {});
 // (imported below) picks up these mocks instead of ever constructing a real
 // Anthropic client, hitting DynamoDB for rate limiting, or making a network call.
 vi.mock("api-shared/anthropic-client", () => ({
-  getAnthropicClient: (...args: unknown[]) => getAnthropicClient(...args),
+  getAnthropicClient: () => getAnthropicClient(),
 }));
 vi.mock("../util/rate-limit", () => ({
-  assertNotRateLimited: (...args: unknown[]) => assertNotRateLimited(...args),
+  assertNotRateLimited: (sourceIp: string | undefined) => assertNotRateLimited(sourceIp),
 }));
 
 import { generateAiWordPair } from "./ai";

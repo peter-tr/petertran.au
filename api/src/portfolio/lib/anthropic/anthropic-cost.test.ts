@@ -169,10 +169,7 @@ describe("getAnthropicAllTimeCostUsd", () => {
     const result = await getAnthropicAllTimeCostUsd();
 
     expect(result).toBe(8.5);
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      "Failed to fetch Anthropic cost report:",
-      expect.any(Error)
-    );
+    expect(consoleErrorSpy).toHaveBeenCalledWith("Failed to fetch Anthropic cost report:", expect.any(Error));
     consoleErrorSpy.mockRestore();
   });
 

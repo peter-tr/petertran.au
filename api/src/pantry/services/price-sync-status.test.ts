@@ -86,7 +86,9 @@ describe("recordPriceCheckProgress", () => {
 
   it("increments checkedItems without adding an error when called with none", async () => {
     ddbMock.on(GetCommand).resolves({
-      Item: { data: { running: true, startedAt: "t", finishedAt: null, totalItems: 3, checkedItems: 1, errors: [] } },
+      Item: {
+        data: { running: true, startedAt: "t", finishedAt: null, totalItems: 3, checkedItems: 1, errors: [] },
+      },
     });
     ddbMock.on(PutCommand).resolves({});
 
@@ -99,11 +101,17 @@ describe("recordPriceCheckProgress", () => {
 
   it("appends the given error to the errors list", async () => {
     ddbMock.on(GetCommand).resolves({
-      Item: { data: { running: true, startedAt: "t", finishedAt: null, totalItems: 3, checkedItems: 1, errors: [] } },
+      Item: {
+        data: { running: true, startedAt: "t", finishedAt: null, totalItems: 3, checkedItems: 1, errors: [] },
+      },
     });
     ddbMock.on(PutCommand).resolves({});
 
-    await recordPriceCheckProgress({ itemName: "Milk", message: "boom", occurredAt: "2026-01-01T00:00:00.000Z" });
+    await recordPriceCheckProgress({
+      itemName: "Milk",
+      message: "boom",
+      occurredAt: "2026-01-01T00:00:00.000Z",
+    });
 
     const putInput = ddbMock.commandCalls(PutCommand)[0].args[0].input as { Item: { data: PriceSyncStatus } };
     expect(putInput.Item.data.checkedItems).toBe(2);
@@ -120,7 +128,14 @@ describe("recordPriceCheckProgress", () => {
     }));
     ddbMock.on(GetCommand).resolves({
       Item: {
-        data: { running: true, startedAt: "t", finishedAt: null, totalItems: 20, checkedItems: 10, errors: existingErrors },
+        data: {
+          running: true,
+          startedAt: "t",
+          finishedAt: null,
+          totalItems: 20,
+          checkedItems: 10,
+          errors: existingErrors,
+        },
       },
     });
     ddbMock.on(PutCommand).resolves({});

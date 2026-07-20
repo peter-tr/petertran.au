@@ -6,7 +6,12 @@ const generateAiWordPair = vi.fn();
 // (imported below) picks up this mocked generateAiWordPair instead of ever
 // touching the real Anthropic client.
 vi.mock("./anthropic/ai", () => ({
-  generateAiWordPair: (...args: unknown[]) => generateAiWordPair(...args),
+  generateAiWordPair: (
+    theme: string | undefined,
+    difficulty: string,
+    sourceIp: string | undefined,
+    xraySegment: unknown
+  ) => generateAiWordPair(theme, difficulty, sourceIp, xraySegment),
 }));
 
 import {
@@ -205,7 +210,10 @@ describe("buildNewGameContent", () => {
       undefined,
       undefined
     );
-    expect(category.hardPairs).toContainEqual({ civilian: content.civilianWord, imposter: content.imposterWord });
+    expect(category.hardPairs).toContainEqual({
+      civilian: content.civilianWord,
+      imposter: content.imposterWord,
+    });
   });
 
   it("hides the imposter word (but not the civilian word) when hintEnabled is false", async () => {

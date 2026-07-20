@@ -66,6 +66,8 @@ describe("idp-bridge handler", () => {
   });
 
   it("collapses a doubled slash before dispatching to /introspect", async () => {
+    ddbMock.on(GetCommand).resolves({ Item: undefined });
+
     const result = await handler(jsonEvent("//introspect", { token: "missing-token" }));
     expect(result.statusCode).toBe(200);
     expect(JSON.parse(result.body as string)).toEqual({ active: false });
@@ -192,7 +194,9 @@ describe("idp-bridge handler", () => {
 
     it("returns active:true with sub/scope/exp for a valid, unexpired token", async () => {
       const now = Math.floor(Date.now() / 1000);
-      ddbMock.on(GetCommand).resolves({ Item: { pk: "good-token", sub: "user-1", scope: "read", ttl: now + 3600 } });
+      ddbMock
+        .on(GetCommand)
+        .resolves({ Item: { pk: "good-token", sub: "user-1", scope: "read", ttl: now + 3600 } });
 
       const result = await handler(jsonEvent("/introspect", { token: "good-token" }));
       expect(result.statusCode).toBe(200);

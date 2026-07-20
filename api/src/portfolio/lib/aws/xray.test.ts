@@ -99,7 +99,14 @@ describe("getTraceBreakdown", () => {
         {
           Id: "trace-1",
           Segments: [
-            { Document: segmentDoc({ name: "AWS::Lambda", origin: "AWS::Lambda", start_time: 100, end_time: 110 }) },
+            {
+              Document: segmentDoc({
+                name: "AWS::Lambda",
+                origin: "AWS::Lambda",
+                start_time: 100,
+                end_time: 110,
+              }),
+            },
             {
               Document: segmentDoc({
                 name: "our-handler-segment",
@@ -126,8 +133,16 @@ describe("getTraceBreakdown", () => {
   it("retries up to twice (700ms then 1500ms) when only a single segment is found, then returns what it gets", async () => {
     xrayMock
       .on(BatchGetTracesCommand)
-      .resolvesOnce({ Traces: [{ Id: "trace-1", Segments: [{ Document: segmentDoc({ name: "Lambda", origin: "AWS::Lambda" }) }] }] })
-      .resolvesOnce({ Traces: [{ Id: "trace-1", Segments: [{ Document: segmentDoc({ name: "Lambda", origin: "AWS::Lambda" }) }] }] })
+      .resolvesOnce({
+        Traces: [
+          { Id: "trace-1", Segments: [{ Document: segmentDoc({ name: "Lambda", origin: "AWS::Lambda" }) }] },
+        ],
+      })
+      .resolvesOnce({
+        Traces: [
+          { Id: "trace-1", Segments: [{ Document: segmentDoc({ name: "Lambda", origin: "AWS::Lambda" }) }] },
+        ],
+      })
       .resolves({
         Traces: [
           {
@@ -153,7 +168,9 @@ describe("getTraceBreakdown", () => {
 
   it("gives up after two retries and returns the single segment it has", async () => {
     xrayMock.on(BatchGetTracesCommand).resolves({
-      Traces: [{ Id: "trace-1", Segments: [{ Document: segmentDoc({ name: "Lambda", origin: "AWS::Lambda" }) }] }],
+      Traces: [
+        { Id: "trace-1", Segments: [{ Document: segmentDoc({ name: "Lambda", origin: "AWS::Lambda" }) }] },
+      ],
     });
 
     const result = await runAndFlush("trace-1");

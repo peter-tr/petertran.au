@@ -29,7 +29,13 @@ const ddb = DynamoDBDocumentClient.from(rawClient);
 const ddbMock = mockClient(ddb);
 
 function makeRepo() {
-  return new WidgetRepository({ ddb, tableName: "test-table", pk: "PK1", skPrefix: "WIDGET#", itemType: "WIDGET" });
+  return new WidgetRepository({
+    ddb,
+    tableName: "test-table",
+    pk: "PK1",
+    skPrefix: "WIDGET#",
+    itemType: "WIDGET",
+  });
 }
 
 describe("DynamoRepository", () => {
@@ -165,7 +171,10 @@ describe("DynamoRepository", () => {
 
       await repo.delete("abc");
 
-      const input = ddbMock.call(0).args[0].input as { ReturnValues: string; Key: { pk: string; sk: string } };
+      const input = ddbMock.call(0).args[0].input as {
+        ReturnValues: string;
+        Key: { pk: string; sk: string };
+      };
       expect(input.ReturnValues).toBe("ALL_OLD");
       expect(input.Key).toEqual({ pk: "PK1", sk: "WIDGET#abc" });
     });

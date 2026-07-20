@@ -1,11 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const createDdbClient = vi.fn(() => ({ ddb: "the-ddb-client", TABLE_NAME: "the-table-name" }));
+const createDdbClient = vi.fn(() => ({
+  ddb: "the-ddb-client",
+  TABLE_NAME: "the-table-name",
+}));
 
 // vi.mock calls are hoisted above imports by vitest's transform, so ddb.ts
 // (imported below) picks up this mocked createDdbClient.
 vi.mock("api-shared/ddb", () => ({
-  createDdbClient: (...args: unknown[]) => createDdbClient(...args),
+  createDdbClient: (config: { defaultTableName: string; xray?: boolean }) => createDdbClient(config),
 }));
 
 describe("imposter's ddb client wiring", () => {

@@ -1,10 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-process.env.KMS_KEY_ID = "test-kms-key-id";
-
-const signJwtMock = vi.fn(async () => "signed-jwt");
-const getJwksMock = vi.fn(async () => ({
-  keys: [{ kty: "RSA", n: "n-value", e: "AQAB", kid: "zero-trust-lab-key-1", use: "sig", alg: "RS256" }],
+// vi.mock's factory is hoisted above regular imports, so any variable it
+// references must itself be declared inside vi.hoisted() - a plain top-level
+// const would still be in its temporal dead zone when the hoisted factory
+// runs (this fails with "Cannot access 'x' before initialization" otherwise).
+const { signJwtMock, getJwksMock } = vi.hoisted(() => ({
+  signJwtMock: vi.fn(async () => "signed-jwt"),
+  getJwksMock: vi.fn(async () => ({
+    keys: [{ kty: "RSA", n: "n-value", e: "AQAB", kid: "zero-trust-lab-key-1", use: "sig", alg: "RS256" }],
+  })),
 }));
 
 // internal-sts/handler.ts only orchestrates routing/dispatch around
@@ -17,7 +21,13 @@ vi.mock("../lib/jwt", () => ({
   getJwks: getJwksMock,
 }));
 
-import { handler } from "./handler";
+// Read as a module-level const at import time in handler.ts. A static
+// `import` is hoisted above this assignment regardless of where it's written
+// textually (ES module semantics), so a dynamic import is used here instead
+// to guarantee the env var is set first.
+process.env.KMS_KEY_ID = "test-kms-key-id";
+
+const { handler } = await import("./handler");
 import type { APIGatewayProxyEventV2 } from "aws-lambda";
 
 function httpEvent(rawPath: string, domainName = "internal-sts.example.com"): APIGatewayProxyEventV2 {

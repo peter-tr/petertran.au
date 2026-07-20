@@ -35,9 +35,9 @@ describe("assertNotRateLimited (portfolio's 5/min limiter)", () => {
   });
 
   it("throws a friendly error when the conditional check fails (over the limit)", async () => {
-    ddbMock.on(UpdateCommand).rejects(
-      new ConditionalCheckFailedException({ message: "conditional failed", $metadata: {} })
-    );
+    ddbMock
+      .on(UpdateCommand)
+      .rejects(new ConditionalCheckFailedException({ message: "conditional failed", $metadata: {} }));
 
     await expect(assertNotRateLimited("5.6.7.8")).rejects.toThrow(
       "Too many requests - please wait a moment and try again."

@@ -2,11 +2,13 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { mockClient } from "aws-sdk-client-mock";
 import { SchedulerClient, GetScheduleCommand, UpdateScheduleCommand } from "@aws-sdk/client-scheduler";
 
-// Read as a module-level const at import time in handler.ts, so this must be
-// set before the module is first imported below.
+// Read as a module-level const at import time in handler.ts. A static
+// `import` is hoisted above this assignment regardless of where it's written
+// textually (ES module semantics), so a dynamic import is used here instead
+// to guarantee the env var is set first.
 process.env.SCHEDULE_NAMES = "portfolio-warmup,pantry-warmup,imposter-warmup";
 
-import { handler } from "./handler";
+const { handler } = await import("./handler");
 import type { APIGatewayProxyEventV2 } from "aws-lambda";
 
 const schedulerMock = mockClient(SchedulerClient);

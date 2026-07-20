@@ -3,7 +3,12 @@ import { INVENTORY_FLAGS, type InventoryFlagKey, type InventoryFlags } from "./i
 
 describe("INVENTORY_FLAGS", () => {
   it("defines exactly the four known flag keys, in a stable order", () => {
-    expect(INVENTORY_FLAGS.map((f) => f.key)).toEqual(["isStaple", "lowPriority", "nearlyEmpty", "trackPrice"]);
+    expect(INVENTORY_FLAGS.map((f) => f.key)).toEqual([
+      "isStaple",
+      "lowPriority",
+      "nearlyEmpty",
+      "trackPrice",
+    ]);
   });
 
   it("gives every flag a non-empty icon and label", () => {

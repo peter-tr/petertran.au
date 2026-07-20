@@ -241,21 +241,30 @@ describe("CachedCostFetcher", () => {
 
   it("coalesces concurrent calls into a single in-flight fetch", async () => {
     const ddb = fakeDdb();
-    ddb.send.mockResolvedValueOnce({ Item: undefined });
-    ddb.send.mockResolvedValueOnce({});
-    ddb.send.mockResolvedValueOnce({});
+    // Every call (GetCommand, both PutCommands) can resolve generically here -
+    // the coalescing itself is what's under test, not the cache/claim shape.
+    ddb.send.mockResolvedValue({ Item: undefined });
 
     const fetcher = makeFetcher(ddb);
     let resolveFetch!: (value: number) => void;
-    fetcher.fetchRawMock.mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          resolveFetch = resolve;
-        })
-    );
+    // fetchRaw's promise only actually gets constructed after a few
+    // microtask hops (the GetCommand/claim-PutCommand awaits ahead of it),
+    // so resolveFetch isn't assigned the instant getAllTimeCostUsd() is
+    // called - wait for that assignment via this deferred signal instead of
+    // racing it.
+    const fetchStarted = new Promise<void>((signalStarted) => {
+      fetcher.fetchRawMock.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolveFetch = resolve;
+            signalStarted();
+          })
+      );
+    });
 
     const call1 = fetcher.getAllTimeCostUsd();
     const call2 = fetcher.getAllTimeCostUsd();
+    await fetchStarted;
     resolveFetch(50);
 
     const [result1, result2] = await Promise.all([call1, call2]);

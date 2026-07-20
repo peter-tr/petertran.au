@@ -26,7 +26,8 @@ vi.mock("../../services/inventory", () => ({
 }));
 vi.mock("../../services/shopping-list", () => ({
   getShoppingList: () => getShoppingList(),
-  setShoppingListLastKnownPrice: (id: string, price: LastKnownPrice) => setShoppingListLastKnownPrice(id, price),
+  setShoppingListLastKnownPrice: (id: string, price: LastKnownPrice) =>
+    setShoppingListLastKnownPrice(id, price),
 }));
 vi.mock("../../services/price-sync-status", () => ({
   startPriceSync: (n: number) => startPriceSync(n),
@@ -138,7 +139,12 @@ describe("checkPrice", () => {
       usage: usage(),
       parsed_output: {
         results: [
-          { name: "Milk", colesPrice: 3.5, productUrl: "https://www.coles.com.au/product/milk-2l).", note: null },
+          {
+            name: "Milk",
+            colesPrice: 3.5,
+            productUrl: "https://www.coles.com.au/product/milk-2l).",
+            note: null,
+          },
         ],
       },
     });
@@ -196,7 +202,10 @@ describe("checkTrackedPrices", () => {
 
     expect(startPriceSync).toHaveBeenCalledWith(2);
     expect(setLastKnownPrice).toHaveBeenCalledWith("inv-1", expect.objectContaining({ colesPrice: 3.5 }));
-    expect(setShoppingListLastKnownPrice).toHaveBeenCalledWith("sl-1", expect.objectContaining({ colesPrice: 6 }));
+    expect(setShoppingListLastKnownPrice).toHaveBeenCalledWith(
+      "sl-1",
+      expect.objectContaining({ colesPrice: 6 })
+    );
     expect(finishPriceSync).toHaveBeenCalledTimes(1);
     // Two successful checks, no errors.
     expect(recordPriceCheckProgress).toHaveBeenCalledTimes(2);

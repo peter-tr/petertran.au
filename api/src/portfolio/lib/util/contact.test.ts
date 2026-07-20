@@ -28,29 +28,35 @@ describe("validateContactInput", () => {
     );
   });
 
-  it.each(["not-an-email", "missing-at.example.com", "missing-domain@", "@no-local-part.com", "spaces in@it.com"])(
-    "throws for an invalid email address %s",
-    (email) => {
-      expect(() => validateContactInput(validInput({ email }))).toThrow(
-        "That doesn't look like a valid email address."
-      );
-    }
-  );
+  it.each([
+    "not-an-email",
+    "missing-at.example.com",
+    "missing-domain@",
+    "@no-local-part.com",
+    "spaces in@it.com",
+  ])("throws for an invalid email address %s", (email) => {
+    expect(() => validateContactInput(validInput({ email }))).toThrow(
+      "That doesn't look like a valid email address."
+    );
+  });
 
   it.each(["a@b.co", "first.last+tag@sub.example.co.uk"])("accepts a valid email address %s", (email) => {
     expect(() => validateContactInput(validInput({ email }))).not.toThrow();
   });
 
   it("throws when name is too long", () => {
-    expect(() => validateContactInput(validInput({ name: "a".repeat(201) }))).toThrow("One of the fields is too long.");
+    expect(() => validateContactInput(validInput({ name: "a".repeat(201) }))).toThrow(
+      "One of the fields is too long."
+    );
   });
 
   it("throws when email is too long", () => {
     // Keep it a technically-valid email shape so only the length check fires.
-    const longLocalPart = "a".repeat(195);
-    expect(() =>
-      validateContactInput(validInput({ email: `${longLocalPart}@b.co` }))
-    ).toThrow("One of the fields is too long.");
+    // "@b.co" is 5 chars, so a 196-char local part makes a 201-char email.
+    const longLocalPart = "a".repeat(196);
+    expect(() => validateContactInput(validInput({ email: `${longLocalPart}@b.co` }))).toThrow(
+      "One of the fields is too long."
+    );
   });
 
   it("throws when message is too long", () => {
@@ -61,8 +67,9 @@ describe("validateContactInput", () => {
 
   it("accepts fields exactly at the length limits", () => {
     const name = "a".repeat(200);
-    const localPart = "a".repeat(193);
-    const email = `${localPart}@b.co`; // exactly 200 chars
+    // "@b.co" is 5 chars, so a 195-char local part makes exactly 200 chars.
+    const localPart = "a".repeat(195);
+    const email = `${localPart}@b.co`;
     expect(email.length).toBe(200);
 
     const message = "a".repeat(5000);
