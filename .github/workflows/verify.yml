@@ -69,16 +69,7 @@ jobs:
       # dependency.
       - name: Run Playwright visual smoke tests
         working-directory: web
-        run: npx playwright test --update-snapshots
-
-      # TEMP: generating Linux baselines (Mac-generated ones don't apply to
-      # this runner's font rendering) - remove this step once downloaded.
-      - name: TEMP - upload generated Linux baselines
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-baselines
-          path: web/e2e/**/*-linux.png
-          retention-days: 1
+        run: npm run test:e2e
 
       - name: Upload Playwright report
         if: failure()
