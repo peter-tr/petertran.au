@@ -8,6 +8,8 @@ import { PantryStack } from "../lib/pantry-stack";
 import { ZeroTrustLabStack } from "../lib/zero-trust-lab-stack";
 import { WarmupStack } from "../lib/warmup-stack";
 import { ApiGatewayStack } from "../lib/api-gateway-stack";
+import { TestCertStack } from "../lib/test-cert-stack";
+import { TestEnvStack } from "../lib/test-env-stack";
 import { FUNCTION_NAMES } from "../lib/shared/function-names";
 
 const app = new App();
@@ -98,3 +100,24 @@ new ApiGatewayStack(app, "PetertranApiGatewayStack", {
   warmupConfigFnName: FUNCTION_NAMES.warmupConfig,
   env: { account, region: "ap-southeast-2" },
 });
+
+// On-demand test environment (test.petertran.au / api.test.petertran.au) for
+// testing big changes (e.g. Apollo Router/Federation) without touching prod -
+// gated behind an env var so it never shows up in a normal `cdk deploy --all`
+// (see .github/workflows/deploy-test-env.yml, which is the only caller that
+// sets this). See infra/lib/test-env-stack.ts for what it deliberately omits.
+if (process.env.DEPLOY_TEST_ENV === "true") {
+  const testCertStack = new TestCertStack(app, "PetertranTestCertStack", {
+    hostedZoneId,
+    hostedZoneName,
+    env: { account, region: "us-east-1" },
+    crossRegionReferences: true,
+  });
+  new TestEnvStack(app, "PetertranTestEnvStack", {
+    certificate: testCertStack.certificate,
+    hostedZoneId,
+    hostedZoneName,
+    env: { account, region: "ap-southeast-2" },
+    crossRegionReferences: true,
+  });
+}
