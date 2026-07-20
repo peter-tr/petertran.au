@@ -27,8 +27,8 @@ jobs:
           restore-keys: |
             turbo-${{ github.job }}-${{ runner.os }}-
 
-      - name: Lint, format:check, typecheck (same as .husky/pre-push)
-        run: npx turbo run lint format:check typecheck
+      - name: Lint, format:check, typecheck, test (same as .husky/pre-push)
+        run: npx turbo run lint format:check typecheck test
 
   visual-e2e:
     runs-on: ubuntu-latest
