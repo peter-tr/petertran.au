@@ -13,6 +13,7 @@ describe("useResumeData", () => {
   it("fetches and returns resume data", async () => {
     const data = { person: { name: "Peter" } };
     runQuery.mockResolvedValue(data);
+
     const { useResumeData } = await import("./useResumeData");
 
     const { result } = renderHook(() => useResumeData());
@@ -25,6 +26,7 @@ describe("useResumeData", () => {
 
   it("surfaces an Error's message on failure", async () => {
     runQuery.mockRejectedValue(new Error("network down"));
+
     const { useResumeData } = await import("./useResumeData");
 
     const { result } = renderHook(() => useResumeData());
@@ -35,6 +37,7 @@ describe("useResumeData", () => {
 
   it("falls back to a generic message for a non-Error rejection", async () => {
     runQuery.mockRejectedValue("weird failure");
+
     const { useResumeData } = await import("./useResumeData");
 
     const { result } = renderHook(() => useResumeData());
@@ -45,6 +48,7 @@ describe("useResumeData", () => {
   it("caches the in-flight/resolved fetch across remounts, calling runQuery only once", async () => {
     const data = { person: { name: "Peter" } };
     runQuery.mockResolvedValue(data);
+
     const { useResumeData } = await import("./useResumeData");
 
     const first = renderHook(() => useResumeData());
@@ -59,6 +63,7 @@ describe("useResumeData", () => {
   it("does not cache a failed fetch, so the next mount retries", async () => {
     runQuery.mockRejectedValueOnce(new Error("first failure"));
     runQuery.mockResolvedValueOnce({ person: { name: "Peter" } });
+
     const { useResumeData } = await import("./useResumeData");
 
     const first = renderHook(() => useResumeData());

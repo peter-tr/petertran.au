@@ -98,6 +98,7 @@ describe("putSettings", () => {
 
   it("writes the full settings object under the fixed SETTINGS key with type SETTINGS", async () => {
     ddbMock.on(PutCommand).resolves({});
+
     const settings: PantrySettings = {
       view: "grid",
       sort: "recent",
@@ -128,6 +129,7 @@ describe("putSettings", () => {
     await putSettings(settings);
 
     expect(ddbMock.calls()).toHaveLength(1);
+
     const input = ddbMock.call(0).args[0].input as {
       Item: { pk: string; sk: string; type: string; data: PantrySettings };
     };

@@ -14,6 +14,19 @@ function segmentDoc(overrides: Record<string, unknown> = {}) {
   });
 }
 
+// getTraceBreakdown retries (via real setTimeout) whenever it sees <=1
+// segment, so every case below must run under fake timers and flush both
+// retry delays - otherwise a scenario that naturally yields 0 or 1 segments
+// (the "no traces"/"no segments" cases included) would hang waiting on a
+// real timer that fake-timers never advances on its own.
+async function runAndFlush(traceId: string) {
+  const promise = getTraceBreakdown(traceId);
+  await vi.advanceTimersByTimeAsync(700);
+  await vi.advanceTimersByTimeAsync(1500);
+
+  return promise;
+}
+
 describe("getTraceBreakdown", () => {
   beforeEach(() => {
     xrayMock.reset();
@@ -28,14 +41,14 @@ describe("getTraceBreakdown", () => {
   it("returns [] when there are no traces", async () => {
     xrayMock.on(BatchGetTracesCommand).resolves({ Traces: [] });
 
-    const result = await getTraceBreakdown("trace-1");
+    const result = await runAndFlush("trace-1");
     expect(result).toEqual([]);
   });
 
   it("returns [] when the trace has no segments", async () => {
     xrayMock.on(BatchGetTracesCommand).resolves({ Traces: [{ Id: "trace-1", Segments: [] }] });
 
-    const result = await getTraceBreakdown("trace-1");
+    const result = await runAndFlush("trace-1");
     expect(result).toEqual([]);
   });
 
@@ -44,7 +57,7 @@ describe("getTraceBreakdown", () => {
       Traces: [{ Id: "trace-1", Segments: [{ Id: "s1" }] }],
     });
 
-    const result = await getTraceBreakdown("trace-1");
+    const result = await runAndFlush("trace-1");
     expect(result).toEqual([]);
   });
 
@@ -70,9 +83,9 @@ describe("getTraceBreakdown", () => {
       ],
     });
 
-    const promise = getTraceBreakdown("trace-1");
-    // More than one real segment lands on the first attempt, so no retries needed.
-    const result = await promise;
+    // More than one real segment lands on the first attempt, so no retries needed
+    // (runAndFlush's timer advances are simply no-ops here).
+    const result = await runAndFlush("trace-1");
 
     expect(result).toEqual([
       { name: "handler", startOffsetMs: 0, durationMs: 500 },
@@ -101,7 +114,7 @@ describe("getTraceBreakdown", () => {
       ],
     });
 
-    const result = await getTraceBreakdown("trace-1");
+    const result = await runAndFlush("trace-1");
 
     const lambdaEntries = result.filter((s) => s.name === "Lambda");
     expect(lambdaEntries).toHaveLength(1);

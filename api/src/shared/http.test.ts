@@ -22,8 +22,11 @@ describe("parseJsonBody", () => {
     expect(parseJsonBody<Record<string, unknown>>({})).toEqual({});
   });
 
-  it("defaults to an empty object when body is undefined even if isBase64Encoded is true", () => {
-    expect(parseJsonBody<Record<string, unknown>>({ isBase64Encoded: true })).toEqual({});
+  it("throws when body is undefined and isBase64Encoded is true - the '{}' fallback itself gets base64-decoded", () => {
+    // The default "{}" is assigned to `raw` before the isBase64Encoded check, so it
+    // is not exempt from decoding: base64-decoding the literal string "{}" does not
+    // round-trip to "{}", so this throws rather than resolving to an empty object.
+    expect(() => parseJsonBody<Record<string, unknown>>({ isBase64Encoded: true })).toThrow();
   });
 
   it("throws on malformed JSON in a plain body", () => {

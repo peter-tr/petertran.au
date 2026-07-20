@@ -105,6 +105,7 @@ describe("RevealBoard", () => {
         game: { gameId: "abcde", phase: "REVEAL" } as never,
       },
     } as never);
+
     const onAllRevealed = vi.fn();
     renderBoard(makePlayers(), onAllRevealed);
 
@@ -127,6 +128,7 @@ describe("RevealBoard", () => {
         game: { gameId: "abcde", phase: "DISCUSSION" } as never,
       },
     } as never);
+
     const onAllRevealed = vi.fn();
     renderBoard(makePlayers(), onAllRevealed);
 
