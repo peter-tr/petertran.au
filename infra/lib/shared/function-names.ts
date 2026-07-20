@@ -1,13 +1,14 @@
 // Single source of truth for every Lambda functionName ProvisionedConcurrencyStack
-// and ApiGatewayStack target. Deliberately plain string literals, imported by
-// both the producing stacks (which set these as each Lambda's functionName
-// prop) and app.ts (which passes them to ProvisionedConcurrencyStack/ApiGatewayStack) - NOT
+// (infra/lib/warm-schedule-stack.ts) and ApiGatewayStack target. Deliberately
+// plain string literals, imported by both the producing stacks (which set
+// these as each Lambda's functionName prop) and app.ts (which passes them to
+// ProvisionedConcurrencyStack/ApiGatewayStack) - NOT
 // read back via `fn.functionName` off the construct object, because that
 // getter always returns a CloudFormation token (a Ref to the resource)
 // regardless of whether functionName was set to an explicit literal. Passing
 // that token cross-stack still creates a real CloudFormation export, which
 // is exactly the coupling this whole module exists to avoid - see
-// pc-config-stack.ts's doc comment.
+// warm-schedule-stack.ts's doc comment.
 export const FUNCTION_NAMES = {
   portfolio: "portfolio-graphql",
   pantry: "pantry-graphql",
@@ -17,7 +18,7 @@ export const FUNCTION_NAMES = {
   ztlEdgeAuthorizer: "ztl-edge-authorizer",
   ztlEdgeProxy: "ztl-edge-proxy",
   ztlDomainA: "ztl-domain-a",
-  pcConfig: "pc-config",
+  warmSchedule: "warm-schedule",
 } as const;
 
 // Test-env counterparts of the 3 GraphQL Lambda names above, passed to
@@ -26,7 +27,7 @@ export const FUNCTION_NAMES = {
 // DEPLOY_TEST_ENV=true (see infra/bin/app.ts). Suffixed so they can never
 // collide with the real prod Lambdas they're testing changes against,
 // since the test env deploys alongside prod, not instead of it - no
-// zero-trust-lab/warmup/pc-config counterparts, since those aren't part of
+// zero-trust-lab/warmup/warm-schedule counterparts, since those aren't part of
 // what the test env exists to validate.
 export const TEST_FUNCTION_NAMES = {
   portfolio: "portfolio-graphql-test",
@@ -36,9 +37,9 @@ export const TEST_FUNCTION_NAMES = {
 
 // Alias name portfolio/pantry/imposter each publish a "live" Lambda Alias
 // under - the qualifier real traffic (ApiGatewayStack) targets, and the one
-// ProvisionedConcurrencyStack's pc-config Lambda applies Provisioned
-// Concurrency to. Zero-trust-lab and pc-config itself have no alias - they
-// stay on bare $LATEST.
+// ProvisionedConcurrencyStack's warm-schedule Lambda applies Provisioned
+// Concurrency to. Zero-trust-lab and warm-schedule itself have no alias -
+// they stay on bare $LATEST.
 export const LIVE_ALIAS_NAME = "live";
 
 // `Alias.fromAliasAttributes` needs a live `IVersion` reference, which can't

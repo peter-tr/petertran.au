@@ -1011,9 +1011,9 @@
   }
 }
 
-/* ---------- settings: PC schedule editor ---------- */
+/* ---------- settings: warm schedule editor ---------- */
 
-.pc-schedule {
+.warm-schedule {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -1021,13 +1021,13 @@
   border-top: 1px solid var(--rule);
 }
 
-.pc-days {
+.warm-schedule-days {
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;
 }
 
-.pc-day-btn {
+.warm-schedule-day-btn {
   font-family: var(--font-mono);
   font-size: 0.72rem;
   color: var(--muted);
@@ -1038,24 +1038,24 @@
   cursor: pointer;
 }
 
-.pc-day-btn.active {
+.warm-schedule-day-btn.active {
   color: var(--ink);
   background: var(--signal);
   border-color: var(--signal);
 }
 
-.pc-times {
+.warm-schedule-times {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   flex-wrap: wrap;
 }
 
-.pc-times .form-input {
+.warm-schedule-times .form-input {
   width: auto;
 }
 
-.pc-times-sep {
+.warm-schedule-times-sep {
   color: var(--muted-dim);
   font-family: var(--font-mono);
   font-size: 0.8rem;

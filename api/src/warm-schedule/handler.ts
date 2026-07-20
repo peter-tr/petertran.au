@@ -14,24 +14,24 @@ const ssm = new SSMClient({});
 const scheduler = new SchedulerClient({});
 
 const ALIAS_NAME = process.env.LIVE_ALIAS_NAME!;
-const PARAM_NAME = process.env.PC_CONFIG_PARAM_NAME!;
+const PARAM_NAME = process.env.WARM_SCHEDULE_PARAM_NAME!;
 // CDK-provided map of each project's on/off EventBridge Schedule names -
-// see infra/lib/pc-config-stack.ts.
-const SCHEDULE_NAMES: Record<PcFunctionKey, { on: string; off: string }> = JSON.parse(
-  process.env.PC_SCHEDULE_NAMES!
+// see infra/lib/warm-schedule-stack.ts.
+const SCHEDULE_NAMES: Record<WarmScheduleKey, { on: string; off: string }> = JSON.parse(
+  process.env.WARM_SCHEDULE_NAMES!
 );
 
-type PcFunctionKey = "portfolio" | "pantry" | "imposter" | "zeroTrustLab";
+type WarmScheduleKey = "portfolio" | "pantry" | "imposter" | "zeroTrustLab";
 type Weekday = "MON" | "TUE" | "WED" | "THU" | "FRI" | "SAT" | "SUN";
 
-interface PcSchedule {
+interface WarmSchedule {
   enabled: boolean;
   days: Weekday[];
   start: string; // "HH:MM", 24h, Sydney-local
   end: string; // "HH:MM", must be > start - same-day windows only
 }
 
-type PcConfig = Record<PcFunctionKey, PcSchedule>;
+type WarmScheduleConfig = Record<WarmScheduleKey, WarmSchedule>;
 
 const ALL_WEEKDAYS: Weekday[] = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 
@@ -40,7 +40,7 @@ const ALL_WEEKDAYS: Weekday[] = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"
 // too, domain-a's JWT verification needs internal-sts's JWKS endpoint
 // reachable), so they reconcile together under a single project rather than
 // drifting independently.
-const TARGETS_BY_PROJECT: Record<PcFunctionKey, string[]> = {
+const TARGETS_BY_PROJECT: Record<WarmScheduleKey, string[]> = {
   portfolio: [process.env.PORTFOLIO_FN_NAME!],
   pantry: [process.env.PANTRY_FN_NAME!],
   imposter: [process.env.IMPOSTER_FN_NAME!],
@@ -56,33 +56,33 @@ const TARGETS_BY_PROJECT: Record<PcFunctionKey, string[]> = {
 // On (business-hours PC scheduling active) by default, 8am-7pm every day -
 // matches how warmup's schedules used to be ENABLED at creation, and this
 // stack's original fixed window.
-const DEFAULT_SCHEDULE: PcSchedule = { enabled: true, days: ALL_WEEKDAYS, start: "08:00", end: "19:00" };
-const DEFAULT_CONFIG: PcConfig = {
+const DEFAULT_SCHEDULE: WarmSchedule = { enabled: true, days: ALL_WEEKDAYS, start: "08:00", end: "19:00" };
+const DEFAULT_CONFIG: WarmScheduleConfig = {
   portfolio: DEFAULT_SCHEDULE,
   pantry: DEFAULT_SCHEDULE,
   imposter: DEFAULT_SCHEDULE,
   zeroTrustLab: DEFAULT_SCHEDULE,
 };
 
-async function getConfig(): Promise<PcConfig> {
+async function getConfig(): Promise<WarmScheduleConfig> {
   const { Parameter } = await ssm.send(new GetParameterCommand({ Name: PARAM_NAME }));
   if (!Parameter?.Value) return DEFAULT_CONFIG;
 
   // Merge per-project over the default (not just top-level) so a project
   // added after this parameter was first written, or a stored value that
-  // predates a field being added to PcSchedule, still gets a complete,
+  // predates a field being added to WarmSchedule, still gets a complete,
   // sane schedule - same reasoning as getSettings()'s
   // {...DEFAULT_SETTINGS, ...stored} merge elsewhere in this codebase.
-  const stored = JSON.parse(Parameter.Value) as Partial<Record<PcFunctionKey, Partial<PcSchedule>>>;
-  const merged = {} as PcConfig;
-  for (const key of Object.keys(DEFAULT_CONFIG) as PcFunctionKey[]) {
+  const stored = JSON.parse(Parameter.Value) as Partial<Record<WarmScheduleKey, Partial<WarmSchedule>>>;
+  const merged = {} as WarmScheduleConfig;
+  for (const key of Object.keys(DEFAULT_CONFIG) as WarmScheduleKey[]) {
     merged[key] = { ...DEFAULT_CONFIG[key], ...stored[key] };
   }
 
   return merged;
 }
 
-async function setConfig(config: PcConfig): Promise<void> {
+async function setConfig(config: WarmScheduleConfig): Promise<void> {
   await ssm.send(
     new PutParameterCommand({ Name: PARAM_NAME, Value: JSON.stringify(config), Overwrite: true })
   );
@@ -109,7 +109,7 @@ function sydneyNow(now: Date): { weekday: Weekday; time: string } {
   return { weekday, time: `${hour}:${minute}` };
 }
 
-function isWithinWindow(schedule: PcSchedule, now: Date): boolean {
+function isWithinWindow(schedule: WarmSchedule, now: Date): boolean {
   if (!schedule.enabled) return false;
 
   const { weekday, time } = sydneyNow(now);
@@ -146,7 +146,7 @@ async function reconcileTarget(functionName: string, shouldBeWarm: boolean): Pro
   }
 }
 
-async function reconcileProjectTo(key: PcFunctionKey, shouldBeWarm: boolean): Promise<void> {
+async function reconcileProjectTo(key: WarmScheduleKey, shouldBeWarm: boolean): Promise<void> {
   await Promise.all(
     TARGETS_BY_PROJECT[key].map((functionName) => reconcileTarget(functionName, shouldBeWarm))
   );
@@ -157,7 +157,7 @@ async function reconcileProjectTo(key: PcFunctionKey, shouldBeWarm: boolean): Pr
 // on/off trigger for just the project whose window opened/closed, and
 // directly by the POST handler for just the project that changed, so an
 // edit takes effect immediately instead of waiting for the next trigger.
-async function reconcileProject(key: PcFunctionKey, schedule: PcSchedule, now: Date): Promise<void> {
+async function reconcileProject(key: WarmScheduleKey, schedule: WarmSchedule, now: Date): Promise<void> {
   await reconcileProjectTo(key, isWithinWindow(schedule, now));
 }
 
@@ -173,7 +173,7 @@ function cronFieldsFor(days: Weekday[], time: string): { minute: string; hour: s
 // resending the full schedule definition, so each edit re-fetches its own
 // current definition first and only changes ScheduleExpression/State. Same
 // idiom the old warmup-config Lambda used to toggle just State.
-async function updateProjectSchedules(key: PcFunctionKey, schedule: PcSchedule): Promise<void> {
+async function updateProjectSchedules(key: WarmScheduleKey, schedule: WarmSchedule): Promise<void> {
   const state = schedule.enabled ? "ENABLED" : "DISABLED";
   const { on, off } = SCHEDULE_NAMES[key];
   const onCron = cronFieldsFor(schedule.days, schedule.start);
@@ -217,12 +217,12 @@ function isReconcilePing(event: unknown): event is ReconcilePing {
   return typeof event === "object" && event !== null && (event as { reconcile?: unknown }).reconcile === true;
 }
 
-interface PcTrigger {
-  project: PcFunctionKey;
+interface WarmScheduleTrigger {
+  project: WarmScheduleKey;
   action: "on" | "off";
 }
 
-function isPcTrigger(event: unknown): event is PcTrigger {
+function isWarmScheduleTrigger(event: unknown): event is WarmScheduleTrigger {
   return (
     typeof event === "object" &&
     event !== null &&
@@ -231,10 +231,10 @@ function isPcTrigger(event: unknown): event is PcTrigger {
   );
 }
 
-function isValidSchedule(value: unknown): value is PcSchedule {
+function isValidSchedule(value: unknown): value is WarmSchedule {
   if (typeof value !== "object" || value === null) return false;
 
-  const s = value as Partial<PcSchedule>;
+  const s = value as Partial<WarmSchedule>;
 
   return (
     typeof s.enabled === "boolean" &&
@@ -250,13 +250,13 @@ function isValidSchedule(value: unknown): value is PcSchedule {
 }
 
 export async function handler(
-  event: APIGatewayProxyEventV2 | ReconcilePing | PcTrigger
+  event: APIGatewayProxyEventV2 | ReconcilePing | WarmScheduleTrigger
 ): Promise<APIGatewayProxyStructuredResultV2> {
   if (isReconcilePing(event)) {
     const config = await getConfig();
     const now = new Date();
     await Promise.all(
-      (Object.keys(TARGETS_BY_PROJECT) as PcFunctionKey[]).map((key) =>
+      (Object.keys(TARGETS_BY_PROJECT) as WarmScheduleKey[]).map((key) =>
         reconcileProject(key, config[key], now)
       )
     );
@@ -264,7 +264,7 @@ export async function handler(
     return { statusCode: 200, body: "reconciled" };
   }
 
-  if (isPcTrigger(event)) {
+  if (isWarmScheduleTrigger(event)) {
     // Trust the trigger - the schedule's own State is kept in sync with
     // schedule.enabled on every settings save, so there's no need to
     // re-derive "should be on" from the stored config here.
@@ -287,7 +287,7 @@ export async function handler(
       };
     }
 
-    const key = body.project as PcFunctionKey;
+    const key = body.project as WarmScheduleKey;
     const schedule = body.schedule;
 
     const config = await getConfig();

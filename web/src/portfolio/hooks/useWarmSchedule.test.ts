@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
-import type { PcSchedule } from "./usePcConfig";
+import type { WarmSchedule } from "./useWarmSchedule";
 
-const DEFAULT_SCHEDULE: PcSchedule = {
+const DEFAULT_SCHEDULE: WarmSchedule = {
   enabled: true,
   days: ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"],
   start: "08:00",
@@ -16,7 +16,7 @@ const DEFAULT_CONFIG = {
   zeroTrustLab: DEFAULT_SCHEDULE,
 };
 
-describe("usePcConfig", () => {
+describe("useWarmSchedule", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.unstubAllEnvs();
@@ -24,11 +24,11 @@ describe("usePcConfig", () => {
   });
 
   it("reports unavailable and never fetches when no endpoint is configured", async () => {
-    vi.stubEnv("VITE_PC_CONFIG_ENDPOINT", "");
+    vi.stubEnv("VITE_WARM_SCHEDULE_ENDPOINT", "");
 
-    const { usePcConfig } = await import("./usePcConfig");
+    const { useWarmSchedule } = await import("./useWarmSchedule");
 
-    const { result } = renderHook(() => usePcConfig());
+    const { result } = renderHook(() => useWarmSchedule());
 
     expect(result.current.available).toBe(false);
     expect(result.current.config).toBeNull();
@@ -36,34 +36,34 @@ describe("usePcConfig", () => {
   });
 
   it("loads the config from the endpoint on mount when available", async () => {
-    vi.stubEnv("VITE_PC_CONFIG_ENDPOINT", "https://api.test/pc-config");
+    vi.stubEnv("VITE_WARM_SCHEDULE_ENDPOINT", "https://api.test/warm-schedule");
 
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ json: async () => DEFAULT_CONFIG });
 
-    const { usePcConfig } = await import("./usePcConfig");
+    const { useWarmSchedule } = await import("./useWarmSchedule");
 
-    const { result } = renderHook(() => usePcConfig());
+    const { result } = renderHook(() => useWarmSchedule());
 
     expect(result.current.available).toBe(true);
     await waitFor(() => expect(result.current.config).toEqual(DEFAULT_CONFIG));
-    expect(fetch).toHaveBeenCalledWith("https://api.test/pc-config");
+    expect(fetch).toHaveBeenCalledWith("https://api.test/warm-schedule");
   });
 
   it("surfaces an error when the initial load fails", async () => {
-    vi.stubEnv("VITE_PC_CONFIG_ENDPOINT", "https://api.test/pc-config");
+    vi.stubEnv("VITE_WARM_SCHEDULE_ENDPOINT", "https://api.test/warm-schedule");
     (fetch as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("network down"));
 
-    const { usePcConfig } = await import("./usePcConfig");
+    const { useWarmSchedule } = await import("./useWarmSchedule");
 
-    const { result } = renderHook(() => usePcConfig());
+    const { result } = renderHook(() => useWarmSchedule());
 
     await waitFor(() => expect(result.current.error).toBe("Couldn't load provisioned concurrency status"));
   });
 
   it("setSchedule POSTs the project/schedule and updates config from the response", async () => {
-    vi.stubEnv("VITE_PC_CONFIG_ENDPOINT", "https://api.test/pc-config");
+    vi.stubEnv("VITE_WARM_SCHEDULE_ENDPOINT", "https://api.test/warm-schedule");
 
-    const newSchedule: PcSchedule = {
+    const newSchedule: WarmSchedule = {
       enabled: true,
       days: ["MON", "TUE", "WED", "THU", "FRI"],
       start: "07:30",
@@ -74,9 +74,9 @@ describe("usePcConfig", () => {
       .mockResolvedValueOnce({ json: async () => DEFAULT_CONFIG })
       .mockResolvedValueOnce({ json: async () => updatedConfig });
 
-    const { usePcConfig } = await import("./usePcConfig");
+    const { useWarmSchedule } = await import("./useWarmSchedule");
 
-    const { result } = renderHook(() => usePcConfig());
+    const { result } = renderHook(() => useWarmSchedule());
     await waitFor(() => expect(result.current.config).toEqual(DEFAULT_CONFIG));
 
     act(() => {
@@ -93,15 +93,15 @@ describe("usePcConfig", () => {
   });
 
   it("setSchedule surfaces an error and clears pending on failure", async () => {
-    vi.stubEnv("VITE_PC_CONFIG_ENDPOINT", "https://api.test/pc-config");
+    vi.stubEnv("VITE_WARM_SCHEDULE_ENDPOINT", "https://api.test/warm-schedule");
 
     (fetch as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce({ json: async () => DEFAULT_CONFIG })
       .mockRejectedValueOnce(new Error("network down"));
 
-    const { usePcConfig } = await import("./usePcConfig");
+    const { useWarmSchedule } = await import("./useWarmSchedule");
 
-    const { result } = renderHook(() => usePcConfig());
+    const { result } = renderHook(() => useWarmSchedule());
     await waitFor(() => expect(result.current.config).toEqual(DEFAULT_CONFIG));
 
     act(() => {
@@ -113,11 +113,11 @@ describe("usePcConfig", () => {
   });
 
   it("setSchedule is a no-op when unavailable", async () => {
-    vi.stubEnv("VITE_PC_CONFIG_ENDPOINT", "");
+    vi.stubEnv("VITE_WARM_SCHEDULE_ENDPOINT", "");
 
-    const { usePcConfig } = await import("./usePcConfig");
+    const { useWarmSchedule } = await import("./useWarmSchedule");
 
-    const { result } = renderHook(() => usePcConfig());
+    const { result } = renderHook(() => useWarmSchedule());
     act(() => result.current.setSchedule("pantry", DEFAULT_SCHEDULE));
 
     expect(fetch).not.toHaveBeenCalled();

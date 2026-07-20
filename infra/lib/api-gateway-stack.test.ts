@@ -14,14 +14,14 @@ describe("ApiGatewayStack", () => {
       portfolioFnName: "portfolio-graphql",
       pantryFnName: "pantry-graphql",
       imposterFnName: "imposter-graphql",
-      pcConfigFnName: "pc-config",
+      warmScheduleFnName: "warm-schedule",
       env: { account: "123456789012", region: "ap-southeast-2" },
     });
 
     const template = Template.fromStack(stack);
 
     template.resourceCountIs("AWS::ApiGatewayV2::Api", 1);
-    // Portfolio, Pantry, Imposter, PcConfig - each registered for both GET
+    // Portfolio, Pantry, Imposter, WarmSchedule - each registered for both GET
     // and POST, which CDK emits as 2 separate Route resources.
     template.resourceCountIs("AWS::ApiGatewayV2::Route", 8);
     template.hasResourceProperties("AWS::ApiGatewayV2::DomainName", {
@@ -40,14 +40,14 @@ describe("ApiGatewayStack", () => {
       portfolioFnName: "portfolio-graphql-test",
       pantryFnName: "pantry-graphql-test",
       imposterFnName: "imposter-graphql-test",
-      // pcConfigFnName omitted - not part of what the test env exists to
+      // warmScheduleFnName omitted - not part of what the test env exists to
       // validate.
       env: { account: "123456789012", region: "ap-southeast-2" },
     });
 
     const template = Template.fromStack(stack);
 
-    // Portfolio, Pantry, Imposter only - PcConfig route skipped.
+    // Portfolio, Pantry, Imposter only - WarmSchedule route skipped.
     template.resourceCountIs("AWS::ApiGatewayV2::Route", 6);
     template.hasResourceProperties("AWS::ApiGatewayV2::DomainName", {
       DomainName: "api.test.example.com",
