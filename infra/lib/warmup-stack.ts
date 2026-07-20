@@ -1,9 +1,10 @@
-import { Stack, StackProps, CfnOutput, Duration } from "aws-cdk-lib";
+import { Stack, StackProps, Duration } from "aws-cdk-lib";
 import { Construct } from "constructs";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as path from "path";
 import { createWarmupSchedules, type WarmupTarget } from "./shared/warmup-schedule";
+import { FUNCTION_NAMES } from "./shared/function-names";
 
 export interface ZeroTrustLabWarmupFunctionNames {
   idpBridge: string;
@@ -14,8 +15,6 @@ export interface ZeroTrustLabWarmupFunctionNames {
 }
 
 export interface WarmupStackProps extends StackProps {
-  domainName: string;
-  alternateDomainNames?: string[];
   // Plain function *names* (not live lambda.IFunction references)
   // deliberately - see the class doc comment below for why.
   portfolioFnName: string;
@@ -80,8 +79,9 @@ export class WarmupStack extends Stack {
 
     const configFn = new lambda.Function(this, "WarmupConfigFunction", {
       // Explicit, so it reads clearly in the X-Ray trace map instead of
-      // CloudFormation's auto-generated name.
-      functionName: "warmup-config",
+      // CloudFormation's auto-generated name. Also lets ApiGatewayStack
+      // reference it by a plain string - see FUNCTION_NAMES's doc comment.
+      functionName: FUNCTION_NAMES.warmupConfig,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "warmup/handler.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/dist")),
@@ -106,25 +106,5 @@ export class WarmupStack extends Stack {
         resources: [role.roleArn],
       })
     );
-
-    const configFnUrl = configFn.addFunctionUrl({
-      authType: lambda.FunctionUrlAuthType.NONE,
-      cors: {
-        allowedOrigins: [
-          `https://${props.domainName}`,
-          ...(props.alternateDomainNames ?? []).map((d) => `https://${d}`),
-          "http://localhost:5173",
-          "http://localhost:3000",
-        ],
-        allowedMethods: [lambda.HttpMethod.GET, lambda.HttpMethod.POST],
-        allowedHeaders: ["content-type"],
-        maxAge: Duration.hours(1),
-      },
-    });
-
-    // Public and unauthenticated, same as every other Function URL in this
-    // codebase - all it does is flip the warmup schedules on/off, which has
-    // no security or cost consequence worth gating behind auth.
-    new CfnOutput(this, "WarmupConfigUrl", { value: configFnUrl.url });
   }
 }
