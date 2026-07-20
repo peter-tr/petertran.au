@@ -82,7 +82,12 @@ export class ApiGatewayStack extends Stack {
     // applies Provisioned Concurrency to - see pc-config-stack.ts's doc
     // comment. warmup/pc-config have no alias, bare $LATEST, unaffected.
     const routes: { id: string; path: string; functionName: string; aliasName?: string }[] = [
-      { id: "Portfolio", path: "/portfolio", functionName: props.portfolioFnName, aliasName: LIVE_ALIAS_NAME },
+      {
+        id: "Portfolio",
+        path: "/portfolio",
+        functionName: props.portfolioFnName,
+        aliasName: LIVE_ALIAS_NAME,
+      },
       { id: "Pantry", path: "/pantry", functionName: props.pantryFnName, aliasName: LIVE_ALIAS_NAME },
       { id: "Imposter", path: "/imposter", functionName: props.imposterFnName, aliasName: LIVE_ALIAS_NAME },
       { id: "Warmup", path: "/warmup", functionName: props.warmupConfigFnName },

@@ -51,7 +51,9 @@ async function getFlags(): Promise<PcFlags> {
 }
 
 async function setFlags(flags: PcFlags): Promise<void> {
-  await ssm.send(new PutParameterCommand({ Name: PARAM_NAME, Value: JSON.stringify(flags), Overwrite: true }));
+  await ssm.send(
+    new PutParameterCommand({ Name: PARAM_NAME, Value: JSON.stringify(flags), Overwrite: true })
+  );
 }
 
 // 8am-7pm Australia/Sydney, every day - the one window Provisioned
@@ -59,7 +61,9 @@ async function setFlags(flags: PcFlags): Promise<void> {
 // flag says.
 function isWithinSydneyBusinessHours(now: Date): boolean {
   const hour = Number(
-    new Intl.DateTimeFormat("en-AU", { timeZone: "Australia/Sydney", hour: "numeric", hour12: false }).format(now)
+    new Intl.DateTimeFormat("en-AU", { timeZone: "Australia/Sydney", hour: "numeric", hour12: false }).format(
+      now
+    )
   );
 
   return hour >= 8 && hour < 19;
@@ -128,11 +132,7 @@ export async function handler(
 
   if (event.requestContext.http.method === "POST") {
     const body = parseJsonBody<{ function?: string; enabled?: boolean }>(event);
-    if (
-      !body.function ||
-      !(body.function in TARGETS_BY_FLAG) ||
-      typeof body.enabled !== "boolean"
-    ) {
+    if (!body.function || !(body.function in TARGETS_BY_FLAG) || typeof body.enabled !== "boolean") {
       return {
         statusCode: 400,
         headers: { "content-type": "application/json" },

@@ -64,7 +64,10 @@ export class WarmupStack extends Stack {
       // portfolio/pantry/imposter above - ProvisionedConcurrencyStack applies
       // PC to that qualifier, not $LATEST, so pinging $LATEST here would warm
       // an environment nothing (not even PC) ever uses.
-      { name: "zero-trust-lab-idp-bridge", fn: liveAlias("ZtlIdpBridgeAlias", props.zeroTrustLabFnNames.idpBridge) },
+      {
+        name: "zero-trust-lab-idp-bridge",
+        fn: liveAlias("ZtlIdpBridgeAlias", props.zeroTrustLabFnNames.idpBridge),
+      },
       {
         name: "zero-trust-lab-internal-sts",
         fn: liveAlias("ZtlInternalStsAlias", props.zeroTrustLabFnNames.internalSts),
@@ -77,7 +80,10 @@ export class WarmupStack extends Stack {
         name: "zero-trust-lab-edge-proxy",
         fn: liveAlias("ZtlEdgeProxyAlias", props.zeroTrustLabFnNames.edgeProxy),
       },
-      { name: "zero-trust-lab-domain-a", fn: liveAlias("ZtlDomainAAlias", props.zeroTrustLabFnNames.domainA) },
+      {
+        name: "zero-trust-lab-domain-a",
+        fn: liveAlias("ZtlDomainAAlias", props.zeroTrustLabFnNames.domainA),
+      },
     ];
 
     const { schedules, role } = createWarmupSchedules(this, targets, SCHEDULE_NAME_PREFIX);

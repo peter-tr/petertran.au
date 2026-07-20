@@ -116,7 +116,8 @@ export class ProvisionedConcurrencyStack extends Stack {
       target: new LambdaInvoke(configFn, {
         input: ScheduleTargetInput.fromObject({ reconcile: true }),
       }),
-      description: "Hourly reconcile of scheduled Provisioned Concurrency for portfolio/pantry/imposter/zero-trust-lab",
+      description:
+        "Hourly reconcile of scheduled Provisioned Concurrency for portfolio/pantry/imposter/zero-trust-lab",
     });
   }
 }
