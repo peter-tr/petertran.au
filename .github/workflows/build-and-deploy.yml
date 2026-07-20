@@ -128,6 +128,11 @@ jobs:
       - name: Build (api, web, infra - via turbo, cached and parallelized)
         run: |
           if [ "${{ inputs.deploy-test-env }}" = "true" ]; then
+            # turbo's own `build` task depends on `codegen` (see turbo.json),
+            # but excluding web from that `build` run also excludes it from
+            # codegen - so codegen has to run explicitly first, or web's
+            # build:test fails on missing *.generated.ts files.
+            npx turbo run codegen
             npx turbo run build --filter=!web
             npm run build:test --workspace=web
           else
