@@ -2,7 +2,8 @@
 
 Investigation and design notes from the 2026-07-20 session that (a) measured
 how well the existing warmup schedule actually works, and (b) added scheduled
-Provisioned Concurrency (PC) for portfolio/pantry/imposter on top of it.
+Provisioned Concurrency (PC) for portfolio/pantry/imposter and, later,
+zero-trust-lab's 5 Lambdas on top of it.
 
 ## Warmup: the "5-45 min idle-reclaim window" doesn't hold here
 
@@ -95,31 +96,91 @@ entirely Init Duration from Cognito/KMS SDK client construction at module
 scope - the warmup path itself returns immediately (`isWarmupPing`) same as
 every project.
 
-## Zero-trust-lab: cost is negligible either way
+## Zero-trust-lab: PC extended here too, cost is negligible either way
 
 All 5 ZTL warmup pings combined cost **~$0.036/month total** (idp-bridge
 $0.011, edge-authorizer $0.009, internal-sts $0.008, edge-proxy $0.003,
 domain-a $0.001) - cost was never actually the problem with this schedule,
-the tight reclaim window was.
+the tight reclaim window was. Despite ZTL having zero organic traffic (PC
+here only speeds up manual testing/demos of the lab, not real visitors),
+scheduled PC was extended to cover it too - decided cheap enough to be worth
+it.
 
-**If PC were added to ZTL on the same 8am-7pm schedule** (only worth it for
-snappier manual/demo testing - ZTL still has zero organic traffic, so
-there's no real visitor being protected the way portfolio/pantry/imposter's
-PC protects real hiring-manager/user traffic):
+### Memory rightsizing applied (7-day peak `Max Memory Used` vs allocated)
 
-| Scenario | Monthly cost (all 5) |
-|---|---|
-| At current memory (4x256MB + domain-a's 128MB) | ~$7.10/mo |
-| If internal-sts + edge-proxy rightsized to 128MB first | ~$5.52/mo |
-
-### Memory rightsizing candidates (7-day peak `Max Memory Used` vs allocated)
-
-Not uniform - don't blanket-apply 128MB:
+Not uniform - didn't blanket-apply 128MB:
 
 | Function | Allocated | 7-day peak | 128MB safe? |
 |---|---|---|---|
-| internal-sts | 256MB | 94MB | **Yes** - 27% headroom |
-| edge-proxy | 256MB | 87MB | **Yes** - 32% headroom |
-| domain-a | 128MB | 68MB | Already there, 47% headroom |
-| idp-bridge | 256MB | 119MB | **No** - only 7% headroom |
-| edge-authorizer | 256MB | 129MB | **No** - already exceeds 128MB, would OOM |
+| internal-sts | 256MB -> **128MB** | 94MB | Yes - 27% headroom |
+| edge-proxy | 256MB -> **128MB** | 87MB | Yes - 32% headroom |
+| domain-a | 128MB (unchanged) | 68MB | Already there, 47% headroom |
+| idp-bridge | 256MB (unchanged) | 119MB | No - only 7% headroom |
+| edge-authorizer | 256MB (unchanged) | 129MB | No - already exceeds 128MB, would OOM |
+
+All 5 get PC 8am-7pm Sydney under one combined `zeroTrustLab` flag (not 5
+independent ones) - they only work as a pipeline together (edge-authorizer
+needs internal-sts warm too, domain-a's JWT verification needs internal-sts's
+JWKS endpoint reachable), so per-function toggles would just let them drift
+out of sync for no benefit. Cost: ~$5.52/mo for all 5 (vs ~$7.10/mo if the
+two rightsizing candidates had stayed at 256MB).
+
+### Why this needed more than just an alias
+
+Unlike portfolio/pantry/imposter (one shared `ApiGatewayStack`, alias swapped
+in via one prop), ZTL's 5 Lambdas are wired together as their own
+token-exchange pipeline with no shared API Gateway - every real entry point
+needed retargeting to the `live` alias for PC to matter at all:
+- `idp-bridge`/`internal-sts`'s **Function URLs** are built from the alias
+  now (`alias.addFunctionUrl(...)`, not `fn.addFunctionUrl(...)`) - this
+  changes the actual URL (Lambda derives it from the qualified ARN), which
+  cascades into Cognito's OAuth `callbackUrls` and the JWT issuer/JWKS URL.
+  Both `idp-bridge/handler.ts` and `internal-sts/handler.ts` already derive
+  their redirect URI/issuer from `event.requestContext.domainName` at
+  runtime, so neither needed a code change to pick up the new URL.
+- `edge-authorizer`'s direct IAM-gated `Invoke` call to `internal-sts` did
+  need a code change (`api/src/zero-trust-lab/edge/authorizer.ts`) - added
+  an explicit `Qualifier: "live"` to the `InvokeCommand`, since it was
+  targeting `$LATEST` by default.
+- `edge-authorizer` (the Lambda Authorizer), `edge-proxy`, and `domain-a`
+  (the two HttpApi integrations) all now point at their respective aliases.
+
+Verified end-to-end post-deploy without a browser (none available this
+session for the interactive Cognito Hosted UI login): manually `PutItem`'d a
+valid session row into `ztl-sessions`, then called the edge HttpApi's
+`/domain-a/` route with that token as `Bearer` auth - exercised introspect,
+the direct-invoke exchange, the Lambda authorizer, and domain-a's native JWT
+verification all the way through. Independently verified the issued JWT's
+RS256 signature against the live JWKS with `pyjwt` too. First attempt
+401'd - stale API Gateway JWKS cache from the URL churn during redeploys
+(see below); a fresh token a few seconds later got a clean `200`.
+
+## Real-world hazards hit during this rollout
+
+**Concurrent deploys to the same AWS account.** This account's `main` branch
+auto-deploys via GitHub Actions on every merge (`.github/workflows/deploy.yml`).
+Mid-session, an unrelated merge to `main` (predating this feature) triggered
+a production deploy that silently reverted portfolio/pantry/imposter's and
+ZTL's new aliases and the `pc-config` API route - discovered when
+`pc-config`'s endpoint started 404ing minutes after it had worked. Fix was
+mechanical (merge `main` into the feature branch, resolve the one real
+conflict in `bin/app.ts`, redeploy), but the lesson is structural: a local
+`cdk deploy` racing an unrelated CI deploy to the same account will lose
+resources non-atomically, stack by stack, with no warning. Worth checking
+`gh run list --workflow=deploy.yml` before *and immediately after* any
+manual production deploy in this account.
+
+**A `cdk diff` "replace" that wasn't real.** After that merge, `cdk diff`
+started showing `PetertranSiteStack`'s SES DKIM Route53 record as
+`requires replacement` with an unresolvable future value, appearing only
+when the new `LiveAlias` construct was present (confirmed via bisection - a
+diff with just the memory change didn't show it). Traced it as far as: the
+underlying `SesDomainIdentity` resource, its logical ID, and its live DKIM
+token were all byte-identical before/after; a clean checkout of `main` alone
+showed zero diff. Deployed anyway given that evidence - the actual deploy
+completed with the DKIM record completely untouched. Treat this as a
+reminder that `cdk diff`'s "read-only changeset" preview can flag
+`Fn::GetAtt`-derived properties as replacing when a changeset touches
+*anything else* in the stack, even when the source attribute genuinely isn't
+changing - worth a real deploy's resource list (not just the diff) as the
+final check on anything this consequential.
