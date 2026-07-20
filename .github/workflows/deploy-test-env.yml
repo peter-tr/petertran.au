@@ -1,4 +1,8 @@
 name: Deploy Test Env
+# Default run-name is just "Deploy Test Env #N: Manually run by @actor" -
+# doesn't say what ref actually got deployed, so a run list is useless for
+# telling deploys of different branches apart at a glance.
+run-name: "Deploy Test Env: ${{ inputs.ref }} (@${{ github.actor }})"
 
 on:
   workflow_dispatch:
