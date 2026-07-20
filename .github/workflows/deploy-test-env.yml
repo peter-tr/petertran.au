@@ -16,7 +16,10 @@ jobs:
     uses: ./.github/workflows/build-and-deploy.yml
     with:
       ref: ${{ inputs.ref }}
-      stacks: PetertranTestCertStack,PetertranTestEnvStack
+      # Space-separated, not comma-separated - cdk's CLI takes each stack name
+      # as its own positional argument, so a comma-joined string gets treated
+      # as one (nonexistent) literal stack name.
+      stacks: "PetertranTestCertStack PetertranTestEnvStack"
       sync-web: true
       deploy-test-env: true
       # The test stacks are disposable and have no prior deployed state to
