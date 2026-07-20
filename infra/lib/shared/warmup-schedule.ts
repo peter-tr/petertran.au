@@ -18,11 +18,25 @@ export interface WarmupSchedulesResult {
 /**
  * One EventBridge Scheduler rule per target, each invoking that Lambda
  * directly (bypassing API Gateway/auth entirely) with a fixed
- * `{warmup: true}` payload every 10 minutes - inside the empirical 5-45 min
- * idle-reclaim window, without Provisioned Concurrency's per-second cost.
- * Every target's handler must recognize this payload (see
- * api/src/shared/warmup.ts's `isWarmupPing`) and return immediately, so a
- * scheduled ping is genuinely free of real work, not just cheap.
+ * `{warmup: true}` payload every 10 minutes, without Provisioned
+ * Concurrency's per-second cost. Every target's handler must recognize this
+ * payload (see api/src/shared/warmup.ts's `isWarmupPing`) and return
+ * immediately, so a scheduled ping is genuinely free of real work, not just
+ * cheap.
+ *
+ * Verified 2026-07-20 against the live account: the oft-cited "5-45 min
+ * idle-reclaim window" doesn't hold for a Lambda that gets *no* traffic
+ * besides the ping itself. Bisecting manual invokes against the 5
+ * zero-trust-lab targets (128-256MB, zero organic traffic - every
+ * invocation on them is a warmup ping) found the environment reclaimed
+ * somewhere between ~2m10s and ~3m20s idle, so every 10-minute tick on
+ * those 5 was a cold start, not a warm one. portfolio/pantry/imposter don't
+ * have this problem in practice because real user traffic interleaves with
+ * the ping and keeps a container warm regardless of the schedule. Left at
+ * 10 min anyway: tightening the interval enough to matter (~2 min) wouldn't
+ * help anyone, since nothing but the ping ever calls these 5 Lambdas - the
+ * "someone might hit this while it's warm" scenario the interval is meant
+ * to protect against doesn't occur here.
  *
  * All targets share one execution role (rather than letting each Schedule
  * auto-create its own) - flipping a schedule's State later still requires

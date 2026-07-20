@@ -18,4 +18,21 @@ export const FUNCTION_NAMES = {
   ztlEdgeProxy: "ztl-edge-proxy",
   ztlDomainA: "ztl-domain-a",
   warmupConfig: "warmup-config",
+  pcConfig: "pc-config",
 } as const;
+
+// Alias name portfolio/pantry/imposter each publish a "live" Lambda Alias
+// under - the qualifier real traffic (ApiGatewayStack) and warmup pings
+// (WarmupStack) both target, and the one ProvisionedConcurrencyStack's
+// pc-config Lambda applies Provisioned Concurrency to. Zero-trust-lab and
+// warmup-config have no alias - they stay on bare $LATEST.
+export const LIVE_ALIAS_NAME = "live";
+
+// `Alias.fromAliasAttributes` needs a live `IVersion` reference, which can't
+// be built from a plain function-name string - so cross-stack consumers
+// (ApiGatewayStack, WarmupStack) instead import the qualified ARN directly
+// via `lambda.Function.fromFunctionAttributes`, same "plain string, no live
+// construct reference" convention as everywhere else in shared/.
+export function liveAliasArn(region: string, account: string, functionName: string): string {
+  return `arn:aws:lambda:${region}:${account}:function:${functionName}:${LIVE_ALIAS_NAME}`;
+}

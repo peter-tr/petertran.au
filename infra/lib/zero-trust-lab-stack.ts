@@ -13,7 +13,7 @@ import {
 } from "aws-cdk-lib/aws-apigatewayv2-authorizers";
 import { HttpLambdaIntegration } from "aws-cdk-lib/aws-apigatewayv2-integrations";
 import * as path from "path";
-import { FUNCTION_NAMES } from "./shared/function-names";
+import { FUNCTION_NAMES, LIVE_ALIAS_NAME } from "./shared/function-names";
 
 export interface ZeroTrustLabStackProps extends StackProps {
   domainName: string;
@@ -28,10 +28,15 @@ export interface ZeroTrustLabStackProps extends StackProps {
  * site/pantry/games stacks. See infra/../../plans/buzzing-herding-willow.md
  * (or the PR description) for the full design writeup.
  *
- * Keep-warm scheduling for this stack's Lambdas lives in PetertranWarmupStack,
- * not here - warming is an operational/cost concern that applies equally to
+ * Keep-warm scheduling and scheduled Provisioned Concurrency for this
+ * stack's Lambdas live in PetertranWarmupStack/PetertranProvisionedConcurrencyStack,
+ * not here - both are operational/cost concerns that apply equally to
  * portfolio/pantry/imposter's Lambdas, not something specific to the
- * zero-trust/token-exchange pattern this stack exists to teach.
+ * zero-trust/token-exchange pattern this stack exists to teach. Each of the
+ * 5 Lambdas here still gets its own `live` alias (see LIVE_ALIAS_NAME) so
+ * those stacks - and every real entry point below (Function URLs, the
+ * direct-invoke exchange, the HttpApi authorizers/integrations) - have a
+ * PC-eligible qualifier to target instead of `$LATEST`.
  */
 export class ZeroTrustLabStack extends Stack {
   // Exposed so PetertranWarmupStack can schedule a keep-warm ping against
@@ -88,7 +93,17 @@ export class ZeroTrustLabStack extends Stack {
     table.grantReadWriteData(idpBridgeFn);
     this.idpBridgeFn = idpBridgeFn;
 
-    const idpBridgeFnUrl = idpBridgeFn.addFunctionUrl({ authType: lambda.FunctionUrlAuthType.NONE });
+    // Qualifier real traffic targets and ProvisionedConcurrencyStack applies
+    // PC to - see LIVE_ALIAS_NAME's doc comment. The Function URL is built
+    // from this alias (not the bare function) so its actual URL - and every
+    // downstream reference to it (Cognito's callbackUrls, IdpBridge's own
+    // dynamically-derived redirect URI) - resolves to the qualified,
+    // PC-eligible endpoint.
+    const idpBridgeAlias = new lambda.Alias(this, "IdpBridgeLiveAlias", {
+      aliasName: LIVE_ALIAS_NAME,
+      version: idpBridgeFn.currentVersion,
+    });
+    const idpBridgeFnUrl = idpBridgeAlias.addFunctionUrl({ authType: lambda.FunctionUrlAuthType.NONE });
 
     // Cognito User Pool + Hosted UI is the actual external IdP - real
     // password storage and a ready-made login page, so nothing here hand-
@@ -169,7 +184,9 @@ export class ZeroTrustLabStack extends Stack {
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "zero-trust-lab/internal-sts/handler.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/dist")),
-      memorySize: 256,
+      // 128, not 256 - measured 7-day peak memory used was 94MB, comfortable
+      // headroom even at 128.
+      memorySize: 128,
       timeout: Duration.seconds(10),
       environment: { KMS_KEY_ID: signingKey.keyId },
       tracing: lambda.Tracing.ACTIVE,
@@ -178,7 +195,15 @@ export class ZeroTrustLabStack extends Stack {
     signingKey.grant(internalStsFn, "kms:GetPublicKey");
     this.internalStsFn = internalStsFn;
 
-    const internalStsFnUrl = internalStsFn.addFunctionUrl({ authType: lambda.FunctionUrlAuthType.NONE });
+    // Qualifier real traffic targets and ProvisionedConcurrencyStack applies
+    // PC to - see LIVE_ALIAS_NAME's doc comment. Same "build the Function
+    // URL off the alias" reasoning as IdpBridge above - this URL is also
+    // what DomainAJwtAuthorizer below uses as the JWT issuer/JWKS source.
+    const internalStsAlias = new lambda.Alias(this, "InternalStsLiveAlias", {
+      aliasName: LIVE_ALIAS_NAME,
+      version: internalStsFn.currentVersion,
+    });
+    const internalStsFnUrl = internalStsAlias.addFunctionUrl({ authType: lambda.FunctionUrlAuthType.NONE });
     // No ISSUER_URL env var here, deliberately - same self-reference problem
     // as CALLBACK_URL above (a Function can't depend on its own FunctionUrl).
     // For JWKS/discovery requests (which go through the Function URL),
@@ -209,22 +234,41 @@ export class ZeroTrustLabStack extends Stack {
     });
     // Direct Lambda Invoke, IAM-gated - the exchange call never goes over
     // the network. See the plan doc for why this is tighter than exposing
-    // InternalSts's exchange operation as another public endpoint.
-    internalStsFn.grantInvoke(edgeAuthorizerFn);
+    // InternalSts's exchange operation as another public endpoint. Granted
+    // on the alias (not the bare function) since edge/authorizer.ts's
+    // InvokeCommand now targets it with an explicit Qualifier - this also
+    // tightens the grant to no longer permit invoking $LATEST at all.
+    internalStsAlias.grantInvoke(edgeAuthorizerFn);
     this.edgeAuthorizerFn = edgeAuthorizerFn;
+
+    // Qualifier real traffic targets and ProvisionedConcurrencyStack applies
+    // PC to - see LIVE_ALIAS_NAME's doc comment.
+    const edgeAuthorizerAlias = new lambda.Alias(this, "EdgeAuthorizerLiveAlias", {
+      aliasName: LIVE_ALIAS_NAME,
+      version: edgeAuthorizerFn.currentVersion,
+    });
 
     const edgeProxyFn = new lambda.Function(this, "EdgeProxyFunction", {
       functionName: FUNCTION_NAMES.ztlEdgeProxy,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "zero-trust-lab/edge/proxy.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/dist")),
-      memorySize: 256,
+      // 128, not 256 - measured 7-day peak memory used was 87MB, comfortable
+      // headroom even at 128.
+      memorySize: 128,
       timeout: Duration.seconds(10),
       tracing: lambda.Tracing.ACTIVE,
     });
     this.edgeProxyFn = edgeProxyFn;
 
-    const edgeAuthorizer = new HttpLambdaAuthorizer("EdgeLambdaAuthorizer", edgeAuthorizerFn, {
+    // Qualifier real traffic targets and ProvisionedConcurrencyStack applies
+    // PC to - see LIVE_ALIAS_NAME's doc comment.
+    const edgeProxyAlias = new lambda.Alias(this, "EdgeProxyLiveAlias", {
+      aliasName: LIVE_ALIAS_NAME,
+      version: edgeProxyFn.currentVersion,
+    });
+
+    const edgeAuthorizer = new HttpLambdaAuthorizer("EdgeLambdaAuthorizer", edgeAuthorizerAlias, {
       responseTypes: [HttpLambdaResponseType.SIMPLE],
       identitySource: ["$request.header.Authorization"],
       resultsCacheTtl: Duration.seconds(0), // always re-verify, no caching in this lab
@@ -234,7 +278,7 @@ export class ZeroTrustLabStack extends Stack {
     edgeApi.addRoutes({
       path: "/domain-a/{proxy+}",
       methods: [apigwv2.HttpMethod.ANY],
-      integration: new HttpLambdaIntegration("EdgeProxyIntegration", edgeProxyFn),
+      integration: new HttpLambdaIntegration("EdgeProxyIntegration", edgeProxyAlias),
       authorizer: edgeAuthorizer,
     });
     // Phase 2 (stretch): add a matching "/domain-b/{proxy+}" route once
@@ -252,15 +296,24 @@ export class ZeroTrustLabStack extends Stack {
     });
     this.domainAFn = domainAFn;
 
+    // Qualifier real traffic targets and ProvisionedConcurrencyStack applies
+    // PC to - see LIVE_ALIAS_NAME's doc comment.
+    const domainAAlias = new lambda.Alias(this, "DomainALiveAlias", {
+      aliasName: LIVE_ALIAS_NAME,
+      version: domainAFn.currentVersion,
+    });
+
     const domainAApi = new apigwv2.HttpApi(this, "DomainAHttpApi");
     domainAApi.addRoutes({
       path: "/{proxy+}",
       methods: [apigwv2.HttpMethod.ANY],
-      integration: new HttpLambdaIntegration("DomainAIntegration", domainAFn),
+      integration: new HttpLambdaIntegration("DomainAIntegration", domainAAlias),
       // No Lambda here - HTTP API validates signature/iss/aud/exp natively
       // against InternalSts's JWKS. This is the "domain gateway never talks
       // to the external IdP, only to the internal signer" property in
-      // action.
+      // action. internalStsFnUrl is alias-based now (see above), so this
+      // issuer automatically matches whatever JWT internal-sts's alias
+      // actually signs.
       authorizer: new HttpJwtAuthorizer("DomainAJwtAuthorizer", internalStsFnUrl.url, {
         jwtAudience: ["domain-a"],
       }),

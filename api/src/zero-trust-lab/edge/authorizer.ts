@@ -54,6 +54,10 @@ export async function handler(
   const invokeResp = await lambda.send(
     new InvokeCommand({
       FunctionName: INTERNAL_STS_FUNCTION_NAME,
+      // Targets internal-sts's `live` alias, not $LATEST - that's the
+      // qualifier ProvisionedConcurrencyStack applies PC to (see
+      // infra/lib/zero-trust-lab-stack.ts's LIVE_ALIAS_NAME comment).
+      Qualifier: "live",
       Payload: Buffer.from(
         JSON.stringify({
           claims: { sub: introspection.sub, scope: introspection.scope },

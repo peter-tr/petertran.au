@@ -7,7 +7,7 @@ import * as ses from "aws-cdk-lib/aws-ses";
 import { Schedule, ScheduleExpression } from "aws-cdk-lib/aws-scheduler";
 import { LambdaInvoke } from "aws-cdk-lib/aws-scheduler-targets";
 import * as path from "path";
-import { FUNCTION_NAMES } from "./shared/function-names";
+import { FUNCTION_NAMES, LIVE_ALIAS_NAME } from "./shared/function-names";
 
 export type PantryStackProps = StackProps;
 
@@ -58,13 +58,14 @@ export class PantryStack extends Stack {
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "handler.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/src/pantry/dist")),
-      // 512, not the other Lambdas' 256 - this is the one on the user-facing
-      // request path (behind ApiGatewayStack), and Lambda cold-start CPU
-      // scales with memory: the bundle pulls in @apollo/server + AWS SDK v3 +
-      // @anthropic-ai/sdk (parse-command/check-prices import it eagerly even
-      // though the client itself inits lazily), so init time was a real
-      // contributor to the ~2-3s first-load-of-the-day latency.
-      memorySize: 512,
+      // 256, not 512 - measured peak memory used has been a stable 175MB
+      // across a full week/400+ invocations (never a rare spike a shorter
+      // window would've missed), so 256 still leaves ~46% headroom.
+      // Cold-start CPU (which scales with memory) no longer has to carry
+      // the whole latency story on its own now that ProvisionedConcurrencyStack
+      // keeps the `live` alias warm 8am-7pm Sydney for real visitors - see
+      // that stack's doc comment.
+      memorySize: 256,
       // Generous - "recipes" mode (esp. an open "what can I make?" request
       // returning several full recipes) has been observed taking 6-8s warm,
       // and a cold start (Secrets Manager fetch + Anthropic client init) on
@@ -83,6 +84,13 @@ export class PantryStack extends Stack {
     table.grantReadWriteData(apiFn);
     anthropicSecret.grantRead(apiFn);
     this.apiFn = apiFn;
+
+    // Qualifier ApiGatewayStack/WarmupStack target and ProvisionedConcurrencyStack
+    // applies PC to - see LIVE_ALIAS_NAME's doc comment.
+    new lambda.Alias(this, "LiveAlias", {
+      aliasName: LIVE_ALIAS_NAME,
+      version: apiFn.currentVersion,
+    });
 
     new CfnOutput(this, "PantryTableName", { value: table.tableName });
 

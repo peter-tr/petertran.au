@@ -2,7 +2,15 @@ import { Link } from "react-router-dom";
 import { useShowAlsoBuilt } from "./hooks/useShowAlsoBuilt";
 import { useWarmupSchedule } from "./hooks/useWarmupSchedule";
 import { usePageLoadWarmup } from "./hooks/usePageLoadWarmup";
+import { usePcConfig, type PcFunctionKey } from "./hooks/usePcConfig";
 import "./portfolio.css";
+
+const PC_FUNCTION_LABELS: Record<PcFunctionKey, string> = {
+  portfolio: "this resume site",
+  pantry: "pantry",
+  imposter: "imposter",
+  zeroTrustLab: "zero-trust-lab (no real visitors - only speeds up your own testing of it)",
+};
 
 export default function PortfolioSettingsPage() {
   const { showAlsoBuilt, setShowAlsoBuilt } = useShowAlsoBuilt();
@@ -14,6 +22,13 @@ export default function PortfolioSettingsPage() {
     available: scheduleAvailable,
   } = useWarmupSchedule();
   const { pageLoadWarmup, setPageLoadWarmup } = usePageLoadWarmup();
+  const {
+    flags: pcFlags,
+    pending: pcPending,
+    error: pcError,
+    setEnabled: setPcEnabled,
+    available: pcAvailable,
+  } = usePcConfig();
 
   return (
     <>
@@ -59,6 +74,28 @@ export default function PortfolioSettingsPage() {
             Keep the site's Lambdas warm on a schedule (pings every 10 minutes, cheaper, helps every visitor)
           </label>
           {scheduleError && <p className="section-hint">{scheduleError}</p>}
+        </div>
+      )}
+
+      {pcAvailable && (
+        <div className="form-row">
+          <p className="form-label">
+            Keep warm 8am-7pm (Sydney) with provisioned concurrency - no cold starts for real visitors during
+            those hours, ~$1.58/mo each
+          </p>
+          {(Object.keys(PC_FUNCTION_LABELS) as PcFunctionKey[]).map((fn) => (
+            <label className="form-label" htmlFor={`pc-${fn}`} key={fn}>
+              <input
+                id={`pc-${fn}`}
+                type="checkbox"
+                checked={pcFlags?.[fn] ?? false}
+                disabled={pcFlags === null || pcPending}
+                onChange={(e) => setPcEnabled(fn, e.target.checked)}
+              />{" "}
+              {PC_FUNCTION_LABELS[fn]}
+            </label>
+          ))}
+          {pcError && <p className="section-hint">{pcError}</p>}
         </div>
       )}
 

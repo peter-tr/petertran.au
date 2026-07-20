@@ -13,7 +13,7 @@ import * as ses from "aws-cdk-lib/aws-ses";
 import * as cognito from "aws-cdk-lib/aws-cognito";
 import * as rum from "aws-cdk-lib/aws-rum";
 import * as path from "path";
-import { FUNCTION_NAMES } from "./shared/function-names";
+import { FUNCTION_NAMES, LIVE_ALIAS_NAME } from "./shared/function-names";
 
 export interface SiteStackProps extends StackProps {
   domainName: string;
@@ -109,12 +109,14 @@ export class SiteStack extends Stack {
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "handler.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/src/portfolio/dist")),
-      // 512, not the default 256 - same reasoning as pantry's GraphQLFunction:
-      // this is a synchronous Lambda on a user-facing request path (behind
-      // ApiGatewayStack), so cold-start CPU (which scales with memory) is
-      // latency a real visitor waits on, not a background job nobody's
-      // watching.
-      memorySize: 512,
+      // 256, not 512 - measured peak memory used has been a stable 186MB
+      // across a full week/500+ invocations (never a rare spike a shorter
+      // window would've missed), so 256 still leaves ~27% headroom.
+      // Cold-start CPU (which scales with memory) no longer has to carry
+      // the whole latency story on its own now that ProvisionedConcurrencyStack
+      // keeps the `live` alias warm 8am-7pm Sydney for real visitors - see
+      // that stack's doc comment.
+      memorySize: 256,
       // 30s (not the default 15s) to leave headroom for the all-time cost
       // fields on a cold cache: Anthropic's cost report caps at 31 days per
       // page, so a 12-month lookback can take a dozen-odd sequential requests.
@@ -135,6 +137,13 @@ export class SiteStack extends Stack {
     anthropicAdminSecret.grantRead(apiFn);
     emailIdentity.grantSendEmail(apiFn);
     recipientIdentity.grantSendEmail(apiFn);
+
+    // Qualifier ApiGatewayStack/WarmupStack target and ProvisionedConcurrencyStack
+    // applies PC to - see LIVE_ALIAS_NAME's doc comment.
+    new lambda.Alias(this, "LiveAlias", {
+      aliasName: LIVE_ALIAS_NAME,
+      version: apiFn.currentVersion,
+    });
     // CloudWatch metrics (for the systemStats query), X-Ray traces (for
     // traceBreakdown), and Cost Explorer (for awsCostUsd) have no
     // resource-level scoping -- "*" is required here regardless of which

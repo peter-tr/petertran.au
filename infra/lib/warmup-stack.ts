@@ -4,7 +4,7 @@ import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as path from "path";
 import { createWarmupSchedules, type WarmupTarget } from "./shared/warmup-schedule";
-import { FUNCTION_NAMES } from "./shared/function-names";
+import { FUNCTION_NAMES, liveAliasArn } from "./shared/function-names";
 
 export interface ZeroTrustLabWarmupFunctionNames {
   idpBridge: string;
@@ -45,33 +45,44 @@ export class WarmupStack extends Stack {
   constructor(scope: Construct, id: string, props: WarmupStackProps) {
     super(scope, id, props);
 
+    // portfolio/pantry/imposter ping the `live` alias (not bare $LATEST) -
+    // that's the qualifier ApiGatewayStack routes real traffic to and
+    // ProvisionedConcurrencyStack applies PC to, so warmup pings outside the
+    // 8am-7pm PC window keep warming the same qualifier real visitors hit.
+    // Pinging $LATEST here instead would warm an environment nobody uses.
+    const liveAlias = (id: string, fnName: string) =>
+      lambda.Function.fromFunctionAttributes(this, id, {
+        functionArn: liveAliasArn(this.region, this.account, fnName),
+        sameEnvironment: true,
+      });
+
     const targets: WarmupTarget[] = [
-      { name: "portfolio", fn: lambda.Function.fromFunctionName(this, "PortfolioFn", props.portfolioFnName) },
-      { name: "pantry", fn: lambda.Function.fromFunctionName(this, "PantryFn", props.pantryFnName) },
-      { name: "imposter", fn: lambda.Function.fromFunctionName(this, "ImposterFn", props.imposterFnName) },
+      { name: "portfolio", fn: liveAlias("PortfolioAlias", props.portfolioFnName) },
+      { name: "pantry", fn: liveAlias("PantryAlias", props.pantryFnName) },
+      { name: "imposter", fn: liveAlias("ImposterAlias", props.imposterFnName) },
+      // zero-trust-lab's 5 now ping the `live` alias too, same reasoning as
+      // portfolio/pantry/imposter above - ProvisionedConcurrencyStack applies
+      // PC to that qualifier, not $LATEST, so pinging $LATEST here would warm
+      // an environment nothing (not even PC) ever uses.
       {
         name: "zero-trust-lab-idp-bridge",
-        fn: lambda.Function.fromFunctionName(this, "ZtlIdpBridgeFn", props.zeroTrustLabFnNames.idpBridge),
+        fn: liveAlias("ZtlIdpBridgeAlias", props.zeroTrustLabFnNames.idpBridge),
       },
       {
         name: "zero-trust-lab-internal-sts",
-        fn: lambda.Function.fromFunctionName(this, "ZtlInternalStsFn", props.zeroTrustLabFnNames.internalSts),
+        fn: liveAlias("ZtlInternalStsAlias", props.zeroTrustLabFnNames.internalSts),
       },
       {
         name: "zero-trust-lab-edge-authorizer",
-        fn: lambda.Function.fromFunctionName(
-          this,
-          "ZtlEdgeAuthorizerFn",
-          props.zeroTrustLabFnNames.edgeAuthorizer
-        ),
+        fn: liveAlias("ZtlEdgeAuthorizerAlias", props.zeroTrustLabFnNames.edgeAuthorizer),
       },
       {
         name: "zero-trust-lab-edge-proxy",
-        fn: lambda.Function.fromFunctionName(this, "ZtlEdgeProxyFn", props.zeroTrustLabFnNames.edgeProxy),
+        fn: liveAlias("ZtlEdgeProxyAlias", props.zeroTrustLabFnNames.edgeProxy),
       },
       {
         name: "zero-trust-lab-domain-a",
-        fn: lambda.Function.fromFunctionName(this, "ZtlDomainAFn", props.zeroTrustLabFnNames.domainA),
+        fn: liveAlias("ZtlDomainAAlias", props.zeroTrustLabFnNames.domainA),
       },
     ];
 
