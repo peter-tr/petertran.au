@@ -1,5 +1,6 @@
 import { SESv2Client, SendEmailCommand } from "@aws-sdk/client-sesv2";
 import { captureAwsClient } from "api-shared/xray";
+import { escapeHtml } from "api-shared/html";
 import type { ContactInput } from "../util/contact";
 import { getLocationForIp } from "../util/geoip";
 
@@ -15,15 +16,6 @@ export interface SubmissionMeta {
   receivedAt: string;
   sourceIp?: string;
   userAgent?: string;
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
 }
 
 // Best-effort notification, sent after the message is already durably stored

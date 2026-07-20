@@ -1,5 +1,6 @@
 import { SESv2Client, SendEmailCommand } from "@aws-sdk/client-sesv2";
 import { captureAwsClient } from "api-shared/xray";
+import { escapeHtml } from "api-shared/html";
 import { getSettings } from "../../services/settings";
 import { getShoppingList, type ShoppingListEntry } from "../../services/shopping-list";
 
@@ -20,15 +21,6 @@ function currentSydneyHour(): number {
 
   // ICU can format midnight as "24" with hour12: false - normalize back to 0.
   return Number(hourPart ?? "0") % 24;
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
 }
 
 function formatEntryText(e: ShoppingListEntry): string {
