@@ -101,7 +101,11 @@ export class TestEnvStack extends Stack {
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "handler.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/src/portfolio/dist")),
-      memorySize: 512,
+      // Matches SiteStack's prod memorySize - this stack exists to test
+      // against a preprod-like environment, so it shouldn't drift from
+      // whatever prod is actually rightsized to (see site-stack.ts's comment
+      // on its own GraphQLFunction for the measured-usage rationale).
+      memorySize: 256,
       timeout: Duration.seconds(30),
       environment: {
         TABLE_NAME: resumeTable.tableName,
@@ -123,7 +127,9 @@ export class TestEnvStack extends Stack {
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "handler.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/src/pantry/dist")),
-      memorySize: 512,
+      // Matches PantryStack's prod memorySize - see the portfolio test
+      // Lambda's comment above for why this stays in sync with prod.
+      memorySize: 256,
       timeout: Duration.seconds(30),
       environment: {
         TABLE_NAME: pantryTable.tableName,
@@ -139,7 +145,9 @@ export class TestEnvStack extends Stack {
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "handler.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/src/games/imposter/dist")),
-      memorySize: 512,
+      // Matches GamesStack's prod memorySize - see the portfolio test
+      // Lambda's comment above for why this stays in sync with prod.
+      memorySize: 256,
       timeout: Duration.seconds(15),
       environment: {
         TABLE_NAME: gamesTable.tableName,

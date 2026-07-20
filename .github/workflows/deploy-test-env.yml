@@ -5,11 +5,15 @@ on:
     inputs:
       ref:
         description: >-
-          Branch, tag, or SHA to deploy to the on-demand test environment
-          (test.petertran.au / api.test.petertran.au) - separate from prod,
-          for testing big changes (e.g. Apollo Router/Federation) safely.
+          Git branch, tag, or commit SHA to deploy - e.g. "main" or a feature
+          branch name. NOT a URL: this always deploys to the on-demand test
+          environment (test.petertran.au / api.test.petertran.au), separate
+          from prod, for testing big changes (e.g. Apollo Router/Federation)
+          safely - the domain names above describe where it lands, not what
+          to type here.
         required: true
         type: string
+        default: main
 
 jobs:
   build-and-deploy:
