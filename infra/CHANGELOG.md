@@ -1,5 +1,19 @@
 # infra
 
+## 1.2.0
+
+### Minor Changes
+
+- 553f6a6: scheduled Provisioned Concurrency for portfolio/pantry/imposter + zero-trust-lab
+
+### Patch Changes
+
+- 342c866: add Vitest unit test suites across all workspaces
+- 5bfa13e: make ApiGatewayStack explicitly depend on its target stacks
+- c3bab6a: add www.test.petertran.au to the test environment
+- d3c957a: reuse prod stack classes for the test env
+- c9d227e: test-env ref-input trap and Lambda memory drift
+
 ## 1.1.0
 
 ### Minor Changes

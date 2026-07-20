@@ -1,5 +1,13 @@
 # portfolio
 
+## 1.2.1
+
+### Patch Changes
+
+- 342c866: add Vitest unit test suites across all workspaces
+- Updated dependencies [342c866]
+  - api-shared@1.1.1
+
 ## 1.2.0
 
 ### Minor Changes

@@ -1,5 +1,17 @@
 # pantry
 
+## 1.3.0
+
+### Minor Changes
+
+- 8856b38: add Playwright visual e2e tests for portfolio/pantry/imposter
+
+### Patch Changes
+
+- 342c866: add Vitest unit test suites across all workspaces
+- Updated dependencies [342c866]
+  - api-shared@1.1.1
+
 ## 1.2.0
 
 ### Minor Changes
