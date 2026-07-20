@@ -10,6 +10,7 @@ const HANDLERS = [
   "src/zero-trust-lab/edge/proxy.ts",
   "src/zero-trust-lab/domain-a/handler.ts",
   "src/warmup/handler.ts",
+  "src/pc-config/handler.ts",
 ];
 
 await Promise.all(

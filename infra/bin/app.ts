@@ -8,6 +8,7 @@ import { PantryStack } from "../lib/pantry-stack";
 import { ZeroTrustLabStack } from "../lib/zero-trust-lab-stack";
 import { WarmupStack } from "../lib/warmup-stack";
 import { ApiGatewayStack } from "../lib/api-gateway-stack";
+import { ProvisionedConcurrencyStack } from "../lib/pc-config-stack";
 import { FUNCTION_NAMES } from "../lib/shared/function-names";
 
 const app = new App();
@@ -61,6 +62,16 @@ new ZeroTrustLabStack(app, "PetertranZeroTrustLabStack", {
   env: { account, region: "ap-southeast-2" },
 });
 
+// Shared by WarmupStack and ProvisionedConcurrencyStack below - both target
+// the same 5 zero-trust-lab Lambdas by plain name.
+const zeroTrustLabFnNames = {
+  idpBridge: FUNCTION_NAMES.ztlIdpBridge,
+  internalSts: FUNCTION_NAMES.ztlInternalSts,
+  edgeAuthorizer: FUNCTION_NAMES.ztlEdgeAuthorizer,
+  edgeProxy: FUNCTION_NAMES.ztlEdgeProxy,
+  domainA: FUNCTION_NAMES.ztlDomainA,
+};
+
 // Keeps every project's Lambda warm on a schedule - deliberately its own
 // stack. Doesn't depend on the stacks above at the CDK/CloudFormation level
 // at all (FUNCTION_NAMES are plain string literals, not read off those
@@ -71,22 +82,28 @@ new WarmupStack(app, "PetertranWarmupStack", {
   portfolioFnName: FUNCTION_NAMES.portfolio,
   pantryFnName: FUNCTION_NAMES.pantry,
   imposterFnName: FUNCTION_NAMES.imposter,
-  zeroTrustLabFnNames: {
-    idpBridge: FUNCTION_NAMES.ztlIdpBridge,
-    internalSts: FUNCTION_NAMES.ztlInternalSts,
-    edgeAuthorizer: FUNCTION_NAMES.ztlEdgeAuthorizer,
-    edgeProxy: FUNCTION_NAMES.ztlEdgeProxy,
-    domainA: FUNCTION_NAMES.ztlDomainA,
-  },
+  zeroTrustLabFnNames,
   env: { account, region: "ap-southeast-2" },
 });
 
-// Shared HttpApi in front of portfolio/pantry/imposter/warmup-config, giving
-// them one stable domain (api.petertran.au) instead of each its own
-// CloudFormation-generated Function URL. Same "plain function names, no
-// live cross-stack reference" reasoning as WarmupStack above - deliberately
-// does NOT cover zero-trust-lab's own edge/domain gateways, which stay
-// isolated per that stack's own design intent. See infra/lib/api-gateway-stack.ts.
+// Scheduled Provisioned Concurrency for portfolio/pantry/imposter's and
+// zero-trust-lab's `live` aliases, 8am-7pm Sydney - deliberately its own
+// stack, same reasoning as WarmupStack above. See infra/lib/pc-config-stack.ts.
+new ProvisionedConcurrencyStack(app, "PetertranProvisionedConcurrencyStack", {
+  portfolioFnName: FUNCTION_NAMES.portfolio,
+  pantryFnName: FUNCTION_NAMES.pantry,
+  imposterFnName: FUNCTION_NAMES.imposter,
+  zeroTrustLabFnNames,
+  env: { account, region: "ap-southeast-2" },
+});
+
+// Shared HttpApi in front of portfolio/pantry/imposter/warmup-config/
+// pc-config, giving them one stable domain (api.petertran.au) instead of
+// each its own CloudFormation-generated Function URL. Same "plain function
+// names, no live cross-stack reference" reasoning as WarmupStack above -
+// deliberately does NOT cover zero-trust-lab's own edge/domain gateways,
+// which stay isolated per that stack's own design intent. See
+// infra/lib/api-gateway-stack.ts.
 new ApiGatewayStack(app, "PetertranApiGatewayStack", {
   domainName,
   alternateDomainNames,
@@ -96,5 +113,6 @@ new ApiGatewayStack(app, "PetertranApiGatewayStack", {
   pantryFnName: FUNCTION_NAMES.pantry,
   imposterFnName: FUNCTION_NAMES.imposter,
   warmupConfigFnName: FUNCTION_NAMES.warmupConfig,
+  pcConfigFnName: FUNCTION_NAMES.pcConfig,
   env: { account, region: "ap-southeast-2" },
 });

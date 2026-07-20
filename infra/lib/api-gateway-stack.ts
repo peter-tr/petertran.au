@@ -6,6 +6,7 @@ import * as route53 from "aws-cdk-lib/aws-route53";
 import * as route53Targets from "aws-cdk-lib/aws-route53-targets";
 import * as apigwv2 from "aws-cdk-lib/aws-apigatewayv2";
 import { HttpLambdaIntegration } from "aws-cdk-lib/aws-apigatewayv2-integrations";
+import { LIVE_ALIAS_NAME, liveAliasArn } from "./shared/function-names";
 
 export interface ApiGatewayStackProps extends StackProps {
   domainName: string;
@@ -21,15 +22,16 @@ export interface ApiGatewayStackProps extends StackProps {
   pantryFnName: string;
   imposterFnName: string;
   warmupConfigFnName: string;
+  pcConfigFnName: string;
 }
 
 /**
- * Single shared HttpApi in front of portfolio/pantry/imposter/warmup-config,
- * replacing their individual Lambda Function URLs with one stable,
- * human-readable domain (api.petertran.au) - so web/.env.production never
- * needs to track a CloudFormation-generated URL again. Deliberately does NOT
- * cover zero-trust-lab's own edge/domain gateways - those stay isolated per
- * that stack's own design intent (see zero-trust-lab-stack.ts).
+ * Single shared HttpApi in front of portfolio/pantry/imposter/warmup-config/
+ * pc-config, replacing their individual Lambda Function URLs with one
+ * stable, human-readable domain (api.petertran.au) - so web/.env.production
+ * never needs to track a CloudFormation-generated URL again. Deliberately
+ * does NOT cover zero-trust-lab's own edge/domain gateways - those stay
+ * isolated per that stack's own design intent (see zero-trust-lab-stack.ts).
  */
 export class ApiGatewayStack extends Stack {
   constructor(scope: Construct, id: string, props: ApiGatewayStackProps) {
@@ -70,18 +72,30 @@ export class ApiGatewayStack extends Stack {
       },
     });
 
-    // Exact-path routes, not `{proxy+}` - portfolio/pantry/imposter/warmup
-    // are each single-endpoint Apollo/JSON services, never called with a
-    // sub-path (see web/src/shared/graphqlClient.ts and useWarmupSchedule.ts).
-    const routes: { id: string; path: string; functionName: string }[] = [
-      { id: "Portfolio", path: "/portfolio", functionName: props.portfolioFnName },
-      { id: "Pantry", path: "/pantry", functionName: props.pantryFnName },
-      { id: "Imposter", path: "/imposter", functionName: props.imposterFnName },
+    // Exact-path routes, not `{proxy+}` - portfolio/pantry/imposter/warmup/
+    // pc-config are each single-endpoint Apollo/JSON services, never called
+    // with a sub-path (see web/src/shared/graphqlClient.ts and
+    // useWarmupSchedule.ts).
+    //
+    // portfolio/pantry/imposter carry `aliasName: LIVE_ALIAS_NAME` so real
+    // traffic actually lands on the qualifier ProvisionedConcurrencyStack
+    // applies Provisioned Concurrency to - see pc-config-stack.ts's doc
+    // comment. warmup/pc-config have no alias, bare $LATEST, unaffected.
+    const routes: { id: string; path: string; functionName: string; aliasName?: string }[] = [
+      { id: "Portfolio", path: "/portfolio", functionName: props.portfolioFnName, aliasName: LIVE_ALIAS_NAME },
+      { id: "Pantry", path: "/pantry", functionName: props.pantryFnName, aliasName: LIVE_ALIAS_NAME },
+      { id: "Imposter", path: "/imposter", functionName: props.imposterFnName, aliasName: LIVE_ALIAS_NAME },
       { id: "Warmup", path: "/warmup", functionName: props.warmupConfigFnName },
+      { id: "PcConfig", path: "/pc-config", functionName: props.pcConfigFnName },
     ];
 
     for (const route of routes) {
-      const fn = lambda.Function.fromFunctionName(this, `${route.id}Fn`, route.functionName);
+      const targetFn = route.aliasName
+        ? lambda.Function.fromFunctionAttributes(this, `${route.id}Alias`, {
+            functionArn: liveAliasArn(this.region, this.account, route.functionName),
+            sameEnvironment: true,
+          })
+        : lambda.Function.fromFunctionName(this, `${route.id}Fn`, route.functionName);
       httpApi.addRoutes({
         path: route.path,
         // GET/POST, not ANY - ANY also matches OPTIONS, which would route
@@ -91,7 +105,7 @@ export class ApiGatewayStack extends Stack {
         // request with a 400, which browsers treat as a failed preflight -
         // blocking every real request with a CORS error.
         methods: [apigwv2.HttpMethod.GET, apigwv2.HttpMethod.POST],
-        integration: new HttpLambdaIntegration(`${route.id}Integration`, fn),
+        integration: new HttpLambdaIntegration(`${route.id}Integration`, targetFn),
       });
     }
 
