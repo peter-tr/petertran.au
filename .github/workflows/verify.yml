@@ -8,7 +8,14 @@ permissions:
   contents: read
 
 jobs:
+  # Skipped on the Changesets release PR (branch changeset-release/main,
+  # created/updated by changesets.yml) - it only ever contains consumed
+  # .changeset/*.md files, CHANGELOG.md entries, and package.json version
+  # bumps, never hand-written source, so there's nothing here for lint/
+  # format/typecheck/test/e2e to catch. It's also resynchronized on every
+  # new changeset merged to main, so skipping saves real CI time.
   verify:
+    if: github.head_ref != 'changeset-release/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -31,6 +38,7 @@ jobs:
         run: npx turbo run lint format:check typecheck test
 
   visual-e2e:
+    if: github.head_ref != 'changeset-release/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
