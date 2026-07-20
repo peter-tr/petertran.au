@@ -32,6 +32,7 @@ describe("loadTypeDefs", () => {
     // Put a *different* schema.graphql at the top level and the real one nested,
     // to prove it reads from the caller's own directory rather than cwd/dir root.
     mkdirSync(nested, { recursive: true });
+
     const nestedContents = "type Query { nested: Boolean }";
     writeFileSync(join(nested, "schema.graphql"), nestedContents, "utf-8");
 
