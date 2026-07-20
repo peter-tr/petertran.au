@@ -30,11 +30,12 @@ on:
       deploy-test-env:
         description: >-
           Deploy the on-demand test environment (PetertranTestCertStack /
-          PetertranTestEnvStack, test.petertran.au / api.test.petertran.au)
-          instead of prod. Sets DEPLOY_TEST_ENV=true so infra/bin/app.ts
-          registers those stacks - they're otherwise invisible to `cdk deploy
-          --all` - and builds web/ against web/.env.test instead of
-          web/.env.production.
+          PetertranTestSiteStack / PetertranTestPantryStack /
+          PetertranTestGamesStack / PetertranTestApiGatewayStack,
+          test.petertran.au / api.test.petertran.au) instead of prod. Sets
+          DEPLOY_TEST_ENV=true so infra/bin/app.ts registers those stacks -
+          they're otherwise invisible to `cdk deploy --all` - and builds
+          web/ against web/.env.test instead of web/.env.production.
         required: false
         type: boolean
         default: false
@@ -172,7 +173,7 @@ jobs:
       - name: Sync frontend to S3
         if: inputs.sync-web
         env:
-          SITE_STACK_NAME: ${{ inputs.deploy-test-env && 'PetertranTestEnvStack' || 'PetertranSiteStack' }}
+          SITE_STACK_NAME: ${{ inputs.deploy-test-env && 'PetertranTestSiteStack' || 'PetertranSiteStack' }}
         run: |
           BUCKET=$(aws cloudformation describe-stacks --stack-name "$SITE_STACK_NAME" --region ap-southeast-2 \
             --query "Stacks[0].Outputs[?OutputKey=='BucketName'].OutputValue" --output text)
@@ -187,7 +188,7 @@ jobs:
       - name: Invalidate CloudFront cache
         if: inputs.sync-web
         env:
-          SITE_STACK_NAME: ${{ inputs.deploy-test-env && 'PetertranTestEnvStack' || 'PetertranSiteStack' }}
+          SITE_STACK_NAME: ${{ inputs.deploy-test-env && 'PetertranTestSiteStack' || 'PetertranSiteStack' }}
         run: |
           DIST_ID=$(aws cloudformation describe-stacks --stack-name "$SITE_STACK_NAME" --region ap-southeast-2 \
             --query "Stacks[0].Outputs[?OutputKey=='DistributionId'].OutputValue" --output text)

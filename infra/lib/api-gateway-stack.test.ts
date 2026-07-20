@@ -29,4 +29,29 @@ describe("ApiGatewayStack", () => {
       DomainName: "api.example.com",
     });
   });
+
+  it("isTestEnv: routes only portfolio/pantry/imposter, under the given apiSubdomain", () => {
+    const app = new App();
+    const stack = new ApiGatewayStack(app, "TestEnvApiGatewayStack", {
+      domainName: "test.example.com",
+      alternateDomainNames: ["www.test.example.com"],
+      hostedZoneId: "Z0000000000000EXAMPLE",
+      hostedZoneName: "example.com",
+      apiSubdomain: "api.test",
+      portfolioFnName: "portfolio-graphql-test",
+      pantryFnName: "pantry-graphql-test",
+      imposterFnName: "imposter-graphql-test",
+      // warmupConfigFnName/pcConfigFnName omitted - not part of what the
+      // test env exists to validate.
+      env: { account: "123456789012", region: "ap-southeast-2" },
+    });
+
+    const template = Template.fromStack(stack);
+
+    // Portfolio, Pantry, Imposter only - Warmup/PcConfig routes skipped.
+    template.resourceCountIs("AWS::ApiGatewayV2::Route", 6);
+    template.hasResourceProperties("AWS::ApiGatewayV2::DomainName", {
+      DomainName: "api.test.example.com",
+    });
+  });
 });

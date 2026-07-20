@@ -21,6 +21,20 @@ export const FUNCTION_NAMES = {
   pcConfig: "pc-config",
 } as const;
 
+// Test-env counterparts of the 3 GraphQL Lambda names above, passed to
+// SiteStack/PantryStack/GamesStack's functionName prop and
+// ApiGatewayStack's portfolio/pantry/imposterFnName props when
+// DEPLOY_TEST_ENV=true (see infra/bin/app.ts). Suffixed so they can never
+// collide with the real prod Lambdas they're testing changes against,
+// since the test env deploys alongside prod, not instead of it - no
+// zero-trust-lab/warmup/pc-config counterparts, since those aren't part of
+// what the test env exists to validate.
+export const TEST_FUNCTION_NAMES = {
+  portfolio: "portfolio-graphql-test",
+  pantry: "pantry-graphql-test",
+  imposter: "imposter-graphql-test",
+} as const;
+
 // Alias name portfolio/pantry/imposter each publish a "live" Lambda Alias
 // under - the qualifier real traffic (ApiGatewayStack) and warmup pings
 // (WarmupStack) both target, and the one ProvisionedConcurrencyStack's
