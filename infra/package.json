@@ -5,7 +5,8 @@
   "scripts": {
     "cdk": "cdk",
     "build": "tsc --noEmit",
-    "refresh-test-table": "tsx scripts/refresh-test-table.ts"
+    "refresh-test-table": "tsx scripts/refresh-test-table.ts",
+    "test": "vitest run"
   },
   "dependencies": {
     "aws-cdk-lib": "^2.160.0",
@@ -19,6 +20,7 @@
     "ts-node": "^10.9.2",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0",
+    "vitest": "^3.2.0",
     "@types/node": "^20.14.0"
   }
 }

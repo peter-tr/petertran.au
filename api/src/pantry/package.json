@@ -4,7 +4,8 @@
   "version": "1.2.0",
   "type": "module",
   "scripts": {
-    "build": "tsx scripts/build.ts"
+    "build": "tsx scripts/build.ts",
+    "test": "vitest run"
   },
   "dependencies": {
     "api-shared": "1.1.0",

@@ -11,7 +11,8 @@
     "dev:pantry": "tsx src/pantry/dev/dev-server.ts",
     "typecheck": "tsc --noEmit",
     "validate-schemas": "tsx scripts/validate-schemas.ts",
-    "test:e2e": "tsx scripts/e2e-smoke.ts"
+    "test:e2e": "tsx scripts/e2e-smoke.ts",
+    "test": "vitest run"
   },
   "dependencies": {
     "@apollo/server": "^4.11.0",
@@ -26,8 +27,10 @@
   "devDependencies": {
     "@types/aws-lambda": "^8.10.145",
     "@types/node": "^20.14.0",
+    "aws-sdk-client-mock": "^4.1.0",
     "esbuild": "^0.23.0",
     "tsx": "^4.19.0",
-    "typescript": "^5.6.0"
+    "typescript": "^5.6.0",
+    "vitest": "^3.2.0"
   }
 }

@@ -24,7 +24,8 @@
     "format:check": "prettier --check .",
     "typecheck": "turbo run typecheck",
     "build": "turbo run build",
-    "verify": "turbo run lint format:check typecheck build",
+    "test": "turbo run test",
+    "verify": "turbo run lint format:check typecheck build test",
     "prepare": "husky",
     "changeset": "changeset",
     "version-packages": "changeset version"

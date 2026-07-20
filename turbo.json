@@ -31,6 +31,10 @@
       "dependsOn": ["codegen"],
       "outputs": ["dist/**"]
     },
+    "test": {
+      "dependsOn": ["codegen"],
+      "outputs": []
+    },
     "//#lint": {
       "inputs": ["$TURBO_DEFAULT$", "!**/*.md"],
       "outputs": []
