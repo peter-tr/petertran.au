@@ -34,6 +34,27 @@ export default tseslint.config(
     files: ["**/*.mjs"],
     languageOptions: { globals: { ...globals.node }, sourceType: "module" },
   },
+  // Each api/src project owns its own lib/ - reaching into a sibling
+  // project's lib/ via a relative import is a sign that code belongs in
+  // api/src/shared/ instead (see CLAUDE.md's "DRY - use api/src/shared/").
+  // This turns that convention into a lint error instead of relying on
+  // review to catch it.
+  ...["portfolio", "pantry", "games/imposter", "zero-trust-lab"].map((project) => ({
+    files: [`api/src/${project}/**/*.ts`],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: ["portfolio", "pantry", "games/imposter", "zero-trust-lab"]
+            .filter((other) => other !== project)
+            .map((other) => ({
+              group: [`**/${other}/lib/**`],
+              message: `Importing from ${other}'s lib/ - move shared logic to api/src/shared/ instead.`,
+            })),
+        },
+      ],
+    },
+  })),
   {
     files: ["web/**/*.{ts,tsx}"],
     plugins: { "react-hooks": reactHooks, "react-refresh": reactRefresh },
