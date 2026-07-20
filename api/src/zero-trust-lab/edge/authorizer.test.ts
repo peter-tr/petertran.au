@@ -36,8 +36,14 @@ function mockIntrospectResponse(body: unknown, ok = true): void {
 }
 
 function mockInvokePayload(payload: unknown): void {
+  // InvokeCommandOutput's real Payload type is IUint8ArrayBlobAdapter (a
+  // Uint8Array with an extra transformToString method) - a plain Uint8Array
+  // satisfies the handler's actual usage (Buffer.from(invokeResp.Payload))
+  // but not the stricter response type, hence the cast.
   lambdaMock.on(InvokeCommand).resolves({
-    Payload: new TextEncoder().encode(JSON.stringify(payload)),
+    Payload: new TextEncoder().encode(JSON.stringify(payload)) as unknown as Uint8Array & {
+      transformToString(encoding?: string): string;
+    },
   });
 }
 

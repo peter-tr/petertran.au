@@ -1,4 +1,4 @@
-import { describe, it, vi, beforeAll, afterAll } from "vitest";
+import { describe, it, vi, beforeAll, afterAll, type MockInstance } from "vitest";
 import { App } from "aws-cdk-lib";
 import { Template } from "aws-cdk-lib/assertions";
 import * as lambda from "aws-cdk-lib/aws-lambda";
@@ -9,12 +9,14 @@ import { GamesStack } from "./games-stack";
 // build` for that package here) - CDK's AssetCode throws synchronously at
 // Function-construction time if the path is missing. Stub fromAsset with
 // inline code so the stack can synthesize without a real build artifact.
-let fromAssetSpy: ReturnType<typeof vi.spyOn>;
+let fromAssetSpy: MockInstance<typeof lambda.Code.fromAsset>;
 
 beforeAll(() => {
   fromAssetSpy = vi
     .spyOn(lambda.Code, "fromAsset")
-    .mockImplementation(() => lambda.Code.fromInline("exports.handler = async () => {};"));
+    .mockImplementation(
+      () => lambda.Code.fromInline("exports.handler = async () => {};") as unknown as lambda.AssetCode
+    );
 });
 
 afterAll(() => {
