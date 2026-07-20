@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import RevealBoard from "./RevealBoard";
 import { runImposterQuery } from "../lib/api";
@@ -32,6 +32,10 @@ function renderBoard(players: ImposterPlayer[], onAllRevealed = vi.fn()) {
 
 beforeEach(() => {
   runImposterQueryMock.mockReset();
+});
+
+afterEach(() => {
+  cleanup();
 });
 
 describe("RevealBoard", () => {

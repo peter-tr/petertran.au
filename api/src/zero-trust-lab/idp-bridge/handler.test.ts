@@ -87,6 +87,7 @@ describe("idp-bridge handler", () => {
       const result = await handler(jsonEvent("/callback", undefined, { code: "auth-code-1" }));
 
       expect(result.statusCode).toBe(200);
+
       const body = JSON.parse(result.body as string) as { access_token: string; token_type: string };
       expect(body.token_type).toBe("opaque");
       expect(typeof body.access_token).toBe("string");
@@ -94,6 +95,7 @@ describe("idp-bridge handler", () => {
 
       const putCalls = ddbMock.commandCalls(PutCommand);
       expect(putCalls).toHaveLength(1);
+
       const item = putCalls[0].args[0].input.Item as Record<string, unknown>;
       expect(item.pk).toBe(body.access_token);
       expect(item.sub).toBe("cognito-sub-1");
@@ -114,6 +116,7 @@ describe("idp-bridge handler", () => {
       await handler(jsonEvent("/callback", undefined, { code: "auth-code-1" }));
 
       expect(fetchSpy).toHaveBeenCalledTimes(1);
+
       const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
       expect(url).toBe("https://cognito.example.com/oauth2/token");
       expect(init.method).toBe("POST");

@@ -1,6 +1,11 @@
-import { describe, it, expect } from "vitest";
-import { render } from "@testing-library/react";
+import { describe, it, expect, afterEach } from "vitest";
+import { render, cleanup } from "@testing-library/react";
 import CompanyBadge from "./CompanyBadge";
+
+// See RequestsChart.test.tsx: the shared vitest setup file doesn't register
+// RTL's auto-cleanup-after-each, so each render() here must be cleaned up
+// explicitly.
+afterEach(cleanup);
 
 describe("CompanyBadge", () => {
   it("renders a real logo image for a known company", () => {

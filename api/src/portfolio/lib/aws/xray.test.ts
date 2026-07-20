@@ -145,11 +145,7 @@ describe("getTraceBreakdown", () => {
         ],
       });
 
-    const promise = getTraceBreakdown("trace-1");
-    await vi.advanceTimersByTimeAsync(700);
-    await vi.advanceTimersByTimeAsync(1500);
-
-    const result = await promise;
+    const result = await runAndFlush("trace-1");
 
     expect(xrayMock.calls()).toHaveLength(3);
     expect(result.some((s) => s.name === "DynamoDB")).toBe(true);
@@ -160,11 +156,7 @@ describe("getTraceBreakdown", () => {
       Traces: [{ Id: "trace-1", Segments: [{ Document: segmentDoc({ name: "Lambda", origin: "AWS::Lambda" }) }] }],
     });
 
-    const promise = getTraceBreakdown("trace-1");
-    await vi.advanceTimersByTimeAsync(700);
-    await vi.advanceTimersByTimeAsync(1500);
-
-    const result = await promise;
+    const result = await runAndFlush("trace-1");
 
     expect(xrayMock.calls()).toHaveLength(3);
     expect(result).toHaveLength(1);

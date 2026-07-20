@@ -112,6 +112,9 @@ describe("QuantityStepper", () => {
 
     const input = screen.getByRole("spinbutton");
 
+    // blur() is only meaningful in jsdom if the element is actually focused
+    // first - Enter's handler calls currentTarget.blur() to trigger commit().
+    input.focus();
     fireEvent.change(input, { target: { value: "42" } });
     fireEvent.keyDown(input, { key: "Enter" });
 

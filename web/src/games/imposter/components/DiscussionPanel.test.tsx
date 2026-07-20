@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import DiscussionPanel from "./DiscussionPanel";
 import { runImposterQuery } from "../lib/api";
 import type { ImposterPlayer } from "../lib/api";
@@ -34,6 +34,10 @@ const players: ImposterPlayer[] = [
 
 beforeEach(() => {
   runImposterQueryMock.mockReset();
+});
+
+afterEach(() => {
+  cleanup();
 });
 
 describe("DiscussionPanel", () => {

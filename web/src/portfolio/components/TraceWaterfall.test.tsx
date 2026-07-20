@@ -1,7 +1,12 @@
-import { describe, it, expect } from "vitest";
-import { render } from "@testing-library/react";
+import { describe, it, expect, afterEach } from "vitest";
+import { render, cleanup } from "@testing-library/react";
 import TraceWaterfall from "./TraceWaterfall";
 import type { TraceSegment } from "../lib/graphql";
+
+// See RequestsChart.test.tsx: the shared vitest setup file doesn't register
+// RTL's auto-cleanup-after-each, so each render() here must be cleaned up
+// explicitly.
+afterEach(cleanup);
 
 describe("TraceWaterfall", () => {
   it("renders nothing for an empty segment list", () => {

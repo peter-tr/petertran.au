@@ -1,8 +1,14 @@
-import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, afterEach } from "vitest";
+import { render, screen, cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import RequestsChart from "./RequestsChart";
 import type { DailyCount } from "../lib/graphql";
+
+// This test file doesn't rely on the shared vitest setup file for RTL's
+// auto-cleanup-after-each (out of scope to add there - see task instructions),
+// so each render() here must be cleaned up explicitly, otherwise queries like
+// screen.getByRole() see leftover DOM from earlier tests in this file.
+afterEach(cleanup);
 
 function day(offsetFromToday: number, count: number): DailyCount {
   const d = new Date();

@@ -146,7 +146,23 @@ describe("usePantrySettings", () => {
       await Promise.resolve();
     });
 
-    await waitFor(() => expect(result.current.error).toBe("Failed to save settings"));
+    await waitFor(() => expect(result.current.error).toBe("save failed"));
     expect(result.current.settings?.view).toBe("grid");
+  });
+
+  it("falls back to a generic save-error message for a non-Error rejection", async () => {
+    const settings = makeSettings({ view: "list" });
+    mockRunPantryQuery.mockResolvedValueOnce({ settings });
+
+    const { result } = renderHook(() => usePantrySettings());
+    await waitFor(() => expect(result.current.settings).toEqual(settings));
+
+    mockRunPantryQuery.mockRejectedValueOnce("boom");
+    await act(async () => {
+      result.current.updateSettings({ view: "grid" });
+      await Promise.resolve();
+    });
+
+    await waitFor(() => expect(result.current.error).toBe("Failed to save settings"));
   });
 });

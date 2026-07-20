@@ -141,7 +141,7 @@ describe("usePantryHome", () => {
       await Promise.resolve();
     });
 
-    await waitFor(() => expect(result.current.error).toBe("Failed to save settings"));
+    await waitFor(() => expect(result.current.error).toBe("save failed"));
     expect(result.current.settings?.view).toBe("grid");
   });
 });

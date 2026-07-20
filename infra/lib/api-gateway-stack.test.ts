@@ -22,8 +22,9 @@ describe("ApiGatewayStack", () => {
     const template = Template.fromStack(stack);
 
     template.resourceCountIs("AWS::ApiGatewayV2::Api", 1);
-    // Portfolio, Pantry, Imposter, Warmup, PcConfig.
-    template.resourceCountIs("AWS::ApiGatewayV2::Route", 5);
+    // Portfolio, Pantry, Imposter, Warmup, PcConfig - each registered for
+    // both GET and POST, which CDK emits as 2 separate Route resources.
+    template.resourceCountIs("AWS::ApiGatewayV2::Route", 10);
     template.hasResourceProperties("AWS::ApiGatewayV2::DomainName", {
       DomainName: "api.example.com",
     });
