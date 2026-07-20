@@ -6,13 +6,14 @@ import {
   DescribeUserPoolClientCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
 import { createDdbClient } from "api-shared/ddb";
+import { captureAwsClient } from "api-shared/xray";
 import { generateOpaqueToken } from "../lib/opaque-token";
 import { normalizePath } from "../lib/http";
 import { parseJsonBody } from "api-shared/http";
 import { isWarmupPing, type WarmupPing } from "api-shared/warmup";
 
-const { ddb, TABLE_NAME } = createDdbClient({ defaultTableName: "ZeroTrustSessions" });
-const cognito = new CognitoIdentityProviderClient({});
+const { ddb, TABLE_NAME } = createDdbClient({ defaultTableName: "ZeroTrustSessions", xray: true });
+const cognito = captureAwsClient(new CognitoIdentityProviderClient({}));
 
 const COGNITO_DOMAIN = process.env.COGNITO_DOMAIN!;
 const USER_POOL_ID = process.env.USER_POOL_ID!;

@@ -79,6 +79,9 @@ export class ZeroTrustLabStack extends Stack {
       memorySize: 256,
       timeout: Duration.seconds(10),
       environment: { TABLE_NAME: table.tableName },
+      // Traces every invocation to X-Ray, same as portfolio/pantry/imposter -
+      // lets the edge -> IdpBridge -> Cognito hop show up in the trace map.
+      tracing: lambda.Tracing.ACTIVE,
     });
     table.grantReadWriteData(idpBridgeFn);
     this.idpBridgeFn = idpBridgeFn;
@@ -167,6 +170,7 @@ export class ZeroTrustLabStack extends Stack {
       memorySize: 256,
       timeout: Duration.seconds(10),
       environment: { KMS_KEY_ID: signingKey.keyId },
+      tracing: lambda.Tracing.ACTIVE,
     });
     signingKey.grantSign(internalStsFn);
     signingKey.grant(internalStsFn, "kms:GetPublicKey");
@@ -199,6 +203,7 @@ export class ZeroTrustLabStack extends Stack {
         // InternalSts's direct-invoke exchange payload as `issuer`.
         INTERNAL_STS_ISSUER_URL: internalStsFnUrl.url,
       },
+      tracing: lambda.Tracing.ACTIVE,
     });
     // Direct Lambda Invoke, IAM-gated - the exchange call never goes over
     // the network. See the plan doc for why this is tighter than exposing
@@ -213,6 +218,7 @@ export class ZeroTrustLabStack extends Stack {
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/dist")),
       memorySize: 256,
       timeout: Duration.seconds(10),
+      tracing: lambda.Tracing.ACTIVE,
     });
     this.edgeProxyFn = edgeProxyFn;
 
@@ -240,6 +246,7 @@ export class ZeroTrustLabStack extends Stack {
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/dist")),
       memorySize: 128,
       timeout: Duration.seconds(10),
+      tracing: lambda.Tracing.ACTIVE,
     });
     this.domainAFn = domainAFn;
 

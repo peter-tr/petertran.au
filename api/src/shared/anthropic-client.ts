@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { SecretsManagerClient, GetSecretValueCommand } from "@aws-sdk/client-secrets-manager";
+import { captureAwsClient } from "./xray";
 
 let cachedClient: Anthropic | null = null;
 
@@ -18,7 +19,7 @@ async function fetchApiKeyFromSecretsManager(): Promise<string> {
     throw new Error("Neither ANTHROPIC_API_KEY nor ANTHROPIC_SECRET_ARN is configured.");
   }
 
-  const client = new SecretsManagerClient({});
+  const client = captureAwsClient(new SecretsManagerClient({}));
   const res = await client.send(new GetSecretValueCommand({ SecretId: secretArn }));
   if (!res.SecretString) {
     throw new Error("Anthropic API key secret has no string value.");

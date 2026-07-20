@@ -3,9 +3,10 @@ import type {
   APIGatewaySimpleAuthorizerWithContextResult,
 } from "aws-lambda";
 import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
+import { captureAwsClient } from "api-shared/xray";
 import { isWarmupPing, type WarmupPing } from "api-shared/warmup";
 
-const lambda = new LambdaClient({});
+const lambda = captureAwsClient(new LambdaClient({}));
 
 const IDP_BRIDGE_URL = process.env.IDP_BRIDGE_URL!;
 const INTERNAL_STS_FUNCTION_NAME = process.env.INTERNAL_STS_FUNCTION_NAME!;

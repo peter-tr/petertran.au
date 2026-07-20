@@ -27,6 +27,7 @@ jobs:
         with:
           token: ${{ secrets.CHANGESET_PAT }}
           fetch-depth: 0
+          fetch-tags: true
 
       - uses: actions/setup-node@v4
         with:
@@ -34,6 +35,18 @@ jobs:
           cache: npm
 
       - run: npm ci
+
+      # Mirrors deploy.yml's tag-release job (highest existing release-N tag
+      # + 1) so the PR title always shows the release number that will
+      # actually be tagged once it merges. Safe to recompute on every run -
+      # release-N tags are only ever created by that job, which only fires
+      # once this exact PR (branch changeset-release/main) merges, so the
+      # "next" number can't drift out from under a still-open PR.
+      - name: Compute next release number
+        id: next-release
+        run: |
+          LAST=$(git tag -l 'release-*' | sed 's/release-//' | sort -n | tail -1)
+          echo "version=v$(( ${LAST:-0} + 1 ))" >> "$GITHUB_OUTPUT"
 
       # `publish: npx changeset tag` never touches npm - these are private,
       # internally-deployed apps, not published packages. It only runs once
@@ -46,7 +59,7 @@ jobs:
         with:
           version: npm run version-packages
           publish: npx changeset tag
-          commit: "chore: version packages"
-          title: "chore: version packages"
+          commit: "chore: release ${{ steps.next-release.outputs.version }}"
+          title: "chore: release ${{ steps.next-release.outputs.version }}"
         env:
           GITHUB_TOKEN: ${{ secrets.CHANGESET_PAT }}
