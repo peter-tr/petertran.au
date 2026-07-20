@@ -1,5 +1,12 @@
 # infra
 
+## 1.1.0
+
+### Minor Changes
+
+- 36fcc26: add shared API Gateway in front of portfolio/pantry/imposter/warmup
+- ac54c28: add on-demand test environment for safe big-change testing
+
 ## 1.0.1
 
 ### Patch Changes
