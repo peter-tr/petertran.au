@@ -17,6 +17,16 @@ on:
         required: false
         type: boolean
         default: true
+      allow-replacements:
+        description: >-
+          Allow deploying even if CDK would replace (destroy + recreate) a
+          stateful resource. Defaults to false - safe for rollbacks, where an
+          old ref's stack definition unexpectedly differing from what's live
+          is a surprise, not an intent. The normal push-to-main deploy opts
+          back in, since a forward push's changes are already the intent.
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   id-token: write
@@ -106,6 +116,28 @@ jobs:
 
       - name: Build (api, web, infra - via turbo, cached and parallelized)
         run: npm run build
+
+      # cdk diff annotates every property change that CloudFormation can't
+      # apply in place with "(requires replacement)" or, when it's only
+      # conditional on other factors, "(may cause replacement)" (confirmed
+      # against node_modules/aws-cdk/lib/index.js's diff formatter - these
+      # are the same two phrases `cdk deploy` would silently act on). A
+      # replacement means the old physical resource gets deleted, not
+      # updated - fatal for anything stateful with removalPolicy: DESTROY
+      # (no snapshot/undo). Caught the hard way: rolling back pantry to an
+      # old tag whose stack predated an explicit-resource-naming change
+      # replaced (and destroyed, unrecoverably - no backups, no PITR)
+      # the live DynamoDB table.
+      - name: Check for destructive resource replacements
+        if: ${{ !inputs.allow-replacements }}
+        working-directory: infra
+        run: |
+          set -o pipefail
+          npx cdk diff ${{ inputs.stacks != '' && inputs.stacks || '--all' }} 2>&1 | tee /tmp/cdk-diff.txt || true
+          if grep -qE "requires replacement|may cause replacement" /tmp/cdk-diff.txt; then
+            echo "::error::This ref's infra would replace (destroy + recreate) one or more stateful resources - see the diff above for exactly which property. Re-run with allow-replacements: true only if this is genuinely intended."
+            exit 1
+          fi
 
       - name: Deploy infrastructure
         working-directory: infra

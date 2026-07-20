@@ -13,6 +13,11 @@ jobs:
     uses: ./.github/workflows/build-and-deploy.yml
     with:
       ref: ${{ github.sha }}
+      # A forward push's infra changes are already the intent (see
+      # build-and-deploy.yml's allow-replacements input) - the safety check
+      # exists for rollbacks, where a replacement would be a surprise, not
+      # a decision someone just made.
+      allow-replacements: true
     permissions:
       id-token: write
       contents: read

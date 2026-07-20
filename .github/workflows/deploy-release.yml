@@ -9,12 +9,22 @@ on:
           page or `git tag -l 'release-*'` for available values.
         required: true
         type: string
+      allow-replacements:
+        description: >-
+          Allow the deploy to proceed even if it would replace (destroy +
+          recreate) a stateful resource - e.g. this release's stack
+          definition predates a later infra change. Leave off unless you've
+          checked the cdk diff yourself and the replacement is intended.
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   build-and-deploy:
     uses: ./.github/workflows/build-and-deploy.yml
     with:
       ref: ${{ inputs.release }}
+      allow-replacements: ${{ inputs.allow-replacements }}
     permissions:
       id-token: write
       contents: read
