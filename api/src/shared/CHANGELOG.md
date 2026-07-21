@@ -1,5 +1,12 @@
 # api-shared
 
+## 1.1.2
+
+### Patch Changes
+
+- 2c53dce: propagate X-Ray trace header to subgraph/domain gateway calls
+- 9c5b5fd: migrate ApiGatewayStack from HTTP API to REST API for real X-Ray trace propagation
+
 ## 1.1.1
 
 ### Patch Changes

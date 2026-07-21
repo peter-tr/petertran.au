@@ -1,14 +1,14 @@
 {
   "name": "supergraph",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "scripts": {
     "build": "esbuild handler.ts --bundle --platform=node --target=node20 --format=esm --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url);\" --outfile=dist/handler.mjs --external:@aws-sdk/*",
     "test": "vitest run"
   },
   "dependencies": {
-    "api-shared": "1.1.1",
+    "api-shared": "1.1.2",
     "@apollo/gateway": "^2.9.0",
     "@apollo/server": "^4.11.0",
     "@as-integrations/aws-lambda": "^3.1.0",
