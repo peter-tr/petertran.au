@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { listDesigns, deleteDesign, type Design } from "./api";
+import TemplatesSection from "./components/TemplatesSection";
 import "./design-studio.css";
 
 export default function Gallery() {
@@ -43,6 +44,8 @@ export default function Gallery() {
           </li>
         ))}
       </ul>
+
+      <TemplatesSection />
     </div>
   );
 }

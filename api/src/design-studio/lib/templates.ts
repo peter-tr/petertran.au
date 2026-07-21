@@ -1,0 +1,99 @@
+import type { TemplateSeed } from "./design";
+
+const WIDTH = 900;
+const HEIGHT = 600;
+
+// Hand-built starter templates - shape/text primitives only (no image
+// uploads, see the project plan for why), shared by scripts/seed-templates.ts
+// (real Mongo) and dev/dev-resolvers.ts (in-memory), so local dev and the
+// deployed app never drift from two separately hand-kept lists.
+export const STARTER_TEMPLATES: TemplateSeed[] = [
+  {
+    name: "Bold Announcement",
+    category: "Poster",
+    tags: ["poster", "bold", "announcement"],
+    colors: ["#f2a93b", "#0b0e14"],
+    popularity: 92,
+    width: WIDTH,
+    height: HEIGHT,
+    elements: [
+      { id: "bg", type: "RECTANGLE", x: 0, y: 0, width: WIDTH, height: HEIGHT, rotation: 0, zIndex: 0, fill: "#0b0e14", stroke: "", strokeWidth: 0 },
+      { id: "title", type: "TEXT", x: 80, y: 220, width: 740, height: 90, rotation: 0, zIndex: 1, fill: "#f2a93b", stroke: "", strokeWidth: 0, text: "ANNOUNCEMENT", fontFamily: "IBM Plex Sans", fontSize: 64, fontWeight: 700 },
+      { id: "subtitle", type: "TEXT", x: 80, y: 320, width: 600, height: 40, rotation: 0, zIndex: 2, fill: "#eae7de", stroke: "", strokeWidth: 0, text: "Something big is coming", fontFamily: "IBM Plex Sans", fontSize: 24, fontWeight: 400 },
+    ],
+  },
+  {
+    name: "Minimal Quote",
+    category: "Social Media",
+    tags: ["quote", "minimal", "instagram"],
+    colors: ["#eae7de", "#63c7be"],
+    popularity: 88,
+    width: WIDTH,
+    height: HEIGHT,
+    elements: [
+      { id: "bg", type: "RECTANGLE", x: 0, y: 0, width: WIDTH, height: HEIGHT, rotation: 0, zIndex: 0, fill: "#eae7de", stroke: "", strokeWidth: 0 },
+      { id: "accent", type: "ELLIPSE", x: 380, y: 60, width: 140, height: 140, rotation: 0, zIndex: 1, fill: "#63c7be", stroke: "", strokeWidth: 0 },
+      { id: "quote", type: "TEXT", x: 150, y: 260, width: 600, height: 100, rotation: 0, zIndex: 2, fill: "#0b0e14", stroke: "", strokeWidth: 0, text: "“Simplicity is the ultimate sophistication.”", fontFamily: "IBM Plex Sans", fontSize: 28, fontWeight: 600 },
+    ],
+  },
+  {
+    name: "Business Card Classic",
+    category: "Business Card",
+    tags: ["business-card", "classic", "professional"],
+    colors: ["#131824", "#eae7de"],
+    popularity: 75,
+    width: WIDTH,
+    height: HEIGHT,
+    elements: [
+      { id: "bg", type: "RECTANGLE", x: 0, y: 0, width: WIDTH, height: HEIGHT, rotation: 0, zIndex: 0, fill: "#131824", stroke: "", strokeWidth: 0 },
+      { id: "accent-line", type: "RECTANGLE", x: 80, y: 280, width: 120, height: 6, rotation: 0, zIndex: 1, fill: "#f2a93b", stroke: "", strokeWidth: 0 },
+      { id: "name", type: "TEXT", x: 80, y: 220, width: 500, height: 50, rotation: 0, zIndex: 2, fill: "#eae7de", stroke: "", strokeWidth: 0, text: "Jordan Lee", fontFamily: "IBM Plex Sans", fontSize: 34, fontWeight: 700 },
+      { id: "title", type: "TEXT", x: 80, y: 310, width: 500, height: 34, rotation: 0, zIndex: 3, fill: "#8a93a6", stroke: "", strokeWidth: 0, text: "Product Designer", fontFamily: "IBM Plex Sans", fontSize: 20, fontWeight: 400 },
+    ],
+  },
+  {
+    name: "Sale Banner",
+    category: "Social Media",
+    tags: ["sale", "banner", "promo"],
+    colors: ["#e8896b", "#0b0e14"],
+    popularity: 95,
+    width: WIDTH,
+    height: HEIGHT,
+    elements: [
+      { id: "bg", type: "RECTANGLE", x: 0, y: 0, width: WIDTH, height: HEIGHT, rotation: 0, zIndex: 0, fill: "#e8896b", stroke: "", strokeWidth: 0 },
+      { id: "badge", type: "ELLIPSE", x: 620, y: 150, width: 200, height: 200, rotation: 0, zIndex: 1, fill: "#0b0e14", stroke: "", strokeWidth: 0 },
+      { id: "percent", type: "TEXT", x: 640, y: 220, width: 160, height: 60, rotation: 0, zIndex: 2, fill: "#f2a93b", stroke: "", strokeWidth: 0, text: "50% OFF", fontFamily: "IBM Plex Sans", fontSize: 22, fontWeight: 700 },
+      { id: "title", type: "TEXT", x: 80, y: 240, width: 480, height: 90, rotation: 0, zIndex: 3, fill: "#0b0e14", stroke: "", strokeWidth: 0, text: "SUMMER SALE", fontFamily: "IBM Plex Sans", fontSize: 56, fontWeight: 700 },
+    ],
+  },
+  {
+    name: "Event Flyer",
+    category: "Flyer",
+    tags: ["event", "flyer", "party"],
+    colors: ["#63c7be", "#1a2130"],
+    popularity: 70,
+    width: WIDTH,
+    height: HEIGHT,
+    elements: [
+      { id: "bg", type: "RECTANGLE", x: 0, y: 0, width: WIDTH, height: HEIGHT, rotation: 0, zIndex: 0, fill: "#1a2130", stroke: "", strokeWidth: 0 },
+      { id: "accent", type: "ELLIPSE", x: -80, y: -80, width: 300, height: 300, rotation: 0, zIndex: 1, fill: "#63c7be", stroke: "", strokeWidth: 0 },
+      { id: "title", type: "TEXT", x: 80, y: 250, width: 600, height: 60, rotation: 0, zIndex: 2, fill: "#eae7de", stroke: "", strokeWidth: 0, text: "Summer Rooftop Party", fontFamily: "IBM Plex Sans", fontSize: 40, fontWeight: 700 },
+      { id: "datetime", type: "TEXT", x: 80, y: 320, width: 500, height: 34, rotation: 0, zIndex: 3, fill: "#8a93a6", stroke: "", strokeWidth: 0, text: "Sat, Aug 15 · 7:00 PM", fontFamily: "IBM Plex Sans", fontSize: 20, fontWeight: 400 },
+    ],
+  },
+  {
+    name: "Presentation Title Slide",
+    category: "Presentation",
+    tags: ["presentation", "title-slide", "corporate"],
+    colors: ["#ffffff", "#0b0e14"],
+    popularity: 65,
+    width: WIDTH,
+    height: HEIGHT,
+    elements: [
+      { id: "bg", type: "RECTANGLE", x: 0, y: 0, width: WIDTH, height: HEIGHT, rotation: 0, zIndex: 0, fill: "#ffffff", stroke: "", strokeWidth: 0 },
+      { id: "accent-bar", type: "RECTANGLE", x: 0, y: 0, width: 16, height: HEIGHT, rotation: 0, zIndex: 1, fill: "#0b0e14", stroke: "", strokeWidth: 0 },
+      { id: "title", type: "TEXT", x: 100, y: 250, width: 700, height: 60, rotation: 0, zIndex: 2, fill: "#0b0e14", stroke: "", strokeWidth: 0, text: "Q3 Roadmap Review", fontFamily: "IBM Plex Sans", fontSize: 42, fontWeight: 700 },
+      { id: "subtitle", type: "TEXT", x: 100, y: 320, width: 600, height: 34, rotation: 0, zIndex: 3, fill: "#5b6274", stroke: "", strokeWidth: 0, text: "Engineering Team · July 2026", fontFamily: "IBM Plex Sans", fontSize: 20, fontWeight: 400 },
+    ],
+  },
+];

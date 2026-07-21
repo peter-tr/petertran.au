@@ -1,6 +1,6 @@
-import { ObjectId, type Collection } from "mongodb";
+import { ObjectId, type Collection, type Filter } from "mongodb";
 import { getDb } from "./client";
-import type { DesignElementRecord, DesignRecord, SaveDesignArgs } from "../design";
+import type { DesignElementRecord, DesignRecord, SaveDesignArgs, TemplateRecord, TemplateFilter } from "../design";
 import type { DesignStore } from "../../resolvers/resolvers";
 
 interface DesignDocument {
@@ -25,6 +25,32 @@ function toRecord(doc: DesignDocument): DesignRecord {
   };
 }
 
+interface TemplateDocument {
+  _id: ObjectId;
+  name: string;
+  category: string;
+  tags: string[];
+  colors: string[];
+  popularity: number;
+  width: number;
+  height: number;
+  elements: DesignElementRecord[];
+}
+
+function toTemplateRecord(doc: TemplateDocument): TemplateRecord {
+  return {
+    id: doc._id.toHexString(),
+    name: doc.name,
+    category: doc.category,
+    tags: doc.tags ?? [],
+    colors: doc.colors ?? [],
+    popularity: doc.popularity,
+    width: doc.width,
+    height: doc.height,
+    elements: doc.elements ?? [],
+  };
+}
+
 let indexesEnsured: Promise<unknown> | null = null;
 
 async function getCollection(): Promise<Collection<DesignDocument>> {
@@ -38,6 +64,37 @@ async function getCollection(): Promise<Collection<DesignDocument>> {
   await indexesEnsured;
 
   return collection;
+}
+
+let templateIndexesEnsured: Promise<unknown> | null = null;
+
+async function getTemplatesCollection(): Promise<Collection<TemplateDocument>> {
+  const db = await getDb();
+  const collection = db.collection<TemplateDocument>("templates");
+
+  // The point of this collection existing at all: three different query
+  // shapes (free-text search, exact category match, popularity sort) each
+  // get their own index, added independently as the search UI grew -
+  // no pre-planned access pattern the way a DynamoDB GSI would need.
+  templateIndexesEnsured ??= Promise.all([
+    collection.createIndex({ name: "text", tags: "text" }),
+    collection.createIndex({ category: 1 }),
+    collection.createIndex({ popularity: -1 }),
+  ]);
+  await templateIndexesEnsured;
+
+  return collection;
+}
+
+function buildTemplateQuery(filter: TemplateFilter): Filter<TemplateDocument> {
+  const query: Filter<TemplateDocument> = {};
+
+  if (filter.category) query.category = filter.category;
+  if (filter.color) query.colors = filter.color;
+  if (filter.tags?.length) query.tags = { $in: filter.tags };
+  if (filter.search) query.$text = { $search: filter.search };
+
+  return query;
 }
 
 export class MongoDesignStore implements DesignStore {
@@ -104,5 +161,21 @@ export class MongoDesignStore implements DesignStore {
     const result = await collection.deleteOne({ _id: new ObjectId(id) });
 
     return result.deletedCount === 1;
+  }
+
+  async listTemplates(filter: TemplateFilter): Promise<TemplateRecord[]> {
+    const collection = await getTemplatesCollection();
+    const docs = await collection.find(buildTemplateQuery(filter)).sort({ popularity: -1 }).toArray();
+
+    return docs.map(toTemplateRecord);
+  }
+
+  async getTemplate(id: string): Promise<TemplateRecord | null> {
+    if (!ObjectId.isValid(id)) return null;
+
+    const collection = await getTemplatesCollection();
+    const doc = await collection.findOne({ _id: new ObjectId(id) });
+
+    return doc ? toTemplateRecord(doc) : null;
   }
 }

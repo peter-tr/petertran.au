@@ -73,15 +73,39 @@ input SaveDesignInput {
   elements: [DesignElementInput!]!
 }
 
+type Template {
+  id: ID!
+  name: String!
+  category: String!
+  tags: [String!]!
+  """
+  Dominant colors, for filtering by color swatch.
+  """
+  colors: [String!]!
+  popularity: Int!
+  width: Float!
+  height: Float!
+  elements: [DesignElement!]!
+}
+
 type Query {
   """
   Every saved design, most recently updated first.
   """
   designs: [Design!]!
   design(id: ID!): Design
+  """
+  Starter templates, optionally filtered - every argument is independently
+  optional and combinable. `search` does a free-text match against name/tags.
+  """
+  templates(search: String, category: String, tags: [String!], color: String): [Template!]!
 }
 
 type Mutation {
   saveDesign(input: SaveDesignInput!): Design!
   deleteDesign(id: ID!): Boolean!
+  """
+  Clones a template's elements into a brand-new saved design.
+  """
+  useTemplate(templateId: ID!): Design!
 }

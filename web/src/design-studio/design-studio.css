@@ -119,6 +119,107 @@
   border-color: var(--string);
 }
 
+/* ---------- templates ---------- */
+
+.design-studio-templates {
+  max-width: 46rem;
+  margin: 2rem auto 0;
+}
+
+.design-studio-templates h2 {
+  font-family: var(--font-mono);
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0 0 0.6rem;
+}
+
+.design-studio-templates-filters {
+  display: flex;
+  gap: 0.6rem;
+  margin-bottom: 0.9rem;
+}
+
+.design-studio-templates-filters input,
+.design-studio-templates-filters select {
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  color: var(--paper);
+  background: var(--panel-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 0.4rem 0.6rem;
+}
+
+.design-studio-templates-filters input {
+  flex: 1;
+}
+
+.design-studio-templates-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  gap: 0.8rem;
+}
+
+.design-studio-template-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.9rem 1rem;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+}
+
+.design-studio-template-swatches {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.design-studio-swatch {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  border: 1px solid var(--rule);
+}
+
+.design-studio-template-name {
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  color: var(--paper);
+}
+
+.design-studio-template-category {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+.design-studio-template-card button {
+  align-self: flex-start;
+  margin-top: 0.3rem;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--paper);
+  background: var(--panel-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 0.35rem 0.7rem;
+  cursor: pointer;
+}
+
+.design-studio-template-card button:hover:not(:disabled) {
+  color: var(--type);
+  border-color: var(--type);
+}
+
+.design-studio-template-card button:disabled {
+  color: var(--muted-dim);
+  cursor: not-allowed;
+}
+
 .design-studio-history-controls {
   display: flex;
   gap: 0.4rem;

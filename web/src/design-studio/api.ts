@@ -1,6 +1,16 @@
 import { createGraphQLClient } from "../shared/graphqlClient";
 import type { DesignElementInput as SchemaDesignElementInput } from "./api-schema-types.generated";
-import type { DesignFieldsFragment, DesignsQuery, DesignQuery, SaveDesignMutation, DeleteDesignMutation } from "./api.generated";
+import type {
+  DesignFieldsFragment,
+  TemplateFieldsFragment,
+  DesignsQuery,
+  DesignQuery,
+  SaveDesignMutation,
+  DeleteDesignMutation,
+  TemplatesQuery,
+  TemplatesQueryVariables,
+  UseTemplateMutation,
+} from "./api.generated";
 
 // Separate endpoint, separate service, same reasoning as pantry/imposter's
 // api.ts - optional chaining on `env` because api/scripts/validate-schemas.ts
@@ -77,6 +87,37 @@ export const DELETE_DESIGN_MUTATION = /* GraphQL */ `
   }
 `;
 
+export type Template = TemplateFieldsFragment;
+
+const TEMPLATE_FIELDS = /* GraphQL */ `
+  fragment TemplateFields on Template {
+    id
+    name
+    category
+    tags
+    colors
+    popularity
+  }
+`;
+
+export const TEMPLATES_QUERY = /* GraphQL */ `
+  query Templates($search: String, $category: String, $tags: [String!], $color: String) {
+    templates(search: $search, category: $category, tags: $tags, color: $color) {
+      ...TemplateFields
+    }
+  }
+  ${TEMPLATE_FIELDS}
+`;
+
+export const USE_TEMPLATE_MUTATION = /* GraphQL */ `
+  mutation UseTemplate($templateId: ID!) {
+    useTemplate(templateId: $templateId) {
+      ...DesignFields
+    }
+  }
+  ${DESIGN_FIELDS}
+`;
+
 export async function listDesigns(): Promise<Design[]> {
   const data = await runDesignStudioQuery<DesignsQuery>(DESIGNS_QUERY);
   return data.designs;
@@ -103,4 +144,14 @@ export async function saveDesign(input: SaveDesignArgs): Promise<Design> {
 export async function deleteDesign(id: string): Promise<boolean> {
   const data = await runDesignStudioQuery<DeleteDesignMutation>(DELETE_DESIGN_MUTATION, { id });
   return data.deleteDesign;
+}
+
+export async function listTemplates(filter: TemplatesQueryVariables = {}): Promise<Template[]> {
+  const data = await runDesignStudioQuery<TemplatesQuery>(TEMPLATES_QUERY, filter);
+  return data.templates;
+}
+
+export async function useTemplate(templateId: string): Promise<Design> {
+  const data = await runDesignStudioQuery<UseTemplateMutation>(USE_TEMPLATE_MUTATION, { templateId });
+  return data.useTemplate;
 }
