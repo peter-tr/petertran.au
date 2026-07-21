@@ -7,7 +7,7 @@ import {
 } from "@aws-sdk/client-lambda";
 import { SSMClient, GetParameterCommand, PutParameterCommand } from "@aws-sdk/client-ssm";
 import { SchedulerClient, GetScheduleCommand, UpdateScheduleCommand } from "@aws-sdk/client-scheduler";
-import { parseJsonBody } from "api-shared/http";
+import { parseJsonBody, corsHeaders } from "api-shared/http";
 
 const lambdaClient = new LambdaClient({});
 const ssm = new SSMClient({});
@@ -280,7 +280,7 @@ function isValidSchedule(value: unknown): value is WarmSchedule {
   );
 }
 
-export async function handler(
+async function processEvent(
   event: APIGatewayProxyEvent | ReconcilePing | WarmScheduleTrigger
 ): Promise<APIGatewayProxyResult> {
   if (isReconcilePing(event)) {
@@ -335,4 +335,13 @@ export async function handler(
   const config = await getConfig();
 
   return { statusCode: 200, headers: { "content-type": "application/json" }, body: JSON.stringify(config) };
+}
+
+export async function handler(
+  event: APIGatewayProxyEvent | ReconcilePing | WarmScheduleTrigger
+): Promise<APIGatewayProxyResult> {
+  const result = await processEvent(event);
+  const origin = isReconcilePing(event) || isWarmScheduleTrigger(event) ? undefined : event.headers?.origin;
+
+  return { ...result, headers: { ...result.headers, ...corsHeaders(origin) } };
 }

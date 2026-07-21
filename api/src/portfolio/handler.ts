@@ -8,6 +8,7 @@ import { typeDefs } from "./schema";
 import { resolvers } from "./resolvers/resolvers";
 import { operationStatsPlugin } from "./lib/util/operation-stats-plugin";
 import { createResumePartitionLoader } from "./lib/aws/resume-data";
+import { corsHeaders } from "api-shared/http";
 import type { Context } from "./context";
 
 const server = new ApolloServer<Context>({
@@ -54,5 +55,8 @@ export const handler = async (
   event: APIGatewayProxyEvent,
   context: LambdaContext
 ): Promise<APIGatewayProxyResult | void> => {
-  return apolloHandler(event, context, () => {});
+  const result = await apolloHandler(event, context, () => {});
+  if (!result) return result;
+
+  return { ...result, headers: { ...result.headers, ...corsHeaders(event.headers?.origin) } };
 };
