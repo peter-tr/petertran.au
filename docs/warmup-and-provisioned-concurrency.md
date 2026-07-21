@@ -5,6 +5,29 @@ how well the existing warmup schedule actually works, and (b) added scheduled
 Provisioned Concurrency (PC) for portfolio/pantry/imposter and, later,
 zero-trust-lab's 5 Lambdas on top of it.
 
+## 2026-07-21 update: scheduled ping removed, PC made per-project
+
+Now that PC covers business hours for all four projects, the scheduled
+10-minute warmup ping (`WarmupStack`, `isWarmupPing`) was removed entirely -
+redundant with PC during the window PC covers, and not worth keeping just for
+the hours outside it. See git history for the removal.
+
+PC's own schedule also moved off the single fixed 8am-7pm-for-everyone
+window: each project now has its own configurable days/start/end (Sydney
+time) from the settings page. The old design reconciled via one Lambda
+invoked hourly on the hour, computing "is it business hours right now" - fine
+when every project shared the same whole-hour window, but too coarse once
+times are arbitrary per project (a 7:45am start could land up to 59 minutes
+late). Replaced with exact-time triggers: two EventBridge Schedules per
+project (`pc-on-<project>`/`pc-off-<project>`), built from AWS cron's native
+day-of-week support, invoke `pc-config` directly at the configured minute.
+Settings edits update those two schedules' cron expressions via
+`UpdateScheduleCommand` - same GetSchedule-then-UpdateSchedule idiom the old
+`warmup-config` Lambda used to toggle schedule `State`. A coarser periodic
+reconcile (every 30 min, widened from hourly) stays as a backstop to
+self-heal a missed trigger; unlike the on/off triggers, it doesn't drive the
+window's precision.
+
 ## Warmup: the "5-45 min idle-reclaim window" doesn't hold here
 
 The commonly-cited AWS Lambda idle-reclaim window is "5-45 minutes," but

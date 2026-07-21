@@ -32,8 +32,8 @@ export interface PantryStackProps extends StackProps {
  * separation doesn't require a separate workspace, same as GamesStack.
  */
 export class PantryStack extends Stack {
-  // Exposed so PetertranWarmupStack can schedule a keep-warm ping against it
-  // without this stack needing to know anything about warmup at all.
+  // Exposed so ApiGatewayStack/ProvisionedConcurrencyStack can target it
+  // without this stack needing to know anything about either.
   public readonly apiFn: lambda.Function;
 
   constructor(scope: Construct, id: string, props: PantryStackProps) {
@@ -64,9 +64,10 @@ export class PantryStack extends Stack {
 
     const apiFn = new lambda.Function(this, "PantryGraphQLFunction", {
       // Explicit, so it reads clearly in the X-Ray trace map instead of
-      // CloudFormation's auto-generated name. Also lets WarmupStack
-      // reference it by a plain string - see site-stack.ts's identical
-      // comment on GraphQLFunction for why that matters.
+      // CloudFormation's auto-generated name. Also lets ApiGatewayStack/
+      // ProvisionedConcurrencyStack reference it by a plain string - see
+      // site-stack.ts's identical comment on GraphQLFunction for why that
+      // matters.
       functionName: props.functionName ?? FUNCTION_NAMES.pantry,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "handler.handler",
@@ -98,7 +99,7 @@ export class PantryStack extends Stack {
     anthropicSecret.grantRead(apiFn);
     this.apiFn = apiFn;
 
-    // Qualifier ApiGatewayStack/WarmupStack target and ProvisionedConcurrencyStack
+    // Qualifier ApiGatewayStack targets and ProvisionedConcurrencyStack
     // applies PC to - see LIVE_ALIAS_NAME's doc comment.
     new lambda.Alias(this, "LiveAlias", {
       aliasName: LIVE_ALIAS_NAME,

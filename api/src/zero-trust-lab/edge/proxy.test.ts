@@ -28,16 +28,6 @@ beforeEach(() => {
 });
 
 describe("edge proxy handler", () => {
-  it("short-circuits a warmup ping without forwarding anywhere", async () => {
-    const fetchSpy = vi.fn();
-    vi.stubGlobal("fetch", fetchSpy);
-
-    const result = await handler({ warmup: true });
-
-    expect(result).toEqual({ statusCode: 200, body: "warm" });
-    expect(fetchSpy).not.toHaveBeenCalled();
-  });
-
   it("returns 404 for an unrecognized domain prefix", async () => {
     const result = await handler(proxyEvent("/domain-c/foo"));
     expect(result.statusCode).toBe(404);

@@ -10,7 +10,6 @@ import { captureAwsClient } from "api-shared/xray";
 import { generateOpaqueToken } from "../lib/opaque-token";
 import { normalizePath } from "../lib/http";
 import { parseJsonBody } from "api-shared/http";
-import { isWarmupPing, type WarmupPing } from "api-shared/warmup";
 
 const { ddb, TABLE_NAME } = createDdbClient({ defaultTableName: "ZeroTrustSessions", xray: true });
 const cognito = captureAwsClient(new CognitoIdentityProviderClient({}));
@@ -147,11 +146,7 @@ async function handleLogout(event: APIGatewayProxyEventV2): Promise<APIGatewayPr
   };
 }
 
-export async function handler(
-  event: APIGatewayProxyEventV2 | WarmupPing
-): Promise<APIGatewayProxyStructuredResultV2> {
-  if (isWarmupPing(event)) return { statusCode: 200, body: "warm" };
-
+export async function handler(event: APIGatewayProxyEventV2): Promise<APIGatewayProxyStructuredResultV2> {
   switch (normalizePath(event.rawPath)) {
     case "/callback":
       return handleCallback(event);

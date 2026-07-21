@@ -4,7 +4,6 @@ import type {
 } from "aws-lambda";
 import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
 import { captureAwsClient } from "api-shared/xray";
-import { isWarmupPing, type WarmupPing } from "api-shared/warmup";
 
 const lambda = captureAwsClient(new LambdaClient({}));
 
@@ -30,12 +29,8 @@ function audienceForPath(path: string): string | null {
 }
 
 export async function handler(
-  event: APIGatewayRequestAuthorizerEventV2 | WarmupPing
+  event: APIGatewayRequestAuthorizerEventV2
 ): Promise<APIGatewaySimpleAuthorizerWithContextResult<EdgeAuthContext>> {
-  // Checked first - a warmup payload has no `rawPath`, and audienceForPath
-  // below would throw on that, not just no-op.
-  if (isWarmupPing(event)) return DENY;
-
   const authHeader = event.headers?.authorization ?? event.headers?.Authorization;
   const opaqueToken = authHeader?.replace(/^Bearer\s+/i, "");
   const audience = audienceForPath(event.rawPath);

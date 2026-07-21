@@ -54,12 +54,6 @@ beforeEach(() => {
 });
 
 describe("idp-bridge handler", () => {
-  it("short-circuits a warmup ping", async () => {
-    const result = await handler({ warmup: true });
-    expect(result).toEqual({ statusCode: 200, body: "warm" });
-    expect(ddbMock.commandCalls(PutCommand)).toHaveLength(0);
-  });
-
   it("returns 404 for an unrecognized path", async () => {
     const result = await handler(jsonEvent("/nonsense"));
     expect(result.statusCode).toBe(404);

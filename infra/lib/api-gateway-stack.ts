@@ -19,18 +19,17 @@ export interface ApiGatewayStackProps extends StackProps {
   // deploy into the same hosted zone without colliding.
   apiSubdomain?: string;
   // Plain function *names* (not live lambda.IFunction references) - same
-  // reasoning as WarmupStack (see its doc comment): a live reference passed
+  // reasoning as ProvisionedConcurrencyStack (see its doc comment): a live reference passed
   // cross-stack becomes a CloudFormation export that blocks the producing
   // stack from ever replacing that Lambda for as long as this stack has it
   // imported.
   portfolioFnName: string;
   pantryFnName: string;
   imposterFnName: string;
-  // Omitted (not just empty-string) for the test env - warmup/PC are
-  // operational concerns that don't apply to a disposable environment (see
-  // warmup-stack.ts/pc-config-stack.ts), so their routes are skipped
-  // entirely rather than pointed at a Lambda that doesn't exist there.
-  warmupConfigFnName?: string;
+  // Omitted (not just empty-string) for the test env - PC is an
+  // operational concern that doesn't apply to a disposable environment (see
+  // pc-config-stack.ts), so its route is skipped entirely rather than
+  // pointed at a Lambda that doesn't exist there.
   pcConfigFnName?: string;
   // The reverse of the two above: omitted for prod, only passed by the
   // test-env instantiation - see supergraph-stack.ts's doc comment for why
@@ -39,16 +38,16 @@ export interface ApiGatewayStackProps extends StackProps {
 }
 
 /**
- * Single shared HttpApi in front of portfolio/pantry/imposter/warmup-config/
- * pc-config, replacing their individual Lambda Function URLs with one
- * stable, human-readable domain (api.petertran.au) - so web/.env.production
- * never needs to track a CloudFormation-generated URL again. Deliberately
- * does NOT cover zero-trust-lab's own edge/domain gateways - those stay
- * isolated per that stack's own design intent (see zero-trust-lab-stack.ts).
+ * Single shared HttpApi in front of portfolio/pantry/imposter/pc-config,
+ * replacing their individual Lambda Function URLs with one stable,
+ * human-readable domain (api.petertran.au) - so web/.env.production never
+ * needs to track a CloudFormation-generated URL again. Deliberately does NOT
+ * cover zero-trust-lab's own edge/domain gateways - those stay isolated per
+ * that stack's own design intent (see zero-trust-lab-stack.ts).
  *
  * Reused as-is for the on-demand test environment (see infra/bin/app.ts),
  * fronting portfolio/pantry/imposter/supergraph under api.test.petertran.au -
- * warmupConfigFnName/pcConfigFnName omitted, apiSubdomain overridden.
+ * pcConfigFnName omitted, apiSubdomain overridden.
  */
 export class ApiGatewayStack extends Stack {
   constructor(scope: Construct, id: string, props: ApiGatewayStackProps) {
@@ -89,15 +88,15 @@ export class ApiGatewayStack extends Stack {
       },
     });
 
-    // Exact-path routes, not `{proxy+}` - portfolio/pantry/imposter/warmup/
+    // Exact-path routes, not `{proxy+}` - portfolio/pantry/imposter/
     // pc-config are each single-endpoint Apollo/JSON services, never called
     // with a sub-path (see web/src/shared/graphqlClient.ts and
-    // useWarmupSchedule.ts).
+    // usePcConfig.ts).
     //
     // portfolio/pantry/imposter carry `aliasName: LIVE_ALIAS_NAME` so real
     // traffic actually lands on the qualifier ProvisionedConcurrencyStack
     // applies Provisioned Concurrency to - see pc-config-stack.ts's doc
-    // comment. warmup/pc-config have no alias, bare $LATEST, unaffected.
+    // comment. pc-config has no alias, bare $LATEST, unaffected.
     const routes: { id: string; path: string; functionName: string; aliasName?: string }[] = [
       {
         id: "Portfolio",
@@ -107,9 +106,6 @@ export class ApiGatewayStack extends Stack {
       },
       { id: "Pantry", path: "/pantry", functionName: props.pantryFnName, aliasName: LIVE_ALIAS_NAME },
       { id: "Imposter", path: "/imposter", functionName: props.imposterFnName, aliasName: LIVE_ALIAS_NAME },
-      ...(props.warmupConfigFnName
-        ? [{ id: "Warmup", path: "/warmup", functionName: props.warmupConfigFnName }]
-        : []),
       ...(props.pcConfigFnName
         ? [{ id: "PcConfig", path: "/pc-config", functionName: props.pcConfigFnName }]
         : []),
