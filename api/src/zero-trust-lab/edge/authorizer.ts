@@ -3,7 +3,8 @@ import type {
   APIGatewaySimpleAuthorizerWithContextResult,
 } from "aws-lambda";
 import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
-import { captureAwsClient } from "api-shared/xray";
+import * as AWSXRay from "aws-xray-sdk-core";
+import { captureAwsClient, traced } from "api-shared/xray";
 
 const lambda = captureAwsClient(new LambdaClient({}));
 
@@ -31,16 +32,25 @@ function audienceForPath(path: string): string | null {
 export async function handler(
   event: APIGatewayRequestAuthorizerEventV2
 ): Promise<APIGatewaySimpleAuthorizerWithContextResult<EdgeAuthContext>> {
+  // Captured synchronously, as early as possible in the invocation - see
+  // xray.ts's traced() for why this can't be looked up later.
+  const xraySegment = process.env.AWS_LAMBDA_FUNCTION_NAME ? AWSXRay.getSegment() : undefined;
+
   const authHeader = event.headers?.authorization ?? event.headers?.Authorization;
   const opaqueToken = authHeader?.replace(/^Bearer\s+/i, "");
   const audience = audienceForPath(event.rawPath);
   if (!opaqueToken || !audience) return DENY;
 
-  const introspectResp = await fetch(`${IDP_BRIDGE_URL.replace(/\/$/, "")}/introspect`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ token: opaqueToken }),
-  });
+  const introspectResp = await traced(
+    "IdpBridge: introspect",
+    () =>
+      fetch(`${IDP_BRIDGE_URL.replace(/\/$/, "")}/introspect`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ token: opaqueToken }),
+      }),
+    xraySegment
+  );
   if (!introspectResp.ok) return DENY;
 
   const introspection = (await introspectResp.json()) as { active: boolean; sub?: string; scope?: string };
