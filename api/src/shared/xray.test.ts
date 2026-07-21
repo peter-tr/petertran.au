@@ -6,7 +6,7 @@ vi.mock("aws-xray-sdk-core", () => ({
 }));
 
 import * as AWSXRay from "aws-xray-sdk-core";
-import { ANTHROPIC_API_SEGMENT_NAME, captureAwsClient, traced } from "./xray";
+import { ANTHROPIC_API_SEGMENT_NAME, captureAwsClient, traced, traceHeader } from "./xray";
 
 const mockedGetSegment = vi.mocked(AWSXRay.getSegment);
 const mockedCaptureAWSv3Client = vi.mocked(AWSXRay.captureAWSv3Client);
@@ -147,5 +147,39 @@ describe("captureAwsClient", () => {
 describe("ANTHROPIC_API_SEGMENT_NAME", () => {
   it("is a stable, shared subsegment name", () => {
     expect(ANTHROPIC_API_SEGMENT_NAME).toBe("Anthropic API");
+  });
+});
+
+describe("traceHeader", () => {
+  it("returns an empty object when no segment is passed", () => {
+    expect(traceHeader(undefined)).toEqual({});
+  });
+
+  it("builds the header from a root segment", () => {
+    const segment = { id: "segment-id", trace_id: "trace-id", notTraced: false };
+
+    expect(traceHeader(segment as never)).toEqual({
+      "X-Amzn-Trace-Id": "Root=trace-id;Parent=segment-id;Sampled=1",
+    });
+  });
+
+  it("uses the subsegment's own id as Parent but the root segment's trace_id as Root", () => {
+    const subsegment = {
+      id: "subsegment-id",
+      notTraced: false,
+      segment: { trace_id: "trace-id" },
+    };
+
+    expect(traceHeader(subsegment as never)).toEqual({
+      "X-Amzn-Trace-Id": "Root=trace-id;Parent=subsegment-id;Sampled=1",
+    });
+  });
+
+  it("sets Sampled=0 when the segment is marked notTraced", () => {
+    const segment = { id: "segment-id", trace_id: "trace-id", notTraced: true };
+
+    expect(traceHeader(segment as never)).toEqual({
+      "X-Amzn-Trace-Id": "Root=trace-id;Parent=segment-id;Sampled=0",
+    });
   });
 });

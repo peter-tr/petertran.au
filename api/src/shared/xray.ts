@@ -52,3 +52,27 @@ export async function traced<T>(name: string, fn: () => Promise<T>, parentSegmen
 export function captureAwsClient<T extends Parameters<typeof AWSXRay.captureAWSv3Client>[0]>(client: T): T {
   return process.env.AWS_LAMBDA_FUNCTION_NAME ? AWSXRay.captureAWSv3Client(client) : client;
 }
+
+// Builds the header AWS's X-Ray integration uses to continue a trace across
+// an HTTP call to another one of our own Lambdas (a Function URL call isn't
+// an AWS SDK call, so nothing auto-attaches this the way captureAwsClient
+// does for DynamoDB/KMS - and traced() above only creates a *local*
+// subsegment, it never touches the outgoing request). Without this header,
+// the downstream Lambda has no way to know it's part of the same request,
+// so its own segment starts a brand new, disconnected trace and X-Ray never
+// shows the two services as connected - see supergraph/handler.ts's
+// TracedDataSource and zero-trust-lab/edge/proxy.ts.
+//
+// Mirrors the header aws-xray-sdk-core's own captureHTTPsGlobal() would set
+// (see node_modules/aws-xray-sdk-core/dist/lib/patchers/http_p.js) - not
+// using that helper directly because it resolves the parent segment via the
+// same ambient cls-hooked lookup traced() above deliberately avoids.
+export function traceHeader(segment?: SegmentLike): Record<string, string> {
+  if (!segment) return {};
+
+  const root = "segment" in segment ? segment.segment : segment;
+
+  return {
+    "X-Amzn-Trace-Id": `Root=${root.trace_id};Parent=${segment.id};Sampled=${segment.notTraced ? "0" : "1"}`,
+  };
+}

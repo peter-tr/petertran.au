@@ -3,7 +3,7 @@ import type {
   APIGatewayProxyStructuredResultV2,
 } from "aws-lambda";
 import * as AWSXRay from "aws-xray-sdk-core";
-import { traced } from "api-shared/xray";
+import { traced, traceHeader } from "api-shared/xray";
 import type { EdgeAuthContext } from "./authorizer";
 
 const DOMAIN_A_URL = process.env.DOMAIN_A_URL!;
@@ -28,7 +28,10 @@ export async function handler(
     () =>
       fetch(targetUrl, {
         method: event.requestContext.http.method,
-        headers: { authorization: `Bearer ${jwt}` },
+        // Without this header the internal service's own segment starts a
+        // brand new trace, disconnected from this one - see xray.ts's
+        // traceHeader().
+        headers: { authorization: `Bearer ${jwt}`, ...traceHeader(xraySegment) },
       }),
     xraySegment
   );

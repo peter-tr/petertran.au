@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
+vi.mock("aws-xray-sdk-core", () => ({ getSegment: vi.fn() }));
+
 // Read as module-level consts at import time in proxy.ts. A static `import`
 // is hoisted above these assignments regardless of where it's written
 // textually (ES module semantics), so a dynamic import is used here instead
@@ -8,8 +10,11 @@ process.env.DOMAIN_A_URL = "https://domain-a.example.com/";
 process.env.DOMAIN_B_URL = "https://domain-b.example.com";
 
 const { handler } = await import("./proxy");
+import * as AWSXRay from "aws-xray-sdk-core";
 import type { APIGatewayProxyEventV2WithLambdaAuthorizer } from "aws-lambda";
 import type { EdgeAuthContext } from "./authorizer";
+
+const mockedGetSegment = vi.mocked(AWSXRay.getSegment);
 
 type ProxyEvent = APIGatewayProxyEventV2WithLambdaAuthorizer<EdgeAuthContext>;
 
@@ -100,5 +105,40 @@ describe("edge proxy handler", () => {
 
     const result = await handler(proxyEvent("/domain-a/foo"));
     expect(result.headers?.["content-type"]).toBe("text/html");
+  });
+
+  it("propagates the X-Amzn-Trace-Id header when running in Lambda, so the downstream domain gateway joins the same trace", async () => {
+    const fetchSpy = vi.fn().mockResolvedValue({
+      status: 200,
+      text: () => Promise.resolve("ok"),
+      headers: new Headers(),
+    });
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const originalFnName = process.env.AWS_LAMBDA_FUNCTION_NAME;
+    process.env.AWS_LAMBDA_FUNCTION_NAME = "edge-proxy";
+    mockedGetSegment.mockReturnValue({
+      id: "segment-id",
+      trace_id: "trace-id",
+      notTraced: false,
+      addNewSubsegment: vi.fn().mockReturnValue({ close: vi.fn() }),
+    } as never);
+
+    try {
+      await handler(proxyEvent("/domain-a/foo"));
+    } finally {
+      if (originalFnName === undefined) delete process.env.AWS_LAMBDA_FUNCTION_NAME;
+      else process.env.AWS_LAMBDA_FUNCTION_NAME = originalFnName;
+    }
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        headers: {
+          authorization: "Bearer signed-jwt",
+          "X-Amzn-Trace-Id": "Root=trace-id;Parent=segment-id;Sampled=1",
+        },
+      })
+    );
   });
 });
