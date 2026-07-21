@@ -169,7 +169,7 @@ jobs:
         working-directory: infra
         env:
           DEPLOY_TEST_ENV: ${{ inputs.deploy-test-env }}
-        run: npx cdk deploy ${{ inputs.stacks != '' && inputs.stacks || '--all' }} --concurrency 4 --require-approval never
+        run: npx cdk deploy ${{ inputs.stacks != '' && inputs.stacks || '--all' }} --concurrency 10 --require-approval never
 
       # Must run after "Deploy infrastructure", not chained into the build
       # step above - it fetches live data from VITE_GRAPHQL_ENDPOINT, and
