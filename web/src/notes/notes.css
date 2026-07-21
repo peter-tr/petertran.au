@@ -1,0 +1,232 @@
+/* ---------- notes ---------- */
+
+.notes-layout {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.6rem;
+}
+
+/* ---------- rail (quick-select) ---------- */
+
+.notes-rail {
+  flex: 0 0 9.5rem;
+  position: sticky;
+  top: 4.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.notes-rail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  text-align: left;
+  background: none;
+  border: none;
+  border-left: 2px solid var(--rule);
+  padding: 0.5rem 0 0.5rem 0.8rem;
+  font-family: var(--font-sans);
+  cursor: pointer;
+}
+
+.notes-rail-item:hover {
+  border-left-color: var(--muted);
+}
+
+.notes-rail-item.active {
+  border-left-color: var(--signal);
+}
+
+.notes-rail-label {
+  font-size: 0.78rem;
+  line-height: 1.3;
+  color: var(--muted);
+}
+
+.notes-rail-item:hover .notes-rail-label {
+  color: var(--paper);
+}
+
+.notes-rail-item.active .notes-rail-label {
+  color: var(--paper);
+  font-weight: 600;
+}
+
+.notes-rail-date {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  color: var(--muted-dim);
+}
+
+/* ---------- entry panel ---------- */
+/* Only the selected entry is ever in the DOM here (see Notes.tsx) - this is
+   a tab panel, not an accordion, so there's nothing to collapse/expand. */
+
+.note-entry {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--panel);
+  padding: 1.2rem 1.3rem 1.4rem;
+  margin-bottom: 3rem;
+  scroll-margin-top: 4.5rem;
+}
+
+.note-entry-head {
+  display: flex;
+  width: 100%;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.7rem;
+}
+
+.note-title {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 0.96rem;
+  color: var(--paper);
+}
+
+.note-date {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--muted-dim);
+  white-space: nowrap;
+}
+
+.note-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.8rem 0 0.9rem;
+}
+
+.note-tag {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--type);
+  border: 1px solid rgba(99, 199, 190, 0.35);
+  border-radius: 999px;
+  padding: 0.15rem 0.55rem;
+}
+
+.note-body p {
+  margin: 0 0 0.7rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.note-body p:last-child {
+  margin-bottom: 0;
+}
+
+.note-body strong {
+  color: var(--paper);
+}
+
+.note-body code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  color: var(--type);
+  background: var(--panel-2);
+  border-radius: 4px;
+  padding: 0.1em 0.35em;
+}
+
+.note-body svg.arch-diagram {
+  margin: 0.9rem 0;
+}
+
+/* ---------- tables ---------- */
+
+.note-table-wrap {
+  overflow-x: auto;
+  margin: 0.9rem 0;
+}
+
+.note-table {
+  width: 100%;
+  min-width: 26rem;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.note-table th {
+  text-align: left;
+  color: var(--muted-dim);
+  font-weight: 600;
+  font-size: 0.66rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  padding: 0 0.7rem 0.5rem 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.note-table td {
+  padding: 0.5rem 0.7rem 0.5rem 0;
+  border-bottom: 1px solid var(--rule);
+  color: var(--muted);
+  vertical-align: top;
+}
+
+.note-table tr:last-child td {
+  border-bottom: none;
+}
+
+.note-table td:first-child {
+  color: var(--paper);
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .notes-layout {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .notes-rail {
+    position: static;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 0.5rem;
+    padding-bottom: 0.3rem;
+    scrollbar-width: none;
+  }
+
+  .notes-rail::-webkit-scrollbar {
+    display: none;
+  }
+
+  .notes-rail-item {
+    flex: 0 0 auto;
+    flex-direction: row;
+    align-items: baseline;
+    gap: 0.4rem;
+    border-left: none;
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    padding: 0.35rem 0.8rem;
+    white-space: nowrap;
+  }
+
+  .notes-rail-item.active {
+    background: var(--signal);
+    border-color: var(--signal);
+  }
+
+  .notes-rail-item.active .notes-rail-label {
+    color: var(--ink);
+  }
+
+  .notes-rail-item.active .notes-rail-date {
+    color: var(--ink);
+    opacity: 0.7;
+  }
+}
