@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { useShowAlsoBuilt } from "./hooks/useShowAlsoBuilt";
 import { usePageLoadWarmup } from "./hooks/usePageLoadWarmup";
 import { useWarmSchedule, type WarmScheduleKey } from "./hooks/useWarmSchedule";
+import { useAlertsEnabled } from "./hooks/useAlertsEnabled";
 import WarmScheduleProject from "./components/WarmScheduleProject";
 import "./portfolio.css";
 
@@ -23,6 +24,13 @@ export default function PortfolioSettingsPage() {
     setSchedule: setWarmSchedule,
     available: warmScheduleAvailable,
   } = useWarmSchedule();
+  const {
+    enabled: alertsEnabled,
+    pending: alertsPending,
+    error: alertsError,
+    setEnabled: setAlertsEnabled,
+    available: alertsAvailable,
+  } = useAlertsEnabled();
 
   return (
     <>
@@ -54,6 +62,22 @@ export default function PortfolioSettingsPage() {
           Warm pantry/imposter on page load (tighter timing, only helps this browser)
         </label>
       </div>
+
+      {alertsAvailable && (
+        <div className="form-row">
+          <label className="form-label" htmlFor="alerts-enabled">
+            <input
+              id="alerts-enabled"
+              type="checkbox"
+              checked={alertsEnabled ?? true}
+              disabled={alertsEnabled === null || alertsPending}
+              onChange={(e) => setAlertsEnabled(e.target.checked)}
+            />{" "}
+            Email me when a CloudWatch alarm fires (errors, throttles, or slow p99 duration on any Lambda)
+          </label>
+          {alertsError && <p className="section-hint">{alertsError}</p>}
+        </div>
+      )}
 
       {warmScheduleAvailable && (
         <div className="form-row">
