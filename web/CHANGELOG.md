@@ -1,5 +1,22 @@
 # web
 
+## 1.3.0
+
+### Minor Changes
+
+- 1984776: add supergraph to scheduled provisioned concurrency
+- 74ea629: Apollo Federation supergraph gateway, prod and test
+
+### Patch Changes
+
+- 649a852: bootstrap prod's supergraph rollout in two steps
+- 76e148e: stop warm-schedule deploys from wiping live settings, fix save UX
+- 518b10d: remove scheduled warmup ping, make PC scheduling per-project
+- b451168: run web prerender after infra deploy, not before
+- 4165ddd: rename pc-config to warm-schedule for clarity
+- 0da41b5: cut prod frontend over to the supergraph endpoint; raise the supergraph
+  handler test's timeout for a cold CI cache
+
 ## 1.2.0
 
 ### Minor Changes

@@ -1,5 +1,20 @@
 # infra
 
+## 1.3.0
+
+### Minor Changes
+
+- 1984776: add supergraph to scheduled provisioned concurrency
+- 74ea629: Apollo Federation supergraph gateway, prod and test
+
+### Patch Changes
+
+- 76e148e: stop warm-schedule deploys from wiping live settings, fix save UX
+- 518b10d: remove scheduled warmup ping, make PC scheduling per-project
+- d085a8e: make test-env ApiGatewayStack depend on its target stacks
+- 9c5b5fd: migrate ApiGatewayStack from HTTP API to REST API for real X-Ray trace propagation
+- 4165ddd: rename pc-config to warm-schedule for clarity
+
 ## 1.2.0
 
 ### Minor Changes
