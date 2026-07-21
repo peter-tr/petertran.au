@@ -18,7 +18,7 @@ export default function PortfolioSettingsPage() {
   const { pageLoadWarmup, setPageLoadWarmup } = usePageLoadWarmup();
   const {
     config: warmScheduleConfig,
-    pending: warmSchedulePending,
+    pendingFn: warmSchedulePendingFn,
     error: warmScheduleError,
     setSchedule: setWarmSchedule,
     available: warmScheduleAvailable,
@@ -68,7 +68,7 @@ export default function PortfolioSettingsPage() {
                 fn={fn}
                 label={WARM_SCHEDULE_LABELS[fn]}
                 schedule={warmScheduleConfig[fn]}
-                pending={warmSchedulePending}
+                pending={warmSchedulePendingFn === fn}
                 onSave={(schedule) => setWarmSchedule(fn, schedule)}
               />
             ))}
