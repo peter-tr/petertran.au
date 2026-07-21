@@ -72,12 +72,12 @@ const zeroTrustLabFnNames = {
   domainA: FUNCTION_NAMES.ztlDomainA,
 };
 
-// Scheduled Provisioned Concurrency for portfolio/pantry/imposter's and
-// zero-trust-lab's `live` aliases, per-project configurable days/times
-// (Sydney) - deliberately its own stack, an operational/cost concern that
-// cuts across all of them. Safe to deploy in any order relative to the
-// producing stacks (its own IAM policy referencing those aliases doesn't
-// require them to already exist). See infra/lib/warm-schedule-stack.ts.
+// Scheduled Provisioned Concurrency for portfolio/pantry/imposter/
+// supergraph's and zero-trust-lab's `live` aliases, per-project configurable
+// days/times (Sydney) - deliberately its own stack, an operational/cost
+// concern that cuts across all of them. Safe to deploy in any order relative
+// to the producing stacks (its own IAM policy referencing those aliases
+// doesn't require them to already exist). See infra/lib/warm-schedule-stack.ts.
 const provisionedConcurrencyStack = new ProvisionedConcurrencyStack(
   app,
   "PetertranProvisionedConcurrencyStack",
@@ -85,6 +85,7 @@ const provisionedConcurrencyStack = new ProvisionedConcurrencyStack(
     portfolioFnName: FUNCTION_NAMES.portfolio,
     pantryFnName: FUNCTION_NAMES.pantry,
     imposterFnName: FUNCTION_NAMES.imposter,
+    supergraphFnName: FUNCTION_NAMES.supergraph,
     zeroTrustLabFnNames,
     env: { account, region: "ap-southeast-2" },
   }
