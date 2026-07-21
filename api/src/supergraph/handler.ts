@@ -1,6 +1,10 @@
 import { ApolloServer } from "@apollo/server";
 import { startServerAndCreateLambdaHandler, handlers } from "@as-integrations/aws-lambda";
-import { ApolloGateway, RemoteGraphQLDataSource, type GraphQLDataSourceProcessOptions } from "@apollo/gateway";
+import {
+  ApolloGateway,
+  RemoteGraphQLDataSource,
+  type GraphQLDataSourceProcessOptions,
+} from "@apollo/gateway";
 import * as AWSXRay from "aws-xray-sdk-core";
 import { traced, traceHeader } from "api-shared/xray";
 import type { Context } from "api-shared/context";

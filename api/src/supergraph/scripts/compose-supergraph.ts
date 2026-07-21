@@ -22,9 +22,17 @@ import { typeDefs as imposterTypeDefs } from "../../games/imposter/schema";
 // composed schema, so this one composed artifact is correct for both prod and
 // the on-demand test env without recomposing per environment.
 const SERVICES = [
-  { name: "portfolio", url: "https://composed-at-build-time.invalid/portfolio", typeDefs: parse(portfolioTypeDefs) },
+  {
+    name: "portfolio",
+    url: "https://composed-at-build-time.invalid/portfolio",
+    typeDefs: parse(portfolioTypeDefs),
+  },
   { name: "pantry", url: "https://composed-at-build-time.invalid/pantry", typeDefs: parse(pantryTypeDefs) },
-  { name: "imposter", url: "https://composed-at-build-time.invalid/imposter", typeDefs: parse(imposterTypeDefs) },
+  {
+    name: "imposter",
+    url: "https://composed-at-build-time.invalid/imposter",
+    typeDefs: parse(imposterTypeDefs),
+  },
 ];
 
 const result = composeServices(SERVICES);

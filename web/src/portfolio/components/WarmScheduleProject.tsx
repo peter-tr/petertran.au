@@ -1,5 +1,10 @@
 import { useState } from "react";
-import { MAX_CONCURRENCY, type WarmScheduleKey, type WarmSchedule, type Weekday } from "../hooks/useWarmSchedule";
+import {
+  MAX_CONCURRENCY,
+  type WarmScheduleKey,
+  type WarmSchedule,
+  type Weekday,
+} from "../hooks/useWarmSchedule";
 
 const ALL_DAYS: Weekday[] = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 const DAY_LABELS: Record<Weekday, string> = {

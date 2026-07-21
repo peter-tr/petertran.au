@@ -141,7 +141,11 @@ function isWithinWindow(schedule: WarmSchedule, now: Date): boolean {
 // can't actually grant PC right now (e.g. the account's concurrency quota
 // has no room), that's a transient infra condition, not a reason to fail the
 // request or the other targets' reconciliation in the same tick.
-async function reconcileTarget(functionName: string, shouldBeWarm: boolean, concurrency: number): Promise<void> {
+async function reconcileTarget(
+  functionName: string,
+  shouldBeWarm: boolean,
+  concurrency: number
+): Promise<void> {
   try {
     if (shouldBeWarm) {
       await lambdaClient.send(
@@ -165,7 +169,11 @@ async function reconcileTarget(functionName: string, shouldBeWarm: boolean, conc
   }
 }
 
-async function reconcileProjectTo(key: WarmScheduleKey, shouldBeWarm: boolean, concurrency: number): Promise<void> {
+async function reconcileProjectTo(
+  key: WarmScheduleKey,
+  shouldBeWarm: boolean,
+  concurrency: number
+): Promise<void> {
   await Promise.all(
     TARGETS_BY_PROJECT[key].map((functionName) => reconcileTarget(functionName, shouldBeWarm, concurrency))
   );
