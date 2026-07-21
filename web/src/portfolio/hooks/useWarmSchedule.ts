@@ -23,7 +23,10 @@ export type WarmScheduleConfig = Record<WarmScheduleKey, WarmSchedule>;
 
 export function useWarmSchedule() {
   const [config, setConfigState] = useState<WarmScheduleConfig | null>(null);
-  const [pending, setPending] = useState(false);
+  // The project currently being saved, not a single shared flag - a save in
+  // flight for one project shouldn't disable every other project's Save
+  // button too.
+  const [pendingFn, setPendingFn] = useState<WarmScheduleKey | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -36,7 +39,7 @@ export function useWarmSchedule() {
 
   const setSchedule = useCallback((fn: WarmScheduleKey, schedule: WarmSchedule) => {
     if (!ENDPOINT) return;
-    setPending(true);
+    setPendingFn(fn);
     setError(null);
     fetch(ENDPOINT, {
       method: "POST",
@@ -44,10 +47,17 @@ export function useWarmSchedule() {
       body: JSON.stringify({ project: fn, schedule }),
     })
       .then((res) => res.json())
-      .then((data: WarmScheduleConfig) => setConfigState(data))
+      .then((data: WarmScheduleConfig) =>
+        // Only replace the saved project's entry, not the whole config - a
+        // fresh object reference for every project (even ones nothing
+        // changed for) would otherwise reset every other row's in-progress
+        // draft too (see WarmScheduleProject's schedulesEqual-based reset
+        // check, which this keeps working correctly for untouched rows).
+        setConfigState((current) => (current ? { ...current, [fn]: data[fn] } : data))
+      )
       .catch(() => setError("Couldn't update provisioned concurrency status"))
-      .finally(() => setPending(false));
+      .finally(() => setPendingFn(null));
   }, []);
 
-  return { config, pending, error, setSchedule, available: Boolean(ENDPOINT) };
+  return { config, pendingFn, error, setSchedule, available: Boolean(ENDPOINT) };
 }

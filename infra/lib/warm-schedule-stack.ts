@@ -119,6 +119,25 @@ export class ProvisionedConcurrencyStack extends Stack {
     // had - the actual gating (per-project enabled/days/start/end) is
     // handler-side logic (see warm-schedule/handler.ts's isWithinWindow), not
     // baked into this parameter, so it can change without a redeploy.
+    //
+    // DO NOT EDIT THIS LITERAL to add/remove a project. CloudFormation owns
+    // this parameter's Value declaratively: every deploy diffs this computed
+    // string against what the *previous* deployed template had, and if it
+    // differs, overwrites the live value with it - clobbering whatever the
+    // settings page has since written via PutParameter, since those runtime
+    // writes are invisible to CloudFormation's diff. Adding `supergraph`
+    // here on 2026-07-21 did exactly that: it reset every project's
+    // real, user-configured schedule back to this DEFAULT_SCHEDULE literal
+    // the moment that PR deployed (confirmed via WarmScheduleParam's
+    // UPDATE_COMPLETE stack event at that deploy's timestamp) - see
+    // docs/warmup-and-provisioned-concurrency.md.
+    //
+    // A newly added project needs no change here at all: handler.ts's
+    // getConfig() already merges `{ ...DEFAULT_CONFIG[key], ...stored[key] }`
+    // per project, so any key missing from the stored value (e.g. a project
+    // added after this parameter was first written) is backfilled from
+    // DEFAULT_CONFIG at read time. This literal only ever seeds the
+    // parameter's very first creation.
     const scheduleParam = new ssm.StringParameter(this, "WarmScheduleParam", {
       parameterName: WARM_SCHEDULE_PARAM_NAME,
       stringValue: JSON.stringify({

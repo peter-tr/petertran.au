@@ -15,6 +15,30 @@ computer). References below use the current names; this rollout's own
 CloudWatch data (captured under the old names) is left as originally
 recorded.
 
+## 2026-07-21 update: adding `supergraph` reset everyone's live schedule
+
+Adding `supergraph` to `ProvisionedConcurrencyStack`'s managed projects
+included appending `supergraph: DEFAULT_SCHEDULE` to `WarmScheduleParam`'s
+hardcoded `stringValue` literal. CloudFormation owns that SSM parameter's
+`Value` declaratively - the deploy that shipped this diffed the new literal
+against the previously-deployed one, saw a change, and issued an
+`UpdateParameter` call that overwrote the live value with the literal
+(08:00-19:00 for every project), wiping out everyone's actual
+settings-page-configured schedules. Confirmed via
+`WarmScheduleParam`'s `UPDATE_COMPLETE` CloudFormation stack event
+timestamped inside that exact deploy.
+
+Fixed by leaving the literal alone going forward rather than reverting it
+(a revert would have triggered another overwrite, back to the pre-supergraph
+4-key literal) - `warm-schedule/handler.ts`'s `getConfig()` already merges
+`{ ...DEFAULT_CONFIG[key], ...stored[key] }` per project, so any project
+missing from the stored value is backfilled from `DEFAULT_CONFIG` at read
+time. The CDK-side literal only needs to seed the parameter's very first
+creation and should never be edited again - see the warning comment above
+`WarmScheduleParam` in `infra/lib/warm-schedule-stack.ts`. A future project
+addition only needs `WARM_SCHEDULE_PROJECTS`/`DEFAULT_CONFIG`/etc. updated,
+same as this incident should have done from the start.
+
 ## 2026-07-21 update: scheduled ping removed, PC made per-project
 
 Now that PC covers business hours for all four projects, the scheduled

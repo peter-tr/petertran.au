@@ -84,16 +84,51 @@ describe("useWarmSchedule", () => {
       result.current.setSchedule("pantry", newSchedule);
     });
 
-    expect(result.current.pending).toBe(true);
+    expect(result.current.pendingFn).toBe("pantry");
     await waitFor(() => expect(result.current.config).toEqual(updatedConfig));
-    expect(result.current.pending).toBe(false);
+    expect(result.current.pendingFn).toBeNull();
 
     const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[1];
     expect(init).toMatchObject({ method: "POST", headers: { "content-type": "application/json" } });
     expect(JSON.parse(init.body)).toEqual({ project: "pantry", schedule: newSchedule });
   });
 
-  it("setSchedule surfaces an error and clears pending on failure", async () => {
+  it("setSchedule only replaces the saved project's entry, preserving other projects' object identity", async () => {
+    vi.stubEnv("VITE_WARM_SCHEDULE_ENDPOINT", "https://api.test/warm-schedule");
+
+    const newSchedule: WarmSchedule = {
+      enabled: true,
+      days: ["MON", "TUE", "WED", "THU", "FRI"],
+      start: "07:30",
+      end: "18:00",
+    };
+    // The server always responds with the full config, same as GET - but a
+    // fresh JSON.parse means every key is a new object reference, even ones
+    // nothing changed for.
+    const fullResponseConfig = JSON.parse(JSON.stringify({ ...DEFAULT_CONFIG, pantry: newSchedule }));
+    (fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({ json: async () => DEFAULT_CONFIG })
+      .mockResolvedValueOnce({ json: async () => fullResponseConfig });
+
+    const { useWarmSchedule } = await import("./useWarmSchedule");
+
+    const { result } = renderHook(() => useWarmSchedule());
+    await waitFor(() => expect(result.current.config).toEqual(DEFAULT_CONFIG));
+
+    const imposterBeforeSave = result.current.config!.imposter;
+
+    act(() => {
+      result.current.setSchedule("pantry", newSchedule);
+    });
+    await waitFor(() => expect(result.current.config!.pantry).toEqual(newSchedule));
+
+    // Untouched project keeps the exact same object reference - a sibling
+    // row's local draft (reset via reference-equality against this prop)
+    // must not get discarded just because a different project was saved.
+    expect(result.current.config!.imposter).toBe(imposterBeforeSave);
+  });
+
+  it("setSchedule surfaces an error and clears pendingFn on failure", async () => {
     vi.stubEnv("VITE_WARM_SCHEDULE_ENDPOINT", "https://api.test/warm-schedule");
 
     (fetch as ReturnType<typeof vi.fn>)
@@ -110,7 +145,7 @@ describe("useWarmSchedule", () => {
     });
 
     await waitFor(() => expect(result.current.error).toBe("Couldn't update provisioned concurrency status"));
-    expect(result.current.pending).toBe(false);
+    expect(result.current.pendingFn).toBeNull();
   });
 
   it("setSchedule is a no-op when unavailable", async () => {
@@ -122,6 +157,6 @@ describe("useWarmSchedule", () => {
     act(() => result.current.setSchedule("pantry", DEFAULT_SCHEDULE));
 
     expect(fetch).not.toHaveBeenCalled();
-    expect(result.current.pending).toBe(false);
+    expect(result.current.pendingFn).toBeNull();
   });
 });
