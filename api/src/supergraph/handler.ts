@@ -8,6 +8,7 @@ import {
 } from "@apollo/gateway";
 import * as AWSXRay from "aws-xray-sdk-core";
 import { traced, traceHeader } from "api-shared/xray";
+import { corsHeaders } from "api-shared/http";
 import type { Context } from "api-shared/context";
 import type { APIGatewayProxyEvent, APIGatewayProxyResult, Context as LambdaContext } from "aws-lambda";
 
@@ -81,5 +82,8 @@ export const handler = async (
   event: APIGatewayProxyEvent,
   context: LambdaContext
 ): Promise<APIGatewayProxyResult | void> => {
-  return apolloHandler(event, context, () => {});
+  const result = await apolloHandler(event, context, () => {});
+  if (!result) return result;
+
+  return { ...result, headers: { ...result.headers, ...corsHeaders(event.headers?.origin) } };
 };
