@@ -141,6 +141,16 @@ jobs:
             npm run build
           fi
 
+      # infra/cdk.json's "app" (ts-node bin/app.ts) rebuilds every stack's
+      # construct tree and re-hashes/stages each Lambda's fromAsset dist dir.
+      # Synth once here and point both the diff check and the deploy below
+      # at this cloud assembly via --app, so neither reruns that bootstrap.
+      - name: Synth infrastructure
+        working-directory: infra
+        env:
+          DEPLOY_TEST_ENV: ${{ inputs.deploy-test-env }}
+        run: npx cdk synth ${{ inputs.stacks != '' && inputs.stacks || '--all' }} --output cdk.out
+
       # cdk diff annotates every property change that CloudFormation can't
       # apply in place with "(requires replacement)" or, when it's only
       # conditional on other factors, "(may cause replacement)" (confirmed
@@ -155,11 +165,9 @@ jobs:
       - name: Check for destructive resource replacements
         if: ${{ !inputs.allow-replacements }}
         working-directory: infra
-        env:
-          DEPLOY_TEST_ENV: ${{ inputs.deploy-test-env }}
         run: |
           set -o pipefail
-          npx cdk diff ${{ inputs.stacks != '' && inputs.stacks || '--all' }} 2>&1 | tee /tmp/cdk-diff.txt || true
+          npx cdk diff --app cdk.out ${{ inputs.stacks != '' && inputs.stacks || '--all' }} 2>&1 | tee /tmp/cdk-diff.txt || true
           if grep -qE "requires replacement|may cause replacement" /tmp/cdk-diff.txt; then
             echo "::error::This ref's infra would replace (destroy + recreate) one or more stateful resources - see the diff above for exactly which property. Re-run with allow-replacements: true only if this is genuinely intended."
             exit 1
@@ -167,9 +175,7 @@ jobs:
 
       - name: Deploy infrastructure
         working-directory: infra
-        env:
-          DEPLOY_TEST_ENV: ${{ inputs.deploy-test-env }}
-        run: npx cdk deploy ${{ inputs.stacks != '' && inputs.stacks || '--all' }} --concurrency 10 --require-approval never
+        run: npx cdk deploy --app cdk.out ${{ inputs.stacks != '' && inputs.stacks || '--all' }} --concurrency 10 --require-approval never
 
       # Must run after "Deploy infrastructure", not chained into the build
       # step above - it fetches live data from VITE_GRAPHQL_ENDPOINT, and
