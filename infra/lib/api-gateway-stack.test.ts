@@ -16,19 +16,20 @@ describe("ApiGatewayStack", () => {
       imposterFnName: "imposter-graphql",
       warmScheduleFnName: "warm-schedule",
       supergraphFnName: "supergraph-graphql",
+      alertsSettingsFnName: "alerts-settings",
       env: { account: "123456789012", region: "ap-southeast-2" },
     });
 
     const template = Template.fromStack(stack);
 
     template.resourceCountIs("AWS::ApiGateway::RestApi", 1);
-    // Portfolio, Pantry, Imposter, WarmSchedule, Supergraph - one Resource
-    // (path segment) each.
-    template.resourceCountIs("AWS::ApiGateway::Resource", 5);
-    // Each of the 5 resources gets GET + POST + an auto CORS-preflight
+    // Portfolio, Pantry, Imposter, WarmSchedule, Supergraph, AlertsSettings -
+    // one Resource (path segment) each.
+    template.resourceCountIs("AWS::ApiGateway::Resource", 6);
+    // Each of the 6 resources gets GET + POST + an auto CORS-preflight
     // OPTIONS (from defaultCorsPreflightOptions), plus the root resource
-    // gets its own auto OPTIONS too: 5 * 3 + 1.
-    template.resourceCountIs("AWS::ApiGateway::Method", 16);
+    // gets its own auto OPTIONS too: 6 * 3 + 1.
+    template.resourceCountIs("AWS::ApiGateway::Method", 19);
     template.hasResourceProperties("AWS::ApiGateway::DomainName", {
       DomainName: "api.example.com",
     });

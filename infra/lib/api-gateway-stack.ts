@@ -34,6 +34,10 @@ export interface ApiGatewayStackProps extends StackProps {
   // infra/bin/app.ts) - kept optional rather than required, same as
   // warmScheduleFnName above, so a future caller can still omit it.
   supergraphFnName?: string;
+  // Omitted for the test env, same reasoning as warmScheduleFnName above -
+  // muting alert emails isn't something the test env needs to validate, and
+  // it has no MonitoringStack counterpart to point at anyway.
+  alertsSettingsFnName?: string;
 }
 
 /**
@@ -140,6 +144,9 @@ export class ApiGatewayStack extends Stack {
       { id: "Imposter", path: "imposter", functionName: props.imposterFnName, aliasName: LIVE_ALIAS_NAME },
       ...(props.warmScheduleFnName
         ? [{ id: "WarmSchedule", path: "warm-schedule", functionName: props.warmScheduleFnName }]
+        : []),
+      ...(props.alertsSettingsFnName
+        ? [{ id: "AlertsSettings", path: "alerts-settings", functionName: props.alertsSettingsFnName }]
         : []),
       ...(props.supergraphFnName
         ? [
