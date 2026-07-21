@@ -1,11 +1,11 @@
 import { Link } from "react-router-dom";
 import { useShowAlsoBuilt } from "./hooks/useShowAlsoBuilt";
 import { usePageLoadWarmup } from "./hooks/usePageLoadWarmup";
-import { usePcConfig, type PcFunctionKey } from "./hooks/usePcConfig";
-import PcProjectSchedule from "./components/PcProjectSchedule";
+import { useWarmSchedule, type WarmScheduleKey } from "./hooks/useWarmSchedule";
+import WarmScheduleProject from "./components/WarmScheduleProject";
 import "./portfolio.css";
 
-const PC_FUNCTION_LABELS: Record<PcFunctionKey, string> = {
+const WARM_SCHEDULE_LABELS: Record<WarmScheduleKey, string> = {
   portfolio: "this resume site",
   pantry: "pantry",
   imposter: "imposter",
@@ -16,12 +16,12 @@ export default function PortfolioSettingsPage() {
   const { showAlsoBuilt, setShowAlsoBuilt } = useShowAlsoBuilt();
   const { pageLoadWarmup, setPageLoadWarmup } = usePageLoadWarmup();
   const {
-    config: pcConfig,
-    pending: pcPending,
-    error: pcError,
-    setSchedule: setPcSchedule,
-    available: pcAvailable,
-  } = usePcConfig();
+    config: warmScheduleConfig,
+    pending: warmSchedulePending,
+    error: warmScheduleError,
+    setSchedule: setWarmSchedule,
+    available: warmScheduleAvailable,
+  } = useWarmSchedule();
 
   return (
     <>
@@ -54,24 +54,24 @@ export default function PortfolioSettingsPage() {
         </label>
       </div>
 
-      {pcAvailable && (
+      {warmScheduleAvailable && (
         <div className="form-row">
           <p className="form-label">
             Keep warm with provisioned concurrency (Sydney time) - no cold starts for real visitors during the
             window you set below, ~$1.58/mo each at 11h/day, 256MB
           </p>
-          {pcConfig &&
-            (Object.keys(PC_FUNCTION_LABELS) as PcFunctionKey[]).map((fn) => (
-              <PcProjectSchedule
+          {warmScheduleConfig &&
+            (Object.keys(WARM_SCHEDULE_LABELS) as WarmScheduleKey[]).map((fn) => (
+              <WarmScheduleProject
                 key={fn}
                 fn={fn}
-                label={PC_FUNCTION_LABELS[fn]}
-                schedule={pcConfig[fn]}
-                pending={pcPending}
-                onSave={(schedule) => setPcSchedule(fn, schedule)}
+                label={WARM_SCHEDULE_LABELS[fn]}
+                schedule={warmScheduleConfig[fn]}
+                pending={warmSchedulePending}
+                onSave={(schedule) => setWarmSchedule(fn, schedule)}
               />
             ))}
-          {pcError && <p className="section-hint">{pcError}</p>}
+          {warmScheduleError && <p className="section-hint">{warmScheduleError}</p>}
         </div>
       )}
 

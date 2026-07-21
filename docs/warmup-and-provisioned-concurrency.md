@@ -5,6 +5,16 @@ how well the existing warmup schedule actually works, and (b) added scheduled
 Provisioned Concurrency (PC) for portfolio/pantry/imposter and, later,
 zero-trust-lab's 5 Lambdas on top of it.
 
+## 2026-07-20 update: `pc-config` renamed to `warm-schedule`
+
+The config Lambda/route/SSM parameter/EventBridge schedules described below
+were originally named `pc-config` / `pc-on-<project>` / `pc-off-<project>` -
+renamed to `warm-schedule` / `warm-on-<project>` / `warm-off-<project>` for
+clarity (`pc-config` read ambiguously, e.g. as "PC" meaning a desktop
+computer). References below use the current names; this rollout's own
+CloudWatch data (captured under the old names) is left as originally
+recorded.
+
 ## 2026-07-21 update: scheduled ping removed, PC made per-project
 
 Now that PC covers business hours for all four projects, the scheduled
@@ -19,8 +29,8 @@ invoked hourly on the hour, computing "is it business hours right now" - fine
 when every project shared the same whole-hour window, but too coarse once
 times are arbitrary per project (a 7:45am start could land up to 59 minutes
 late). Replaced with exact-time triggers: two EventBridge Schedules per
-project (`pc-on-<project>`/`pc-off-<project>`), built from AWS cron's native
-day-of-week support, invoke `pc-config` directly at the configured minute.
+project (`warm-on-<project>`/`warm-off-<project>`), built from AWS cron's native
+day-of-week support, invoke `warm-schedule` directly at the configured minute.
 Settings edits update those two schedules' cron expressions via
 `UpdateScheduleCommand` - same GetSchedule-then-UpdateSchedule idiom the old
 `warmup-config` Lambda used to toggle schedule `State`. A coarser periodic
@@ -59,8 +69,8 @@ Shipped on `feature/pc-scheduling`. portfolio/pantry/imposter each:
 - Get 1x Provisioned Concurrency, 8am-7pm Australia/Sydney daily, toggleable
   per-function from the portfolio Settings page
 
-See `infra/lib/pc-config-stack.ts`'s doc comment for the full design
-rationale - in short, a small Lambda (`pc-config`) directly calls
+See `infra/lib/warm-schedule-stack.ts`'s doc comment for the full design
+rationale - in short, a small Lambda (`warm-schedule`) directly calls
 `Put`/`DeleteProvisionedConcurrencyConfig` on an hourly reconcile schedule
 and on every settings toggle, rather than using CDK's native
 `Alias.addAutoScaling()` / Application Auto Scaling scheduled actions (whose

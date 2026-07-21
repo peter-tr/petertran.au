@@ -28,18 +28,18 @@ export interface ApiGatewayStackProps extends StackProps {
   imposterFnName: string;
   // Omitted (not just empty-string) for the test env - PC is an
   // operational concern that doesn't apply to a disposable environment (see
-  // pc-config-stack.ts), so its route is skipped entirely rather than
+  // warm-schedule-stack.ts), so its route is skipped entirely rather than
   // pointed at a Lambda that doesn't exist there.
-  pcConfigFnName?: string;
+  warmScheduleFnName?: string;
   // Passed by both the prod and test-env instantiations (see
   // infra/bin/app.ts) - kept optional rather than required, same as
-  // pcConfigFnName above, so a future caller can still omit it.
+  // warmScheduleFnName above, so a future caller can still omit it.
   supergraphFnName?: string;
 }
 
 /**
  * Single shared HttpApi in front of portfolio/pantry/imposter/supergraph/
- * pc-config, replacing their individual Lambda Function URLs with one
+ * warm-schedule, replacing their individual Lambda Function URLs with one
  * stable, human-readable domain (api.petertran.au) - so
  * web/.env.production never needs to track a CloudFormation-generated URL
  * again. Deliberately does NOT cover zero-trust-lab's own edge/domain
@@ -48,7 +48,7 @@ export interface ApiGatewayStackProps extends StackProps {
  *
  * Reused as-is for the on-demand test environment (see infra/bin/app.ts),
  * fronting portfolio/pantry/imposter/supergraph under api.test.petertran.au -
- * pcConfigFnName omitted, apiSubdomain overridden.
+ * warmScheduleFnName omitted, apiSubdomain overridden.
  */
 export class ApiGatewayStack extends Stack {
   constructor(scope: Construct, id: string, props: ApiGatewayStackProps) {
@@ -90,16 +90,16 @@ export class ApiGatewayStack extends Stack {
     });
 
     // Exact-path routes, not `{proxy+}` - portfolio/pantry/imposter/
-    // supergraph/pc-config are each single-endpoint Apollo/JSON services,
-    // never called with a sub-path (see web/src/shared/graphqlClient.ts and
-    // usePcConfig.ts).
+    // supergraph/warm-schedule are each single-endpoint Apollo/JSON
+    // services, never called with a sub-path (see
+    // web/src/shared/graphqlClient.ts and useWarmSchedule.ts).
     //
     // portfolio/pantry/imposter/supergraph carry `aliasName: LIVE_ALIAS_NAME`
     // so real traffic actually lands on the qualifier ProvisionedConcurrencyStack
-    // applies Provisioned Concurrency to - see pc-config-stack.ts's doc
+    // applies Provisioned Concurrency to - see warm-schedule-stack.ts's doc
     // comment. (Supergraph itself has no PC schedule yet, but still
     // publishes the alias so it's consistent with the other three and ready
-    // for one later.) pc-config has no alias, bare $LATEST, unaffected.
+    // for one later.) warm-schedule has no alias, bare $LATEST, unaffected.
     const routes: { id: string; path: string; functionName: string; aliasName?: string }[] = [
       {
         id: "Portfolio",
@@ -109,8 +109,8 @@ export class ApiGatewayStack extends Stack {
       },
       { id: "Pantry", path: "/pantry", functionName: props.pantryFnName, aliasName: LIVE_ALIAS_NAME },
       { id: "Imposter", path: "/imposter", functionName: props.imposterFnName, aliasName: LIVE_ALIAS_NAME },
-      ...(props.pcConfigFnName
-        ? [{ id: "PcConfig", path: "/pc-config", functionName: props.pcConfigFnName }]
+      ...(props.warmScheduleFnName
+        ? [{ id: "WarmSchedule", path: "/warm-schedule", functionName: props.warmScheduleFnName }]
         : []),
       ...(props.supergraphFnName
         ? [

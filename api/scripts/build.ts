@@ -1,7 +1,7 @@
 import { build } from "esbuild";
 
 // portfolio/pantry/imposter build via their own workspace package.json now -
-// this only covers the zero-trust-lab/pc-config handlers, which deliberately
+// this only covers the zero-trust-lab/warm-schedule handlers, which deliberately
 // stayed out of the nested-workspace split (see CLAUDE.md).
 const HANDLERS = [
   "src/zero-trust-lab/idp-bridge/handler.ts",
@@ -9,7 +9,7 @@ const HANDLERS = [
   "src/zero-trust-lab/edge/authorizer.ts",
   "src/zero-trust-lab/edge/proxy.ts",
   "src/zero-trust-lab/domain-a/handler.ts",
-  "src/pc-config/handler.ts",
+  "src/warm-schedule/handler.ts",
 ];
 
 await Promise.all(

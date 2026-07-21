@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { PcFunctionKey, PcSchedule, Weekday } from "../hooks/usePcConfig";
+import type { WarmScheduleKey, WarmSchedule, Weekday } from "../hooks/useWarmSchedule";
 
 const ALL_DAYS: Weekday[] = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 const DAY_LABELS: Record<Weekday, string> = {
@@ -12,7 +12,7 @@ const DAY_LABELS: Record<Weekday, string> = {
   SUN: "Sun",
 };
 
-function schedulesEqual(a: PcSchedule, b: PcSchedule): boolean {
+function schedulesEqual(a: WarmSchedule, b: WarmSchedule): boolean {
   return (
     a.enabled === b.enabled &&
     a.start === b.start &&
@@ -22,18 +22,24 @@ function schedulesEqual(a: PcSchedule, b: PcSchedule): boolean {
   );
 }
 
-interface PcProjectScheduleProps {
-  fn: PcFunctionKey;
+interface WarmScheduleProjectProps {
+  fn: WarmScheduleKey;
   label: string;
-  schedule: PcSchedule;
+  schedule: WarmSchedule;
   pending: boolean;
-  onSave: (schedule: PcSchedule) => void;
+  onSave: (schedule: WarmSchedule) => void;
 }
 
 // One project's day/time editor - edits stay in local `draft` state until
 // "Save" is clicked, so toggling a day or nudging a time input doesn't fire
 // a request (and an UpdateScheduleCommand pair) per keystroke.
-export default function PcProjectSchedule({ fn, label, schedule, pending, onSave }: PcProjectScheduleProps) {
+export default function WarmScheduleProject({
+  fn,
+  label,
+  schedule,
+  pending,
+  onSave,
+}: WarmScheduleProjectProps) {
   const [draft, setDraft] = useState(schedule);
   // Tracks the last `schedule` prop seen, so a change to it (e.g. after a
   // fetch/reload) resets the local draft - adjusted during render rather
@@ -56,10 +62,10 @@ export default function PcProjectSchedule({ fn, label, schedule, pending, onSave
   const invalid = draft.enabled && (draft.days.length === 0 || draft.start >= draft.end);
 
   return (
-    <div className="pc-schedule">
-      <label className="form-label" htmlFor={`pc-${fn}-enabled`}>
+    <div className="warm-schedule">
+      <label className="form-label" htmlFor={`warm-schedule-${fn}-enabled`}>
         <input
-          id={`pc-${fn}-enabled`}
+          id={`warm-schedule-${fn}-enabled`}
           type="checkbox"
           checked={draft.enabled}
           onChange={(e) => setDraft((d) => ({ ...d, enabled: e.target.checked }))}
@@ -67,12 +73,12 @@ export default function PcProjectSchedule({ fn, label, schedule, pending, onSave
         {label}
       </label>
 
-      <div className="pc-days">
+      <div className="warm-schedule-days">
         {ALL_DAYS.map((day) => (
           <button
             key={day}
             type="button"
-            className={`pc-day-btn${draft.days.includes(day) ? " active" : ""}`}
+            className={`warm-schedule-day-btn${draft.days.includes(day) ? " active" : ""}`}
             aria-pressed={draft.days.includes(day)}
             onClick={() => toggleDay(day)}
           >
@@ -81,7 +87,7 @@ export default function PcProjectSchedule({ fn, label, schedule, pending, onSave
         ))}
       </div>
 
-      <div className="pc-times">
+      <div className="warm-schedule-times">
         <input
           className="form-input"
           type="time"
@@ -89,7 +95,7 @@ export default function PcProjectSchedule({ fn, label, schedule, pending, onSave
           value={draft.start}
           onChange={(e) => setDraft((d) => ({ ...d, start: e.target.value }))}
         />
-        <span className="pc-times-sep">to</span>
+        <span className="warm-schedule-times-sep">to</span>
         <input
           className="form-input"
           type="time"
