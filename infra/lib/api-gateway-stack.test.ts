@@ -16,16 +16,17 @@ describe("ApiGatewayStack", () => {
       imposterFnName: "imposter-graphql",
       warmScheduleFnName: "warm-schedule",
       supergraphFnName: "supergraph-graphql",
+      designStudioFnName: "design-studio-graphql",
       env: { account: "123456789012", region: "ap-southeast-2" },
     });
 
     const template = Template.fromStack(stack);
 
     template.resourceCountIs("AWS::ApiGatewayV2::Api", 1);
-    // Portfolio, Pantry, Imposter, WarmSchedule, Supergraph - each
-    // registered for both GET and POST, which CDK emits as 2 separate
+    // Portfolio, Pantry, Imposter, WarmSchedule, Supergraph, DesignStudio -
+    // each registered for both GET and POST, which CDK emits as 2 separate
     // Route resources.
-    template.resourceCountIs("AWS::ApiGatewayV2::Route", 10);
+    template.resourceCountIs("AWS::ApiGatewayV2::Route", 12);
     template.hasResourceProperties("AWS::ApiGatewayV2::DomainName", {
       DomainName: "api.example.com",
     });

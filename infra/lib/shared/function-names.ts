@@ -20,6 +20,7 @@ export const FUNCTION_NAMES = {
   ztlDomainA: "ztl-domain-a",
   warmSchedule: "warm-schedule",
   supergraph: "supergraph-graphql",
+  designStudio: "design-studio-graphql",
 } as const;
 
 // Test-env counterparts of the 4 GraphQL Lambda names above, passed to
