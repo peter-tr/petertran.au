@@ -1,4 +1,4 @@
-import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2 } from "aws-lambda";
+import type { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import {
   LambdaClient,
   PutProvisionedConcurrencyConfigCommand,
@@ -273,8 +273,8 @@ function isValidSchedule(value: unknown): value is WarmSchedule {
 }
 
 export async function handler(
-  event: APIGatewayProxyEventV2 | ReconcilePing | WarmScheduleTrigger
-): Promise<APIGatewayProxyStructuredResultV2> {
+  event: APIGatewayProxyEvent | ReconcilePing | WarmScheduleTrigger
+): Promise<APIGatewayProxyResult> {
   if (isReconcilePing(event)) {
     const config = await getConfig();
     const now = new Date();
@@ -298,7 +298,7 @@ export async function handler(
     return { statusCode: 200, body: "reconciled" };
   }
 
-  if (event.requestContext.http.method === "POST") {
+  if (event.httpMethod === "POST") {
     const body = parseJsonBody<{ project?: string; schedule?: unknown }>(event);
     if (!body.project || !(body.project in TARGETS_BY_PROJECT) || !isValidSchedule(body.schedule)) {
       return {

@@ -33,7 +33,7 @@ process.env.WARM_SCHEDULE_NAMES = JSON.stringify({
 });
 
 const { handler } = await import("./handler");
-import type { APIGatewayProxyEventV2 } from "aws-lambda";
+import type { APIGatewayProxyEvent } from "aws-lambda";
 
 const lambdaMock = mockClient(LambdaClient);
 const ssmMock = mockClient(SSMClient);
@@ -69,12 +69,12 @@ const WITHIN_WINDOW = new Date("2026-07-20T00:00:00.000Z");
 // Same calendar day, 22:00 Sydney - outside the window.
 const OUTSIDE_WINDOW = new Date("2026-07-20T12:00:00.000Z");
 
-function httpEvent(method: string, body?: unknown): APIGatewayProxyEventV2 {
+function httpEvent(method: string, body?: unknown): APIGatewayProxyEvent {
   return {
-    requestContext: { http: { method } },
+    httpMethod: method,
     body: body !== undefined ? JSON.stringify(body) : undefined,
     isBase64Encoded: false,
-  } as unknown as APIGatewayProxyEventV2;
+  } as unknown as APIGatewayProxyEvent;
 }
 
 beforeEach(() => {

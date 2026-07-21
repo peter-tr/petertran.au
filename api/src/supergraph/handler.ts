@@ -4,11 +4,7 @@ import { ApolloGateway, RemoteGraphQLDataSource, type GraphQLDataSourceProcessOp
 import * as AWSXRay from "aws-xray-sdk-core";
 import { traced, traceHeader } from "api-shared/xray";
 import type { Context } from "api-shared/context";
-import type {
-  APIGatewayProxyEventV2,
-  APIGatewayProxyStructuredResultV2,
-  Context as LambdaContext,
-} from "aws-lambda";
+import type { APIGatewayProxyEvent, APIGatewayProxyResult, Context as LambdaContext } from "aws-lambda";
 import { SUPERGRAPH_SDL } from "./supergraph.generated";
 
 const apiBaseUrl = process.env.API_BASE_URL;
@@ -66,7 +62,7 @@ const server = new ApolloServer<Context>({ gateway, introspection: true });
 
 const apolloHandler = startServerAndCreateLambdaHandler(
   server,
-  handlers.createAPIGatewayProxyEventV2RequestHandler(),
+  handlers.createAPIGatewayProxyEventRequestHandler(),
   {
     context: async () => ({
       // Captured synchronously, as early as possible in the invocation -
@@ -77,8 +73,8 @@ const apolloHandler = startServerAndCreateLambdaHandler(
 );
 
 export const handler = async (
-  event: APIGatewayProxyEventV2,
+  event: APIGatewayProxyEvent,
   context: LambdaContext
-): Promise<APIGatewayProxyStructuredResultV2 | void> => {
+): Promise<APIGatewayProxyResult | void> => {
   return apolloHandler(event, context, () => {});
 };

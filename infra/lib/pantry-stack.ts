@@ -90,9 +90,8 @@ export class PantryStack extends Stack {
         ANTHROPIC_SECRET_ARN: anthropicSecret.secretArn,
       },
       // Traces every invocation to X-Ray, same as the portfolio GraphQL
-      // Lambda - without this the invocation never gets a trace, since
-      // ApiGatewayStack's HttpApi doesn't have X-Ray tracing enabled on
-      // its own stage.
+      // Lambda - needed for this Lambda's own DynamoDB/Anthropic subsegments
+      // regardless of ApiGatewayStack's own gateway-level tracing.
       tracing: lambda.Tracing.ACTIVE,
     });
     table.grantReadWriteData(apiFn);

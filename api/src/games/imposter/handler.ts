@@ -3,11 +3,7 @@ import { startServerAndCreateLambdaHandler, handlers } from "@as-integrations/aw
 import { buildSubgraphSchema } from "@apollo/subgraph";
 import { parse } from "graphql";
 import * as AWSXRay from "aws-xray-sdk-core";
-import type {
-  APIGatewayProxyEventV2,
-  APIGatewayProxyStructuredResultV2,
-  Context as LambdaContext,
-} from "aws-lambda";
+import type { APIGatewayProxyEvent, APIGatewayProxyResult, Context as LambdaContext } from "aws-lambda";
 import { typeDefs } from "./schema";
 import { createImposterResolvers } from "./resolvers/resolvers";
 import { DynamoImposterStore } from "./lib/aws/store";
@@ -29,10 +25,10 @@ const server = new ApolloServer<Context>({
 
 const apolloHandler = startServerAndCreateLambdaHandler(
   server,
-  handlers.createAPIGatewayProxyEventV2RequestHandler(),
+  handlers.createAPIGatewayProxyEventRequestHandler(),
   {
     context: async ({ event }) => ({
-      sourceIp: event.requestContext?.http?.sourceIp,
+      sourceIp: event.requestContext?.identity?.sourceIp,
       // Captured synchronously, as early as possible in the invocation -
       // see xray.ts's traced() for why this can't be looked up later.
       xraySegment: process.env.AWS_LAMBDA_FUNCTION_NAME ? AWSXRay.getSegment() : undefined,
@@ -41,8 +37,8 @@ const apolloHandler = startServerAndCreateLambdaHandler(
 );
 
 export const handler = async (
-  event: APIGatewayProxyEventV2,
+  event: APIGatewayProxyEvent,
   context: LambdaContext
-): Promise<APIGatewayProxyStructuredResultV2 | void> => {
+): Promise<APIGatewayProxyResult | void> => {
   return apolloHandler(event, context, () => {});
 };
