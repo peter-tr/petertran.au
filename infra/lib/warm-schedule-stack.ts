@@ -24,12 +24,13 @@ export interface ProvisionedConcurrencyStackProps extends StackProps {
   portfolioFnName: string;
   pantryFnName: string;
   imposterFnName: string;
+  supergraphFnName: string;
   zeroTrustLabFnNames: ZeroTrustLabFunctionNames;
 }
 
 const WARM_SCHEDULE_PARAM_NAME = "/petertran-au/warm-schedule";
 
-type WarmScheduleKey = "portfolio" | "pantry" | "imposter" | "zeroTrustLab";
+type WarmScheduleKey = "portfolio" | "pantry" | "imposter" | "supergraph" | "zeroTrustLab";
 type Weekday = "MON" | "TUE" | "WED" | "THU" | "FRI" | "SAT" | "SUN";
 
 interface WarmSchedule {
@@ -47,7 +48,13 @@ const ALL_WEEKDAYS: Weekday[] = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"
 // its own fallback" duplication this stack already had before this change).
 const DEFAULT_SCHEDULE: WarmSchedule = { enabled: true, days: ALL_WEEKDAYS, start: "08:00", end: "19:00" };
 
-const WARM_SCHEDULE_PROJECTS: WarmScheduleKey[] = ["portfolio", "pantry", "imposter", "zeroTrustLab"];
+const WARM_SCHEDULE_PROJECTS: WarmScheduleKey[] = [
+  "portfolio",
+  "pantry",
+  "imposter",
+  "supergraph",
+  "zeroTrustLab",
+];
 // Slug used in each project's on/off Schedule name - "zero-trust-lab", not
 // the camelCase flag key, to match this codebase's EventBridge Schedule
 // naming convention elsewhere (e.g. the old warmup-* names).
@@ -55,6 +62,7 @@ const WARM_SCHEDULE_PROJECT_SLUGS: Record<WarmScheduleKey, string> = {
   portfolio: "portfolio",
   pantry: "pantry",
   imposter: "imposter",
+  supergraph: "supergraph",
   zeroTrustLab: "zero-trust-lab",
 };
 
@@ -75,9 +83,9 @@ function warmScheduleArn(region: string, account: string, name: string): string 
 }
 
 /**
- * Scheduled Provisioned Concurrency (PC) for portfolio/pantry/imposter's and
- * zero-trust-lab's 5 Lambdas' `live` alias, per-project configurable
- * days/times (Sydney), settable from the portfolio Settings page.
+ * Scheduled Provisioned Concurrency (PC) for portfolio/pantry/imposter/
+ * supergraph's and zero-trust-lab's 5 Lambdas' `live` alias, per-project
+ * configurable days/times (Sydney), settable from the portfolio Settings page.
  * zero-trust-lab gets no organic traffic (see the old warmup schedule's
  * design notes in docs/warmup-and-provisioned-concurrency.md), so its PC
  * only speeds up manual testing/demos - kept as one combined `zeroTrustLab`
@@ -117,6 +125,7 @@ export class ProvisionedConcurrencyStack extends Stack {
         portfolio: DEFAULT_SCHEDULE,
         pantry: DEFAULT_SCHEDULE,
         imposter: DEFAULT_SCHEDULE,
+        supergraph: DEFAULT_SCHEDULE,
         zeroTrustLab: DEFAULT_SCHEDULE,
       }),
     });
@@ -126,6 +135,7 @@ export class ProvisionedConcurrencyStack extends Stack {
       props.portfolioFnName,
       props.pantryFnName,
       props.imposterFnName,
+      props.supergraphFnName,
       ztl.idpBridge,
       ztl.internalSts,
       ztl.edgeAuthorizer,
@@ -160,6 +170,7 @@ export class ProvisionedConcurrencyStack extends Stack {
         PORTFOLIO_FN_NAME: props.portfolioFnName,
         PANTRY_FN_NAME: props.pantryFnName,
         IMPOSTER_FN_NAME: props.imposterFnName,
+        SUPERGRAPH_FN_NAME: props.supergraphFnName,
         ZTL_IDP_BRIDGE_FN_NAME: ztl.idpBridge,
         ZTL_INTERNAL_STS_FN_NAME: ztl.internalSts,
         ZTL_EDGE_AUTHORIZER_FN_NAME: ztl.edgeAuthorizer,
@@ -241,7 +252,8 @@ export class ProvisionedConcurrencyStack extends Stack {
         input: ScheduleTargetInput.fromObject({ reconcile: true }),
       }),
       description:
-        "Backstop reconcile of scheduled Provisioned Concurrency for portfolio/pantry/imposter/zero-trust-lab",
+        "Backstop reconcile of scheduled Provisioned Concurrency for " +
+        "portfolio/pantry/imposter/supergraph/zero-trust-lab",
     });
   }
 }

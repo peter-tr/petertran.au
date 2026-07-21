@@ -21,7 +21,7 @@ const SCHEDULE_NAMES: Record<WarmScheduleKey, { on: string; off: string }> = JSO
   process.env.WARM_SCHEDULE_NAMES!
 );
 
-type WarmScheduleKey = "portfolio" | "pantry" | "imposter" | "zeroTrustLab";
+type WarmScheduleKey = "portfolio" | "pantry" | "imposter" | "supergraph" | "zeroTrustLab";
 type Weekday = "MON" | "TUE" | "WED" | "THU" | "FRI" | "SAT" | "SUN";
 
 interface WarmSchedule {
@@ -44,6 +44,7 @@ const TARGETS_BY_PROJECT: Record<WarmScheduleKey, string[]> = {
   portfolio: [process.env.PORTFOLIO_FN_NAME!],
   pantry: [process.env.PANTRY_FN_NAME!],
   imposter: [process.env.IMPOSTER_FN_NAME!],
+  supergraph: [process.env.SUPERGRAPH_FN_NAME!],
   zeroTrustLab: [
     process.env.ZTL_IDP_BRIDGE_FN_NAME!,
     process.env.ZTL_INTERNAL_STS_FN_NAME!,
@@ -61,6 +62,7 @@ const DEFAULT_CONFIG: WarmScheduleConfig = {
   portfolio: DEFAULT_SCHEDULE,
   pantry: DEFAULT_SCHEDULE,
   imposter: DEFAULT_SCHEDULE,
+  supergraph: DEFAULT_SCHEDULE,
   zeroTrustLab: DEFAULT_SCHEDULE,
 };
 
@@ -281,8 +283,8 @@ export async function handler(
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           error:
-            "project must be one of portfolio/pantry/imposter/zeroTrustLab, schedule must be a valid " +
-            "{ enabled, days, start, end }",
+            "project must be one of portfolio/pantry/imposter/supergraph/zeroTrustLab, schedule must be a " +
+            "valid { enabled, days, start, end }",
         }),
       };
     }

@@ -9,6 +9,7 @@ const WARM_SCHEDULE_LABELS: Record<WarmScheduleKey, string> = {
   portfolio: "this resume site",
   pantry: "pantry",
   imposter: "imposter",
+  supergraph: "supergraph (GraphQL gateway in front of the three above)",
   zeroTrustLab: "zero-trust-lab (no real visitors - only speeds up your own testing of it)",
 };
 

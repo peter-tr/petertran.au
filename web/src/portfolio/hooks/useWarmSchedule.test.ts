@@ -13,6 +13,7 @@ const DEFAULT_CONFIG = {
   portfolio: DEFAULT_SCHEDULE,
   pantry: DEFAULT_SCHEDULE,
   imposter: DEFAULT_SCHEDULE,
+  supergraph: DEFAULT_SCHEDULE,
   zeroTrustLab: DEFAULT_SCHEDULE,
 };
 

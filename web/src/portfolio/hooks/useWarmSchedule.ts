@@ -3,12 +3,13 @@ import { useCallback, useEffect, useState } from "react";
 // Direct read/write against ProvisionedConcurrencyStack's WarmScheduleFunction -
 // same "not a per-browser preference" reasoning as the old warmup schedule
 // toggle: this flips real Provisioned Concurrency for every visitor, per
-// project (portfolio/pantry/imposter), on the days/times its own schedule
-// says. zeroTrustLab is the one exception - it has no real visitors, so its
-// schedule only affects how snappy your own manual testing of that lab feels.
+// project (portfolio/pantry/imposter/supergraph), on the days/times its own
+// schedule says. zeroTrustLab is the one exception - it has no real visitors,
+// so its schedule only affects how snappy your own manual testing of that lab
+// feels.
 const ENDPOINT = import.meta.env.VITE_WARM_SCHEDULE_ENDPOINT;
 
-export type WarmScheduleKey = "portfolio" | "pantry" | "imposter" | "zeroTrustLab";
+export type WarmScheduleKey = "portfolio" | "pantry" | "imposter" | "supergraph" | "zeroTrustLab";
 export type Weekday = "MON" | "TUE" | "WED" | "THU" | "FRI" | "SAT" | "SUN";
 
 export interface WarmSchedule {
