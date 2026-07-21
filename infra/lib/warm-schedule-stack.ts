@@ -127,24 +127,31 @@ export class ProvisionedConcurrencyStack extends Stack {
     // handler-side logic (see warm-schedule/handler.ts's isWithinWindow), not
     // baked into this parameter, so it can change without a redeploy.
     //
-    // DO NOT EDIT THIS LITERAL to add/remove a project. CloudFormation owns
-    // this parameter's Value declaratively: every deploy diffs this computed
-    // string against what the *previous* deployed template had, and if it
-    // differs, overwrites the live value with it - clobbering whatever the
-    // settings page has since written via PutParameter, since those runtime
-    // writes are invisible to CloudFormation's diff. Adding `supergraph`
-    // here on 2026-07-21 did exactly that: it reset every project's
-    // real, user-configured schedule back to this DEFAULT_SCHEDULE literal
-    // the moment that PR deployed (confirmed via WarmScheduleParam's
-    // UPDATE_COMPLETE stack event at that deploy's timestamp) - see
-    // docs/warmup-and-provisioned-concurrency.md.
+    // DO NOT EDIT THIS LITERAL - not to add/remove a project, and not to
+    // change WarmSchedule's shape either (e.g. adding a field like
+    // `concurrency`). CloudFormation owns this parameter's Value
+    // declaratively: every deploy diffs this computed string against what
+    // the *previous* deployed template had, and if it differs *in any way*,
+    // overwrites the live value with it - clobbering whatever the settings
+    // page has since written via PutParameter, since those runtime writes
+    // are invisible to CloudFormation's diff. This has happened twice:
+    // adding `supergraph` here on 2026-07-21 reset every project's
+    // real schedule back to this literal (confirmed via WarmScheduleParam's
+    // UPDATE_COMPLETE stack event timestamp - see
+    // docs/warmup-and-provisioned-concurrency.md), and adding `concurrency`
+    // to WarmSchedule/DEFAULT_SCHEDULE on 2026-07-22 did it again even
+    // though no project key was touched - the serialized string still
+    // changed, which is all CloudFormation's diff actually looks at.
     //
-    // A newly added project needs no change here at all: handler.ts's
+    // A newly added project or field needs no change here at all: handler.ts's
     // getConfig() already merges `{ ...DEFAULT_CONFIG[key], ...stored[key] }`
-    // per project, so any key missing from the stored value (e.g. a project
-    // added after this parameter was first written) is backfilled from
-    // DEFAULT_CONFIG at read time. This literal only ever seeds the
-    // parameter's very first creation.
+    // per project, so any key missing from the stored value (a new project,
+    // or a new field on an existing one) is backfilled from DEFAULT_CONFIG at
+    // read time. This literal only ever seeds the parameter's very first
+    // creation - if it must change, the deploy needs to immediately follow
+    // up by re-POSTing every project's real schedule back through the
+    // settings page (or the /warm-schedule endpoint directly) to undo the
+    // clobber, same as both past incidents required.
     const scheduleParam = new ssm.StringParameter(this, "WarmScheduleParam", {
       parameterName: WARM_SCHEDULE_PARAM_NAME,
       stringValue: JSON.stringify({

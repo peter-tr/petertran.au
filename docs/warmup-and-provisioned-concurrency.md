@@ -39,6 +39,24 @@ creation and should never be edited again - see the warning comment above
 addition only needs `WARM_SCHEDULE_PROJECTS`/`DEFAULT_CONFIG`/etc. updated,
 same as this incident should have done from the start.
 
+## 2026-07-22 update: it happened again - adding a _field_, not a project, still clobbers
+
+The 2026-07-21 fix above assumed the risk was specifically "adding a project
+key" to the literal. It isn't - it's any change to the literal's serialized
+value at all. Adding a `concurrency` field to `WarmSchedule`/`DEFAULT_SCHEDULE`
+(to make Provisioned Concurrency's count settable per project, not just
+on/off) touched every project's entry in the literal even though no project
+was added or removed, and the deploy overwrote the live schedule again -
+`end: "22:00"` back to `end: "19:00"` for every project, and `zeroTrustLab`
+flipped from `enabled: false` back to `enabled: true`. Fixed the same way:
+re-POSTed every project's real schedule back through `/warm-schedule`
+immediately after the deploy, and broadened the warning comment above
+`WarmScheduleParam` accordingly. If `WarmSchedule`'s shape ever needs another
+field, budget for this same "deploy, then immediately restore live state"
+two-step - there's no way to avoid the overwrite itself given
+CloudFormation's ownership of this parameter's `Value`, only to be ready to
+undo it fast.
+
 ## 2026-07-21 update: scheduled ping removed, PC made per-project
 
 Now that PC covers business hours for all four projects, the scheduled
