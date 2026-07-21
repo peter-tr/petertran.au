@@ -30,7 +30,7 @@ jobs:
       # prod (infra/bin/app.ts reuses CertStack/SiteStack/PantryStack/
       # GamesStack/ApiGatewayStack directly), just the test-specific
       # instantiation of each.
-      stacks: "PetertranTestCertStack PetertranTestSiteStack PetertranTestPantryStack PetertranTestGamesStack PetertranTestApiGatewayStack"
+      stacks: "PetertranTestCertStack PetertranTestSiteStack PetertranTestPantryStack PetertranTestGamesStack PetertranTestSupergraphStack PetertranTestApiGatewayStack"
       sync-web: true
       deploy-test-env: true
       # The test stacks are disposable and have no prior deployed state to
@@ -51,8 +51,10 @@ jobs:
       # with nothing deployed yet.
       - name: Print test environment URLs
         run: |
-          echo "Web:  https://test.petertran.au"
-          echo "API:  https://api.test.petertran.au"
+          echo "Web:        https://test.petertran.au"
+          echo "API:        https://api.test.petertran.au"
+          echo "Supergraph: https://api.test.petertran.au/graphql"
           echo "### Test environment deployed" >> "$GITHUB_STEP_SUMMARY"
           echo "- Web: https://test.petertran.au" >> "$GITHUB_STEP_SUMMARY"
           echo "- API: https://api.test.petertran.au" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Supergraph: https://api.test.petertran.au/graphql" >> "$GITHUB_STEP_SUMMARY"

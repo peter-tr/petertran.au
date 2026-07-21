@@ -10,6 +10,7 @@
   "dependencies": {
     "api-shared": "1.1.1",
     "@apollo/server": "^4.11.0",
+    "@apollo/subgraph": "^2.9.0",
     "@as-integrations/aws-lambda": "^3.1.0",
     "@aws-sdk/client-lambda": "^3.1085.0",
     "@aws-sdk/client-sesv2": "^3.1080.0",

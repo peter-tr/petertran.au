@@ -67,7 +67,7 @@ describe("PANTRY_ENDPOINT / runPantryQuery", () => {
   });
 
   it("is configured from the test environment", () => {
-    expect(PANTRY_ENDPOINT).toBe("https://api.test.petertran.au/pantry");
+    expect(PANTRY_ENDPOINT).toBe("https://api.test.petertran.au/graphql");
   });
 
   it("posts the query/variables as JSON to the configured endpoint", async () => {
@@ -83,7 +83,7 @@ describe("PANTRY_ENDPOINT / runPantryQuery", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
     const [url, init] = fetchMock.mock.calls[0];
-    expect(String(url)).toContain("api.test.petertran.au/pantry");
+    expect(String(url)).toContain("api.test.petertran.au/graphql");
     expect(String(url)).toContain("opname=Foo");
     expect(init.method).toBe("POST");
     expect(JSON.parse(init.body)).toEqual({ query: "query Foo { foo }", variables: { a: 1 } });

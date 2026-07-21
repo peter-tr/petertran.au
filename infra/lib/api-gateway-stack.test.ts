@@ -15,21 +15,23 @@ describe("ApiGatewayStack", () => {
       pantryFnName: "pantry-graphql",
       imposterFnName: "imposter-graphql",
       warmScheduleFnName: "warm-schedule",
+      supergraphFnName: "supergraph-graphql",
       env: { account: "123456789012", region: "ap-southeast-2" },
     });
 
     const template = Template.fromStack(stack);
 
     template.resourceCountIs("AWS::ApiGatewayV2::Api", 1);
-    // Portfolio, Pantry, Imposter, WarmSchedule - each registered for both GET
-    // and POST, which CDK emits as 2 separate Route resources.
-    template.resourceCountIs("AWS::ApiGatewayV2::Route", 8);
+    // Portfolio, Pantry, Imposter, WarmSchedule, Supergraph - each
+    // registered for both GET and POST, which CDK emits as 2 separate
+    // Route resources.
+    template.resourceCountIs("AWS::ApiGatewayV2::Route", 10);
     template.hasResourceProperties("AWS::ApiGatewayV2::DomainName", {
       DomainName: "api.example.com",
     });
   });
 
-  it("isTestEnv: routes only portfolio/pantry/imposter, under the given apiSubdomain", () => {
+  it("isTestEnv: routes portfolio/pantry/imposter/supergraph (no warm-schedule), under the given apiSubdomain", () => {
     const app = new App();
     const stack = new ApiGatewayStack(app, "TestEnvApiGatewayStack", {
       domainName: "test.example.com",
@@ -40,6 +42,7 @@ describe("ApiGatewayStack", () => {
       portfolioFnName: "portfolio-graphql-test",
       pantryFnName: "pantry-graphql-test",
       imposterFnName: "imposter-graphql-test",
+      supergraphFnName: "supergraph-graphql-test",
       // warmScheduleFnName omitted - not part of what the test env exists to
       // validate.
       env: { account: "123456789012", region: "ap-southeast-2" },
@@ -47,8 +50,8 @@ describe("ApiGatewayStack", () => {
 
     const template = Template.fromStack(stack);
 
-    // Portfolio, Pantry, Imposter only - WarmSchedule route skipped.
-    template.resourceCountIs("AWS::ApiGatewayV2::Route", 6);
+    // Portfolio, Pantry, Imposter, Supergraph - WarmSchedule route skipped.
+    template.resourceCountIs("AWS::ApiGatewayV2::Route", 8);
     template.hasResourceProperties("AWS::ApiGatewayV2::DomainName", {
       DomainName: "api.test.example.com",
     });

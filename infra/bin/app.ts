@@ -8,6 +8,7 @@ import { PantryStack } from "../lib/pantry-stack";
 import { ZeroTrustLabStack } from "../lib/zero-trust-lab-stack";
 import { ApiGatewayStack } from "../lib/api-gateway-stack";
 import { ProvisionedConcurrencyStack } from "../lib/warm-schedule-stack";
+import { SupergraphStack } from "../lib/supergraph-stack";
 import { FUNCTION_NAMES, TEST_FUNCTION_NAMES } from "../lib/shared/function-names";
 
 const app = new App();
@@ -89,8 +90,22 @@ const provisionedConcurrencyStack = new ProvisionedConcurrencyStack(
   }
 );
 
-// Shared HttpApi in front of portfolio/pantry/imposter/warm-schedule, giving
-// them one stable domain (api.petertran.au) instead of each its own
+// Federation gateway composing portfolio/pantry/imposter's deployed
+// subgraphs into one endpoint - see infra/lib/supergraph-stack.ts. Talks to
+// the other three over their existing public HTTPS routes (via
+// apiGatewayStack below), not direct Lambda invoke, so - like
+// ProvisionedConcurrencyStack - it has no live CloudFormation coupling to
+// the stacks it depends on functionally and can deploy in any order
+// relative to them.
+const supergraphStack = new SupergraphStack(app, "PetertranSupergraphStack", {
+  apiBaseUrl: `https://api.${hostedZoneName}`,
+  functionName: FUNCTION_NAMES.supergraph,
+  env: { account, region: "ap-southeast-2" },
+});
+
+// Shared HttpApi in front of portfolio/pantry/imposter/supergraph/
+// warm-schedule, giving them one stable domain (api.petertran.au) instead
+// of each its own
 // CloudFormation-generated Function URL. Plain function names, no live
 // cross-stack reference - deliberately does NOT cover zero-trust-lab's own
 // edge/domain gateways, which stay isolated per that stack's own design
@@ -104,6 +119,7 @@ const apiGatewayStack = new ApiGatewayStack(app, "PetertranApiGatewayStack", {
   pantryFnName: FUNCTION_NAMES.pantry,
   imposterFnName: FUNCTION_NAMES.imposter,
   warmScheduleFnName: FUNCTION_NAMES.warmSchedule,
+  supergraphFnName: FUNCTION_NAMES.supergraph,
   env: { account, region: "ap-southeast-2" },
 });
 
@@ -123,6 +139,7 @@ apiGatewayStack.addDependency(pantryStack);
 apiGatewayStack.addDependency(gamesStack);
 apiGatewayStack.addDependency(zeroTrustLabStack);
 apiGatewayStack.addDependency(provisionedConcurrencyStack);
+apiGatewayStack.addDependency(supergraphStack);
 
 // On-demand test environment (test.petertran.au / api.test.petertran.au) for
 // testing big changes (e.g. Apollo Router/Federation) without touching prod -
@@ -176,6 +193,14 @@ if (process.env.DEPLOY_TEST_ENV === "true") {
     env: { account, region: "ap-southeast-2" },
   });
 
+  // Federation gateway composing the three test subgraphs above - mirrors
+  // prod's supergraphStack instantiation above.
+  const testSupergraphStack = new SupergraphStack(app, "PetertranTestSupergraphStack", {
+    apiBaseUrl: `https://api.test.${hostedZoneName}`,
+    functionName: TEST_FUNCTION_NAMES.supergraph,
+    env: { account, region: "ap-southeast-2" },
+  });
+
   const testApiGatewayStack = new ApiGatewayStack(app, "PetertranTestApiGatewayStack", {
     domainName: testDomainName,
     alternateDomainNames: testAlternateDomainNames,
@@ -185,6 +210,7 @@ if (process.env.DEPLOY_TEST_ENV === "true") {
     portfolioFnName: TEST_FUNCTION_NAMES.portfolio,
     pantryFnName: TEST_FUNCTION_NAMES.pantry,
     imposterFnName: TEST_FUNCTION_NAMES.imposter,
+    supergraphFnName: TEST_FUNCTION_NAMES.supergraph,
     env: { account, region: "ap-southeast-2" },
   });
   // Same fix as prod's apiGatewayStack.addDependency calls above, and even
@@ -196,4 +222,5 @@ if (process.env.DEPLOY_TEST_ENV === "true") {
   testApiGatewayStack.addDependency(testSiteStack);
   testApiGatewayStack.addDependency(testPantryStack);
   testApiGatewayStack.addDependency(testGamesStack);
+  testApiGatewayStack.addDependency(testSupergraphStack);
 }

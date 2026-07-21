@@ -1,5 +1,7 @@
 import { ApolloServer } from "@apollo/server";
 import { startServerAndCreateLambdaHandler, handlers } from "@as-integrations/aws-lambda";
+import { buildSubgraphSchema } from "@apollo/subgraph";
+import { parse } from "graphql";
 import * as AWSXRay from "aws-xray-sdk-core";
 import type {
   APIGatewayProxyEventV2,
@@ -13,8 +15,7 @@ import { ddb, TABLE_NAME, PK } from "./lib/aws/ddb";
 import type { Context } from "./context";
 
 const server = new ApolloServer<Context>({
-  typeDefs,
-  resolvers,
+  schema: buildSubgraphSchema([{ typeDefs: parse(typeDefs), resolvers }]),
   introspection: true,
   plugins: [
     // pantry keeps everything under a single pk ("PANTRY", see PK) and

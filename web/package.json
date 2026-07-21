@@ -8,7 +8,7 @@
     "dev": "vite",
     "typecheck": "tsc -b",
     "build": "tsc -b && vite build && npm run prerender",
-    "build:test": "tsc -b && vite build --mode test && npm run prerender",
+    "build:test": "tsc -b && vite build --mode test && PRERENDER_ENV_FILE=.env.test npm run prerender",
     "prerender": "tsx scripts/prerender.tsx",
     "preview": "vite preview",
     "test:e2e": "playwright test",

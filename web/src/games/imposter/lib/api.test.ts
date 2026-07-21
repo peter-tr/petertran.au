@@ -29,7 +29,7 @@ describe("api.ts", () => {
   });
 
   it("reads the imposter GraphQL endpoint from VITE_IMPOSTER_GRAPHQL_ENDPOINT (.env.test)", () => {
-    expect(IMPOSTER_ENDPOINT).toBe("https://api.test.petertran.au/imposter");
+    expect(IMPOSTER_ENDPOINT).toBe("https://api.test.petertran.au/graphql");
   });
 
   it("POSTs the query/variables as JSON to the configured endpoint, tagged with the operation name", async () => {

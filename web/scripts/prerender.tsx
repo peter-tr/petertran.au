@@ -93,10 +93,20 @@ const RESUME_QUERY = /* GraphQL */ `
   }
 `;
 
+// This runs as a plain Node script after `vite build`, in its own process -
+// it has no access to the `--mode` flag that build passed to vite, so
+// `build:test` (see package.json) sets PRERENDER_ENV_FILE=.env.test
+// explicitly. Without it, this silently fell back to reading
+// .env.production even during a test-env build, so a test deploy always
+// prerendered against whatever was live in *prod* - harmless by luck while
+// prod and test happened to expose the same route shape, but broke outright
+// the moment prod and test diverged (prod not yet having a route this
+// build's .env.production pointed at).
 function readEnvVar(name: string): string {
-  const envFile = readFileSync(path.resolve(import.meta.dirname, "../.env.production"), "utf-8");
+  const envFileName = process.env.PRERENDER_ENV_FILE ?? ".env.production";
+  const envFile = readFileSync(path.resolve(import.meta.dirname, `../${envFileName}`), "utf-8");
   const match = envFile.match(new RegExp(`^${name}=(.+)$`, "m"));
-  if (!match) throw new Error(`${name} not found in web/.env.production`);
+  if (!match) throw new Error(`${name} not found in web/${envFileName}`);
 
   return match[1].trim();
 }

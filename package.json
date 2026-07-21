@@ -9,6 +9,7 @@
     "api/src/portfolio",
     "api/src/pantry",
     "api/src/games/imposter",
+    "api/src/supergraph",
     "web"
   ],
   "overrides": {
