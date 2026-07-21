@@ -2,7 +2,6 @@ import { ApolloServer } from "@apollo/server";
 import { startServerAndCreateLambdaHandler, handlers } from "@as-integrations/aws-lambda";
 import {
   ApolloGateway,
-  IntrospectAndCompose,
   RemoteGraphQLDataSource,
   type GraphQLDataSourceProcessOptions,
 } from "@apollo/gateway";
@@ -11,6 +10,7 @@ import { traced, traceHeader } from "api-shared/xray";
 import { corsHeaders } from "api-shared/http";
 import type { Context } from "api-shared/context";
 import type { APIGatewayProxyEvent, APIGatewayProxyResult, Context as LambdaContext } from "aws-lambda";
+import { SUPERGRAPH_SDL } from "./supergraph.generated";
 
 const apiBaseUrl = process.env.API_BASE_URL;
 if (!apiBaseUrl) throw new Error("API_BASE_URL is required");
@@ -51,17 +51,16 @@ class TracedDataSource extends RemoteGraphQLDataSource<Context> {
 }
 
 const gateway = new ApolloGateway({
-  supergraphSdl: new IntrospectAndCompose({
-    subgraphs: [
-      { name: "portfolio", url: `${apiBaseUrl}/portfolio` },
-      { name: "pantry", url: `${apiBaseUrl}/pantry` },
-      { name: "imposter", url: `${apiBaseUrl}/imposter` },
-    ],
-    // No pollIntervalInMs, unlike the local dev-server gateway - Lambda
-    // freezes between invocations, so an ongoing poll timer serves no
-    // purpose here. Composes once per cold start instead.
-  }),
-  buildService: ({ name, url }) => new TracedDataSource(name, url!),
+  // Composed at build time (see scripts/compose-supergraph.ts), not via
+  // IntrospectAndCompose - that used to fetch all 3 subgraphs' SDL over
+  // HTTPS on every cold start, which was the dominant cost in the gateway's
+  // cold-start latency.
+  supergraphSdl: SUPERGRAPH_SDL,
+  // Ignores the `url` composed into the schema (a build-time placeholder,
+  // see compose-supergraph.ts) and reconstructs the real per-environment URL
+  // from `name` instead - the same composed artifact is deployed to both
+  // prod and the test env, only apiBaseUrl differs between them.
+  buildService: ({ name }) => new TracedDataSource(name, `${apiBaseUrl}/${name}`),
 });
 
 const server = new ApolloServer<Context>({ gateway, introspection: true });

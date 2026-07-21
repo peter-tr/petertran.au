@@ -17,7 +17,15 @@ export interface WarmSchedule {
   days: Weekday[];
   start: string; // "HH:MM", 24h, Sydney-local
   end: string; // "HH:MM"
+  concurrency: number; // ProvisionedConcurrentExecutions granted while within window
 }
+
+// Mirrors warm-schedule/handler.ts's own MAX_CONCURRENCY (the actual
+// server-side validation bound) - kept in sync by hand, same "seeded in two
+// places" duplication DEFAULT_SCHEDULE already has between the CDK stack and
+// the handler's own fallback. Only used here to bound the settings page's
+// number input before a save round-trips to the real check.
+export const MAX_CONCURRENCY = 5;
 
 export type WarmScheduleConfig = Record<WarmScheduleKey, WarmSchedule>;
 

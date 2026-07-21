@@ -1,5 +1,10 @@
 import { useState } from "react";
-import type { WarmScheduleKey, WarmSchedule, Weekday } from "../hooks/useWarmSchedule";
+import {
+  MAX_CONCURRENCY,
+  type WarmScheduleKey,
+  type WarmSchedule,
+  type Weekday,
+} from "../hooks/useWarmSchedule";
 
 const ALL_DAYS: Weekday[] = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 const DAY_LABELS: Record<Weekday, string> = {
@@ -17,6 +22,7 @@ function schedulesEqual(a: WarmSchedule, b: WarmSchedule): boolean {
     a.enabled === b.enabled &&
     a.start === b.start &&
     a.end === b.end &&
+    a.concurrency === b.concurrency &&
     a.days.length === b.days.length &&
     a.days.every((d) => b.days.includes(d))
   );
@@ -59,7 +65,13 @@ export default function WarmScheduleProject({
   }
 
   const dirty = !schedulesEqual(draft, schedule);
-  const invalid = draft.enabled && (draft.days.length === 0 || draft.start >= draft.end);
+  const invalid =
+    draft.enabled &&
+    (draft.days.length === 0 ||
+      draft.start >= draft.end ||
+      !Number.isInteger(draft.concurrency) ||
+      draft.concurrency < 1 ||
+      draft.concurrency > MAX_CONCURRENCY);
 
   return (
     <div className="warm-schedule">
@@ -103,6 +115,16 @@ export default function WarmScheduleProject({
           value={draft.end}
           onChange={(e) => setDraft((d) => ({ ...d, end: e.target.value }))}
         />
+        <span className="warm-schedule-times-sep">×</span>
+        <input
+          className="form-input warm-schedule-concurrency-input"
+          type="number"
+          min={1}
+          max={MAX_CONCURRENCY}
+          aria-label={`${label} provisioned concurrency`}
+          value={draft.concurrency}
+          onChange={(e) => setDraft((d) => ({ ...d, concurrency: Number(e.target.value) }))}
+        />
         <button
           className="run-btn"
           type="button"
@@ -112,7 +134,11 @@ export default function WarmScheduleProject({
           Save
         </button>
       </div>
-      {invalid && <p className="section-hint">Pick at least one day, with start before end.</p>}
+      {invalid && (
+        <p className="section-hint">
+          Pick at least one day, with start before end, and concurrency between 1 and {MAX_CONCURRENCY}.
+        </p>
+      )}
     </div>
   );
 }

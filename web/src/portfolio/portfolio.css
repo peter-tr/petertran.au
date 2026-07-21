@@ -1055,6 +1055,10 @@
   width: auto;
 }
 
+.warm-schedule-concurrency-input {
+  width: 3.5rem;
+}
+
 .warm-schedule-times-sep {
   color: var(--muted-dim);
   font-family: var(--font-mono);
