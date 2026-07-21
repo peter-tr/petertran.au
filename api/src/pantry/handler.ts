@@ -7,6 +7,7 @@ import type { APIGatewayProxyEvent, APIGatewayProxyResult, Context as LambdaCont
 import { typeDefs } from "./schema";
 import { resolvers } from "./resolvers/resolvers";
 import { createOperationMetricsPlugin } from "api-shared/operation-metrics";
+import { corsHeaders } from "api-shared/http";
 import { ddb, TABLE_NAME, PK } from "./lib/aws/ddb";
 import type { Context } from "./context";
 
@@ -44,5 +45,8 @@ export const handler = async (
   event: APIGatewayProxyEvent,
   context: LambdaContext
 ): Promise<APIGatewayProxyResult | void> => {
-  return apolloHandler(event, context, () => {});
+  const result = await apolloHandler(event, context, () => {});
+  if (!result) return result;
+
+  return { ...result, headers: { ...result.headers, ...corsHeaders(event.headers?.origin) } };
 };

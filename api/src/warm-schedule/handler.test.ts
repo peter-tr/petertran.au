@@ -206,7 +206,7 @@ describe("warm-schedule handler - config GET/POST", () => {
 describe("warm-schedule handler - on/off trigger", () => {
   it("grants PC to a project's targets on an 'on' trigger", async () => {
     const result = await handler({ project: "imposter", action: "on" });
-    expect(result).toEqual({ statusCode: 200, body: "reconciled" });
+    expect(result).toEqual({ statusCode: 200, headers: {}, body: "reconciled" });
 
     const putCalls = lambdaMock.commandCalls(PutProvisionedConcurrencyConfigCommand);
     expect(putCalls).toHaveLength(1);
@@ -215,7 +215,7 @@ describe("warm-schedule handler - on/off trigger", () => {
 
   it("tears down PC for a project's targets on an 'off' trigger", async () => {
     const result = await handler({ project: "zeroTrustLab", action: "off" });
-    expect(result).toEqual({ statusCode: 200, body: "reconciled" });
+    expect(result).toEqual({ statusCode: 200, headers: {}, body: "reconciled" });
 
     const deleteCalls = lambdaMock.commandCalls(DeleteProvisionedConcurrencyConfigCommand);
     expect(deleteCalls.map((c) => c.args[0].input.FunctionName).sort()).toEqual([...ALL_ZTL_TARGETS].sort());
@@ -229,7 +229,7 @@ describe("warm-schedule handler - reconcile ping", () => {
     ssmMock.on(GetParameterCommand).resolves({});
 
     const result = await handler({ reconcile: true });
-    expect(result).toEqual({ statusCode: 200, body: "reconciled" });
+    expect(result).toEqual({ statusCode: 200, headers: {}, body: "reconciled" });
 
     const putCalls = lambdaMock.commandCalls(PutProvisionedConcurrencyConfigCommand);
     expect(putCalls.map((c) => c.args[0].input.FunctionName).sort()).toEqual([...ALL_TARGETS].sort());
@@ -300,7 +300,7 @@ describe("warm-schedule handler - reconcile ping", () => {
     );
 
     const result = await handler({ reconcile: true });
-    expect(result).toEqual({ statusCode: 200, body: "reconciled" });
+    expect(result).toEqual({ statusCode: 200, headers: {}, body: "reconciled" });
   });
 
   it("logs but does not throw or block other targets when reconciling one target fails unexpectedly", async () => {
@@ -314,7 +314,7 @@ describe("warm-schedule handler - reconcile ping", () => {
       .rejects(new Error("concurrency quota exceeded"));
 
     const result = await handler({ reconcile: true });
-    expect(result).toEqual({ statusCode: 200, body: "reconciled" });
+    expect(result).toEqual({ statusCode: 200, headers: {}, body: "reconciled" });
     expect(consoleErrorSpy).toHaveBeenCalled();
 
     // The other targets still got reconciled despite portfolio-fn's failure.
