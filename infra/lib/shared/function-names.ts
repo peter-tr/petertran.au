@@ -18,18 +18,17 @@ export const FUNCTION_NAMES = {
   ztlEdgeProxy: "ztl-edge-proxy",
   ztlDomainA: "ztl-domain-a",
   pcConfig: "pc-config",
+  supergraph: "supergraph-graphql",
 } as const;
 
-// Test-env counterparts of the 3 GraphQL Lambda names above, passed to
-// SiteStack/PantryStack/GamesStack's functionName prop and
-// ApiGatewayStack's portfolio/pantry/imposterFnName props when
+// Test-env counterparts of the 4 GraphQL Lambda names above, passed to
+// SiteStack/PantryStack/GamesStack/SupergraphStack's functionName prop and
+// ApiGatewayStack's portfolio/pantry/imposter/supergraphFnName props when
 // DEPLOY_TEST_ENV=true (see infra/bin/app.ts). Suffixed so they can never
 // collide with the real prod Lambdas they're testing changes against,
 // since the test env deploys alongside prod, not instead of it - no
-// zero-trust-lab/warmup/pc-config counterparts, since those aren't part of
-// what the test env exists to validate. `supergraph` is test-env-only in
-// the other direction - no prod FUNCTION_NAMES entry yet (see
-// supergraph-stack.ts's doc comment).
+// zero-trust-lab/pc-config counterparts, since those aren't part of what
+// the test env exists to validate.
 export const TEST_FUNCTION_NAMES = {
   portfolio: "portfolio-graphql-test",
   pantry: "pantry-graphql-test",

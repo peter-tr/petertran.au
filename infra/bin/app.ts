@@ -90,8 +90,21 @@ const provisionedConcurrencyStack = new ProvisionedConcurrencyStack(
   }
 );
 
-// Shared HttpApi in front of portfolio/pantry/imposter/pc-config, giving
-// them one stable domain (api.petertran.au) instead of each its own
+// Federation gateway composing portfolio/pantry/imposter's deployed
+// subgraphs into one endpoint - see infra/lib/supergraph-stack.ts. Talks to
+// the other three over their existing public HTTPS routes (via
+// apiGatewayStack below), not direct Lambda invoke, so - like
+// ProvisionedConcurrencyStack - it has no live CloudFormation coupling to
+// the stacks it depends on functionally and can deploy in any order
+// relative to them.
+const supergraphStack = new SupergraphStack(app, "PetertranSupergraphStack", {
+  apiBaseUrl: `https://api.${hostedZoneName}`,
+  functionName: FUNCTION_NAMES.supergraph,
+  env: { account, region: "ap-southeast-2" },
+});
+
+// Shared HttpApi in front of portfolio/pantry/imposter/supergraph/pc-config,
+// giving them one stable domain (api.petertran.au) instead of each its own
 // CloudFormation-generated Function URL. Plain function names, no live
 // cross-stack reference - deliberately does NOT cover zero-trust-lab's own
 // edge/domain gateways, which stay isolated per that stack's own design
@@ -105,6 +118,7 @@ const apiGatewayStack = new ApiGatewayStack(app, "PetertranApiGatewayStack", {
   pantryFnName: FUNCTION_NAMES.pantry,
   imposterFnName: FUNCTION_NAMES.imposter,
   pcConfigFnName: FUNCTION_NAMES.pcConfig,
+  supergraphFnName: FUNCTION_NAMES.supergraph,
   env: { account, region: "ap-southeast-2" },
 });
 
@@ -124,6 +138,7 @@ apiGatewayStack.addDependency(pantryStack);
 apiGatewayStack.addDependency(gamesStack);
 apiGatewayStack.addDependency(zeroTrustLabStack);
 apiGatewayStack.addDependency(provisionedConcurrencyStack);
+apiGatewayStack.addDependency(supergraphStack);
 
 // On-demand test environment (test.petertran.au / api.test.petertran.au) for
 // testing big changes (e.g. Apollo Router/Federation) without touching prod -
@@ -177,8 +192,8 @@ if (process.env.DEPLOY_TEST_ENV === "true") {
     env: { account, region: "ap-southeast-2" },
   });
 
-  // Federation gateway composing the three test subgraphs above - test-env
-  // only for now, see supergraph-stack.ts's doc comment.
+  // Federation gateway composing the three test subgraphs above - mirrors
+  // prod's supergraphStack instantiation above.
   const testSupergraphStack = new SupergraphStack(app, "PetertranTestSupergraphStack", {
     apiBaseUrl: `https://api.test.${hostedZoneName}`,
     functionName: TEST_FUNCTION_NAMES.supergraph,

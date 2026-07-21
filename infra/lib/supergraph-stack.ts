@@ -17,11 +17,12 @@ export interface SupergraphStackProps extends StackProps {
  * to the other subgraphs over their existing public HTTPS routes (see
  * apiBaseUrl), not direct Lambda invoke, so it has zero live CloudFormation
  * coupling to the stacks it depends on functionally - same "plain strings,
- * no live cross-stack refs" reasoning as WarmupStack/ProvisionedConcurrencyStack.
+ * no live cross-stack refs" reasoning as ProvisionedConcurrencyStack.
  *
- * Test-env only for now (see infra/bin/app.ts) - functionName/apiBaseUrl are
- * required rather than optional-with-a-prod-fallback since there's only one
- * caller today.
+ * Instantiated twice (see infra/bin/app.ts) - once for prod
+ * (api.petertran.au/graphql) and once for the on-demand test env
+ * (api.test.petertran.au/graphql) - functionName/apiBaseUrl are required
+ * rather than defaulted since both callers always pass their own.
  */
 export class SupergraphStack extends Stack {
   public readonly gatewayFn: lambda.Function;

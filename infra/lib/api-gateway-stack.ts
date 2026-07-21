@@ -31,19 +31,20 @@ export interface ApiGatewayStackProps extends StackProps {
   // pc-config-stack.ts), so its route is skipped entirely rather than
   // pointed at a Lambda that doesn't exist there.
   pcConfigFnName?: string;
-  // The reverse of the two above: omitted for prod, only passed by the
-  // test-env instantiation - see supergraph-stack.ts's doc comment for why
-  // it's test-only for now.
+  // Passed by both the prod and test-env instantiations (see
+  // infra/bin/app.ts) - kept optional rather than required, same as
+  // pcConfigFnName above, so a future caller can still omit it.
   supergraphFnName?: string;
 }
 
 /**
- * Single shared HttpApi in front of portfolio/pantry/imposter/pc-config,
- * replacing their individual Lambda Function URLs with one stable,
- * human-readable domain (api.petertran.au) - so web/.env.production never
- * needs to track a CloudFormation-generated URL again. Deliberately does NOT
- * cover zero-trust-lab's own edge/domain gateways - those stay isolated per
- * that stack's own design intent (see zero-trust-lab-stack.ts).
+ * Single shared HttpApi in front of portfolio/pantry/imposter/supergraph/
+ * pc-config, replacing their individual Lambda Function URLs with one
+ * stable, human-readable domain (api.petertran.au) - so
+ * web/.env.production never needs to track a CloudFormation-generated URL
+ * again. Deliberately does NOT cover zero-trust-lab's own edge/domain
+ * gateways - those stay isolated per that stack's own design intent (see
+ * zero-trust-lab-stack.ts).
  *
  * Reused as-is for the on-demand test environment (see infra/bin/app.ts),
  * fronting portfolio/pantry/imposter/supergraph under api.test.petertran.au -
@@ -89,14 +90,16 @@ export class ApiGatewayStack extends Stack {
     });
 
     // Exact-path routes, not `{proxy+}` - portfolio/pantry/imposter/
-    // pc-config are each single-endpoint Apollo/JSON services, never called
-    // with a sub-path (see web/src/shared/graphqlClient.ts and
+    // supergraph/pc-config are each single-endpoint Apollo/JSON services,
+    // never called with a sub-path (see web/src/shared/graphqlClient.ts and
     // usePcConfig.ts).
     //
-    // portfolio/pantry/imposter carry `aliasName: LIVE_ALIAS_NAME` so real
-    // traffic actually lands on the qualifier ProvisionedConcurrencyStack
+    // portfolio/pantry/imposter/supergraph carry `aliasName: LIVE_ALIAS_NAME`
+    // so real traffic actually lands on the qualifier ProvisionedConcurrencyStack
     // applies Provisioned Concurrency to - see pc-config-stack.ts's doc
-    // comment. pc-config has no alias, bare $LATEST, unaffected.
+    // comment. (Supergraph itself has no PC schedule yet, but still
+    // publishes the alias so it's consistent with the other three and ready
+    // for one later.) pc-config has no alias, bare $LATEST, unaffected.
     const routes: { id: string; path: string; functionName: string; aliasName?: string }[] = [
       {
         id: "Portfolio",
