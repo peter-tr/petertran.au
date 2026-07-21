@@ -26,16 +26,16 @@ const ENTRIES: NoteEntry[] = [
       <>
         <p>
           Three approaches, tried in order. <strong>Ping on page load:</strong> the homepage fires a
-          background warmup invoke at Pantry's and Imposter's Lambdas as soon as it mounts - tightly timed
-          to real navigation, but does nothing for the day's first visitor.
+          background warmup invoke at Pantry's and Imposter's Lambdas as soon as it mounts - tightly timed to
+          real navigation, but does nothing for the day's first visitor.
         </p>
         <p>
           <strong>Scheduled ping, every 10 minutes:</strong> an EventBridge schedule kept every Lambda warm
           around the clock regardless of traffic. Bisecting the real idle-reclaim window (invoke, wait N,
-          invoke again, read <code>Init Duration</code> off the REPORT line) against zero-trust-lab's
-          Lambdas - which get literally zero organic traffic, so every cold invocation there is real - found
-          it's actually <strong>~2m10s-3m20s</strong>, nowhere near the commonly-cited 5-45 minutes. A 10-min
-          ping was already cutting it close.
+          invoke again, read <code>Init Duration</code> off the REPORT line) against zero-trust-lab's Lambdas
+          - which get literally zero organic traffic, so every cold invocation there is real - found it's
+          actually <strong>~2m10s-3m20s</strong>, nowhere near the commonly-cited 5-45 minutes. A 10-min ping
+          was already cutting it close.
         </p>
         <p>
           <strong>Provisioned concurrency, business hours only:</strong> removed the scheduled ping entirely
@@ -92,8 +92,8 @@ const ENTRIES: NoteEntry[] = [
       <>
         <p>
           A learning exercise built as a real deployable stack, not a diagram: an edge gateway accepts an
-          opaque token, exchanges it via an internal STS for a short-lived, audience-scoped JWT (RS256,
-          signed by <strong>KMS</strong> - the private key never leaves KMS), and a separate domain gateway
+          opaque token, exchanges it via an internal STS for a short-lived, audience-scoped JWT (RS256, signed
+          by <strong>KMS</strong> - the private key never leaves KMS), and a separate domain gateway
           independently verifies that JWT with HTTP API's native JWT authorizer before reaching a backend.
           Real Cognito Hosted UI login, own DynamoDB table, own everything - fully isolated from the real
           site.
@@ -102,9 +102,9 @@ const ENTRIES: NoteEntry[] = [
         <p>
           Gotchas hit building it, not hypothetical: a Lambda can't reference its own Function URL from its
           own environment variables (CloudFormation circular dependency) - fixed by deriving issuer/callback
-          URLs from the request's <code>domainName</code> at runtime instead. HTTP API's native JWT
-          authorizer needs full OIDC discovery, not a bare JWKS URL. Lambda Function URLs base64-encode the
-          body under some conditions, so <code>JSON.parse(event.body)</code> without checking{" "}
+          URLs from the request's <code>domainName</code> at runtime instead. HTTP API's native JWT authorizer
+          needs full OIDC discovery, not a bare JWKS URL. Lambda Function URLs base64-encode the body under
+          some conditions, so <code>JSON.parse(event.body)</code> without checking{" "}
           <code>isBase64Encoded</code> breaks silently. And <code>scheduler:UpdateSchedule</code> also needs{" "}
           <code>iam:PassRole</code> on the schedule target's execution role, not just permission on the
           schedule itself.
@@ -149,7 +149,9 @@ const ENTRIES: NoteEntry[] = [
               <tr>
                 <td>Woolworths</td>
                 <td>Not reliable - dropped</td>
-                <td>Akamai fronts woolworths.com.au - blocks or challenges the fetch, confirmed live, repeatedly</td>
+                <td>
+                  Akamai fronts woolworths.com.au - blocks or challenges the fetch, confirmed live, repeatedly
+                </td>
               </tr>
             </tbody>
           </table>

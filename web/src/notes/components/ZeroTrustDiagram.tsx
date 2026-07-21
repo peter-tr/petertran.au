@@ -22,7 +22,15 @@ export default function ZeroTrustDiagram() {
       aria-label="Diagram: the client sends an opaque bearer token to the Edge HttpApi, whose authorizer introspects it and directly invokes Internal STS to exchange it for a short-lived, audience-scoped JWT signed by KMS. The Edge HttpApi forwards that JWT to the Domain-A HttpApi, whose native JWT authorizer verifies it with zero application code before it reaches the Domain-A function."
     >
       <defs>
-        <marker id="ztl-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <marker
+          id="ztl-arrow"
+          viewBox="0 0 10 10"
+          refX="8"
+          refY="5"
+          markerWidth="7"
+          markerHeight="7"
+          orient="auto-start-reverse"
+        >
           <path d="M0,0 L10,5 L0,10 z" className="arch-arrowhead" />
         </marker>
       </defs>
@@ -32,7 +40,14 @@ export default function ZeroTrustDiagram() {
         opaque token
       </text>
 
-      <line x1="240" y1="130" x2="240" y2="150" className="arch-edge arch-edge-dashed" markerEnd="url(#ztl-arrow)" />
+      <line
+        x1="240"
+        y1="130"
+        x2="240"
+        y2="150"
+        className="arch-edge arch-edge-dashed"
+        markerEnd="url(#ztl-arrow)"
+      />
       <text x="253" y="145" className="arch-edge-label">
         introspect +
       </text>
