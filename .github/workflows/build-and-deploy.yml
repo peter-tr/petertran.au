@@ -171,6 +171,23 @@ jobs:
           DEPLOY_TEST_ENV: ${{ inputs.deploy-test-env }}
         run: npx cdk deploy ${{ inputs.stacks != '' && inputs.stacks || '--all' }} --concurrency 4 --require-approval never
 
+      # Must run after "Deploy infrastructure", not chained into the build
+      # step above - it fetches live data from VITE_GRAPHQL_ENDPOINT, and
+      # whenever that endpoint's route is new (e.g. api.petertran.au/graphql
+      # the first time the supergraph gateway went to prod), it doesn't
+      # exist until this deploy step creates it. Running it as part of
+      # `npm run build`, before infra deploy, 404s and aborts the job before
+      # `cdk deploy` ever runs.
+      - name: Prerender web
+        if: inputs.sync-web
+        working-directory: web
+        run: |
+          if [ "${{ inputs.deploy-test-env }}" = "true" ]; then
+            PRERENDER_ENV_FILE=.env.test npm run prerender
+          else
+            npm run prerender
+          fi
+
       - name: Sync frontend to S3
         if: inputs.sync-web
         env:
