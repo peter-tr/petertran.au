@@ -11,7 +11,10 @@
 // useEffect, which SSR never runs) into the built dist/index.html and a new
 // dist/resume file. A real browser's JS still takes over and re-renders
 // normally on top - this only changes what a non-JS fetch sees, not the
-// interactive experience.
+// interactive experience. It also snapshots the pristine, pre-edit shell to
+// dist/fallback.html, which CloudFront serves for every other client-routed
+// path (see site-stack.ts's errorResponses) - it must stay generic, not
+// "/"'s rendered content.
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import React from "react";
@@ -148,6 +151,18 @@ async function main() {
 
   const shellPath = path.join(DIST_DIR, "index.html");
   const shellHtml = readFileSync(shellPath, "utf-8");
+
+  // CloudFront's 403/404 error responses (site-stack.ts) serve a single
+  // static file for every route this script doesn't know about - /notes,
+  // /pantry, /imposter, /settings, anything. That file must stay the
+  // pristine, generic shell (empty #root, generic title/meta) - captured
+  // here, before shellHtml gets overwritten below with content specific to
+  // "/". Pointing the fallback at the post-prerender index.html instead
+  // (as this used to) meant every one of those other routes rendered the
+  // home page's bio/title first, until client JS mounted over it.
+  const fallbackPath = path.join(DIST_DIR, "fallback.html");
+  writeFileSync(fallbackPath, shellHtml);
+  console.log(`Wrote generic fallback shell -> ${fallbackPath}`);
 
   const currentRole = data.experience.find((e) => e.isCurrent) ?? data.experience[0];
 
