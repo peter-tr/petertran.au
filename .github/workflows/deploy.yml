@@ -8,6 +8,17 @@ permissions:
   id-token: write
   contents: write
 
+# Two merges landing close together would otherwise run two overlapping
+# `cdk deploy`s against the same stacks - cancel the older run so only the
+# latest commit's deploy proceeds. If cancellation lands mid-`cdk deploy`,
+# CloudFormation's own stack update keeps running server-side regardless
+# (killing the job just stops polling it) - a deploy that starts before that
+# update settles fails with "stack is in UPDATE_IN_PROGRESS state", but the
+# next push's run succeeds once it does.
+concurrency:
+  group: deploy-main
+  cancel-in-progress: true
+
 jobs:
   build-and-deploy:
     uses: ./.github/workflows/build-and-deploy.yml

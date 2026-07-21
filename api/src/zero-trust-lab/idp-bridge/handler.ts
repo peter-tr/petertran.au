@@ -5,8 +5,10 @@ import {
   ListUserPoolClientsCommand,
   DescribeUserPoolClientCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
+import * as AWSXRay from "aws-xray-sdk-core";
+import type { SegmentLike } from "aws-xray-sdk-core";
 import { createDdbClient } from "api-shared/ddb";
-import { captureAwsClient } from "api-shared/xray";
+import { captureAwsClient, traced } from "api-shared/xray";
 import { generateOpaqueToken } from "../lib/opaque-token";
 import { normalizePath } from "../lib/http";
 import { parseJsonBody } from "api-shared/http";
@@ -61,7 +63,10 @@ async function getClientCredentials(): Promise<{ clientId: string; clientSecret:
   return cachedClientCredentials;
 }
 
-async function handleCallback(event: APIGatewayProxyEventV2): Promise<APIGatewayProxyStructuredResultV2> {
+async function handleCallback(
+  event: APIGatewayProxyEventV2,
+  xraySegment: SegmentLike | undefined
+): Promise<APIGatewayProxyStructuredResultV2> {
   const code = event.queryStringParameters?.code;
   if (!code) return { statusCode: 400, body: "missing code" };
 
@@ -73,16 +78,21 @@ async function handleCallback(event: APIGatewayProxyEventV2): Promise<APIGateway
   const redirectUri = `https://${event.requestContext.domainName}/callback`;
 
   const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
-  const tokenResp = await fetch(`${COGNITO_DOMAIN}/oauth2/token`, {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded", authorization: `Basic ${basicAuth}` },
-    body: new URLSearchParams({
-      grant_type: "authorization_code",
-      client_id: clientId,
-      code,
-      redirect_uri: redirectUri,
-    }),
-  });
+  const tokenResp = await traced(
+    "Cognito: oauth2/token",
+    () =>
+      fetch(`${COGNITO_DOMAIN}/oauth2/token`, {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded", authorization: `Basic ${basicAuth}` },
+        body: new URLSearchParams({
+          grant_type: "authorization_code",
+          client_id: clientId,
+          code,
+          redirect_uri: redirectUri,
+        }),
+      }),
+    xraySegment
+  );
   if (!tokenResp.ok) {
     return { statusCode: 502, body: `cognito token exchange failed: ${await tokenResp.text()}` };
   }
@@ -147,9 +157,13 @@ async function handleLogout(event: APIGatewayProxyEventV2): Promise<APIGatewayPr
 }
 
 export async function handler(event: APIGatewayProxyEventV2): Promise<APIGatewayProxyStructuredResultV2> {
+  // Captured synchronously, as early as possible in the invocation - see
+  // xray.ts's traced() for why this can't be looked up later.
+  const xraySegment = process.env.AWS_LAMBDA_FUNCTION_NAME ? AWSXRay.getSegment() : undefined;
+
   switch (normalizePath(event.rawPath)) {
     case "/callback":
-      return handleCallback(event);
+      return handleCallback(event, xraySegment);
     case "/introspect":
       return handleIntrospect(event);
     case "/logout":
