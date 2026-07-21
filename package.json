@@ -16,7 +16,7 @@
     "graphql": "^16.14.2"
   },
   "scripts": {
-    "dev": "turbo run dev:portfolio dev:pantry dev:imposter dev",
+    "dev": "turbo run dev:portfolio dev:pantry dev:imposter dev:supergraph dev",
     "seed": "npm run seed --workspace=api",
     "deploy": "./scripts/deploy.sh",
     "cdk": "npm run cdk --workspace=infra",
