@@ -38,6 +38,7 @@ interface WarmSchedule {
   days: Weekday[];
   start: string; // "HH:MM", 24h, Sydney-local
   end: string; // "HH:MM"
+  concurrency: number; // ProvisionedConcurrentExecutions granted while within window
 }
 
 const ALL_WEEKDAYS: Weekday[] = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
@@ -46,7 +47,13 @@ const ALL_WEEKDAYS: Weekday[] = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"
 // fixed 8am-7pm window. Not shared with api/src/warm-schedule/handler.ts's own
 // DEFAULT_CONFIG constant (same "CDK seeds the initial value, the Lambda has
 // its own fallback" duplication this stack already had before this change).
-const DEFAULT_SCHEDULE: WarmSchedule = { enabled: true, days: ALL_WEEKDAYS, start: "08:00", end: "19:00" };
+const DEFAULT_SCHEDULE: WarmSchedule = {
+  enabled: true,
+  days: ALL_WEEKDAYS,
+  start: "08:00",
+  end: "19:00",
+  concurrency: 1,
+};
 
 const WARM_SCHEDULE_PROJECTS: WarmScheduleKey[] = [
   "portfolio",
