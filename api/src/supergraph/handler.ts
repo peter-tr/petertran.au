@@ -7,7 +7,7 @@ import {
   type GraphQLDataSourceProcessOptions,
 } from "@apollo/gateway";
 import * as AWSXRay from "aws-xray-sdk-core";
-import { traced } from "api-shared/xray";
+import { traced, traceHeader } from "api-shared/xray";
 import type { Context } from "api-shared/context";
 import type {
   APIGatewayProxyEventV2,
@@ -37,6 +37,19 @@ class TracedDataSource extends RemoteGraphQLDataSource<Context> {
       () => super.process(options),
       options.context.xraySegment
     );
+  }
+
+  // process() above only gives *local* visibility (a subsegment on the
+  // supergraph's own trace) - it doesn't tell the subgraph it's part of the
+  // same request. Without this header, each subgraph Lambda starts its own
+  // disconnected trace, so X-Ray never shows the supergraph and subgraphs
+  // as one connected trace/service map. willSendRequest() is the officially
+  // supported hook for mutating the outgoing request, called by
+  // super.process() after request.http.headers has already been set up.
+  override willSendRequest({ request, context }: GraphQLDataSourceProcessOptions<Context>) {
+    for (const [name, value] of Object.entries(traceHeader(context.xraySegment))) {
+      request.http?.headers.set(name, value);
+    }
   }
 }
 
