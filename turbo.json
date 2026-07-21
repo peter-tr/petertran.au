@@ -19,6 +19,10 @@
       "cache": false,
       "persistent": true
     },
+    "dev:design-studio": {
+      "cache": false,
+      "persistent": true
+    },
     "dev:supergraph": {
       "cache": false,
       "persistent": true

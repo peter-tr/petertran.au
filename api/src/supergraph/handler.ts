@@ -59,6 +59,7 @@ const gateway = new ApolloGateway({
       { name: "portfolio", url: `${apiBaseUrl}/portfolio` },
       { name: "pantry", url: `${apiBaseUrl}/pantry` },
       { name: "imposter", url: `${apiBaseUrl}/imposter` },
+      { name: "design-studio", url: `${apiBaseUrl}/design-studio` },
     ],
     // No pollIntervalInMs, unlike the local dev-server gateway - Lambda
     // freezes between invocations, so an ongoing poll timer serves no

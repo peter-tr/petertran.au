@@ -60,6 +60,11 @@ const imposter = serviceConfig(
   "src/games/imposter/**/*.{ts,tsx}",
   "src/games/imposter/lib/api-schema-types.generated.ts"
 );
+const designStudio = serviceConfig(
+  "../api/src/design-studio/schema.graphql",
+  "src/design-studio/**/*.{ts,tsx}",
+  "src/design-studio/api-schema-types.generated.ts"
+);
 
 const config: CodegenConfig = {
   overwrite: true,
@@ -70,6 +75,8 @@ const config: CodegenConfig = {
     "src/pantry/api.generated.ts": pantry.operations,
     "src/games/imposter/lib/api-schema-types.generated.ts": imposter.schemaTypes,
     "src/games/imposter/lib/api.generated.ts": imposter.operations,
+    "src/design-studio/api-schema-types.generated.ts": designStudio.schemaTypes,
+    "src/design-studio/api.generated.ts": designStudio.operations,
   },
 };
 

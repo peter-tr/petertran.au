@@ -13,6 +13,8 @@ const Pantry = lazy(() => import("./pantry/Pantry"));
 const PantrySettingsPage = lazy(() => import("./pantry/PantrySettingsPage"));
 const ImposterSetup = lazy(() => import("./games/imposter/Setup"));
 const ImposterGame = lazy(() => import("./games/imposter/Game"));
+const DesignStudioGallery = lazy(() => import("./design-studio/Gallery"));
+const DesignStudioEditor = lazy(() => import("./design-studio/Editor"));
 
 function ScrollManager() {
   const location = useLocation();
@@ -39,7 +41,7 @@ function ScrollManager() {
 // switcher nav (between each other, and back to the portfolio) instead of
 // the full site nav (resume/query/contact links), so they don't read as
 // part of the resume site itself.
-const STANDALONE_ROUTE_PREFIXES = ["/imposter", "/pantry"];
+const STANDALONE_ROUTE_PREFIXES = ["/imposter", "/pantry", "/design-studio"];
 
 function activeNavLink({ isActive }: { isActive: boolean }): string {
   return isActive ? "active" : "";
@@ -67,6 +69,11 @@ function AppNav() {
                 pantry
               </NavLink>
             </li>
+            <li>
+              <NavLink to="/design-studio" className={activeNavLink}>
+                design studio
+              </NavLink>
+            </li>
           </ul>
         </div>
       </nav>
@@ -91,6 +98,8 @@ export default function App() {
             <Route path="/pantry/settings" element={<PantrySettingsPage />} />
             <Route path="/imposter" element={<ImposterSetup />} />
             <Route path="/imposter/:gameId" element={<ImposterGame />} />
+            <Route path="/design-studio" element={<DesignStudioGallery />} />
+            <Route path="/design-studio/:designId" element={<DesignStudioEditor />} />
           </Routes>
         </Suspense>
       </main>

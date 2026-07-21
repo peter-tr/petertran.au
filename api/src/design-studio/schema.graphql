@@ -1,0 +1,87 @@
+"""
+Design Studio - a mock Canva-style design editor. Backed by MongoDB rather
+than this repo's usual DynamoDB, deliberately: a design document is large,
+deeply nested, and gains new element types/properties as the editor grows -
+a document store lets that shape evolve field by field with no migration
+step, where DynamoDB would need a GSI planned per query shape and a
+relational store would mean normalizing elements into their own table.
+"""
+
+enum DesignElementType {
+  RECTANGLE
+  ELLIPSE
+  TEXT
+}
+
+type DesignElement {
+  id: ID!
+  type: DesignElementType!
+  x: Float!
+  y: Float!
+  width: Float!
+  height: Float!
+  rotation: Float!
+  zIndex: Int!
+  fill: String!
+  stroke: String!
+  strokeWidth: Float!
+  """
+  Only present on TEXT elements.
+  """
+  text: String
+  fontFamily: String
+  fontSize: Float
+  fontWeight: Int
+}
+
+input DesignElementInput {
+  id: ID!
+  type: DesignElementType!
+  x: Float!
+  y: Float!
+  width: Float!
+  height: Float!
+  rotation: Float!
+  zIndex: Int!
+  fill: String!
+  stroke: String!
+  strokeWidth: Float!
+  text: String
+  fontFamily: String
+  fontSize: Float
+  fontWeight: Int
+}
+
+type Design {
+  id: ID!
+  name: String!
+  width: Float!
+  height: Float!
+  createdAt: String!
+  updatedAt: String!
+  elements: [DesignElement!]!
+}
+
+input SaveDesignInput {
+  """
+  Omit to create a new design; pass an existing design's id to update it.
+  """
+  id: ID
+  name: String!
+  width: Float!
+  height: Float!
+  elements: [DesignElementInput!]!
+}
+
+type Query {
+  """
+  Every saved design, most recently updated first.
+  """
+  designs: [Design!]!
+  design(id: ID!): Design
+}
+
+type Mutation {
+  saveDesign(input: SaveDesignInput!): Design!
+  deleteDesign(id: ID!): Boolean!
+}
