@@ -6,7 +6,6 @@ import type {
   APIGatewayProxyStructuredResultV2,
   Context as LambdaContext,
 } from "aws-lambda";
-import { isWarmupPing, type WarmupPing } from "api-shared/warmup";
 
 const apiBaseUrl = process.env.API_BASE_URL;
 if (!apiBaseUrl) throw new Error("API_BASE_URL is required");
@@ -31,15 +30,9 @@ const apolloHandler = startServerAndCreateLambdaHandler(
   handlers.createAPIGatewayProxyEventV2RequestHandler()
 );
 
-// The warmup schedule invokes this function directly (bypassing API
-// Gateway) with a fixed {warmup: true} payload - short-circuit before
-// Apollo ever sees it, so a scheduled ping never triggers gateway
-// composition against the three subgraphs.
 export const handler = async (
-  event: APIGatewayProxyEventV2 | WarmupPing,
+  event: APIGatewayProxyEventV2,
   context: LambdaContext
 ): Promise<APIGatewayProxyStructuredResultV2 | void> => {
-  if (isWarmupPing(event)) return { statusCode: 200, body: "warm" };
-
   return apolloHandler(event, context, () => {});
 };
