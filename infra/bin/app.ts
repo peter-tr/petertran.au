@@ -7,7 +7,7 @@ import { GamesStack } from "../lib/games-stack";
 import { PantryStack } from "../lib/pantry-stack";
 import { ZeroTrustLabStack } from "../lib/zero-trust-lab-stack";
 import { ApiGatewayStack } from "../lib/api-gateway-stack";
-import { ProvisionedConcurrencyStack } from "../lib/pc-config-stack";
+import { ProvisionedConcurrencyStack } from "../lib/warm-schedule-stack";
 import { FUNCTION_NAMES, TEST_FUNCTION_NAMES } from "../lib/shared/function-names";
 
 const app = new App();
@@ -76,7 +76,7 @@ const zeroTrustLabFnNames = {
 // (Sydney) - deliberately its own stack, an operational/cost concern that
 // cuts across all of them. Safe to deploy in any order relative to the
 // producing stacks (its own IAM policy referencing those aliases doesn't
-// require them to already exist). See infra/lib/pc-config-stack.ts.
+// require them to already exist). See infra/lib/warm-schedule-stack.ts.
 const provisionedConcurrencyStack = new ProvisionedConcurrencyStack(
   app,
   "PetertranProvisionedConcurrencyStack",
@@ -89,7 +89,7 @@ const provisionedConcurrencyStack = new ProvisionedConcurrencyStack(
   }
 );
 
-// Shared HttpApi in front of portfolio/pantry/imposter/pc-config, giving
+// Shared HttpApi in front of portfolio/pantry/imposter/warm-schedule, giving
 // them one stable domain (api.petertran.au) instead of each its own
 // CloudFormation-generated Function URL. Plain function names, no live
 // cross-stack reference - deliberately does NOT cover zero-trust-lab's own
@@ -103,7 +103,7 @@ const apiGatewayStack = new ApiGatewayStack(app, "PetertranApiGatewayStack", {
   portfolioFnName: FUNCTION_NAMES.portfolio,
   pantryFnName: FUNCTION_NAMES.pantry,
   imposterFnName: FUNCTION_NAMES.imposter,
-  pcConfigFnName: FUNCTION_NAMES.pcConfig,
+  warmScheduleFnName: FUNCTION_NAMES.warmSchedule,
   env: { account, region: "ap-southeast-2" },
 });
 
@@ -133,7 +133,7 @@ apiGatewayStack.addDependency(provisionedConcurrencyStack);
 // parallel copy, so it can't silently drift from whatever prod actually
 // deploys (see each class's isTestEnv-guarded branches for what's
 // deliberately omitted: SES/RUM domain-wide singletons stay owned by prod's
-// invocation, and pc-config/zero-trust-lab aren't part of what the test env
+// invocation, and warm-schedule/zero-trust-lab aren't part of what the test env
 // exists to validate).
 if (process.env.DEPLOY_TEST_ENV === "true") {
   const testDomainName = `test.${hostedZoneName}`;

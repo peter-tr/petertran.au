@@ -14,7 +14,7 @@ import { SchedulerClient, GetScheduleCommand, UpdateScheduleCommand } from "@aws
 // written textually (ES module semantics), so a dynamic import is used here
 // instead to guarantee the env vars are set first.
 process.env.LIVE_ALIAS_NAME = "live";
-process.env.PC_CONFIG_PARAM_NAME = "/pc-config/schedules";
+process.env.WARM_SCHEDULE_PARAM_NAME = "/warm-schedule/schedules";
 process.env.PORTFOLIO_FN_NAME = "portfolio-fn";
 process.env.PANTRY_FN_NAME = "pantry-fn";
 process.env.IMPOSTER_FN_NAME = "imposter-fn";
@@ -23,11 +23,11 @@ process.env.ZTL_INTERNAL_STS_FN_NAME = "ztl-internal-sts-fn";
 process.env.ZTL_EDGE_AUTHORIZER_FN_NAME = "ztl-edge-authorizer-fn";
 process.env.ZTL_EDGE_PROXY_FN_NAME = "ztl-edge-proxy-fn";
 process.env.ZTL_DOMAIN_A_FN_NAME = "ztl-domain-a-fn";
-process.env.PC_SCHEDULE_NAMES = JSON.stringify({
-  portfolio: { on: "pc-on-portfolio", off: "pc-off-portfolio" },
-  pantry: { on: "pc-on-pantry", off: "pc-off-pantry" },
-  imposter: { on: "pc-on-imposter", off: "pc-off-imposter" },
-  zeroTrustLab: { on: "pc-on-zero-trust-lab", off: "pc-off-zero-trust-lab" },
+process.env.WARM_SCHEDULE_NAMES = JSON.stringify({
+  portfolio: { on: "warm-on-portfolio", off: "warm-off-portfolio" },
+  pantry: { on: "warm-on-pantry", off: "warm-off-pantry" },
+  imposter: { on: "warm-on-imposter", off: "warm-off-imposter" },
+  zeroTrustLab: { on: "warm-on-zero-trust-lab", off: "warm-off-zero-trust-lab" },
 });
 
 const { handler } = await import("./handler");
@@ -82,8 +82,8 @@ beforeEach(() => {
   schedulerMock.on(GetScheduleCommand).resolves({
     FlexibleTimeWindow: { Mode: "OFF" },
     Target: {
-      Arn: "arn:aws:lambda:ap-southeast-2:123456789012:function:pc-config",
-      RoleArn: "arn:aws:iam::123456789012:role/pc-scheduler-role",
+      Arn: "arn:aws:lambda:ap-southeast-2:123456789012:function:warm-schedule",
+      RoleArn: "arn:aws:iam::123456789012:role/warm-schedule-role",
     },
   });
   schedulerMock.on(UpdateScheduleCommand).resolves({});
@@ -93,7 +93,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("pc-config handler - config GET/POST", () => {
+describe("warm-schedule handler - config GET/POST", () => {
   it("GET with no stored parameter returns the all-enabled 8am-7pm defaults", async () => {
     ssmMock.on(GetParameterCommand).resolves({});
 
@@ -164,14 +164,14 @@ describe("pc-config handler - config GET/POST", () => {
 
     const updateCalls = schedulerMock.commandCalls(UpdateScheduleCommand);
     expect(updateCalls.map((c) => c.args[0].input.Name).sort()).toEqual(
-      ["pc-off-pantry", "pc-on-pantry"].sort()
+      ["warm-off-pantry", "warm-on-pantry"].sort()
     );
 
-    const onCall = updateCalls.find((c) => c.args[0].input.Name === "pc-on-pantry")!;
+    const onCall = updateCalls.find((c) => c.args[0].input.Name === "warm-on-pantry")!;
     expect(onCall.args[0].input.ScheduleExpression).toBe("cron(30 07 ? * MON,TUE,WED,THU,FRI *)");
     expect(onCall.args[0].input.State).toBe("ENABLED");
 
-    const offCall = updateCalls.find((c) => c.args[0].input.Name === "pc-off-pantry")!;
+    const offCall = updateCalls.find((c) => c.args[0].input.Name === "warm-off-pantry")!;
     expect(offCall.args[0].input.ScheduleExpression).toBe("cron(00 18 ? * MON,TUE,WED,THU,FRI *)");
 
     // Only pantry changed, so only pantry-fn should be reconciled - within
@@ -181,7 +181,7 @@ describe("pc-config handler - config GET/POST", () => {
     expect(putCalls[0].args[0].input.FunctionName).toBe("pantry-fn");
   });
 
-  it("POST with enabled:false disables both EventBridge Schedules and tears down PC", async () => {
+  it("POST with enabled:false disables both EventBridge Schedules and tears down warm capacity", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(WITHIN_WINDOW);
     ssmMock.on(GetParameterCommand).resolves({ Parameter: { Value: JSON.stringify(DEFAULT_CONFIG) } });
@@ -198,7 +198,7 @@ describe("pc-config handler - config GET/POST", () => {
   });
 });
 
-describe("pc-config handler - on/off trigger", () => {
+describe("warm-schedule handler - on/off trigger", () => {
   it("grants PC to a project's targets on an 'on' trigger", async () => {
     const result = await handler({ project: "imposter", action: "on" });
     expect(result).toEqual({ statusCode: 200, body: "reconciled" });
@@ -217,7 +217,7 @@ describe("pc-config handler - on/off trigger", () => {
   });
 });
 
-describe("pc-config handler - reconcile ping", () => {
+describe("warm-schedule handler - reconcile ping", () => {
   it("grants PC to every target when every project is enabled and within its window", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(WITHIN_WINDOW);

@@ -2,9 +2,9 @@ import { describe, it, vi, beforeAll, afterAll, type MockInstance } from "vitest
 import { App } from "aws-cdk-lib";
 import { Template } from "aws-cdk-lib/assertions";
 import * as lambda from "aws-cdk-lib/aws-lambda";
-import { ProvisionedConcurrencyStack } from "./pc-config-stack";
+import { ProvisionedConcurrencyStack } from "./warm-schedule-stack";
 
-// PcConfigFunction points lambda.Code.fromAsset at api/dist, a build output
+// WarmScheduleFunction points lambda.Code.fromAsset at api/dist, a build output
 // that doesn't exist in this checkout - see games-stack.test.ts's identical
 // comment for why this needs stubbing.
 let fromAssetSpy: MockInstance<typeof lambda.Code.fromAsset>;
@@ -22,7 +22,7 @@ afterAll(() => {
 });
 
 describe("ProvisionedConcurrencyStack", () => {
-  it("synthesizes with the pc-config Lambda, its SSM parameter, and 8 on/off schedules plus the backstop reconcile", () => {
+  it("synthesizes with the warm-schedule Lambda, its SSM parameter, and 8 on/off schedules plus the backstop reconcile", () => {
     const app = new App();
     const stack = new ProvisionedConcurrencyStack(app, "TestProvisionedConcurrencyStack", {
       portfolioFnName: "portfolio-graphql",
@@ -42,7 +42,7 @@ describe("ProvisionedConcurrencyStack", () => {
 
     template.resourceCountIs("AWS::Lambda::Function", 1);
     template.hasResourceProperties("AWS::Lambda::Function", {
-      FunctionName: "pc-config",
+      FunctionName: "warm-schedule",
     });
     template.resourceCountIs("AWS::SSM::Parameter", 1);
     // 2 (on/off) per project (portfolio, pantry, imposter, zeroTrustLab) plus
