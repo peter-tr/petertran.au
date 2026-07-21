@@ -191,9 +191,16 @@
   }
 
   .notes-rail {
+    /* Overrides the base rule's flex: 0 0 9.5rem, which sets a fixed
+       *width* for the desktop sidebar (a row-direction flex item there) -
+       left as-is here, it instead pins .notes-rail to a 9.5rem *height*
+       now that it's a column-direction flex item, and the default
+       align-items: stretch then stretches every pill to fill it. */
+    flex: 0 0 auto;
     position: static;
     flex-direction: row;
     flex-wrap: nowrap;
+    align-items: center;
     overflow-x: auto;
     gap: 0.5rem;
     padding-bottom: 0.3rem;
