@@ -1,5 +1,21 @@
 # web
 
+## 1.4.0
+
+### Minor Changes
+
+- f44c18f: add CloudWatch alarms/dashboard and an alert-email toggle
+- cbb9100: add hidden /notes page for experiments and learnings
+
+### Patch Changes
+
+- 062b67b: stop notes mobile rail pills from stretching to 9.5rem tall
+- b43199c: stop client-routed pages from flashing the home page's prerendered content
+- 9c1bdbf: stop notes page from forcing mobile viewport to zoom out
+- 93c0b32: supergraph cold-start + configurable PC concurrency
+- 6ad5e54: Route local dev/e2e GraphQL calls through the supergraph gateway instead of each subgraph's own dev-server port.
+- e744989: Update home page architecture diagram to match current infra: API Gateway + Apollo Federation Supergraph gateway in front of the portfolio Lambda, plus the second Anthropic secret and Cost Explorer.
+
 ## 1.3.0
 
 ### Minor Changes
