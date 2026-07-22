@@ -178,12 +178,19 @@ export class MonitoringStack extends Stack {
     );
     alertsSettingsFn.addToRolePolicy(
       new iam.PolicyStatement({
-        // Subscription ARNs are the topic ARN with a UUID suffix
-        // (`<topicArn>:<uuid>`), not known until the subscription is
-        // actually created - the wildcard covers that without needing to
-        // hardcode it.
+        // `*`, not `${alarmTopic.topicArn}:*` - tried the scoped wildcard
+        // first (subscription ARNs are the topic ARN with a UUID suffix,
+        // `<topicArn>:<uuid>`, not known until the subscription actually
+        // exists), but confirmed live (via iam:SimulatePrincipalPolicy
+        // against the real deployed role, and against the real subscription
+        // ARN, cross-checked with the real Lambda's own AccessDenied logs)
+        // that AWS's IAM engine does not match a `topicArn:*` pattern
+        // against a real `topicArn:<uuid>` subscription ARN for these two
+        // actions - same "AWS API with no usable resource-level ARN
+        // scoping" category as the CloudWatch/X-Ray/Cost Explorer grant in
+        // site-stack.ts, just discovered empirically rather than up front.
         actions: ["sns:GetSubscriptionAttributes", "sns:SetSubscriptionAttributes"],
-        resources: [`${alarmTopic.topicArn}:*`],
+        resources: ["*"],
       })
     );
 
