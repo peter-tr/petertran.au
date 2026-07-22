@@ -197,6 +197,14 @@
        now that it's a column-direction flex item, and the default
        align-items: stretch then stretches every pill to fill it. */
     flex: 0 0 auto;
+    /* .notes-layout's align-items: flex-start (set in the base rule, for
+       desktop) sizes a column-direction flex item to fit its content by
+       default. Its pill children don't wrap (white-space: nowrap below),
+       so without this, .notes-rail grows to the sum of every pill's full
+       width instead of staying at the viewport's width and scrolling
+       internally - which was dragging the whole page into horizontal
+       overflow, forcing a pinch-zoom-out to see anything. */
+    width: 100%;
     position: static;
     flex-direction: row;
     flex-wrap: nowrap;
@@ -235,5 +243,16 @@
   .notes-rail-item.active .notes-rail-date {
     color: var(--ink);
     opacity: 0.7;
+  }
+
+  /* Same shrink-to-fit issue as .notes-rail above: .note-entry's min-width: 0
+     (base rule) only lifts its lower bound, it doesn't cap the upper one, so
+     under .notes-layout's align-items: flex-start (also base rule) it still
+     sizes up to its widest descendant's max-content width - here, a
+     .note-table's min-width: 26rem. Without this, that table dragged the
+     whole page into horizontal overflow instead of just scrolling within
+     its own .note-table-wrap. */
+  .note-entry {
+    width: 100%;
   }
 }
