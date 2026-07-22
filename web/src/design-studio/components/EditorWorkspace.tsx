@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import Canvas, { CANVAS_WIDTH, CANVAS_HEIGHT, type CanvasHandle } from "./Canvas";
+import Canvas, { type CanvasHandle } from "./Canvas";
 import Toolbar from "./Toolbar";
 import LayersPanel from "./LayersPanel";
 import PropertyPanel from "./PropertyPanel";
@@ -17,6 +17,8 @@ import { saveDesign, type Design } from "../api";
 
 interface EditorWorkspaceProps {
   designId: string | undefined;
+  width: number;
+  height: number;
   initialEvents: HistoryEvent[];
   initialName: string;
   onSaved: (design: Design) => void;
@@ -32,6 +34,8 @@ function isEditableTarget(target: EventTarget | null): boolean {
 
 export default function EditorWorkspace({
   designId,
+  width,
+  height,
   initialEvents,
   initialName,
   onSaved,
@@ -47,8 +51,8 @@ export default function EditorWorkspace({
 
   const handleAdd = useCallback(
     (type: ElementType) => {
-      const centerX = CANVAS_WIDTH / 2;
-      const centerY = CANVAS_HEIGHT / 2;
+      const centerX = width / 2;
+      const centerY = height / 2;
       const created =
         type === "rectangle"
           ? createRectangle(elements, centerX, centerY)
@@ -59,7 +63,7 @@ export default function EditorWorkspace({
       dispatch({ type: "add", element: created });
       setSelectedId(created.id);
     },
-    [elements, dispatch]
+    [elements, dispatch, width, height]
   );
 
   const handleChange = useCallback(
@@ -116,8 +120,8 @@ export default function EditorWorkspace({
       const saved = await saveDesign({
         id: designId,
         name,
-        width: CANVAS_WIDTH,
-        height: CANVAS_HEIGHT,
+        width,
+        height,
         elements: elements.map(toElementInput),
       });
       onSaved(saved);
@@ -126,7 +130,7 @@ export default function EditorWorkspace({
     } finally {
       setSaving(false);
     }
-  }, [designId, name, elements, onSaved]);
+  }, [designId, name, elements, onSaved, width, height]);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -178,6 +182,8 @@ export default function EditorWorkspace({
         <div className="design-studio-canvas-frame">
           <Canvas
             ref={canvasRef}
+            width={width}
+            height={height}
             elements={elements}
             selectedId={selectedId}
             onSelect={setSelectedId}

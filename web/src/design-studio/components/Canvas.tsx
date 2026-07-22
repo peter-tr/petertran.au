@@ -4,10 +4,9 @@ import type Konva from "konva";
 import type { KonvaEventObject } from "konva/lib/Node";
 import type { DesignElement } from "../lib/elements";
 
-export const CANVAS_WIDTH = 900;
-export const CANVAS_HEIGHT = 600;
-
 interface CanvasProps {
+  width: number;
+  height: number;
   elements: DesignElement[];
   selectedId: string | null;
   onSelect: (id: string | null) => void;
@@ -33,7 +32,7 @@ function topLeftFromCenterNode(node: Konva.Node, width: number, height: number):
 }
 
 const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
-  { elements, selectedId, onSelect, onChange },
+  { width, height, elements, selectedId, onSelect, onChange },
   ref
 ) {
   const stageRef = useRef<Konva.Stage>(null);
@@ -109,15 +108,15 @@ const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
     <div className="design-studio-stage-wrapper">
       <Stage
         ref={stageRef}
-        width={CANVAS_WIDTH}
-        height={CANVAS_HEIGHT}
+        width={width}
+        height={height}
         className="design-studio-stage"
         onMouseDown={(e) => {
           if (e.target === e.target.getStage()) onSelect(null);
         }}
       >
         <Layer>
-          <Rect x={0} y={0} width={CANVAS_WIDTH} height={CANVAS_HEIGHT} fill="#ffffff" listening={false} />
+          <Rect x={0} y={0} width={width} height={height} fill="#ffffff" listening={false} />
           {sorted.map((element) => {
             const { x, y } = centerOf(element);
             const common = {

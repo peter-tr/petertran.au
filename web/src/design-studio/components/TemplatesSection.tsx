@@ -40,7 +40,12 @@ export default function TemplatesSection() {
   // nothing is actually persisted until the editor's own Save button is
   // clicked.
   function handleOpen(template: Template) {
-    const state: NewDesignLocationState = { seedElements: template.elements, seedName: template.name };
+    const state: NewDesignLocationState = {
+      seedElements: template.elements,
+      seedName: template.name,
+      seedWidth: template.width,
+      seedHeight: template.height,
+    };
     navigate("/design-studio/new", { state });
   }
 
