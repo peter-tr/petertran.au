@@ -135,7 +135,11 @@ export const operationStatsPlugin: ApolloServerPlugin<Context> = {
           // Segment or a Subsegment depending on call context -- only the root
           // carries trace_id, so a Subsegment needs one hop up via `.segment`.
           const current = process.env.AWS_LAMBDA_FUNCTION_NAME ? AWSXRay.getSegment() : undefined;
-          const traceId = current ? ("segment" in current ? current.segment.trace_id : current.trace_id) : null;
+          const traceId = current
+            ? "segment" in current
+              ? current.segment.trace_id
+              : current.trace_id
+            : null;
 
           tasks.push(recordOperation(name, Date.now() - start, sample, traceId).catch(() => {}));
         }
