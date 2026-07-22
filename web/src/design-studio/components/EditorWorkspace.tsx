@@ -13,7 +13,7 @@ import {
   type ElementType,
 } from "../lib/elements";
 import { toElementInput } from "../lib/serialization";
-import { saveDesign, type Design } from "../api";
+import { saveDesign, saveAsTemplate, type Design } from "../api";
 
 interface EditorWorkspaceProps {
   designId: string | undefined;
@@ -45,6 +45,11 @@ export default function EditorWorkspace({
   const [name, setName] = useState(initialName);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [showTemplateForm, setShowTemplateForm] = useState(false);
+  const [templateCategory, setTemplateCategory] = useState("");
+  const [templateTags, setTemplateTags] = useState("");
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [templateMessage, setTemplateMessage] = useState<string | null>(null);
   const canvasRef = useRef<CanvasHandle>(null);
 
   const selectedElement = elements.find((el) => el.id === selectedId);
@@ -132,6 +137,34 @@ export default function EditorWorkspace({
     }
   }, [designId, name, elements, onSaved, width, height]);
 
+  const handleSaveAsTemplate = useCallback(async () => {
+    if (!templateCategory.trim()) return;
+
+    setSavingTemplate(true);
+    setTemplateMessage(null);
+    try {
+      await saveAsTemplate({
+        name: name || "Untitled template",
+        category: templateCategory.trim(),
+        tags: templateTags
+          .split(",")
+          .map((tag) => tag.trim())
+          .filter(Boolean),
+        width,
+        height,
+        elements: elements.map(toElementInput),
+      });
+      setTemplateMessage("Saved as a template.");
+      setShowTemplateForm(false);
+      setTemplateCategory("");
+      setTemplateTags("");
+    } catch {
+      setTemplateMessage("Couldn't save this as a template - try again.");
+    } finally {
+      setSavingTemplate(false);
+    }
+  }, [name, templateCategory, templateTags, elements, width, height]);
+
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (isEditableTarget(e.target)) return;
@@ -174,9 +207,41 @@ export default function EditorWorkspace({
           <button type="button" onClick={handleSave} disabled={saving}>
             {saving ? "Saving…" : "Save"}
           </button>
+          <button type="button" onClick={() => setShowTemplateForm((v) => !v)}>
+            Save as template
+          </button>
         </div>
       </header>
       {saveError && <p className="status-line">// {saveError}</p>}
+      {showTemplateForm && (
+        <div className="design-studio-template-form">
+          <input
+            type="text"
+            placeholder="Category (e.g. Poster)"
+            value={templateCategory}
+            onChange={(e) => setTemplateCategory(e.target.value)}
+            aria-label="Template category"
+          />
+          <input
+            type="text"
+            placeholder="Tags, comma separated"
+            value={templateTags}
+            onChange={(e) => setTemplateTags(e.target.value)}
+            aria-label="Template tags"
+          />
+          <button
+            type="button"
+            onClick={handleSaveAsTemplate}
+            disabled={savingTemplate || !templateCategory.trim()}
+          >
+            {savingTemplate ? "Saving…" : "Save template"}
+          </button>
+          <button type="button" onClick={() => setShowTemplateForm(false)}>
+            Cancel
+          </button>
+        </div>
+      )}
+      {templateMessage && <p className="status-line">// {templateMessage}</p>}
       <div className="design-studio-workspace">
         <Toolbar onAdd={handleAdd} onExport={() => canvasRef.current?.exportPNG()} />
         <div className="design-studio-canvas-frame">
