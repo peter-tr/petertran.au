@@ -54,7 +54,7 @@ describe("MonitoringStack", () => {
     template.resourceCountIs("AWS::CloudWatch::Dashboard", 1);
   });
 
-  it("synthesizes AlertsSettingsFunction with sns:*SubscriptionAttributes/ListSubscriptionsByTopic scoped to the alarms topic", () => {
+  it("synthesizes AlertsSettingsFunction with sns:ListSubscriptionsByTopic scoped to the topic and sns:*SubscriptionAttributes on *", () => {
     const app = new App();
     const stack = new MonitoringStack(app, "TestMonitoringStack", {
       env: { account: "123456789012", region: "ap-southeast-2" },
@@ -72,9 +72,14 @@ describe("MonitoringStack", () => {
     template.hasResourceProperties("AWS::IAM::Policy", {
       PolicyDocument: {
         Statement: Match.arrayWith([
-          Match.objectLike({ Action: "sns:ListSubscriptionsByTopic" }),
+          Match.objectLike({ Action: "sns:ListSubscriptionsByTopic", Resource: { Ref: Match.anyValue() } }),
+          // Resource: "*", not a scoped `topicArn:*` wildcard - confirmed
+          // live that AWS's IAM engine doesn't match that pattern against a
+          // real subscription ARN for these two actions (see
+          // monitoring-stack.ts's doc comment on this statement).
           Match.objectLike({
             Action: ["sns:GetSubscriptionAttributes", "sns:SetSubscriptionAttributes"],
+            Resource: "*",
           }),
         ]),
       },
