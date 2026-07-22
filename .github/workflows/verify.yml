@@ -3,6 +3,15 @@ name: Verify
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+    # changeset-check.yml auto-commits a .changeset/*.md file and pushes it
+    # straight to the PR branch, which fires its own `synchronize` event -
+    # without this, that second event re-ran the full lint/format/typecheck/
+    # test suite plus the Playwright visual-e2e job (Chromium install
+    # included) a second time, ~15s later, against a diff that only ever
+    # added one changeset file. Confirmed against the run history: roughly
+    # half of all Verify runs were this exact back-to-back duplicate.
+    paths-ignore:
+      - ".changeset/**"
 
 permissions:
   contents: read
