@@ -12,6 +12,7 @@ let cachedDb: Promise<Db> | null = null;
 // connection instead of an AWS SDK client.
 export function getDb(): Promise<Db> {
   if (!cachedDb) cachedDb = connect();
+
   return cachedDb;
 }
 

@@ -22,7 +22,11 @@ export default function PropertyPanel({ element, onChange }: PropertyPanelProps)
       <h2>Properties</h2>
       <label className="design-studio-field">
         Fill
-        <input type="color" value={element.fill} onChange={(e) => onChange({ ...element, fill: e.target.value })} />
+        <input
+          type="color"
+          value={element.fill}
+          onChange={(e) => onChange({ ...element, fill: e.target.value })}
+        />
       </label>
       <label className="design-studio-field">
         Stroke

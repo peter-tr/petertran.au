@@ -24,6 +24,7 @@ export function applyEvent(elements: DesignElement[], event: HistoryEvent): Desi
 
     case "reorder": {
       const zIndexById = new Map(event.order.map((id, index) => [id, index]));
+
       return elements.map((el) => ({ ...el, zIndex: zIndexById.get(el.id) ?? el.zIndex }));
     }
   }

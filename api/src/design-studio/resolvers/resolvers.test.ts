@@ -119,6 +119,7 @@ describe("createDesignStudioResolvers", () => {
     const result = await resolvers.Mutation.useTemplate({}, { templateId: "tpl-1" });
 
     expect(store.getTemplate).toHaveBeenCalledWith("tpl-1");
+
     const [saveArgs] = vi.mocked(store.saveDesign).mock.calls[0];
     expect(saveArgs.name).toBe(template.name);
     expect(saveArgs.elements).toHaveLength(1);

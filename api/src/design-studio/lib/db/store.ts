@@ -1,6 +1,12 @@
 import { ObjectId, type Collection, type Filter } from "mongodb";
 import { getDb } from "./client";
-import type { DesignElementRecord, DesignRecord, SaveDesignArgs, TemplateRecord, TemplateFilter } from "../design";
+import type {
+  DesignElementRecord,
+  DesignRecord,
+  SaveDesignArgs,
+  TemplateRecord,
+  TemplateFilter,
+} from "../design";
 import type { DesignStore } from "../../resolvers/resolvers";
 
 interface DesignDocument {
@@ -120,6 +126,7 @@ export class MongoDesignStore implements DesignStore {
 
     if (args.id) {
       if (!ObjectId.isValid(args.id)) throw new Error("Invalid design id.");
+
       const _id = new ObjectId(args.id);
       await collection.updateOne(
         { _id },

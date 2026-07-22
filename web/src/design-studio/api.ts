@@ -16,7 +16,8 @@ import type {
 // api.ts - optional chaining on `env` because api/scripts/validate-schemas.ts
 // requires this module from plain Node/tsx (no Vite, so import.meta.env
 // doesn't exist there) purely to validate the query strings below.
-export const DESIGN_STUDIO_ENDPOINT = import.meta.env?.VITE_DESIGN_STUDIO_GRAPHQL_ENDPOINT as string | undefined;
+export const DESIGN_STUDIO_ENDPOINT = import.meta.env?.VITE_DESIGN_STUDIO_GRAPHQL_ENDPOINT as
+  string | undefined;
 
 export const runDesignStudioQuery = createGraphQLClient(
   DESIGN_STUDIO_ENDPOINT,
@@ -120,11 +121,13 @@ export const USE_TEMPLATE_MUTATION = /* GraphQL */ `
 
 export async function listDesigns(): Promise<Design[]> {
   const data = await runDesignStudioQuery<DesignsQuery>(DESIGNS_QUERY);
+
   return data.designs;
 }
 
 export async function getDesign(id: string): Promise<Design | null> {
   const data = await runDesignStudioQuery<DesignQuery>(DESIGN_QUERY, { id });
+
   return data.design ?? null;
 }
 
@@ -138,20 +141,27 @@ export interface SaveDesignArgs {
 
 export async function saveDesign(input: SaveDesignArgs): Promise<Design> {
   const data = await runDesignStudioQuery<SaveDesignMutation>(SAVE_DESIGN_MUTATION, { input });
+
   return data.saveDesign;
 }
 
 export async function deleteDesign(id: string): Promise<boolean> {
   const data = await runDesignStudioQuery<DeleteDesignMutation>(DELETE_DESIGN_MUTATION, { id });
+
   return data.deleteDesign;
 }
 
 export async function listTemplates(filter: TemplatesQueryVariables = {}): Promise<Template[]> {
   const data = await runDesignStudioQuery<TemplatesQuery>(TEMPLATES_QUERY, filter);
+
   return data.templates;
 }
 
-export async function useTemplate(templateId: string): Promise<Design> {
+// Named applyTemplate, not useTemplate (matching the GraphQL mutation name)
+// - "use..." reads as a React Hook name to eslint-plugin-react-hooks, and
+// this is a plain async call, not a hook.
+export async function applyTemplate(templateId: string): Promise<Design> {
   const data = await runDesignStudioQuery<UseTemplateMutation>(USE_TEMPLATE_MUTATION, { templateId });
+
   return data.useTemplate;
 }

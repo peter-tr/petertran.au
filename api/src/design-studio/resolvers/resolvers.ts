@@ -23,10 +23,12 @@ export function createDesignStudioResolvers(store: DesignStore) {
     Query: {
       designs: async () => {
         const designs = await store.listDesigns();
+
         return designs.map(withDesignDefaults);
       },
       design: async (_: unknown, args: { id: string }) => {
         const design = await store.getDesign(args.id);
+
         return design ? withDesignDefaults(design) : null;
       },
       templates: (_: unknown, args: TemplateFilter) => store.listTemplates(args),
@@ -34,6 +36,7 @@ export function createDesignStudioResolvers(store: DesignStore) {
     Mutation: {
       saveDesign: async (_: unknown, args: { input: SaveDesignArgs }) => {
         const saved = await store.saveDesign(args.input);
+
         return withDesignDefaults(saved);
       },
       deleteDesign: async (_: unknown, args: { id: string }) => store.deleteDesign(args.id),

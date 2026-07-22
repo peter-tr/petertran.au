@@ -11,6 +11,7 @@ interface LayersPanelProps {
 
 function elementLabel(element: DesignElement): string {
   if (element.type === "text") return element.text.slice(0, 20) || "Text";
+
   return element.type === "rectangle" ? "Rectangle" : "Ellipse";
 }
 

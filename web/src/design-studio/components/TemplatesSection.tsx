@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { listTemplates, useTemplate, type Template } from "../api";
+import { listTemplates, applyTemplate, type Template } from "../api";
 
 export default function TemplatesSection() {
   const navigate = useNavigate();
@@ -14,7 +14,9 @@ export default function TemplatesSection() {
   // Loaded once, unfiltered, purely to populate the category dropdown -
   // every actual search/filter combination still goes to the server below.
   useEffect(() => {
-    listTemplates().then(setAllTemplates).catch(() => {});
+    listTemplates()
+      .then(setAllTemplates)
+      .catch(() => {});
   }, []);
 
   const categories = useMemo(
@@ -36,7 +38,7 @@ export default function TemplatesSection() {
   async function handleUse(templateId: string) {
     setCreatingId(templateId);
     try {
-      const design = await useTemplate(templateId);
+      const design = await applyTemplate(templateId);
       navigate(`/design-studio/${design.id}`);
     } catch {
       setError("Couldn't create a design from that template - try again.");
@@ -55,7 +57,11 @@ export default function TemplatesSection() {
           onChange={(e) => setSearch(e.target.value)}
           aria-label="Search templates"
         />
-        <select value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Filter by category">
+        <select
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+          aria-label="Filter by category"
+        >
           <option value="">All categories</option>
           {categories.map((cat) => (
             <option key={cat} value={cat}>
@@ -78,7 +84,11 @@ export default function TemplatesSection() {
             </div>
             <span className="design-studio-template-name">{template.name}</span>
             <span className="design-studio-template-category">{template.category}</span>
-            <button type="button" disabled={creatingId === template.id} onClick={() => handleUse(template.id)}>
+            <button
+              type="button"
+              disabled={creatingId === template.id}
+              onClick={() => handleUse(template.id)}
+            >
               {creatingId === template.id ? "Creating…" : "Use template"}
             </button>
           </li>

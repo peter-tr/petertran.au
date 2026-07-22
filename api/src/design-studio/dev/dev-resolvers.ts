@@ -44,6 +44,7 @@ class InMemoryDesignStore implements DesignStore {
     };
 
     this.designs.set(design.id, design);
+
     return design;
   }
 
@@ -52,7 +53,9 @@ class InMemoryDesignStore implements DesignStore {
   }
 
   async listTemplates(filter: TemplateFilter): Promise<TemplateRecord[]> {
-    return this.templates.filter((template) => matchesFilter(template, filter)).sort((a, b) => b.popularity - a.popularity);
+    return this.templates
+      .filter((template) => matchesFilter(template, filter))
+      .sort((a, b) => b.popularity - a.popularity);
   }
 
   async getTemplate(id: string): Promise<TemplateRecord | null> {

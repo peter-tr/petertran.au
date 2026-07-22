@@ -5,7 +5,13 @@ import LayersPanel from "./LayersPanel";
 import PropertyPanel from "./PropertyPanel";
 import { useEventHistory } from "../lib/history/useEventHistory";
 import type { HistoryEvent } from "../lib/history/reducer";
-import { createRectangle, createEllipse, createText, type DesignElement, type ElementType } from "../lib/elements";
+import {
+  createRectangle,
+  createEllipse,
+  createText,
+  type DesignElement,
+  type ElementType,
+} from "../lib/elements";
 import { toElementInput } from "../lib/serialization";
 import { saveDesign, type Design } from "../api";
 
@@ -24,7 +30,12 @@ function isEditableTarget(target: EventTarget | null): boolean {
   );
 }
 
-export default function EditorWorkspace({ designId, initialEvents, initialName, onSaved }: EditorWorkspaceProps) {
+export default function EditorWorkspace({
+  designId,
+  initialEvents,
+  initialName,
+  onSaved,
+}: EditorWorkspaceProps) {
   const { elements, dispatch, undo, redo, canUndo, canRedo } = useEventHistory(initialEvents);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [name, setName] = useState(initialName);
@@ -136,6 +147,7 @@ export default function EditorWorkspace({ designId, initialEvents, initialName, 
     }
 
     window.addEventListener("keydown", handleKeyDown);
+
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [undo, redo, selectedId, handleDelete, handleSave]);
 

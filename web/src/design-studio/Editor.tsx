@@ -20,6 +20,7 @@ export default function Editor() {
 
   useEffect(() => {
     if (isNew || !designId) return;
+
     let cancelled = false;
 
     getDesign(designId)
@@ -27,6 +28,7 @@ export default function Editor() {
         if (cancelled) return;
         if (!design) {
           setError("That design wasn't found.");
+
           return;
         }
         setSeed({

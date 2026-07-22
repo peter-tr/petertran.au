@@ -43,7 +43,7 @@ export default tseslint.config(
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
     },
   },
-  // Each of the 3 services' schema.graphql is self-contained (no cross-schema
+  // Each of the 4 services' schema.graphql is self-contained (no cross-schema
   // references), so it's linted against itself rather than needing a single
   // combined schema pointer.
   {

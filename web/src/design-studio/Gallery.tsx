@@ -38,7 +38,11 @@ export default function Gallery() {
         {designs?.map((design) => (
           <li key={design.id} className="design-studio-gallery-card">
             <Link to={`/design-studio/${design.id}`}>{design.name}</Link>
-            <button type="button" onClick={() => handleDelete(design.id)} aria-label={`Delete ${design.name}`}>
+            <button
+              type="button"
+              onClick={() => handleDelete(design.id)}
+              aria-label={`Delete ${design.name}`}
+            >
               ✕
             </button>
           </li>
