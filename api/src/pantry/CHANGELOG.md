@@ -1,5 +1,13 @@
 # pantry
 
+## 1.4.1
+
+### Patch Changes
+
+- 0584cff: add CORS headers to actual Lambda responses, not just preflight
+- Updated dependencies [0584cff]
+  - api-shared@1.1.3
+
 ## 1.4.0
 
 ### Minor Changes

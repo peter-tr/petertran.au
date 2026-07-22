@@ -1,5 +1,12 @@
 # supergraph
 
+## 0.1.2
+
+### Patch Changes
+
+- Updated dependencies [0584cff]
+  - api-shared@1.1.3
+
 ## 0.1.1
 
 ### Patch Changes

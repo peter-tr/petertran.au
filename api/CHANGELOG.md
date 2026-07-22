@@ -1,5 +1,16 @@
 # api
 
+## 1.3.0
+
+### Minor Changes
+
+- f44c18f: add CloudWatch alarms/dashboard and an alert-email toggle
+
+### Patch Changes
+
+- 0584cff: add CORS headers to actual Lambda responses, not just preflight
+- 93c0b32: supergraph cold-start + configurable PC concurrency
+
 ## 1.2.0
 
 ### Minor Changes
