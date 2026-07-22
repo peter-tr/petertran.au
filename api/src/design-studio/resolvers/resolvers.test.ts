@@ -134,4 +134,18 @@ describe("createDesignStudioResolvers", () => {
     });
     expect(result.id).toBe("new-tpl");
   });
+
+  it("Mutation.generateDesignElements delegates to the injected generate function with the request context", async () => {
+    const generated = [makeTemplate().elements[0]];
+    const generate = vi.fn().mockResolvedValue(generated);
+    const store = makeStore();
+    const resolvers = createDesignStudioResolvers(store, generate);
+
+    const args = { prompt: "a bold sale poster", width: 900, height: 600 };
+    const context = { sourceIp: "1.2.3.4", xraySegment: undefined };
+    const result = await resolvers.Mutation.generateDesignElements({}, args, context);
+
+    expect(generate).toHaveBeenCalledWith("a bold sale poster", 900, 600, "1.2.3.4", undefined);
+    expect(result).toBe(generated);
+  });
 });
