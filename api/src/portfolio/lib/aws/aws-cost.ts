@@ -35,7 +35,11 @@ class AwsCostFetcher extends CachedCostFetcher {
       ddb,
       tableName: TABLE_NAME,
       cacheKey: { pk: "STATS", sk: "AWS_COST" },
-      cacheTtlMs: 6 * 60 * 60 * 1000,
+      // 25h, not 6h - cost-refresh-handler.ts proactively refreshes this
+      // once a day now, so this TTL is only a backstop if that schedule
+      // ever misses a day (see anthropic-cost.ts's matching comment for the
+      // incident that motivated this).
+      cacheTtlMs: 25 * 60 * 60 * 1000,
     });
   }
 
