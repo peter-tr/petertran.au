@@ -230,6 +230,15 @@ if (process.env.DEPLOY_TEST_ENV === "true") {
     env: { account, region: "ap-southeast-2" },
   });
 
+  // Dashboard-only counterpart to prod's monitoringStack above (no
+  // alarms/SNS/alerts-toggle - see MonitoringStack's isTestEnv doc comment)
+  // so a test-env deploy gets its own operational visibility without
+  // sharing prod's dashboard or paging anyone about disposable infra.
+  new MonitoringStack(app, "PetertranTestMonitoringStack", {
+    isTestEnv: true,
+    env: { account, region: "ap-southeast-2" },
+  });
+
   const testApiGatewayStack = new ApiGatewayStack(app, "PetertranTestApiGatewayStack", {
     domainName: testDomainName,
     alternateDomainNames: testAlternateDomainNames,

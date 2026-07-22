@@ -1,5 +1,14 @@
 # portfolio
 
+## 1.3.1
+
+### Patch Changes
+
+- cfa8fc5: refresh footer cost figures on a daily schedule, not per-request
+- 0584cff: add CORS headers to actual Lambda responses, not just preflight
+- Updated dependencies [0584cff]
+  - api-shared@1.1.3
+
 ## 1.3.0
 
 ### Minor Changes

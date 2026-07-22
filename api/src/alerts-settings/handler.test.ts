@@ -18,11 +18,16 @@ const snsMock = mockClient(SNSClient);
 const SUBSCRIPTION_ARN =
   "arn:aws:sns:ap-southeast-2:123456789012:petertran-au-alarms:11111111-2222-3333-4444-555555555555";
 
-function httpEvent(method: string, body?: unknown): APIGatewayProxyEvent {
+function httpEvent(
+  method: string,
+  body?: unknown,
+  origin = "https://www.petertran.au"
+): APIGatewayProxyEvent {
   return {
     httpMethod: method,
     body: body !== undefined ? JSON.stringify(body) : undefined,
     isBase64Encoded: false,
+    headers: origin ? { origin } : {},
   } as unknown as APIGatewayProxyEvent;
 }
 
@@ -104,5 +109,40 @@ describe("alerts-settings handler - POST", () => {
 
     const result = await handler(httpEvent("POST", { enabled: false }));
     expect(result.statusCode).toBe(409);
+  });
+});
+
+// Regression coverage for a real bug: this handler shipped without
+// api-shared/http.ts's corsHeaders wrapping (unlike warm-schedule/handler.ts,
+// which it was otherwise modeled on), so the browser's actual GET/POST
+// request - not just the OPTIONS preflight API Gateway answers on its own -
+// had no Access-Control-Allow-Origin header and silently failed client-side
+// with "Couldn't load alert email status" despite curl/CLI calls (no Origin
+// header) working fine.
+describe("alerts-settings handler - CORS", () => {
+  it("GET reflects an allow-listed Origin back on the response", async () => {
+    snsMock.on(GetSubscriptionAttributesCommand).resolves({ Attributes: {} });
+
+    const result = await handler(httpEvent("GET", undefined, "https://www.petertran.au"));
+    expect(result.headers?.["Access-Control-Allow-Origin"]).toBe("https://www.petertran.au");
+  });
+
+  it("omits the header for an Origin that isn't allow-listed", async () => {
+    snsMock.on(GetSubscriptionAttributesCommand).resolves({ Attributes: {} });
+
+    const result = await handler(httpEvent("GET", undefined, "https://evil.example.com"));
+    expect(result.headers?.["Access-Control-Allow-Origin"]).toBeUndefined();
+  });
+
+  it("is present on error responses too (400/409), not just 200s", async () => {
+    const badRequest = await handler(httpEvent("POST", { enabled: "yes" }, "https://www.petertran.au"));
+    expect(badRequest.statusCode).toBe(400);
+    expect(badRequest.headers?.["Access-Control-Allow-Origin"]).toBe("https://www.petertran.au");
+
+    snsMock.on(ListSubscriptionsByTopicCommand).resolves({ Subscriptions: [] });
+
+    const conflict = await handler(httpEvent("POST", { enabled: false }, "https://www.petertran.au"));
+    expect(conflict.statusCode).toBe(409);
+    expect(conflict.headers?.["Access-Control-Allow-Origin"]).toBe("https://www.petertran.au");
   });
 });

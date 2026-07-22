@@ -96,4 +96,63 @@ describe("MonitoringStack", () => {
 
     expect(json).not.toContain("-test");
   });
+
+  it("dashboard has a compact alarm-status widget, bar graphs for counts, a latency graph, and a GraphQL-operations Logs Insights widget per project", () => {
+    const app = new App();
+    const stack = new MonitoringStack(app, "TestMonitoringStack", {
+      env: { account: "123456789012", region: "ap-southeast-2" },
+    });
+
+    const body = dashboardBodyText(Template.fromStack(stack));
+
+    expect(body).toContain('"title":"Alarms"');
+    expect(body).toContain('"title":"Latency (p50 / p99)"');
+    expect(body).toContain('"title":"Invocations"');
+    expect(body).toContain('"title":"Errors & throttles"');
+    // Bar, not the default line/timeSeries view - see the widget's own doc
+    // comment on why sparse event counts read better as bars.
+    expect(body).toContain('"view":"bar"');
+    // The GraphQL-operations widget is a Logs Insights query ("type":"log"),
+    // not a metric graph, since operation names aren't known at synth time.
+    expect(body).toContain('"title":"GraphQL operations by name"');
+    expect(body).toContain('"type":"log"');
+    expect(body).toContain("stats sum(OperationCount) as count by operationName");
+  });
+
+  it("isTestEnv: dashboard-only - no alarms, no SNS topic, no AlertsSettingsFunction, uses the test env's own Lambdas", () => {
+    const app = new App();
+    const stack = new MonitoringStack(app, "TestTestMonitoringStack", {
+      isTestEnv: true,
+      env: { account: "123456789012", region: "ap-southeast-2" },
+    });
+
+    const template = Template.fromStack(stack);
+
+    template.resourceCountIs("AWS::SNS::Topic", 0);
+    template.resourceCountIs("AWS::CloudWatch::Alarm", 0);
+    // Only the 4 test-env GraphQL Lambdas' log groups are ever referenced -
+    // no AlertsSettingsFunction (prod-only), no digest/price-check/
+    // warm-schedule/zero-trust-lab (not part of what the test env exists to
+    // validate - see TEST_FUNCTIONS's doc comment).
+    template.resourceCountIs("AWS::Lambda::Function", 0);
+    template.hasResourceProperties("AWS::CloudWatch::Dashboard", { DashboardName: "petertran-au-test" });
+
+    const body = dashboardBodyText(template);
+    expect(body).toContain("portfolio-graphql-test");
+    expect(body).toContain("pantry-graphql-test");
+    expect(body).toContain("imposter-graphql-test");
+    expect(body).toContain("supergraph-graphql-test");
+    expect(body).not.toContain('"title":"Alarms"');
+  });
 });
+
+// Widget content lives inside DashboardBody's Fn::Join (the topic/table ARNs
+// interpolated into metric dimensions are CFN tokens, so the whole body
+// isn't a plain string) - concatenating just the literal string fragments
+// is enough to substring-search for expected widget titles/types.
+function dashboardBodyText(template: Template): string {
+  const [dashboard] = Object.values(template.findResources("AWS::CloudWatch::Dashboard"));
+  const join = (dashboard.Properties.DashboardBody as { "Fn::Join": [string, unknown[]] })["Fn::Join"];
+
+  return join[1].filter((part): part is string => typeof part === "string").join("");
+}
