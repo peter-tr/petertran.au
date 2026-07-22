@@ -95,6 +95,11 @@ describe("getAnthropicAllTimeCostUsd", () => {
   it("returns 0 when the secret exists but has no SecretString", async () => {
     process.env.ANTHROPIC_ADMIN_SECRET_ARN = "arn:aws:secretsmanager:...:admin-key";
     secretsManagerMock.on(GetSecretValueCommand).resolves({ SecretString: undefined });
+    // guard() can only cheaply confirm a credential *source* is configured -
+    // discovering the secret's actual value is empty happens inside
+    // fetchRaw(), after the (empty) cache has already been checked/claimed.
+    ddbMock.on(GetCommand).resolves({ Item: undefined });
+    ddbMock.on(PutCommand).resolves({});
 
     const getAnthropicAllTimeCostUsd = await importGetAnthropicAllTimeCostUsd();
 
@@ -184,6 +189,21 @@ describe("getAnthropicAllTimeCostUsd", () => {
     const result = await getAnthropicAllTimeCostUsd();
 
     expect(result).toBe(3.25);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("never calls Secrets Manager on a fresh cache hit, even with only a secret ARN configured", async () => {
+    process.env.ANTHROPIC_ADMIN_SECRET_ARN = "arn:aws:secretsmanager:...:admin-key";
+    ddbMock.on(GetCommand).resolves({
+      Item: { pk: "STATS", sk: "ANTHROPIC_COST", amountUsd: 3.25, fetchedAt: "2026-06-15T11:30:00.000Z" },
+    });
+
+    const getAnthropicAllTimeCostUsd = await importGetAnthropicAllTimeCostUsd();
+
+    const result = await getAnthropicAllTimeCostUsd();
+
+    expect(result).toBe(3.25);
+    expect(secretsManagerMock.calls()).toHaveLength(0);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });

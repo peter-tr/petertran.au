@@ -9,6 +9,7 @@ await Promise.all(
       entryPoints: [entry],
       outfile: `dist/${entry.replace(/\.ts$/, ".mjs")}`,
       bundle: true,
+      minify: true,
       platform: "node",
       target: "node20",
       format: "esm",
