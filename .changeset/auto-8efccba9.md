@@ -2,4 +2,4 @@
 "infra": patch
 ---
 
-grant sns:*SubscriptionAttributes on * instead of a topicArn:* wildcard
+Fix AlertsSettingsFunction's SNS subscription-attribute permissions, which were denied live despite looking correctly scoped
