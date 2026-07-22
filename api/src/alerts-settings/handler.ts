@@ -5,7 +5,7 @@ import {
   GetSubscriptionAttributesCommand,
   SetSubscriptionAttributesCommand,
 } from "@aws-sdk/client-sns";
-import { parseJsonBody } from "api-shared/http";
+import { parseJsonBody, corsHeaders } from "api-shared/http";
 
 const sns = new SNSClient({});
 
@@ -57,7 +57,18 @@ async function setEnabled(enabled: boolean): Promise<void> {
   );
 }
 
+// api-shared/http.ts's corsHeaders doc comment explains why this is needed
+// at all: API Gateway REST API's defaultCorsPreflightOptions only answers
+// the browser's OPTIONS preflight, not the actual GET/POST response coming
+// back through a Lambda proxy integration - every handler behind it has to
+// add Access-Control-Allow-Origin itself, same as warm-schedule/handler.ts.
 export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
+  const result = await handleRequest(event);
+
+  return { ...result, headers: { ...result.headers, ...corsHeaders(event.headers?.origin) } };
+}
+
+async function handleRequest(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
   if (event.httpMethod === "POST") {
     const body = parseJsonBody<{ enabled?: unknown }>(event);
     if (typeof body.enabled !== "boolean") {
