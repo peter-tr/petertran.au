@@ -84,10 +84,15 @@ class AnthropicCostFetcher extends CachedCostFetcher {
       ddb,
       tableName: TABLE_NAME,
       cacheKey: { pk: "STATS", sk: "ANTHROPIC_COST" },
-      // Anthropic's cost data lands within ~5 minutes of a request
-      // completing (much fresher than AWS Cost Explorer's ~daily cadence),
-      // so a shorter cache window is worthwhile here.
-      cacheTtlMs: 60 * 60 * 1000,
+      // 25h, not 1h - cost-refresh-handler.ts proactively refreshes this
+      // once a day now (see its own comment), so this TTL only matters as a
+      // backstop if that schedule ever misses a day. Was 1h, which meant a
+      // real visitor's request paid for this fetch roughly every hour;
+      // paginating up to a dozen sequential requests against Anthropic's
+      // cost API (each with its own 8s timeout) once left one real request
+      // blocked for ~17s. The 1h-freshness this bought was never the point -
+      // a footer figure doesn't need to be that current.
+      cacheTtlMs: 25 * 60 * 60 * 1000,
     });
   }
 

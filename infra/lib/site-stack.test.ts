@@ -51,14 +51,18 @@ describe("SiteStack", () => {
 
     const template = Template.fromStack(stack);
 
-    // GraphQLFunction, plus CDK's auto-generated custom-resource Lambda for
-    // the S3 bucket's autoDeleteObjects.
-    template.resourceCountIs("AWS::Lambda::Function", 2);
+    // GraphQLFunction + PortfolioCostRefreshFunction, plus CDK's
+    // auto-generated custom-resource Lambda for the S3 bucket's
+    // autoDeleteObjects.
+    template.resourceCountIs("AWS::Lambda::Function", 3);
     template.hasResourceProperties("AWS::DynamoDB::Table", {
       TableName: "resume",
       DeletionProtectionEnabled: true,
     });
     template.resourceCountIs("AWS::CloudFront::Distribution", 1);
+    // Daily proactive refresh of the footer's cost figures - not part of
+    // the isTestEnv path below.
+    template.resourceCountIs("AWS::Scheduler::Schedule", 1);
     template.hasResourceProperties("AWS::Lambda::Alias", {
       Name: "live",
     });
@@ -106,6 +110,7 @@ describe("SiteStack", () => {
     template.resourceCountIs("AWS::SES::EmailIdentity", 0);
     template.resourceCountIs("AWS::RUM::AppMonitor", 0);
     template.resourceCountIs("AWS::Cognito::IdentityPool", 0);
+    template.resourceCountIs("AWS::Scheduler::Schedule", 0);
     // A + AAAA for both the primary and alternate domain.
     template.resourceCountIs("AWS::Route53::RecordSet", 4);
   });
