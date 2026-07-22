@@ -51,6 +51,7 @@ function makeStore(overrides: Partial<DesignStore> = {}): DesignStore {
     saveDesign: vi.fn(),
     deleteDesign: vi.fn().mockResolvedValue(true),
     listTemplates: vi.fn().mockResolvedValue([]),
+    saveTemplate: vi.fn(),
     ...overrides,
   };
 }
@@ -104,5 +105,33 @@ describe("createDesignStudioResolvers", () => {
 
     expect(store.listTemplates).toHaveBeenCalledWith(args);
     expect(result).toEqual(templates);
+  });
+
+  it("Mutation.saveAsTemplate derives colors from the elements' fills and defaults popularity to 0", async () => {
+    const saved = makeTemplate({ id: "new-tpl" });
+    const store = makeStore({ saveTemplate: vi.fn().mockResolvedValue(saved) });
+    const resolvers = createDesignStudioResolvers(store);
+
+    const input = {
+      name: "My template",
+      category: "Poster",
+      tags: ["fun"],
+      width: 900,
+      height: 600,
+      elements: [
+        { ...makeTemplate().elements[0], id: "a", fill: "#111111" },
+        { ...makeTemplate().elements[0], id: "b", fill: "#222222" },
+        { ...makeTemplate().elements[0], id: "c", fill: "#111111" },
+      ],
+    };
+
+    const result = await resolvers.Mutation.saveAsTemplate({}, { input });
+
+    expect(store.saveTemplate).toHaveBeenCalledWith({
+      ...input,
+      colors: ["#111111", "#222222"],
+      popularity: 0,
+    });
+    expect(result.id).toBe("new-tpl");
   });
 });

@@ -1,7 +1,9 @@
 import {
   withDesignDefaults,
+  deriveColors,
   type DesignRecord,
   type SaveDesignArgs,
+  type SaveAsTemplateArgs,
   type TemplateRecord,
   type TemplateFilter,
 } from "../lib/design";
@@ -12,6 +14,7 @@ export interface DesignStore {
   saveDesign(args: SaveDesignArgs): Promise<DesignRecord>;
   deleteDesign(id: string): Promise<boolean>;
   listTemplates(filter: TemplateFilter): Promise<TemplateRecord[]>;
+  saveTemplate(args: Omit<TemplateRecord, "id">): Promise<TemplateRecord>;
 }
 
 // Shared resolver logic for both the real (Mongo) and dev (in-memory)
@@ -38,6 +41,12 @@ export function createDesignStudioResolvers(store: DesignStore) {
         return withDesignDefaults(saved);
       },
       deleteDesign: async (_: unknown, args: { id: string }) => store.deleteDesign(args.id),
+      saveAsTemplate: (_: unknown, args: { input: SaveAsTemplateArgs }) =>
+        store.saveTemplate({
+          ...args.input,
+          colors: deriveColors(args.input.elements),
+          popularity: 0,
+        }),
     },
   };
 }

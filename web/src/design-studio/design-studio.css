@@ -249,6 +249,40 @@
   cursor: not-allowed;
 }
 
+.design-studio-template-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+  margin: 0 0 0.8rem;
+}
+
+.design-studio-template-form input {
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  color: var(--paper);
+  background: var(--panel-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 0.4rem 0.6rem;
+}
+
+.design-studio-template-form button {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--paper);
+  background: var(--panel-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 0.4rem 0.7rem;
+  cursor: pointer;
+}
+
+.design-studio-template-form button:disabled {
+  color: var(--muted-dim);
+  cursor: not-allowed;
+}
+
 .design-studio-workspace {
   display: flex;
   gap: 1rem;

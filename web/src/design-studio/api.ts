@@ -9,6 +9,7 @@ import type {
   DeleteDesignMutation,
   TemplatesQuery,
   TemplatesQueryVariables,
+  SaveAsTemplateMutation,
 } from "./api.generated";
 
 // Separate endpoint, separate service, same reasoning as pantry/imposter's
@@ -128,6 +129,15 @@ export const TEMPLATES_QUERY = /* GraphQL */ `
   ${TEMPLATE_FIELDS}
 `;
 
+export const SAVE_AS_TEMPLATE_MUTATION = /* GraphQL */ `
+  mutation SaveAsTemplate($input: SaveAsTemplateInput!) {
+    saveAsTemplate(input: $input) {
+      ...TemplateFields
+    }
+  }
+  ${TEMPLATE_FIELDS}
+`;
+
 export async function listDesigns(): Promise<Design[]> {
   const data = await runDesignStudioQuery<DesignsQuery>(DESIGNS_QUERY);
 
@@ -164,4 +174,19 @@ export async function listTemplates(filter: TemplatesQueryVariables = {}): Promi
   const data = await runDesignStudioQuery<TemplatesQuery>(TEMPLATES_QUERY, filter);
 
   return data.templates;
+}
+
+export interface SaveAsTemplateArgs {
+  name: string;
+  category: string;
+  tags: string[];
+  width: number;
+  height: number;
+  elements: DesignElementInput[];
+}
+
+export async function saveAsTemplate(input: SaveAsTemplateArgs): Promise<Template> {
+  const data = await runDesignStudioQuery<SaveAsTemplateMutation>(SAVE_AS_TEMPLATE_MUTATION, { input });
+
+  return data.saveAsTemplate;
 }

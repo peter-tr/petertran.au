@@ -57,6 +57,13 @@ class InMemoryDesignStore implements DesignStore {
       .filter((template) => matchesFilter(template, filter))
       .sort((a, b) => b.popularity - a.popularity);
   }
+
+  async saveTemplate(args: Omit<TemplateRecord, "id">): Promise<TemplateRecord> {
+    const template: TemplateRecord = { ...args, id: randomUUID() };
+    this.templates.push(template);
+
+    return template;
+  }
 }
 
 export const devResolvers = createDesignStudioResolvers(new InMemoryDesignStore());

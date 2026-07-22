@@ -66,3 +66,23 @@ export interface TemplateFilter {
   tags?: string[] | null;
   color?: string | null;
 }
+
+export interface SaveAsTemplateArgs {
+  name: string;
+  category: string;
+  tags: string[];
+  width: number;
+  height: number;
+  elements: DesignElementRecord[];
+}
+
+const MAX_DERIVED_COLORS = 4;
+
+// Templates carry `colors` for the swatch filter, but nobody hand-picks
+// them - they're just the design's own distinct fill values, same as what
+// a viewer would actually see looking at the canvas.
+export function deriveColors(elements: DesignElementRecord[]): string[] {
+  const distinct = [...new Set(elements.map((el) => el.fill))];
+
+  return distinct.slice(0, MAX_DERIVED_COLORS);
+}
