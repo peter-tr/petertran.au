@@ -10,6 +10,8 @@ import type {
   TemplatesQuery,
   TemplatesQueryVariables,
   SaveAsTemplateMutation,
+  GenerateDesignElementsMutation,
+  GenerateDesignElementsMutationVariables,
 } from "./api.generated";
 
 // Separate endpoint, separate service, same reasoning as pantry/imposter's
@@ -189,4 +191,37 @@ export async function saveAsTemplate(input: SaveAsTemplateArgs): Promise<Templat
   const data = await runDesignStudioQuery<SaveAsTemplateMutation>(SAVE_AS_TEMPLATE_MUTATION, { input });
 
   return data.saveAsTemplate;
+}
+
+export const GENERATE_DESIGN_ELEMENTS_MUTATION = /* GraphQL */ `
+  mutation GenerateDesignElements($prompt: String!, $width: Float!, $height: Float!) {
+    generateDesignElements(prompt: $prompt, width: $width, height: $height) {
+      id
+      type
+      x
+      y
+      width
+      height
+      rotation
+      zIndex
+      fill
+      stroke
+      strokeWidth
+      text
+      fontFamily
+      fontSize
+      fontWeight
+    }
+  }
+`;
+
+export async function generateDesignElements(
+  args: GenerateDesignElementsMutationVariables
+): Promise<Design["elements"]> {
+  const data = await runDesignStudioQuery<GenerateDesignElementsMutation>(
+    GENERATE_DESIGN_ELEMENTS_MUTATION,
+    args
+  );
+
+  return data.generateDesignElements;
 }

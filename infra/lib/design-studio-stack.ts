@@ -38,6 +38,14 @@ export class DesignStudioStack extends Stack {
       "MongoConnectionString",
       "petertran-au/design-studio-mongo-uri"
     );
+    // Same secret every other Anthropic-calling Lambda in this repo already
+    // reads (see pantry-stack.ts's anthropicSecret) - reused here for the
+    // AI design-generation mutation, not a project-specific key.
+    const anthropicSecret = secretsmanager.Secret.fromSecretNameV2(
+      this,
+      "AnthropicApiKey",
+      "petertran-au/anthropic-api-key"
+    );
 
     const designStudioFn = new lambda.Function(this, "DesignStudioFunction", {
       // Explicit, so it reads clearly in the X-Ray trace map instead of
@@ -54,10 +62,12 @@ export class DesignStudioStack extends Stack {
       timeout: Duration.seconds(20),
       environment: {
         MONGO_SECRET_ARN: mongoSecret.secretArn,
+        ANTHROPIC_SECRET_ARN: anthropicSecret.secretArn,
       },
       tracing: lambda.Tracing.ACTIVE,
     });
     mongoSecret.grantRead(designStudioFn);
+    anthropicSecret.grantRead(designStudioFn);
     this.designStudioFn = designStudioFn;
 
     // Qualifier ApiGatewayStack targets and ProvisionedConcurrencyStack

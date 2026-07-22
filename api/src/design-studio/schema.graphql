@@ -146,4 +146,11 @@ type Mutation {
   automatically from the elements' fills, not part of the input.
   """
   saveAsTemplate(input: SaveAsTemplateInput!): Template!
+  """
+  Generates a set of design elements from a natural-language prompt, sized
+  to fit within width/height. Pure generation - nothing is persisted here;
+  the returned elements are a draft the caller decides whether to keep,
+  typically via a normal saveDesign call once accepted.
+  """
+  generateDesignElements(prompt: String!, width: Float!, height: Float!): [DesignElement!]!
 }

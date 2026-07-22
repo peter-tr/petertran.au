@@ -12,8 +12,8 @@ import {
   type DesignElement,
   type ElementType,
 } from "../lib/elements";
-import { toElementInput } from "../lib/serialization";
-import { saveDesign, saveAsTemplate, type Design } from "../api";
+import { toElementInput, fromWireElement } from "../lib/serialization";
+import { saveDesign, saveAsTemplate, generateDesignElements, type Design } from "../api";
 
 interface EditorWorkspaceProps {
   designId: string | undefined;
@@ -50,6 +50,15 @@ export default function EditorWorkspace({
   const [templateTags, setTemplateTags] = useState("");
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [templateMessage, setTemplateMessage] = useState<string | null>(null);
+  const [showAiForm, setShowAiForm] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [generating, setGenerating] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  // A pending AI-generated draft - kept entirely outside useEventHistory
+  // (see the reducer.ts doc comment on HistoryEvent) so nothing is
+  // undoable/persisted until the user explicitly accepts it.
+  const [draftElements, setDraftElements] = useState<DesignElement[] | null>(null);
+  const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null);
   const canvasRef = useRef<CanvasHandle>(null);
 
   const selectedElement = elements.find((el) => el.id === selectedId);
@@ -165,6 +174,40 @@ export default function EditorWorkspace({
     }
   }, [name, templateCategory, templateTags, elements, width, height]);
 
+  const handleGenerate = useCallback(async () => {
+    if (!aiPrompt.trim()) return;
+
+    setGenerating(true);
+    setAiError(null);
+    try {
+      const generated = await generateDesignElements({ prompt: aiPrompt.trim(), width, height });
+      setDraftElements(generated.map(fromWireElement));
+      setSelectedDraftId(null);
+      setShowAiForm(false);
+    } catch {
+      setAiError("Couldn't generate a design - try a different prompt.");
+    } finally {
+      setGenerating(false);
+    }
+  }, [aiPrompt, width, height]);
+
+  const handleAcceptDraft = useCallback(() => {
+    if (!draftElements) return;
+
+    for (const element of draftElements) dispatch({ type: "add", element });
+    setDraftElements(null);
+    setSelectedDraftId(null);
+  }, [draftElements, dispatch]);
+
+  const handleDiscardDraft = useCallback(() => {
+    setDraftElements(null);
+    setSelectedDraftId(null);
+  }, []);
+
+  const handleDraftChange = useCallback((before: DesignElement, after: DesignElement) => {
+    setDraftElements((current) => current?.map((el) => (el.id === before.id ? after : el)) ?? null);
+  }, []);
+
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (isEditableTarget(e.target)) return;
@@ -210,6 +253,9 @@ export default function EditorWorkspace({
           <button type="button" onClick={() => setShowTemplateForm((v) => !v)}>
             Save as template
           </button>
+          <button type="button" onClick={() => setShowAiForm((v) => !v)}>
+            Generate with AI
+          </button>
         </div>
       </header>
       {saveError && <p className="status-line">// {saveError}</p>}
@@ -242,6 +288,38 @@ export default function EditorWorkspace({
         </div>
       )}
       {templateMessage && <p className="status-line">// {templateMessage}</p>}
+      {showAiForm && (
+        <div className="design-studio-ai-form">
+          <input
+            type="text"
+            placeholder="Describe what you want, e.g. “bold sale poster in teal and orange”"
+            value={aiPrompt}
+            onChange={(e) => setAiPrompt(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleGenerate();
+            }}
+            aria-label="AI design prompt"
+          />
+          <button type="button" onClick={handleGenerate} disabled={generating || !aiPrompt.trim()}>
+            {generating ? "Generating…" : "Generate"}
+          </button>
+          <button type="button" onClick={() => setShowAiForm(false)}>
+            Cancel
+          </button>
+        </div>
+      )}
+      {aiError && <p className="status-line">// {aiError}</p>}
+      {draftElements && (
+        <div className="design-studio-draft-banner">
+          <span>AI draft ready - drag/resize it, then accept or discard.</span>
+          <button type="button" onClick={handleAcceptDraft}>
+            Accept
+          </button>
+          <button type="button" onClick={handleDiscardDraft}>
+            Discard
+          </button>
+        </div>
+      )}
       <div className="design-studio-workspace">
         <Toolbar onAdd={handleAdd} onExport={() => canvasRef.current?.exportPNG()} />
         <div className="design-studio-canvas-frame">
@@ -253,6 +331,10 @@ export default function EditorWorkspace({
             selectedId={selectedId}
             onSelect={setSelectedId}
             onChange={handleChange}
+            draftElements={draftElements ?? undefined}
+            selectedDraftId={selectedDraftId}
+            onSelectDraft={setSelectedDraftId}
+            onDraftChange={handleDraftChange}
           />
         </div>
         <div className="design-studio-side-panels">

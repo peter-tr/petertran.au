@@ -11,6 +11,14 @@ interface CanvasProps {
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   onChange: (before: DesignElement, after: DesignElement) => void;
+  // An AI-generated draft, rendered as a distinct dashed-outline overlay -
+  // draggable/resizable like real elements, but tracked entirely separately
+  // so nothing touches useEventHistory until the draft is accepted. Absent
+  // (undefined) when there's no pending draft.
+  draftElements?: DesignElement[];
+  selectedDraftId?: string | null;
+  onSelectDraft?: (id: string | null) => void;
+  onDraftChange?: (before: DesignElement, after: DesignElement) => void;
 }
 
 export interface CanvasHandle {
@@ -32,12 +40,25 @@ function topLeftFromCenterNode(node: Konva.Node, width: number, height: number):
 }
 
 const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
-  { width, height, elements, selectedId, onSelect, onChange },
+  {
+    width,
+    height,
+    elements,
+    selectedId,
+    onSelect,
+    onChange,
+    draftElements,
+    selectedDraftId,
+    onSelectDraft,
+    onDraftChange,
+  },
   ref
 ) {
   const stageRef = useRef<Konva.Stage>(null);
   const transformerRef = useRef<Konva.Transformer>(null);
   const nodeRefs = useRef(new Map<string, Konva.Node>());
+  const draftNodeRefs = useRef(new Map<string, Konva.Node>());
+  const draftTransformerRef = useRef<Konva.Transformer>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingValue, setEditingValue] = useState("");
 
@@ -62,6 +83,15 @@ const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
     transformer.getLayer()?.batchDraw();
   }, [selectedId, elements]);
 
+  useEffect(() => {
+    const transformer = draftTransformerRef.current;
+    if (!transformer) return;
+
+    const node = selectedDraftId ? draftNodeRefs.current.get(selectedDraftId) : undefined;
+    transformer.nodes(node ? [node] : []);
+    transformer.getLayer()?.batchDraw();
+  }, [selectedDraftId, draftElements]);
+
   function handleDragEnd(element: DesignElement, e: KonvaEventObject<DragEvent>) {
     onChange(element, { ...element, ...topLeftFromCenterNode(e.target, element.width, element.height) });
   }
@@ -78,6 +108,29 @@ const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
     node.scaleY(1);
 
     onChange(element, {
+      ...element,
+      ...topLeftFromCenterNode(node, width, height),
+      width,
+      height,
+      rotation: node.rotation(),
+    });
+  }
+
+  function handleDraftDragEnd(element: DesignElement, e: KonvaEventObject<DragEvent>) {
+    onDraftChange?.(element, {
+      ...element,
+      ...topLeftFromCenterNode(e.target, element.width, element.height),
+    });
+  }
+
+  function handleDraftTransformEnd(element: DesignElement, e: KonvaEventObject<Event>) {
+    const node = e.target;
+    const width = Math.max(5, element.width * node.scaleX());
+    const height = Math.max(5, element.height * node.scaleY());
+    node.scaleX(1);
+    node.scaleY(1);
+
+    onDraftChange?.(element, {
       ...element,
       ...topLeftFromCenterNode(node, width, height),
       width,
@@ -112,7 +165,10 @@ const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
         height={height}
         className="design-studio-stage"
         onMouseDown={(e) => {
-          if (e.target === e.target.getStage()) onSelect(null);
+          if (e.target === e.target.getStage()) {
+            onSelect(null);
+            onSelectDraft?.(null);
+          }
         }}
       >
         <Layer>
@@ -173,6 +229,71 @@ const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
           })}
           <Transformer ref={transformerRef} rotateEnabled />
         </Layer>
+
+        {/* AI-generated draft overlay - a distinct dashed-outline layer,
+            draggable/resizable via its own Transformer, but never touching
+            useEventHistory (see EditorWorkspace's draftElements state)
+            until the user explicitly accepts it. */}
+        {draftElements && draftElements.length > 0 && (
+          <Layer>
+            {[...draftElements]
+              .sort((a, b) => a.zIndex - b.zIndex)
+              .map((element) => {
+                const { x, y } = centerOf(element);
+                const common = {
+                  key: element.id,
+                  ref: (node: Konva.Node | null) => {
+                    if (node) draftNodeRefs.current.set(element.id, node);
+                    else draftNodeRefs.current.delete(element.id);
+                  },
+                  x,
+                  y,
+                  rotation: element.rotation,
+                  fill: element.fill,
+                  stroke: "#f2a93b",
+                  strokeWidth: Math.max(element.strokeWidth, 2),
+                  dash: [10, 6],
+                  opacity: 0.85,
+                  draggable: true,
+                  onClick: () => onSelectDraft?.(element.id),
+                  onTap: () => onSelectDraft?.(element.id),
+                  onDragEnd: (e: KonvaEventObject<DragEvent>) => handleDraftDragEnd(element, e),
+                  onTransformEnd: (e: KonvaEventObject<Event>) => handleDraftTransformEnd(element, e),
+                };
+
+                if (element.type === "rectangle") {
+                  return (
+                    <Rect
+                      {...common}
+                      width={element.width}
+                      height={element.height}
+                      offsetX={element.width / 2}
+                      offsetY={element.height / 2}
+                    />
+                  );
+                }
+
+                if (element.type === "ellipse") {
+                  return <Ellipse {...common} radiusX={element.width / 2} radiusY={element.height / 2} />;
+                }
+
+                return (
+                  <Text
+                    {...common}
+                    width={element.width}
+                    height={element.height}
+                    offsetX={element.width / 2}
+                    offsetY={element.height / 2}
+                    text={element.text}
+                    fontFamily={element.fontFamily}
+                    fontSize={element.fontSize}
+                    fontStyle={element.fontWeight >= 600 ? "bold" : "normal"}
+                  />
+                );
+              })}
+            <Transformer ref={draftTransformerRef} rotateEnabled />
+          </Layer>
+        )}
       </Stage>
 
       {/* Konva has no native text editing - swap in a plain HTML textarea

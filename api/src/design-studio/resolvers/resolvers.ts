@@ -1,12 +1,15 @@
 import {
   withDesignDefaults,
   deriveColors,
+  type DesignElementRecord,
   type DesignRecord,
   type SaveDesignArgs,
   type SaveAsTemplateArgs,
   type TemplateRecord,
   type TemplateFilter,
 } from "../lib/design";
+import { generateDesignElements as defaultGenerateDesignElements } from "../lib/anthropic/generate-elements";
+import type { Context } from "../context";
 
 export interface DesignStore {
   listDesigns(): Promise<DesignRecord[]>;
@@ -17,9 +20,26 @@ export interface DesignStore {
   saveTemplate(args: Omit<TemplateRecord, "id">): Promise<TemplateRecord>;
 }
 
+// Kept separate from DesignStore - generation isn't a persistence concern,
+// so it's injected as its own dependency rather than bolted onto the store
+// interface. The real (Mongo) backend just uses the default (a real
+// Anthropic call); the dev backend passes a mock so the local dev server
+// never needs an Anthropic API key.
+export type GenerateDesignElementsFn = (
+  prompt: string,
+  width: number,
+  height: number,
+  sourceIp: string | undefined,
+  xraySegment: Context["xraySegment"]
+) => Promise<DesignElementRecord[]>;
+
 // Shared resolver logic for both the real (Mongo) and dev (in-memory)
-// backends - only the storage implementation differs between them.
-export function createDesignStudioResolvers(store: DesignStore) {
+// backends - only the storage implementation (and the AI generation
+// implementation) differs between them.
+export function createDesignStudioResolvers(
+  store: DesignStore,
+  generateDesignElements: GenerateDesignElementsFn = defaultGenerateDesignElements
+) {
   return {
     Query: {
       designs: async () => {
@@ -47,6 +67,12 @@ export function createDesignStudioResolvers(store: DesignStore) {
           colors: deriveColors(args.input.elements),
           popularity: 0,
         }),
+      generateDesignElements: (
+        _: unknown,
+        args: { prompt: string; width: number; height: number },
+        context: Context
+      ) =>
+        generateDesignElements(args.prompt, args.width, args.height, context.sourceIp, context.xraySegment),
     },
   };
 }
