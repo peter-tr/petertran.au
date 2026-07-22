@@ -52,7 +52,7 @@ class TracedDataSource extends RemoteGraphQLDataSource<Context> {
 
 const gateway = new ApolloGateway({
   // Composed at build time (see scripts/compose-supergraph.ts), not via
-  // IntrospectAndCompose - that used to fetch all 3 subgraphs' SDL over
+  // IntrospectAndCompose - that used to fetch all subgraphs' SDL over
   // HTTPS on every cold start, which was the dominant cost in the gateway's
   // cold-start latency.
   supergraphSdl: SUPERGRAPH_SDL,

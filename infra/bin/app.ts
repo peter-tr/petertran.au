@@ -5,6 +5,7 @@ import { CertStack } from "../lib/cert-stack";
 import { SiteStack } from "../lib/site-stack";
 import { GamesStack } from "../lib/games-stack";
 import { PantryStack } from "../lib/pantry-stack";
+import { DesignStudioStack } from "../lib/design-studio-stack";
 import { ZeroTrustLabStack } from "../lib/zero-trust-lab-stack";
 import { ApiGatewayStack } from "../lib/api-gateway-stack";
 import { ProvisionedConcurrencyStack } from "../lib/warm-schedule-stack";
@@ -51,6 +52,16 @@ const gamesStack = new GamesStack(app, "PetertranGamesStack", {
 // Separate service from the resume site above - own table, own Lambda, own
 // schema. See infra/lib/pantry-stack.ts for why.
 const pantryStack = new PantryStack(app, "PetertranPantryStack", {
+  env: { account, region: "ap-southeast-2" },
+});
+
+// Mock Canva-style design editor - own Lambda, backed by MongoDB Atlas
+// (provisioned outside CDK) rather than a DynamoDB table, deliberately -
+// see infra/lib/design-studio-stack.ts's doc comment. Not part of the
+// on-demand test env or ProvisionedConcurrencyStack's warm schedule yet -
+// both are optional additions for later, not needed for this project's
+// first deploy.
+const designStudioStack = new DesignStudioStack(app, "PetertranDesignStudioStack", {
   env: { account, region: "ap-southeast-2" },
 });
 
@@ -134,6 +145,7 @@ const apiGatewayStack = new ApiGatewayStack(app, "PetertranApiGatewayStack", {
   imposterFnName: FUNCTION_NAMES.imposter,
   warmScheduleFnName: FUNCTION_NAMES.warmSchedule,
   supergraphFnName: FUNCTION_NAMES.supergraph,
+  designStudioFnName: FUNCTION_NAMES.designStudio,
   alertsSettingsFnName: FUNCTION_NAMES.alertsSettings,
   env: { account, region: "ap-southeast-2" },
 });
@@ -151,6 +163,7 @@ const apiGatewayStack = new ApiGatewayStack(app, "PetertranApiGatewayStack", {
 // the `live` alias additions.
 apiGatewayStack.addDependency(siteStack);
 apiGatewayStack.addDependency(pantryStack);
+apiGatewayStack.addDependency(designStudioStack);
 apiGatewayStack.addDependency(gamesStack);
 apiGatewayStack.addDependency(zeroTrustLabStack);
 apiGatewayStack.addDependency(provisionedConcurrencyStack);

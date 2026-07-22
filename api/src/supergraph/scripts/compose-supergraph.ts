@@ -6,6 +6,7 @@ import { composeServices } from "@apollo/composition";
 import { typeDefs as portfolioTypeDefs } from "../../portfolio/schema";
 import { typeDefs as pantryTypeDefs } from "../../pantry/schema";
 import { typeDefs as imposterTypeDefs } from "../../games/imposter/schema";
+import { typeDefs as designStudioTypeDefs } from "../../design-studio/schema";
 
 // Runs at build time (wired into turbo's "codegen" task, see turbo.json's
 // "supergraph#codegen" override) instead of the gateway doing
@@ -32,6 +33,11 @@ const SERVICES = [
     name: "imposter",
     url: "https://composed-at-build-time.invalid/imposter",
     typeDefs: parse(imposterTypeDefs),
+  },
+  {
+    name: "design-studio",
+    url: "https://composed-at-build-time.invalid/design-studio",
+    typeDefs: parse(designStudioTypeDefs),
   },
 ];
 

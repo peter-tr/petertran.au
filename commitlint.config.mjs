@@ -13,6 +13,7 @@ export default {
         "portfolio",
         "pantry",
         "imposter",
+        "design-studio",
         "shared",
         // cross-cutting
         "deps",

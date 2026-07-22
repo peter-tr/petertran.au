@@ -20,6 +20,7 @@ export const FUNCTION_NAMES = {
   ztlDomainA: "ztl-domain-a",
   warmSchedule: "warm-schedule",
   supergraph: "supergraph-graphql",
+  designStudio: "design-studio-graphql",
   alertsSettings: "alerts-settings",
 } as const;
 
