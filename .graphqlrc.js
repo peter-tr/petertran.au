@@ -14,5 +14,8 @@ module.exports = {
     imposter: {
       schema: "api/src/games/imposter/schema.graphql",
     },
+    "design-studio": {
+      schema: "api/src/design-studio/schema.graphql",
+    },
   },
 };

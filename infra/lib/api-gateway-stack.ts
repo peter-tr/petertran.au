@@ -34,6 +34,14 @@ export interface ApiGatewayStackProps extends StackProps {
   // infra/bin/app.ts) - kept optional rather than required, same as
   // warmScheduleFnName above, so a future caller can still omit it.
   supergraphFnName?: string;
+  // Optional (unlike portfolio/pantry/imposter) - design-studio doesn't
+  // participate in the on-demand test env yet, so this is only ever passed
+  // by the prod instantiation.
+  designStudioFnName?: string;
+  // Omitted for the test env, same reasoning as warmScheduleFnName above -
+  // muting alert emails isn't something the test env needs to validate, and
+  // it has no MonitoringStack counterpart to point at anyway.
+  alertsSettingsFnName?: string;
 }
 
 /**
@@ -141,12 +149,29 @@ export class ApiGatewayStack extends Stack {
       ...(props.warmScheduleFnName
         ? [{ id: "WarmSchedule", path: "warm-schedule", functionName: props.warmScheduleFnName }]
         : []),
+      ...(props.alertsSettingsFnName
+        ? [{ id: "AlertsSettings", path: "alerts-settings", functionName: props.alertsSettingsFnName }]
+        : []),
       ...(props.supergraphFnName
         ? [
             {
               id: "Supergraph",
               path: "graphql",
               functionName: props.supergraphFnName,
+              aliasName: LIVE_ALIAS_NAME,
+            },
+          ]
+        : []),
+      // This route exists only for the supergraph gateway's own
+      // IntrospectAndCompose to reach this subgraph - the browser always
+      // talks to /graphql (the composed schema) above, never straight to
+      // /design-studio (see web/.env.production's comment).
+      ...(props.designStudioFnName
+        ? [
+            {
+              id: "DesignStudio",
+              path: "design-studio",
+              functionName: props.designStudioFnName,
               aliasName: LIVE_ALIAS_NAME,
             },
           ]

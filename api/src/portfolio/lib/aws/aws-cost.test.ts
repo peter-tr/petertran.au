@@ -33,9 +33,9 @@ describe("getAwsAllTimeCostUsd", () => {
     vi.useRealTimers();
   });
 
-  it("returns the cached amount without calling Cost Explorer when the cache is fresh (<6h)", async () => {
+  it("returns the cached amount without calling Cost Explorer when the cache is fresh (<25h)", async () => {
     ddbMock.on(GetCommand).resolves({
-      Item: { amountUsd: 17.25, fetchedAt: "2026-06-15T10:00:00.000Z" }, // 2h ago, TTL is 6h
+      Item: { amountUsd: 17.25, fetchedAt: "2026-06-15T10:00:00.000Z" }, // 2h ago, TTL is 25h
     });
 
     const getAwsAllTimeCostUsd = await importGetAwsAllTimeCostUsd();
@@ -48,7 +48,7 @@ describe("getAwsAllTimeCostUsd", () => {
 
   it("fetches from Cost Explorer and sums UnblendedCost across all periods when the cache is stale", async () => {
     ddbMock.on(GetCommand).resolves({
-      Item: { amountUsd: 1, fetchedAt: "2026-06-15T00:00:00.000Z" }, // 12h ago, past the 6h TTL
+      Item: { amountUsd: 1, fetchedAt: "2026-06-14T10:00:00.000Z" }, // 26h ago, past the 25h TTL
     });
     ddbMock.on(PutCommand).resolves({});
     costExplorerMock.on(GetCostAndUsageCommand).resolves({

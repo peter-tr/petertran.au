@@ -36,9 +36,9 @@ export class SupergraphStack extends Stack {
       handler: "handler.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/src/supergraph/dist")),
       memorySize: 256,
-      // Generous - cold start means IntrospectAndCompose fetching all 3
-      // subgraphs' SDL in parallel over HTTPS, each of which may itself be
-      // a cold Lambda, before the gateway can serve its first request.
+      // Generous - even with the supergraph SDL composed at build time (see
+      // scripts/compose-supergraph.ts), every request still fans out to all
+      // 3 subgraphs over HTTPS, any of which may itself be a cold Lambda.
       timeout: Duration.seconds(30),
       environment: {
         API_BASE_URL: props.apiBaseUrl,

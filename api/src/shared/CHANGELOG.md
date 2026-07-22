@@ -1,5 +1,11 @@
 # api-shared
 
+## 1.1.3
+
+### Patch Changes
+
+- 0584cff: add CORS headers to actual Lambda responses, not just preflight
+
 ## 1.1.2
 
 ### Patch Changes

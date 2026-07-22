@@ -178,7 +178,7 @@ describe("getAnthropicAllTimeCostUsd", () => {
     consoleErrorSpy.mockRestore();
   });
 
-  it("returns the cached amount without calling fetch when the 1h cache is still fresh", async () => {
+  it("returns the cached amount without calling fetch when the 25h cache is still fresh", async () => {
     process.env.ANTHROPIC_ADMIN_API_KEY = "sk-admin";
     ddbMock.on(GetCommand).resolves({
       Item: { pk: "STATS", sk: "ANTHROPIC_COST", amountUsd: 3.25, fetchedAt: "2026-06-15T11:30:00.000Z" },

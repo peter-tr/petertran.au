@@ -53,6 +53,7 @@ const DEFAULT_SCHEDULE = {
   days: ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"],
   start: "08:00",
   end: "19:00",
+  concurrency: 1,
 };
 const DEFAULT_CONFIG = {
   portfolio: DEFAULT_SCHEDULE,
@@ -121,7 +122,7 @@ describe("warm-schedule handler - config GET/POST", () => {
     const result = await handler(
       httpEvent("POST", {
         project: "portfolio",
-        schedule: { enabled: true, days: [], start: "08:00", end: "19:00" },
+        schedule: { enabled: true, days: [], start: "08:00", end: "19:00", concurrency: 1 },
       })
     );
     expect(result.statusCode).toBe(400);
@@ -132,10 +133,25 @@ describe("warm-schedule handler - config GET/POST", () => {
     const result = await handler(
       httpEvent("POST", {
         project: "portfolio",
-        schedule: { enabled: true, days: ["MON"], start: "19:00", end: "08:00" },
+        schedule: { enabled: true, days: ["MON"], start: "19:00", end: "08:00", concurrency: 1 },
       })
     );
     expect(result.statusCode).toBe(400);
+  });
+
+  it.each([
+    ["zero", 0],
+    ["above the max", 6],
+    ["non-integer", 1.5],
+  ])("POST with concurrency %s returns 400", async (_label, concurrency) => {
+    const result = await handler(
+      httpEvent("POST", {
+        project: "portfolio",
+        schedule: { enabled: true, days: ["MON"], start: "08:00", end: "19:00", concurrency },
+      })
+    );
+    expect(result.statusCode).toBe(400);
+    expect(ssmMock.commandCalls(PutParameterCommand)).toHaveLength(0);
   });
 
   it("POST with an unrecognized project returns 400", async () => {
@@ -158,6 +174,7 @@ describe("warm-schedule handler - config GET/POST", () => {
       days: ["MON", "TUE", "WED", "THU", "FRI"],
       start: "07:30",
       end: "18:00",
+      concurrency: 3,
     };
     const result = await handler(httpEvent("POST", { project: "pantry", schedule: newSchedule }));
     expect(result.statusCode).toBe(200);
@@ -180,10 +197,12 @@ describe("warm-schedule handler - config GET/POST", () => {
     expect(offCall.args[0].input.ScheduleExpression).toBe("cron(00 18 ? * MON,TUE,WED,THU,FRI *)");
 
     // Only pantry changed, so only pantry-fn should be reconciled - within
-    // window and enabled, so it should be granted PC.
+    // window and enabled, so it should be granted PC at its configured
+    // (non-default) concurrency.
     const putCalls = lambdaMock.commandCalls(PutProvisionedConcurrencyConfigCommand);
     expect(putCalls).toHaveLength(1);
     expect(putCalls[0].args[0].input.FunctionName).toBe("pantry-fn");
+    expect(putCalls[0].args[0].input.ProvisionedConcurrentExecutions).toBe(3);
   });
 
   it("POST with enabled:false disables both EventBridge Schedules and tears down warm capacity", async () => {
@@ -204,16 +223,32 @@ describe("warm-schedule handler - config GET/POST", () => {
 });
 
 describe("warm-schedule handler - on/off trigger", () => {
-  it("grants PC to a project's targets on an 'on' trigger", async () => {
+  it("grants PC to a project's targets on an 'on' trigger, at its configured (default) concurrency", async () => {
+    ssmMock.on(GetParameterCommand).resolves({});
+
     const result = await handler({ project: "imposter", action: "on" });
     expect(result).toEqual({ statusCode: 200, headers: {}, body: "reconciled" });
 
     const putCalls = lambdaMock.commandCalls(PutProvisionedConcurrencyConfigCommand);
     expect(putCalls).toHaveLength(1);
     expect(putCalls[0].args[0].input.FunctionName).toBe("imposter-fn");
+    expect(putCalls[0].args[0].input.ProvisionedConcurrentExecutions).toBe(1);
+  });
+
+  it("grants a non-default configured concurrency on an 'on' trigger", async () => {
+    ssmMock.on(GetParameterCommand).resolves({
+      Parameter: { Value: JSON.stringify({ imposter: { ...DEFAULT_SCHEDULE, concurrency: 4 } }) },
+    });
+
+    await handler({ project: "imposter", action: "on" });
+
+    const putCalls = lambdaMock.commandCalls(PutProvisionedConcurrencyConfigCommand);
+    expect(putCalls[0].args[0].input.ProvisionedConcurrentExecutions).toBe(4);
   });
 
   it("tears down PC for a project's targets on an 'off' trigger", async () => {
+    ssmMock.on(GetParameterCommand).resolves({});
+
     const result = await handler({ project: "zeroTrustLab", action: "off" });
     expect(result).toEqual({ statusCode: 200, headers: {}, body: "reconciled" });
 
@@ -233,18 +268,9 @@ describe("warm-schedule handler - reconcile ping", () => {
 
     const putCalls = lambdaMock.commandCalls(PutProvisionedConcurrencyConfigCommand);
     expect(putCalls.map((c) => c.args[0].input.FunctionName).sort()).toEqual([...ALL_TARGETS].sort());
-
-    // portfolio/supergraph get concurrency 3 (a single Home page load fires 3
-    // concurrent requests through both) - everything else gets 1.
-    const CONCURRENCY_BY_FN: Record<string, number> = {
-      "portfolio-fn": 3,
-      "supergraph-fn": 3,
-    };
     for (const call of putCalls) {
       expect(call.args[0].input.Qualifier).toBe("live");
-      expect(call.args[0].input.ProvisionedConcurrentExecutions).toBe(
-        CONCURRENCY_BY_FN[call.args[0].input.FunctionName as string] ?? 1
-      );
+      expect(call.args[0].input.ProvisionedConcurrentExecutions).toBe(1);
     }
     expect(lambdaMock.commandCalls(DeleteProvisionedConcurrencyConfigCommand)).toHaveLength(0);
   });
@@ -277,6 +303,22 @@ describe("warm-schedule handler - reconcile ping", () => {
     expect(putCalls.map((c) => c.args[0].input.FunctionName).sort()).toEqual(
       ["portfolio-fn", "pantry-fn", "imposter-fn", "supergraph-fn"].sort()
     );
+  });
+
+  it("grants each project its own configured concurrency, not a shared default", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(WITHIN_WINDOW);
+    ssmMock.on(GetParameterCommand).resolves({
+      Parameter: { Value: JSON.stringify({ pantry: { ...DEFAULT_SCHEDULE, concurrency: 2 } }) },
+    });
+
+    await handler({ reconcile: true });
+
+    const putCalls = lambdaMock.commandCalls(PutProvisionedConcurrencyConfigCommand);
+    const pantryCall = putCalls.find((c) => c.args[0].input.FunctionName === "pantry-fn")!;
+    const portfolioCall = putCalls.find((c) => c.args[0].input.FunctionName === "portfolio-fn")!;
+    expect(pantryCall.args[0].input.ProvisionedConcurrentExecutions).toBe(2);
+    expect(portfolioCall.args[0].input.ProvisionedConcurrentExecutions).toBe(1);
   });
 
   it("tears down a project outside its own narrower window even while others (default, wider) are within theirs", async () => {

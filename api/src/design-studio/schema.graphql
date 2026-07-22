@@ -1,0 +1,135 @@
+"""
+Distinguishes which shape-specific fields on DesignElement apply (e.g. only
+TEXT elements populate text/fontFamily/fontSize/fontWeight).
+"""
+enum DesignElementType {
+  RECTANGLE
+  ELLIPSE
+  TEXT
+}
+
+"""
+A single shape or text box on a design's canvas. Deliberately one flat type
+covering every element type (rather than a GraphQL union per shape) - the
+underlying store keeps the same flat, evolvable document shape.
+"""
+type DesignElement {
+  id: ID!
+  type: DesignElementType!
+  x: Float!
+  y: Float!
+  width: Float!
+  height: Float!
+  rotation: Float!
+  zIndex: Int!
+  fill: String!
+  stroke: String!
+  strokeWidth: Float!
+  """
+  Only present on TEXT elements.
+  """
+  text: String
+  fontFamily: String
+  fontSize: Float
+  fontWeight: Int
+}
+
+"""
+Input mirror of DesignElement, used by SaveDesignInput.
+"""
+input DesignElementInput {
+  id: ID!
+  type: DesignElementType!
+  x: Float!
+  y: Float!
+  width: Float!
+  height: Float!
+  rotation: Float!
+  zIndex: Int!
+  fill: String!
+  stroke: String!
+  strokeWidth: Float!
+  text: String
+  fontFamily: String
+  fontSize: Float
+  fontWeight: Int
+}
+
+"""
+A saved design: an ordered collection of DesignElements plus canvas
+dimensions. Backed by MongoDB rather than this repo's usual DynamoDB,
+deliberately - a design document is large, deeply nested, and gains new
+element types/properties as the editor grows, which a document store
+absorbs field by field with no migration step (unlike a pre-planned
+DynamoDB GSI per query shape, or a relational store's normalized tables).
+"""
+type Design {
+  id: ID!
+  name: String!
+  width: Float!
+  height: Float!
+  createdAt: String!
+  updatedAt: String!
+  elements: [DesignElement!]!
+}
+
+"""
+Input for creating or updating a design.
+"""
+input SaveDesignInput {
+  """
+  Omit to create a new design; pass an existing design's id to update it.
+  """
+  id: ID
+  name: String!
+  width: Float!
+  height: Float!
+  elements: [DesignElementInput!]!
+}
+
+"""
+A starter template a new design can be cloned from.
+"""
+type Template {
+  id: ID!
+  name: String!
+  category: String!
+  tags: [String!]!
+  """
+  Dominant colors, for filtering by color swatch.
+  """
+  colors: [String!]!
+  popularity: Int!
+  width: Float!
+  height: Float!
+  elements: [DesignElement!]!
+}
+
+"""
+Standalone schema for the Design Studio mock-Canva editor - served by its
+own Lambda, entirely separate from petertran.au's resume API.
+"""
+type Query {
+  """
+  Every saved design, most recently updated first.
+  """
+  designs: [Design!]!
+  design(id: ID!): Design
+  """
+  Starter templates, optionally filtered - every argument is independently
+  optional and combinable. `search` does a free-text match against name/tags.
+  """
+  templates(search: String, category: String, tags: [String!], color: String): [Template!]!
+}
+
+"""
+Write operations for Design Studio.
+"""
+type Mutation {
+  saveDesign(input: SaveDesignInput!): Design!
+  deleteDesign(id: ID!): Boolean!
+  """
+  Clones a template's elements into a brand-new saved design.
+  """
+  useTemplate(templateId: ID!): Design!
+}

@@ -1,7 +1,7 @@
 {
   "name": "api",
   "private": true,
-  "version": "1.2.0",
+  "version": "1.3.0",
   "type": "module",
   "scripts": {
     "build": "tsx scripts/build.ts",
@@ -9,6 +9,7 @@
     "dev:portfolio": "tsx src/portfolio/dev/dev-server.ts",
     "dev:imposter": "tsx src/games/imposter/dev/dev-server.ts",
     "dev:pantry": "tsx src/pantry/dev/dev-server.ts",
+    "dev:design-studio": "tsx src/design-studio/dev/dev-server.ts",
     "dev:supergraph": "tsx src/supergraph/dev/dev-server.ts",
     "typecheck": "tsc --noEmit",
     "validate-schemas": "tsx scripts/validate-schemas.ts",
@@ -21,6 +22,7 @@
     "@aws-sdk/client-kms": "^3.1085.0",
     "@aws-sdk/client-lambda": "^3.1085.0",
     "@aws-sdk/client-scheduler": "^3.1085.0",
+    "@aws-sdk/client-sns": "^3.1085.0",
     "@aws-sdk/client-ssm": "^3.1085.0",
     "@aws-sdk/lib-dynamodb": "^3.658.0",
     "graphql": "^16.9.0"

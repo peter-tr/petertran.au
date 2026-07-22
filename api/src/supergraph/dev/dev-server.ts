@@ -8,6 +8,7 @@ const gateway = new ApolloGateway({
       { name: "portfolio", url: "http://localhost:4000" },
       { name: "imposter", url: "http://localhost:4001" },
       { name: "pantry", url: "http://localhost:4002" },
+      { name: "design-studio", url: "http://localhost:4004" },
     ],
     // Keeps retrying composition instead of failing hard if a subgraph dev
     // server isn't up yet - so startup order between the four `dev:*`
@@ -18,4 +19,4 @@ const gateway = new ApolloGateway({
 
 const server = new ApolloServer({ gateway });
 const { url } = await startStandaloneServer(server, { listen: { port: 4003 } });
-console.log(`Supergraph gateway (portfolio + pantry + imposter) ready at ${url}`);
+console.log(`Supergraph gateway (portfolio + pantry + imposter + design-studio) ready at ${url}`);

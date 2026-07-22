@@ -1,5 +1,19 @@
 # infra
 
+## 1.4.0
+
+### Minor Changes
+
+- f44c18f: add CloudWatch alarms/dashboard and an alert-email toggle
+
+### Patch Changes
+
+- 81fa4b5: broaden WarmScheduleParam clobber warning past just project add/remove
+- cfa8fc5: refresh footer cost figures on a daily schedule, not per-request
+- fe9a2dd: Fix AlertsSettingsFunction's SNS subscription-attribute permissions, which were denied live despite looking correctly scoped
+- b43199c: stop client-routed pages from flashing the home page's prerendered content
+- 93c0b32: supergraph cold-start + configurable PC concurrency
+
 ## 1.3.0
 
 ### Minor Changes

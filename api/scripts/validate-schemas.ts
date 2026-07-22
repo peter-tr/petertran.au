@@ -7,6 +7,8 @@ import { typeDefs as imposterTypeDefs } from "../src/games/imposter/schema";
 import { devResolvers as imposterResolvers } from "../src/games/imposter/dev/dev-resolvers";
 import { typeDefs as pantryTypeDefs } from "../src/pantry/schema";
 import { devResolvers as pantryResolvers } from "../src/pantry/dev/dev-resolvers";
+import { typeDefs as designStudioTypeDefs } from "../src/design-studio/schema";
+import { devResolvers as designStudioResolvers } from "../src/design-studio/dev/dev-resolvers";
 import { PARSE_COMMAND_SCHEMA } from "../src/pantry/lib/anthropic/parse-command";
 
 // require(), not a static `import` - the web workspace has its own tsconfig
@@ -19,6 +21,7 @@ const require = createRequire(import.meta.url);
 const portfolioApi: Record<string, unknown> = require("../../web/src/portfolio/lib/graphql.ts");
 const imposterApi: Record<string, unknown> = require("../../web/src/games/imposter/lib/api.ts");
 const pantryApi: Record<string, unknown> = require("../../web/src/pantry/api.ts");
+const designStudioApi: Record<string, unknown> = require("../../web/src/design-studio/api.ts");
 
 // Catches SDL-level bugs that neither tsc nor esbuild can see - both just
 // treat schema.graphql as an opaque string. This is the exact check that
@@ -33,6 +36,7 @@ const GRAPHQL_SERVICES = [
   { name: "portfolio", typeDefs: portfolioTypeDefs, resolvers: portfolioResolvers },
   { name: "imposter", typeDefs: imposterTypeDefs, resolvers: imposterResolvers },
   { name: "pantry", typeDefs: pantryTypeDefs, resolvers: pantryResolvers },
+  { name: "design-studio", typeDefs: designStudioTypeDefs, resolvers: designStudioResolvers },
 ];
 
 // Anthropic's structured-output API rejects any json_schema with more than
@@ -105,6 +109,7 @@ const FRONTEND_QUERY_SERVICES = [
   { name: "portfolio", typeDefs: portfolioTypeDefs, module: portfolioApi },
   { name: "imposter", typeDefs: imposterTypeDefs, module: imposterApi },
   { name: "pantry", typeDefs: pantryTypeDefs, module: pantryApi },
+  { name: "design-studio", typeDefs: designStudioTypeDefs, module: designStudioApi },
 ];
 
 for (const { name, typeDefs, module } of FRONTEND_QUERY_SERVICES) {

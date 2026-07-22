@@ -29,11 +29,22 @@ interface WarmSchedule {
   days: Weekday[];
   start: string; // "HH:MM", 24h, Sydney-local
   end: string; // "HH:MM", must be > start - same-day windows only
+  concurrency: number; // ProvisionedConcurrentExecutions granted to every target while within window
 }
 
 type WarmScheduleConfig = Record<WarmScheduleKey, WarmSchedule>;
 
 const ALL_WEEKDAYS: Weekday[] = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+
+// Settings-page upper bound on concurrency. A personal site's concurrent-
+// request bursts (a single page load firing several parallel GraphQL
+// queries) topped out at 4-5 in practice (see the 2026-07-21 supergraph
+// cold-start investigation's ConcurrentExecutions measurements), so
+// anything past this is far more likely a typo than an intentional choice -
+// and each unit is real ongoing cost (~$2/mo per unit at 256MB over a
+// 14h/day window). web/src/portfolio/hooks/useWarmSchedule.ts mirrors this
+// value for the settings page's own input bound - keep the two in sync.
+const MAX_CONCURRENCY = 5;
 
 // One flag/schedule can cover more than one target function - zero-trust-lab's
 // 5 Lambdas only work as a pipeline (edge-authorizer needs internal-sts warm
@@ -54,28 +65,16 @@ const TARGETS_BY_PROJECT: Record<WarmScheduleKey, string[]> = {
   ],
 };
 
-// A single Home page load fires 3 concurrent GraphQL requests (Hero,
-// SystemStatsSection, Footer - each has its own independent useEffect/
-// runQuery), each traversing supergraph-graphql -> portfolio-graphql - with
-// PC below 3 on either hop, at least one of those concurrent invocations
-// always cold-starts. Bumped to 3 there to cover that real concurrency;
-// everything else still only ever sees 1 concurrent invocation at a time.
-// Deliberately not part of the WarmSchedule/SSM schema - see
-// WarmScheduleParam's doc comment in warm-schedule-stack.ts for why editing
-// that CDK-seeded literal clobbers live, settings-page-customized schedules
-// on next deploy.
-const CONCURRENCY_BY_PROJECT: Record<WarmScheduleKey, number> = {
-  portfolio: 3,
-  pantry: 1,
-  imposter: 1,
-  supergraph: 3,
-  zeroTrustLab: 1,
+// On (business-hours PC scheduling active) by default, 8am-7pm every day,
+// 1 provisioned instance - matches how warmup's schedules used to be
+// ENABLED at creation, and this stack's original fixed window.
+const DEFAULT_SCHEDULE: WarmSchedule = {
+  enabled: true,
+  days: ALL_WEEKDAYS,
+  start: "08:00",
+  end: "19:00",
+  concurrency: 1,
 };
-
-// On (business-hours PC scheduling active) by default, 8am-7pm every day -
-// matches how warmup's schedules used to be ENABLED at creation, and this
-// stack's original fixed window.
-const DEFAULT_SCHEDULE: WarmSchedule = { enabled: true, days: ALL_WEEKDAYS, start: "08:00", end: "19:00" };
 const DEFAULT_CONFIG: WarmScheduleConfig = {
   portfolio: DEFAULT_SCHEDULE,
   pantry: DEFAULT_SCHEDULE,
@@ -90,8 +89,8 @@ async function getConfig(): Promise<WarmScheduleConfig> {
 
   // Merge per-project over the default (not just top-level) so a project
   // added after this parameter was first written, or a stored value that
-  // predates a field being added to WarmSchedule, still gets a complete,
-  // sane schedule - same reasoning as getSettings()'s
+  // predates a field being added to WarmSchedule (e.g. concurrency), still
+  // gets a complete, sane schedule - same reasoning as getSettings()'s
   // {...DEFAULT_SETTINGS, ...stored} merge elsewhere in this codebase.
   const stored = JSON.parse(Parameter.Value) as Partial<Record<WarmScheduleKey, Partial<WarmSchedule>>>;
   const merged = {} as WarmScheduleConfig;
@@ -170,8 +169,11 @@ async function reconcileTarget(
   }
 }
 
-async function reconcileProjectTo(key: WarmScheduleKey, shouldBeWarm: boolean): Promise<void> {
-  const concurrency = CONCURRENCY_BY_PROJECT[key];
+async function reconcileProjectTo(
+  key: WarmScheduleKey,
+  shouldBeWarm: boolean,
+  concurrency: number
+): Promise<void> {
   await Promise.all(
     TARGETS_BY_PROJECT[key].map((functionName) => reconcileTarget(functionName, shouldBeWarm, concurrency))
   );
@@ -183,7 +185,7 @@ async function reconcileProjectTo(key: WarmScheduleKey, shouldBeWarm: boolean): 
 // directly by the POST handler for just the project that changed, so an
 // edit takes effect immediately instead of waiting for the next trigger.
 async function reconcileProject(key: WarmScheduleKey, schedule: WarmSchedule, now: Date): Promise<void> {
-  await reconcileProjectTo(key, isWithinWindow(schedule, now));
+  await reconcileProjectTo(key, isWithinWindow(schedule, now), schedule.concurrency);
 }
 
 // Builds the AWS cron fields for a project's on/off EventBridge Schedule
@@ -270,7 +272,11 @@ function isValidSchedule(value: unknown): value is WarmSchedule {
     typeof s.end === "string" &&
     /^\d{2}:\d{2}$/.test(s.start) &&
     /^\d{2}:\d{2}$/.test(s.end) &&
-    s.start < s.end
+    s.start < s.end &&
+    typeof s.concurrency === "number" &&
+    Number.isInteger(s.concurrency) &&
+    s.concurrency >= 1 &&
+    s.concurrency <= MAX_CONCURRENCY
   );
 }
 
@@ -290,10 +296,12 @@ async function processEvent(
   }
 
   if (isWarmScheduleTrigger(event)) {
-    // Trust the trigger - the schedule's own State is kept in sync with
-    // schedule.enabled on every settings save, so there's no need to
-    // re-derive "should be on" from the stored config here.
-    await reconcileProjectTo(event.project, event.action === "on");
+    // Unlike the on/off action, concurrency isn't part of the trigger
+    // payload itself (the EventBridge Schedule's input is just
+    // {project, action}, set once at CDK synth time / on a settings save) -
+    // fetch the current config to know how much concurrency to grant.
+    const config = await getConfig();
+    await reconcileProjectTo(event.project, event.action === "on", config[event.project].concurrency);
 
     return { statusCode: 200, body: "reconciled" };
   }
@@ -307,7 +315,7 @@ async function processEvent(
         body: JSON.stringify({
           error:
             "project must be one of portfolio/pantry/imposter/supergraph/zeroTrustLab, schedule must be a " +
-            "valid { enabled, days, start, end }",
+            `valid { enabled, days, start, end, concurrency } (concurrency an integer 1-${MAX_CONCURRENCY})`,
         }),
       };
     }

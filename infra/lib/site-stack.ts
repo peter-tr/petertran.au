@@ -1,4 +1,4 @@
-import { Stack, StackProps, CfnOutput, Duration, RemovalPolicy } from "aws-cdk-lib";
+import { Stack, StackProps, CfnOutput, Duration, RemovalPolicy, TimeZone } from "aws-cdk-lib";
 import { Construct } from "constructs";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
@@ -13,6 +13,8 @@ import * as route53Targets from "aws-cdk-lib/aws-route53-targets";
 import * as ses from "aws-cdk-lib/aws-ses";
 import * as cognito from "aws-cdk-lib/aws-cognito";
 import * as rum from "aws-cdk-lib/aws-rum";
+import { Schedule, ScheduleExpression } from "aws-cdk-lib/aws-scheduler";
+import { LambdaInvoke } from "aws-cdk-lib/aws-scheduler-targets";
 import * as path from "path";
 import { FUNCTION_NAMES, LIVE_ALIAS_NAME } from "./shared/function-names";
 
@@ -163,9 +165,13 @@ export class SiteStack extends Stack {
       // keeps the `live` alias warm 8am-7pm Sydney for real visitors - see
       // that stack's doc comment.
       memorySize: 256,
-      // 30s (not the default 15s) to leave headroom for the all-time cost
-      // fields on a cold cache: Anthropic's cost report caps at 31 days per
-      // page, so a 12-month lookback can take a dozen-odd sequential requests.
+      // 30s (not the default 15s): a backstop, not the primary safeguard,
+      // for the all-time cost fields' worst case - CostRefreshFunction below
+      // now refreshes both caches daily, so a real request only pays for
+      // Anthropic's cost report (paginated, 31 days/page, a dozen-odd
+      // sequential requests for a 12-month lookback) if that schedule ever
+      // misses a day. One real request got stuck for ~17s paying that cost
+      // before the daily refresh existed.
       timeout: Duration.seconds(30),
       environment: {
         TABLE_NAME: table.tableName,
@@ -210,6 +216,42 @@ export class SiteStack extends Stack {
 
     this.apiFn = apiFn;
 
+    // --- Daily proactive refresh of the footer's all-time cost figures ---
+    // Not part of what the test env exists to validate (same reasoning as
+    // RUM below) - a disposable environment doesn't need its own cost
+    // figures kept warm.
+    if (!props.isTestEnv) {
+      const costRefreshFn = new lambda.Function(this, "PortfolioCostRefreshFunction", {
+        functionName: "portfolio-cost-refresh",
+        runtime: lambda.Runtime.NODEJS_20_X,
+        handler: "cost-refresh-handler.handler",
+        code: lambda.Code.fromAsset(path.join(__dirname, "../../api/src/portfolio/dist")),
+        memorySize: 256,
+        // Generous - no request is waiting on this, and Anthropic's cost
+        // report can take a dozen-odd sequential paginated requests (each
+        // with its own 8s timeout) in the worst case.
+        timeout: Duration.minutes(2),
+        environment: {
+          TABLE_NAME: table.tableName,
+          ANTHROPIC_ADMIN_SECRET_ARN: anthropicAdminSecret.secretArn,
+        },
+        tracing: lambda.Tracing.ACTIVE,
+      });
+      table.grantReadWriteData(costRefreshFn);
+      anthropicAdminSecret.grantRead(costRefreshFn);
+      costRefreshFn.addToRolePolicy(
+        new iam.PolicyStatement({ actions: ["ce:GetCostAndUsage"], resources: ["*"] })
+      );
+
+      // Early morning Sydney, well outside business hours - if this ever
+      // runs long, it shouldn't contend with real traffic for anything.
+      new Schedule(this, "PortfolioCostRefreshSchedule", {
+        schedule: ScheduleExpression.cron({ minute: "0", hour: "4", timeZone: TimeZone.AUSTRALIA_SYDNEY }),
+        target: new LambdaInvoke(costRefreshFn),
+        description: "Daily proactive refresh of the footer's AWS/Anthropic all-time cost figures",
+      });
+    }
+
     // --- Static site: S3 (private, OAC) + CloudFront ---
     const siteBucket = new s3.Bucket(this, "SiteBucket", {
       // Explicit, so it reads clearly in the S3 console instead of
@@ -235,17 +277,23 @@ export class SiteStack extends Stack {
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
       },
+      // Not /index.html: prerender.tsx bakes "/"'s own rendered content
+      // into that file, so serving it as the catch-all for every other
+      // client-routed path (/notes, /pantry, /imposter, /settings, ...)
+      // would show the home page's bio/title before client JS replaces it.
+      // /fallback.html is the pristine, generic shell prerender.tsx writes
+      // out before it makes any route-specific edits.
       errorResponses: [
         {
           httpStatus: 403,
           responseHttpStatus: 200,
-          responsePagePath: "/index.html",
+          responsePagePath: "/fallback.html",
           ttl: Duration.seconds(0),
         },
         {
           httpStatus: 404,
           responseHttpStatus: 200,
-          responsePagePath: "/index.html",
+          responsePagePath: "/fallback.html",
           ttl: Duration.seconds(0),
         },
       ],
