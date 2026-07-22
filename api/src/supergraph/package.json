@@ -9,7 +9,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "api-shared": "1.1.2",
+    "api-shared": "*",
     "@apollo/gateway": "^2.9.0",
     "@apollo/server": "^4.11.0",
     "@as-integrations/aws-lambda": "^3.1.0",
