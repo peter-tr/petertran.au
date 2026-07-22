@@ -107,44 +107,40 @@ export const operationStatsPlugin: ApolloServerPlugin<Context> = {
     const start = Date.now();
 
     return {
+      // These writes are independent (different keys), so they're fired
+      // together rather than awaited one at a time -- willSendResponse blocks
+      // the actual response, so sequential awaits here were pure added
+      // latency on every request.
       async willSendResponse(requestContext) {
+        const tasks: Promise<unknown>[] = [];
+
         const sourceIp = requestContext.contextValue.sourceIp;
         if (sourceIp) {
-          try {
-            await recordVisitorAllTime(sourceIp);
-          } catch {
-            // Best-effort -- never let stats tracking break a real response.
-          }
-        }
-
-        try {
-          await recordTotalRequests();
-        } catch {
           // Best-effort -- never let stats tracking break a real response.
+          tasks.push(recordVisitorAllTime(sourceIp).catch(() => {}));
         }
+        tasks.push(recordTotalRequests().catch(() => {}));
 
         const name = requestContext.operationName ?? "Anonymous";
-        if (IGNORED_OPERATIONS.has(name)) return;
+        if (!IGNORED_OPERATIONS.has(name)) {
+          emitOperationCountMetric("portfolio", name, requestContext.operation?.operation ?? "unknown");
 
-        emitOperationCountMetric("portfolio", name, requestContext.operation?.operation ?? "unknown");
+          const isMutation = requestContext.operation?.operation === "mutation";
+          const sample = isMutation
+            ? null
+            : { query: requestContext.request.query ?? "", variables: requestContext.request.variables };
+          // getSegment() logs a noisy "context missing" error if called outside
+          // an active X-Ray context (e.g. local dev has no daemon/segment at
+          // all), so only call it in Lambda. It can return either the root
+          // Segment or a Subsegment depending on call context -- only the root
+          // carries trace_id, so a Subsegment needs one hop up via `.segment`.
+          const current = process.env.AWS_LAMBDA_FUNCTION_NAME ? AWSXRay.getSegment() : undefined;
+          const traceId = current ? ("segment" in current ? current.segment.trace_id : current.trace_id) : null;
 
-        const isMutation = requestContext.operation?.operation === "mutation";
-        const sample = isMutation
-          ? null
-          : { query: requestContext.request.query ?? "", variables: requestContext.request.variables };
-        // getSegment() logs a noisy "context missing" error if called outside
-        // an active X-Ray context (e.g. local dev has no daemon/segment at
-        // all), so only call it in Lambda. It can return either the root
-        // Segment or a Subsegment depending on call context -- only the root
-        // carries trace_id, so a Subsegment needs one hop up via `.segment`.
-        const current = process.env.AWS_LAMBDA_FUNCTION_NAME ? AWSXRay.getSegment() : undefined;
-        const traceId = current ? ("segment" in current ? current.segment.trace_id : current.trace_id) : null;
-
-        try {
-          await recordOperation(name, Date.now() - start, sample, traceId);
-        } catch {
-          // Best-effort usage counter -- never let stats tracking break a real response.
+          tasks.push(recordOperation(name, Date.now() - start, sample, traceId).catch(() => {}));
         }
+
+        await Promise.all(tasks);
       },
     };
   },

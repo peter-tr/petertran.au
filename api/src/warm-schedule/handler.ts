@@ -54,6 +54,24 @@ const TARGETS_BY_PROJECT: Record<WarmScheduleKey, string[]> = {
   ],
 };
 
+// A single Home page load fires 3 concurrent GraphQL requests (Hero,
+// SystemStatsSection, Footer - each has its own independent useEffect/
+// runQuery), each traversing supergraph-graphql -> portfolio-graphql - with
+// PC below 3 on either hop, at least one of those concurrent invocations
+// always cold-starts. Bumped to 3 there to cover that real concurrency;
+// everything else still only ever sees 1 concurrent invocation at a time.
+// Deliberately not part of the WarmSchedule/SSM schema - see
+// WarmScheduleParam's doc comment in warm-schedule-stack.ts for why editing
+// that CDK-seeded literal clobbers live, settings-page-customized schedules
+// on next deploy.
+const CONCURRENCY_BY_PROJECT: Record<WarmScheduleKey, number> = {
+  portfolio: 3,
+  pantry: 1,
+  imposter: 1,
+  supergraph: 3,
+  zeroTrustLab: 1,
+};
+
 // On (business-hours PC scheduling active) by default, 8am-7pm every day -
 // matches how warmup's schedules used to be ENABLED at creation, and this
 // stack's original fixed window.
@@ -124,14 +142,18 @@ function isWithinWindow(schedule: WarmSchedule, now: Date): boolean {
 // can't actually grant PC right now (e.g. the account's concurrency quota
 // has no room), that's a transient infra condition, not a reason to fail the
 // request or the other targets' reconciliation in the same tick.
-async function reconcileTarget(functionName: string, shouldBeWarm: boolean): Promise<void> {
+async function reconcileTarget(
+  functionName: string,
+  shouldBeWarm: boolean,
+  concurrency: number
+): Promise<void> {
   try {
     if (shouldBeWarm) {
       await lambdaClient.send(
         new PutProvisionedConcurrencyConfigCommand({
           FunctionName: functionName,
           Qualifier: ALIAS_NAME,
-          ProvisionedConcurrentExecutions: 1,
+          ProvisionedConcurrentExecutions: concurrency,
         })
       );
 
@@ -149,8 +171,9 @@ async function reconcileTarget(functionName: string, shouldBeWarm: boolean): Pro
 }
 
 async function reconcileProjectTo(key: WarmScheduleKey, shouldBeWarm: boolean): Promise<void> {
+  const concurrency = CONCURRENCY_BY_PROJECT[key];
   await Promise.all(
-    TARGETS_BY_PROJECT[key].map((functionName) => reconcileTarget(functionName, shouldBeWarm))
+    TARGETS_BY_PROJECT[key].map((functionName) => reconcileTarget(functionName, shouldBeWarm, concurrency))
   );
 }
 

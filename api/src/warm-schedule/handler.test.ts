@@ -233,9 +233,17 @@ describe("warm-schedule handler - reconcile ping", () => {
 
     const putCalls = lambdaMock.commandCalls(PutProvisionedConcurrencyConfigCommand);
     expect(putCalls.map((c) => c.args[0].input.FunctionName).sort()).toEqual([...ALL_TARGETS].sort());
+    // portfolio/supergraph get concurrency 3 (a single Home page load fires 3
+    // concurrent requests through both) - everything else gets 1.
+    const CONCURRENCY_BY_FN: Record<string, number> = {
+      "portfolio-fn": 3,
+      "supergraph-fn": 3,
+    };
     for (const call of putCalls) {
       expect(call.args[0].input.Qualifier).toBe("live");
-      expect(call.args[0].input.ProvisionedConcurrentExecutions).toBe(1);
+      expect(call.args[0].input.ProvisionedConcurrentExecutions).toBe(
+        CONCURRENCY_BY_FN[call.args[0].input.FunctionName as string] ?? 1
+      );
     }
     expect(lambdaMock.commandCalls(DeleteProvisionedConcurrencyConfigCommand)).toHaveLength(0);
   });
