@@ -248,6 +248,58 @@
   justify-content: center;
 }
 
+/* Below this, the desktop 3-column row (toolbar + 900px canvas + side
+   panels, ~1300px total) no longer fits - rather than let flexbox force it
+   into an unscrollable, squeezed mess, stack everything vertically. The
+   canvas itself stays at its native 900x600 resolution (Konva computes
+   pointer/drag coordinates from the stage's actual bounding rect, so
+   CSS-scaling it down would throw off where clicks/drags land) and instead
+   scrolls horizontally within its own frame - a deliberately different,
+   simpler layout for a touch screen, not a shrunk copy of the desktop one. */
+@media (max-width: 960px) {
+  .design-studio-editor {
+    padding: 1rem 0.75rem 1.5rem;
+  }
+
+  .design-studio-workspace {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .design-studio-toolbar {
+    width: auto;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .design-studio-toolbar-rule {
+    /* A horizontal rule reads as a section break in a vertical rail; in a
+       wrapped row it just looks like a stray line - drop it. */
+    display: none;
+  }
+
+  .design-studio-canvas-frame {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .design-studio-side-panels {
+    width: auto;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .design-studio-layers,
+  .design-studio-properties {
+    flex: 1 1 12rem;
+  }
+
+  .design-studio-head {
+    flex-wrap: wrap;
+  }
+}
+
 .design-studio-toolbar,
 .design-studio-layers,
 .design-studio-properties {
