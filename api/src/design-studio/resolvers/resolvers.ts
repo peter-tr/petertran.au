@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import {
   withDesignDefaults,
   type DesignRecord,
@@ -13,7 +12,6 @@ export interface DesignStore {
   saveDesign(args: SaveDesignArgs): Promise<DesignRecord>;
   deleteDesign(id: string): Promise<boolean>;
   listTemplates(filter: TemplateFilter): Promise<TemplateRecord[]>;
-  getTemplate(id: string): Promise<TemplateRecord | null>;
 }
 
 // Shared resolver logic for both the real (Mongo) and dev (in-memory)
@@ -40,22 +38,6 @@ export function createDesignStudioResolvers(store: DesignStore) {
         return withDesignDefaults(saved);
       },
       deleteDesign: async (_: unknown, args: { id: string }) => store.deleteDesign(args.id),
-      useTemplate: async (_: unknown, args: { templateId: string }) => {
-        const template = await store.getTemplate(args.templateId);
-        if (!template) throw new Error("That template wasn't found.");
-
-        // Fresh ids for every element - reusing the template's own ids
-        // would collide the moment someone creates a second design from
-        // the same template.
-        const saved = await store.saveDesign({
-          name: template.name,
-          width: template.width,
-          height: template.height,
-          elements: template.elements.map((element) => ({ ...element, id: randomUUID() })),
-        });
-
-        return withDesignDefaults(saved);
-      },
     },
   };
 }

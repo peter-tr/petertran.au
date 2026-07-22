@@ -51,7 +51,6 @@ function makeStore(overrides: Partial<DesignStore> = {}): DesignStore {
     saveDesign: vi.fn(),
     deleteDesign: vi.fn().mockResolvedValue(true),
     listTemplates: vi.fn().mockResolvedValue([]),
-    getTemplate: vi.fn().mockResolvedValue(null),
     ...overrides,
   };
 }
@@ -105,34 +104,5 @@ describe("createDesignStudioResolvers", () => {
 
     expect(store.listTemplates).toHaveBeenCalledWith(args);
     expect(result).toEqual(templates);
-  });
-
-  it("Mutation.useTemplate clones the template's elements with fresh ids into a new design", async () => {
-    const template = makeTemplate();
-    const saved = makeDesign({ id: "new-design", name: template.name });
-    const store = makeStore({
-      getTemplate: vi.fn().mockResolvedValue(template),
-      saveDesign: vi.fn().mockResolvedValue(saved),
-    });
-    const resolvers = createDesignStudioResolvers(store);
-
-    const result = await resolvers.Mutation.useTemplate({}, { templateId: "tpl-1" });
-
-    expect(store.getTemplate).toHaveBeenCalledWith("tpl-1");
-
-    const [saveArgs] = vi.mocked(store.saveDesign).mock.calls[0];
-    expect(saveArgs.name).toBe(template.name);
-    expect(saveArgs.elements).toHaveLength(1);
-    expect(saveArgs.elements[0].id).not.toBe(template.elements[0].id);
-    expect(result.id).toBe("new-design");
-  });
-
-  it("Mutation.useTemplate throws when the template doesn't exist", async () => {
-    const store = makeStore({ getTemplate: vi.fn().mockResolvedValue(null) });
-    const resolvers = createDesignStudioResolvers(store);
-
-    await expect(resolvers.Mutation.useTemplate({}, { templateId: "missing" })).rejects.toThrow(
-      "wasn't found"
-    );
   });
 });

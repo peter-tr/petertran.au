@@ -9,7 +9,6 @@ import type {
   DeleteDesignMutation,
   TemplatesQuery,
   TemplatesQueryVariables,
-  UseTemplateMutation,
 } from "./api.generated";
 
 // Separate endpoint, separate service, same reasoning as pantry/imposter's
@@ -98,6 +97,25 @@ const TEMPLATE_FIELDS = /* GraphQL */ `
     tags
     colors
     popularity
+    width
+    height
+    elements {
+      id
+      type
+      x
+      y
+      width
+      height
+      rotation
+      zIndex
+      fill
+      stroke
+      strokeWidth
+      text
+      fontFamily
+      fontSize
+      fontWeight
+    }
   }
 `;
 
@@ -108,15 +126,6 @@ export const TEMPLATES_QUERY = /* GraphQL */ `
     }
   }
   ${TEMPLATE_FIELDS}
-`;
-
-export const USE_TEMPLATE_MUTATION = /* GraphQL */ `
-  mutation UseTemplate($templateId: ID!) {
-    useTemplate(templateId: $templateId) {
-      ...DesignFields
-    }
-  }
-  ${DESIGN_FIELDS}
 `;
 
 export async function listDesigns(): Promise<Design[]> {
@@ -155,13 +164,4 @@ export async function listTemplates(filter: TemplatesQueryVariables = {}): Promi
   const data = await runDesignStudioQuery<TemplatesQuery>(TEMPLATES_QUERY, filter);
 
   return data.templates;
-}
-
-// Named applyTemplate, not useTemplate (matching the GraphQL mutation name)
-// - "use..." reads as a React Hook name to eslint-plugin-react-hooks, and
-// this is a plain async call, not a hook.
-export async function applyTemplate(templateId: string): Promise<Design> {
-  const data = await runDesignStudioQuery<UseTemplateMutation>(USE_TEMPLATE_MUTATION, { templateId });
-
-  return data.useTemplate;
 }

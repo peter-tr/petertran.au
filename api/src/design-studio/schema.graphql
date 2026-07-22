@@ -128,8 +128,4 @@ Write operations for Design Studio.
 type Mutation {
   saveDesign(input: SaveDesignInput!): Design!
   deleteDesign(id: ID!): Boolean!
-  """
-  Clones a template's elements into a brand-new saved design.
-  """
-  useTemplate(templateId: ID!): Design!
 }
