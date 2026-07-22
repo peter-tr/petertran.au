@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import EditorWorkspace from "./components/EditorWorkspace";
 import { getDesign, type Design, type Template } from "./api";
@@ -21,7 +21,9 @@ export interface NewDesignLocationState {
 }
 
 function isNewDesignLocationState(state: unknown): state is NewDesignLocationState {
-  return !!state && typeof state === "object" && Array.isArray((state as NewDesignLocationState).seedElements);
+  return (
+    !!state && typeof state === "object" && Array.isArray((state as NewDesignLocationState).seedElements)
+  );
 }
 
 function seedFromLocationState(state: unknown): Seed {
@@ -29,7 +31,10 @@ function seedFromLocationState(state: unknown): Seed {
 
   return {
     name: state.seedName,
-    events: state.seedElements.map((element) => ({ type: "add" as const, element: fromWireElement(element) })),
+    events: state.seedElements.map((element) => ({
+      type: "add" as const,
+      element: fromWireElement(element),
+    })),
   };
 }
 
@@ -38,24 +43,21 @@ export default function Editor() {
   const navigate = useNavigate();
   const location = useLocation();
   const isNew = designId === "new";
-  const [seed, setSeed] = useState<Seed | null>(null);
+
+  // Purely derived from the current location - no async work involved, so
+  // this is computed directly rather than mirrored into state via an effect
+  // (an effect would need a synchronous setState call at its top just to
+  // publish this, which is exactly what triggers cascading extra renders).
+  const newSeed = useMemo(
+    () => (isNew ? seedFromLocationState(location.state) : null),
+    [isNew, location.state]
+  );
+
+  const [fetchedSeed, setFetchedSeed] = useState<Seed | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setError(null);
-
-    // Keyed on location.key (React Router's unique id per navigation entry),
-    // not just designId - opening a *different* template still lands on the
-    // same "/design-studio/new" path, so designId alone wouldn't change and
-    // this effect wouldn't otherwise notice the new location.state (e.g.
-    // browser back to the gallery, then opening a second template).
-    if (isNew) {
-      setSeed(seedFromLocationState(location.state));
-
-      return;
-    }
-
-    if (!designId) return;
+    if (isNew || !designId) return;
 
     let cancelled = false;
 
@@ -67,7 +69,7 @@ export default function Editor() {
 
           return;
         }
-        setSeed({
+        setFetchedSeed({
           name: design.name,
           events: design.elements.map((element) => ({
             type: "add" as const,
@@ -82,19 +84,23 @@ export default function Editor() {
     return () => {
       cancelled = true;
     };
-  }, [designId, isNew, location.key, location.state]);
+  }, [designId, isNew]);
 
   function handleSaved(saved: Design) {
     if (isNew) navigate(`/design-studio/${saved.id}`, { replace: true });
   }
 
-  if (error) {
+  // Gated on !isNew so a stale error from a previously-viewed design (e.g.
+  // one that failed to load) never leaks into a fresh "new design" view.
+  if (!isNew && error) {
     return (
       <div className="design-studio-editor">
         <p className="status-line">// {error}</p>
       </div>
     );
   }
+
+  const seed = isNew ? newSeed : fetchedSeed;
 
   if (!seed) {
     return (
