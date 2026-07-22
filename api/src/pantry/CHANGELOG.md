@@ -1,5 +1,19 @@
 # pantry
 
+## 1.4.0
+
+### Minor Changes
+
+- 74ea629: Apollo Federation supergraph gateway, prod and test
+
+### Patch Changes
+
+- 518b10d: remove scheduled warmup ping, make PC scheduling per-project
+- 9c5b5fd: migrate ApiGatewayStack from HTTP API to REST API for real X-Ray trace propagation
+- Updated dependencies [2c53dce]
+- Updated dependencies [9c5b5fd]
+  - api-shared@1.1.2
+
 ## 1.3.0
 
 ### Minor Changes

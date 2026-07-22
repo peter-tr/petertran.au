@@ -2,18 +2,15 @@ import { ApolloServer } from "@apollo/server";
 import { startServerAndCreateLambdaHandler, handlers } from "@as-integrations/aws-lambda";
 import {
   ApolloGateway,
-  IntrospectAndCompose,
   RemoteGraphQLDataSource,
   type GraphQLDataSourceProcessOptions,
 } from "@apollo/gateway";
 import * as AWSXRay from "aws-xray-sdk-core";
 import { traced, traceHeader } from "api-shared/xray";
+import { corsHeaders } from "api-shared/http";
 import type { Context } from "api-shared/context";
-import type {
-  APIGatewayProxyEventV2,
-  APIGatewayProxyStructuredResultV2,
-  Context as LambdaContext,
-} from "aws-lambda";
+import type { APIGatewayProxyEvent, APIGatewayProxyResult, Context as LambdaContext } from "aws-lambda";
+import { SUPERGRAPH_SDL } from "./supergraph.generated";
 
 const apiBaseUrl = process.env.API_BASE_URL;
 if (!apiBaseUrl) throw new Error("API_BASE_URL is required");
@@ -54,25 +51,23 @@ class TracedDataSource extends RemoteGraphQLDataSource<Context> {
 }
 
 const gateway = new ApolloGateway({
-  supergraphSdl: new IntrospectAndCompose({
-    subgraphs: [
-      { name: "portfolio", url: `${apiBaseUrl}/portfolio` },
-      { name: "pantry", url: `${apiBaseUrl}/pantry` },
-      { name: "imposter", url: `${apiBaseUrl}/imposter` },
-      { name: "design-studio", url: `${apiBaseUrl}/design-studio` },
-    ],
-    // No pollIntervalInMs, unlike the local dev-server gateway - Lambda
-    // freezes between invocations, so an ongoing poll timer serves no
-    // purpose here. Composes once per cold start instead.
-  }),
-  buildService: ({ name, url }) => new TracedDataSource(name, url!),
+  // Composed at build time (see scripts/compose-supergraph.ts), not via
+  // IntrospectAndCompose - that used to fetch all subgraphs' SDL over
+  // HTTPS on every cold start, which was the dominant cost in the gateway's
+  // cold-start latency.
+  supergraphSdl: SUPERGRAPH_SDL,
+  // Ignores the `url` composed into the schema (a build-time placeholder,
+  // see compose-supergraph.ts) and reconstructs the real per-environment URL
+  // from `name` instead - the same composed artifact is deployed to both
+  // prod and the test env, only apiBaseUrl differs between them.
+  buildService: ({ name }) => new TracedDataSource(name, `${apiBaseUrl}/${name}`),
 });
 
 const server = new ApolloServer<Context>({ gateway, introspection: true });
 
 const apolloHandler = startServerAndCreateLambdaHandler(
   server,
-  handlers.createAPIGatewayProxyEventV2RequestHandler(),
+  handlers.createAPIGatewayProxyEventRequestHandler(),
   {
     context: async () => ({
       // Captured synchronously, as early as possible in the invocation -
@@ -83,8 +78,11 @@ const apolloHandler = startServerAndCreateLambdaHandler(
 );
 
 export const handler = async (
-  event: APIGatewayProxyEventV2,
+  event: APIGatewayProxyEvent,
   context: LambdaContext
-): Promise<APIGatewayProxyStructuredResultV2 | void> => {
-  return apolloHandler(event, context, () => {});
+): Promise<APIGatewayProxyResult | void> => {
+  const result = await apolloHandler(event, context, () => {});
+  if (!result) return result;
+
+  return { ...result, headers: { ...result.headers, ...corsHeaders(event.headers?.origin) } };
 };

@@ -235,17 +235,23 @@ export class SiteStack extends Stack {
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
       },
+      // Not /index.html: prerender.tsx bakes "/"'s own rendered content
+      // into that file, so serving it as the catch-all for every other
+      // client-routed path (/notes, /pantry, /imposter, /settings, ...)
+      // would show the home page's bio/title before client JS replaces it.
+      // /fallback.html is the pristine, generic shell prerender.tsx writes
+      // out before it makes any route-specific edits.
       errorResponses: [
         {
           httpStatus: 403,
           responseHttpStatus: 200,
-          responsePagePath: "/index.html",
+          responsePagePath: "/fallback.html",
           ttl: Duration.seconds(0),
         },
         {
           httpStatus: 404,
           responseHttpStatus: 200,
-          responsePagePath: "/index.html",
+          responsePagePath: "/fallback.html",
           ttl: Duration.seconds(0),
         },
       ],

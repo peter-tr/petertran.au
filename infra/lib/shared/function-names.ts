@@ -21,6 +21,7 @@ export const FUNCTION_NAMES = {
   warmSchedule: "warm-schedule",
   supergraph: "supergraph-graphql",
   designStudio: "design-studio-graphql",
+  alertsSettings: "alerts-settings",
 } as const;
 
 // Test-env counterparts of the 4 GraphQL Lambda names above, passed to

@@ -31,6 +31,15 @@
       "inputs": ["$TURBO_DEFAULT$", "../api/src/**/schema.graphql"],
       "outputs": ["src/**/*.generated.ts"]
     },
+    "supergraph#codegen": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "../../portfolio/schema.graphql",
+        "../../pantry/schema.graphql",
+        "../../games/imposter/schema.graphql"
+      ],
+      "outputs": ["supergraph.generated.ts"]
+    },
     "typecheck": {
       "dependsOn": ["codegen"],
       "outputs": []

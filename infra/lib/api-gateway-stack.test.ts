@@ -4,7 +4,7 @@ import { Template } from "aws-cdk-lib/assertions";
 import { ApiGatewayStack } from "./api-gateway-stack";
 
 describe("ApiGatewayStack", () => {
-  it("synthesizes with the shared HttpApi and a route per target Lambda", () => {
+  it("synthesizes with the shared RestApi and a resource per target Lambda, tracing enabled", () => {
     const app = new App();
     const stack = new ApiGatewayStack(app, "TestApiGatewayStack", {
       domainName: "www.example.com",
@@ -17,19 +17,33 @@ describe("ApiGatewayStack", () => {
       warmScheduleFnName: "warm-schedule",
       supergraphFnName: "supergraph-graphql",
       designStudioFnName: "design-studio-graphql",
+      alertsSettingsFnName: "alerts-settings",
       env: { account: "123456789012", region: "ap-southeast-2" },
     });
 
     const template = Template.fromStack(stack);
 
-    template.resourceCountIs("AWS::ApiGatewayV2::Api", 1);
-    // Portfolio, Pantry, Imposter, WarmSchedule, Supergraph, DesignStudio -
-    // each registered for both GET and POST, which CDK emits as 2 separate
-    // Route resources.
-    template.resourceCountIs("AWS::ApiGatewayV2::Route", 12);
-    template.hasResourceProperties("AWS::ApiGatewayV2::DomainName", {
+    template.resourceCountIs("AWS::ApiGateway::RestApi", 1);
+    // Portfolio, Pantry, Imposter, WarmSchedule, Supergraph, AlertsSettings,
+    // DesignStudio - one Resource (path segment) each.
+    template.resourceCountIs("AWS::ApiGateway::Resource", 7);
+    // Each of the 7 resources gets GET + POST + an auto CORS-preflight
+    // OPTIONS (from defaultCorsPreflightOptions), plus the root resource
+    // gets its own auto OPTIONS too: 7 * 3 + 1.
+    template.resourceCountIs("AWS::ApiGateway::Method", 22);
+    template.hasResourceProperties("AWS::ApiGateway::DomainName", {
       DomainName: "api.example.com",
     });
+    // The whole point of RestApi over the cheaper HttpApi it replaced - see
+    // the stack's doc comment for why HttpApi couldn't propagate a trace
+    // into the Lambda it routed to.
+    template.hasResourceProperties("AWS::ApiGateway::Stage", {
+      TracingEnabled: true,
+    });
+    // Asserts the cross-stack singleton collision (this stack + its
+    // on-demand test-env twin, same account/region) never has a chance to
+    // reappear - see the stack's cloudWatchRole comment.
+    template.resourceCountIs("AWS::ApiGateway::Account", 0);
   });
 
   it("isTestEnv: routes portfolio/pantry/imposter/supergraph (no warm-schedule), under the given apiSubdomain", () => {
@@ -51,9 +65,11 @@ describe("ApiGatewayStack", () => {
 
     const template = Template.fromStack(stack);
 
-    // Portfolio, Pantry, Imposter, Supergraph - WarmSchedule route skipped.
-    template.resourceCountIs("AWS::ApiGatewayV2::Route", 8);
-    template.hasResourceProperties("AWS::ApiGatewayV2::DomainName", {
+    // Portfolio, Pantry, Imposter, Supergraph - WarmSchedule resource
+    // skipped. 4 resources * (GET+POST+OPTIONS) + root's own OPTIONS.
+    template.resourceCountIs("AWS::ApiGateway::Resource", 4);
+    template.resourceCountIs("AWS::ApiGateway::Method", 13);
+    template.hasResourceProperties("AWS::ApiGateway::DomainName", {
       DomainName: "api.test.example.com",
     });
   });

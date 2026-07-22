@@ -10,6 +10,7 @@ import { ZeroTrustLabStack } from "../lib/zero-trust-lab-stack";
 import { ApiGatewayStack } from "../lib/api-gateway-stack";
 import { ProvisionedConcurrencyStack } from "../lib/warm-schedule-stack";
 import { SupergraphStack } from "../lib/supergraph-stack";
+import { MonitoringStack } from "../lib/monitoring-stack";
 import { FUNCTION_NAMES, TEST_FUNCTION_NAMES } from "../lib/shared/function-names";
 
 const app = new App();
@@ -115,9 +116,21 @@ const supergraphStack = new SupergraphStack(app, "PetertranSupergraphStack", {
   env: { account, region: "ap-southeast-2" },
 });
 
+// Operational visibility (alarms + dashboard) across every prod Lambda/table
+// above, plus AlertsSettingsFunction backing the Settings page's alert-email
+// toggle - deliberately its own stack, same reasoning as
+// provisionedConcurrencyStack: it imports every target by plain name (see
+// monitoring-stack.ts), so it has no live CloudFormation coupling to the
+// stacks that create them and can deploy in any order relative to them.
+// Prod only - the on-demand test env below is disposable and short-lived,
+// so alarming on it would just be noise.
+const monitoringStack = new MonitoringStack(app, "PetertranMonitoringStack", {
+  env: { account, region: "ap-southeast-2" },
+});
+
 // Shared HttpApi in front of portfolio/pantry/imposter/supergraph/
-// warm-schedule, giving them one stable domain (api.petertran.au) instead
-// of each its own
+// warm-schedule/alerts-settings, giving them one stable domain
+// (api.petertran.au) instead of each its own
 // CloudFormation-generated Function URL. Plain function names, no live
 // cross-stack reference - deliberately does NOT cover zero-trust-lab's own
 // edge/domain gateways, which stay isolated per that stack's own design
@@ -133,6 +146,7 @@ const apiGatewayStack = new ApiGatewayStack(app, "PetertranApiGatewayStack", {
   warmScheduleFnName: FUNCTION_NAMES.warmSchedule,
   supergraphFnName: FUNCTION_NAMES.supergraph,
   designStudioFnName: FUNCTION_NAMES.designStudio,
+  alertsSettingsFnName: FUNCTION_NAMES.alertsSettings,
   env: { account, region: "ap-southeast-2" },
 });
 
@@ -154,6 +168,7 @@ apiGatewayStack.addDependency(gamesStack);
 apiGatewayStack.addDependency(zeroTrustLabStack);
 apiGatewayStack.addDependency(provisionedConcurrencyStack);
 apiGatewayStack.addDependency(supergraphStack);
+apiGatewayStack.addDependency(monitoringStack);
 
 // On-demand test environment (test.petertran.au / api.test.petertran.au) for
 // testing big changes (e.g. Apollo Router/Federation) without touching prod -

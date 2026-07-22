@@ -6,6 +6,11 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     environment: "node",
-    include: ["src/zero-trust-lab/**/*.test.ts", "src/warmup/**/*.test.ts", "src/warm-schedule/**/*.test.ts"],
+    include: [
+      "src/zero-trust-lab/**/*.test.ts",
+      "src/warmup/**/*.test.ts",
+      "src/warm-schedule/**/*.test.ts",
+      "src/alerts-settings/**/*.test.ts",
+    ],
   },
 });
