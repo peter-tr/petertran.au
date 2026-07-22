@@ -77,8 +77,6 @@ async function fetchAnthropicCostUsd(apiKey: string, startingAt: Date, endingAt:
 }
 
 class AnthropicCostFetcher extends CachedCostFetcher {
-  private apiKey: string | null = null;
-
   constructor() {
     super({
       ddb,
@@ -99,15 +97,27 @@ class AnthropicCostFetcher extends CachedCostFetcher {
   // Requires an Admin API key (separate from the messages-API key used
   // elsewhere) - returns 0 rather than failing if it's not configured,
   // since this is a nice-to-have footer figure, not core functionality.
-  // Runs before any cache/claim DynamoDB calls, same as the original
-  // early-return did.
+  // Only checks whether a credential *source* is configured (a plain env
+  // read, no network call) - actually fetching the secret's value is
+  // deferred to fetchRaw(), so a fresh cache hit never pays that Secrets
+  // Manager round trip. Still runs before any cache/claim DynamoDB calls,
+  // same as the original early-return did.
   protected async guard(): Promise<number | null> {
-    this.apiKey = await getAnthropicAdminApiKey();
+    const hasCredentialSource = Boolean(
+      process.env.ANTHROPIC_ADMIN_API_KEY || process.env.ANTHROPIC_ADMIN_SECRET_ARN
+    );
 
-    return this.apiKey ? null : 0;
+    return hasCredentialSource ? null : 0;
   }
 
   protected async fetchRaw(now: Date): Promise<number> {
+    // Only reached once guard() has confirmed a credential source exists and
+    // the cache has been found stale - getAnthropicAdminApiKey() is memoized
+    // at module scope, so this is still just one Secrets Manager call per
+    // warm container, now paid only when actually needed.
+    const apiKey = await getAnthropicAdminApiKey();
+    if (!apiKey) return 0;
+
     // 12 months back comfortably covers this project's whole history (and
     // matches the same lookback used for the AWS side); the cost endpoint
     // caps at 31 daily buckets per page, so a range this wide means
@@ -115,7 +125,7 @@ class AnthropicCostFetcher extends CachedCostFetcher {
     const startingAt = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 12, 1));
     const endingAt = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
 
-    return fetchAnthropicCostUsd(this.apiKey!, startingAt, endingAt);
+    return fetchAnthropicCostUsd(apiKey, startingAt, endingAt);
   }
 
   protected async onFetchError(err: unknown, cachedAmountUsd: number): Promise<number> {

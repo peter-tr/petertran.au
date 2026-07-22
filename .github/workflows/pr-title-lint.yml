@@ -3,6 +3,11 @@ name: PR Title Lint
 on:
   pull_request:
     types: [opened, edited, synchronize, reopened]
+    # See verify.yml's paths-ignore comment - skips the redundant re-run
+    # triggered by changeset-check.yml's auto-commit, which never changes
+    # the PR title this workflow lints anyway.
+    paths-ignore:
+      - ".changeset/**"
 
 permissions:
   pull-requests: read
