@@ -89,7 +89,13 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
     },
     {
-      // Composes the three subgraphs above into one endpoint - web's
+      command: "npm run dev:design-studio --workspace=api",
+      cwd: REPO_ROOT,
+      url: "http://localhost:4004/",
+      reuseExistingServer: !process.env.CI,
+    },
+    {
+      // Composes the four subgraphs above into one endpoint - web's
       // .env.development points every VITE_*_GRAPHQL_ENDPOINT here, not at
       // a subgraph directly, so e2e exercises the same supergraph path
       // prod/test traffic takes instead of bypassing it.
