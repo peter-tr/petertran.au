@@ -10,7 +10,7 @@ vi.mock("api-shared/ddb", () => ({
 }));
 
 // Imported after the mock so the module picks up the mocked createDdbClient.
-const { ddb, TABLE_NAME, PK } = await import("./ddb");
+const { ddb, TABLE_NAME } = await import("./ddb");
 
 describe("pantry ddb client", () => {
   it("configures createDdbClient with pantry's own default table name and xray enabled", () => {
@@ -20,9 +20,5 @@ describe("pantry ddb client", () => {
   it("re-exports the ddb client and table name from createDdbClient", () => {
     expect(ddb).toEqual({ fake: true });
     expect(TABLE_NAME).toBe("resolved-table");
-  });
-
-  it("uses the fixed PANTRY partition key", () => {
-    expect(PK).toBe("PANTRY");
   });
 });

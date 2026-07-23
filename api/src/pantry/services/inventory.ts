@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { ddb, TABLE_NAME, PK } from "../lib/aws/ddb";
+import { ddb, TABLE_NAME } from "../lib/aws/ddb";
 import { normalizeUnit } from "../lib/util/normalize";
 import type { AiCallDebugInfo } from "../lib/anthropic/debug-info";
 import { DynamoRepository } from "./dynamo-repository";
@@ -92,7 +92,7 @@ function withInventoryDefaults(item: InventoryItem): InventoryItem {
 
 class InventoryRepository extends DynamoRepository<InventoryItem> {
   constructor() {
-    super({ ddb, tableName: TABLE_NAME, pk: PK, skPrefix: ITEM_PREFIX, itemType: "ITEM" });
+    super({ ddb, tableName: TABLE_NAME, skPrefix: ITEM_PREFIX, itemType: "ITEM" });
   }
 
   protected applyDefaults(item: InventoryItem): InventoryItem {
@@ -102,30 +102,30 @@ class InventoryRepository extends DynamoRepository<InventoryItem> {
 
 const inventoryRepository = new InventoryRepository();
 
-export async function getItem(id: string): Promise<InventoryItem | null> {
-  return inventoryRepository.get(id);
+export async function getItem(pk: string, id: string): Promise<InventoryItem | null> {
+  return inventoryRepository.get(pk, id);
 }
 
-export async function getAllItems(): Promise<InventoryItem[]> {
-  return inventoryRepository.getAll();
+export async function getAllItems(pk: string): Promise<InventoryItem[]> {
+  return inventoryRepository.getAll(pk);
 }
 
-export async function putItem(item: InventoryItem): Promise<void> {
-  return inventoryRepository.put(item);
+export async function putItem(pk: string, item: InventoryItem): Promise<void> {
+  return inventoryRepository.put(pk, item);
 }
 
-export async function deleteItem(id: string): Promise<boolean> {
-  return inventoryRepository.delete(id);
+export async function deleteItem(pk: string, id: string): Promise<boolean> {
+  return inventoryRepository.delete(pk, id);
 }
 
 // Called only by the price-check Lambda (lib/anthropic/check-prices.ts), not
 // exposed as a GraphQL mutation - lastKnownPrice is system-written, never
 // something a user (or the AI command bar) can set directly.
-export async function setLastKnownPrice(id: string, price: LastKnownPrice): Promise<void> {
-  const existing = await getItem(id);
+export async function setLastKnownPrice(pk: string, id: string, price: LastKnownPrice): Promise<void> {
+  const existing = await getItem(pk, id);
   if (!existing) throw new Error(`No inventory item found with id "${id}".`);
 
-  await putItem({ ...existing, lastKnownPrice: price });
+  await putItem(pk, { ...existing, lastKnownPrice: price });
 }
 
 export function createItem(input: AddInventoryItemInput): InventoryItem {

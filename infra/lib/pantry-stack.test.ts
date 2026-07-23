@@ -40,6 +40,8 @@ describe("PantryStack", () => {
     // Hourly digest + hourly-tick isn't here - PantryDigestSchedule is the
     // only scheduler:: Schedule this stack creates.
     template.resourceCountIs("AWS::Scheduler::Schedule", 1);
+    template.resourceCountIs("AWS::Cognito::UserPool", 1);
+    template.hasResourceProperties("AWS::Cognito::UserPool", { UserPoolName: "pantry-users" });
   });
 
   it("isTestEnv: skips the digest/price-check Lambdas and schedule, drops table protection", () => {

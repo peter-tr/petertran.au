@@ -173,8 +173,8 @@ interface TrackedTarget {
 // exhaustion incident) - a best-effort background refresh, not a data path
 // anything else depends on, so a failure just leaves lastKnownPrice stale
 // rather than anything user-visible breaking.
-export async function checkTrackedPrices(xraySegment: Context["xraySegment"]): Promise<void> {
-  const [items, shoppingList] = await Promise.all([getAllItems(), getShoppingList()]);
+export async function checkTrackedPrices(pk: string, xraySegment: Context["xraySegment"]): Promise<void> {
+  const [items, shoppingList] = await Promise.all([getAllItems(pk), getShoppingList(pk)]);
 
   const targets: TrackedTarget[] = [
     ...items
@@ -183,7 +183,7 @@ export async function checkTrackedPrices(xraySegment: Context["xraySegment"]): P
         id: i.id,
         list: "inventory",
         name: i.name,
-        apply: (price) => setLastKnownPrice(i.id, price),
+        apply: (price) => setLastKnownPrice(pk, i.id, price),
       })),
     ...shoppingList
       .filter((e) => e.trackPrice)
@@ -191,17 +191,17 @@ export async function checkTrackedPrices(xraySegment: Context["xraySegment"]): P
         id: e.id,
         list: "shoppingList",
         name: e.name,
-        apply: (price) => setShoppingListLastKnownPrice(e.id, price),
+        apply: (price) => setShoppingListLastKnownPrice(pk, e.id, price),
       })),
   ].slice(0, MAX_ITEMS_PER_RUN);
 
   if (targets.length === 0) {
-    console.log("No trackPrice items - skipping price check.");
+    console.log(`No trackPrice items for pk="${pk}" - skipping price check.`);
 
     return;
   }
 
-  await startPriceSync(targets.length);
+  await startPriceSync(pk, targets.length);
 
   let batch: { results: Map<string, BatchPriceResult>; debugInfo: AiCallDebugInfo } | null = null;
   let batchError: string | null = null;
@@ -232,7 +232,7 @@ export async function checkTrackedPrices(xraySegment: Context["xraySegment"]): P
 
   for (const target of targets) {
     if (batchError) {
-      await recordPriceCheckProgress({
+      await recordPriceCheckProgress(pk, {
         itemName: target.name,
         message: batchError,
         occurredAt: new Date().toISOString(),
@@ -244,7 +244,7 @@ export async function checkTrackedPrices(xraySegment: Context["xraySegment"]): P
     if (!entry) {
       const message = "No result returned for this item in the batch response.";
       console.error(`Price check missing for "${target.name}"`);
-      await recordPriceCheckProgress({
+      await recordPriceCheckProgress(pk, {
         itemName: target.name,
         message,
         occurredAt: new Date().toISOString(),
@@ -264,10 +264,10 @@ export async function checkTrackedPrices(xraySegment: Context["xraySegment"]): P
       console.log(
         `Checked "${target.name}": Coles $${price.colesPrice ?? "?"}${price.note ? ` (${price.note})` : ""}`
       );
-      await recordPriceCheckProgress();
+      await recordPriceCheckProgress(pk);
     } catch (err) {
       console.error(`Failed to save price for "${target.name}":`, err);
-      await recordPriceCheckProgress({
+      await recordPriceCheckProgress(pk, {
         itemName: target.name,
         message: err instanceof Error ? err.message : "Unknown error",
         occurredAt: new Date().toISOString(),
@@ -275,5 +275,5 @@ export async function checkTrackedPrices(xraySegment: Context["xraySegment"]): P
     }
   }
 
-  await finishPriceSync();
+  await finishPriceSync(pk);
 }

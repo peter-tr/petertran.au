@@ -8,27 +8,31 @@ import type { Context } from "../context";
 const assertNotRateLimited = vi.fn<(ip: string | undefined) => Promise<void>>(async () => undefined);
 const assertAiNotRateLimited = vi.fn<(ip: string | undefined) => Promise<void>>(async () => undefined);
 
-const getItem = vi.fn<(id: string) => Promise<InventoryItem | null>>();
-const getAllItems = vi.fn<() => Promise<InventoryItem[]>>();
-const putItem = vi.fn<(item: unknown) => Promise<void>>(async () => undefined);
-const deleteItem = vi.fn<(id: string) => Promise<boolean>>();
+const getItem = vi.fn<(pk: string, id: string) => Promise<InventoryItem | null>>();
+const getAllItems = vi.fn<(pk: string) => Promise<InventoryItem[]>>();
+const putItem = vi.fn<(pk: string, item: unknown) => Promise<void>>(async () => undefined);
+const deleteItem = vi.fn<(pk: string, id: string) => Promise<boolean>>();
 const createItem = vi.fn();
-const setLastKnownPrice = vi.fn<(id: string, price: unknown) => Promise<void>>(async () => undefined);
-
-const getShoppingListEntry = vi.fn<(id: string) => Promise<ShoppingListEntry | null>>();
-const getShoppingList = vi.fn<() => Promise<ShoppingListEntry[]>>();
-const putShoppingListEntry = vi.fn<(entry: unknown) => Promise<void>>(async () => undefined);
-const deleteShoppingListEntry = vi.fn<(id: string) => Promise<boolean>>();
-const upsertShoppingListEntry = vi.fn();
-const setShoppingListLastKnownPrice = vi.fn<(id: string, price: unknown) => Promise<void>>(
+const setLastKnownPrice = vi.fn<(pk: string, id: string, price: unknown) => Promise<void>>(
   async () => undefined
 );
 
-const getSettings = vi.fn<() => Promise<PantrySettings>>();
-const putSettings = vi.fn<(settings: unknown) => Promise<void>>(async () => undefined);
+const getShoppingListEntry = vi.fn<(pk: string, id: string) => Promise<ShoppingListEntry | null>>();
+const getShoppingList = vi.fn<(pk: string) => Promise<ShoppingListEntry[]>>();
+const putShoppingListEntry = vi.fn<(pk: string, entry: unknown) => Promise<void>>(async () => undefined);
+const deleteShoppingListEntry = vi.fn<(pk: string, id: string) => Promise<boolean>>();
+const upsertShoppingListEntry = vi.fn();
+const setShoppingListLastKnownPrice = vi.fn<(pk: string, id: string, price: unknown) => Promise<void>>(
+  async () => undefined
+);
 
-const getPriceSyncStatus = vi.fn<() => Promise<PriceSyncStatus>>();
-const triggerPriceSync = vi.fn(async () => undefined);
+const getSettings = vi.fn<(pk: string) => Promise<PantrySettings>>();
+const putSettings = vi.fn<(pk: string, settings: unknown) => Promise<void>>(async () => undefined);
+
+const getPriceSyncStatus = vi.fn<(pk: string) => Promise<PriceSyncStatus>>();
+const triggerPriceSync = vi.fn<(pk: string) => Promise<void>>(async () => undefined);
+
+const registerUser = vi.fn<(pk: string, email: string) => Promise<void>>(async () => undefined);
 
 const parseCommand = vi.fn();
 const checkPrice = vi.fn();
@@ -46,36 +50,49 @@ vi.mock("../lib/anthropic/check-prices", () => ({
   checkPrice: (...args: unknown[]) => checkPrice(...args),
 }));
 vi.mock("../services/inventory", () => ({
-  getItem: (id: string) => getItem(id),
-  getAllItems: () => getAllItems(),
-  putItem: (item: unknown) => putItem(item),
-  deleteItem: (id: string) => deleteItem(id),
+  getItem: (pk: string, id: string) => getItem(pk, id),
+  getAllItems: (pk: string) => getAllItems(pk),
+  putItem: (pk: string, item: unknown) => putItem(pk, item),
+  deleteItem: (pk: string, id: string) => deleteItem(pk, id),
   createItem: (input: unknown) => createItem(input),
-  setLastKnownPrice: (id: string, price: unknown) => setLastKnownPrice(id, price),
+  setLastKnownPrice: (pk: string, id: string, price: unknown) => setLastKnownPrice(pk, id, price),
 }));
 vi.mock("../services/shopping-list", () => ({
-  getShoppingListEntry: (id: string) => getShoppingListEntry(id),
-  getShoppingList: () => getShoppingList(),
-  putShoppingListEntry: (entry: unknown) => putShoppingListEntry(entry),
-  deleteShoppingListEntry: (id: string) => deleteShoppingListEntry(id),
+  getShoppingListEntry: (pk: string, id: string) => getShoppingListEntry(pk, id),
+  getShoppingList: (pk: string) => getShoppingList(pk),
+  putShoppingListEntry: (pk: string, entry: unknown) => putShoppingListEntry(pk, entry),
+  deleteShoppingListEntry: (pk: string, id: string) => deleteShoppingListEntry(pk, id),
   upsertShoppingListEntry: (...args: unknown[]) => upsertShoppingListEntry(...args),
-  setShoppingListLastKnownPrice: (id: string, price: unknown) => setShoppingListLastKnownPrice(id, price),
+  setShoppingListLastKnownPrice: (pk: string, id: string, price: unknown) =>
+    setShoppingListLastKnownPrice(pk, id, price),
 }));
 vi.mock("../services/settings", () => ({
-  getSettings: () => getSettings(),
-  putSettings: (settings: unknown) => putSettings(settings),
+  getSettings: (pk: string) => getSettings(pk),
+  putSettings: (pk: string, settings: unknown) => putSettings(pk, settings),
 }));
 vi.mock("../services/price-sync-status", () => ({
-  getPriceSyncStatus: () => getPriceSyncStatus(),
+  getPriceSyncStatus: (pk: string) => getPriceSyncStatus(pk),
 }));
 vi.mock("../lib/aws/sync-prices", () => ({
-  triggerPriceSync: () => triggerPriceSync(),
+  triggerPriceSync: (pk: string) => triggerPriceSync(pk),
+}));
+vi.mock("../services/users", () => ({
+  registerUser: (pk: string, email: string) => registerUser(pk, email),
 }));
 
 const { resolvers } = await import("./resolvers");
 
+const TEST_PK = "PANTRY";
+
 function ctx(overrides: Partial<Context> = {}): Context {
-  return { sourceIp: "1.2.3.4", xraySegment: undefined, ...overrides } as Context;
+  return {
+    sourceIp: "1.2.3.4",
+    xraySegment: undefined,
+    pantryPk: TEST_PK,
+    userId: null,
+    email: null,
+    ...overrides,
+  };
 }
 
 function inventoryItem(overrides: Partial<InventoryItem> = {}): InventoryItem {
@@ -132,7 +149,7 @@ describe("Query.inventory", () => {
       inventoryItem({ id: "b", addedAt: "2026-03-01T00:00:00.000Z" }),
     ]);
 
-    const result = await resolvers.Query.inventory(null, {});
+    const result = await resolvers.Query.inventory(null, {}, ctx());
 
     expect(result.map((i) => i.id)).toEqual(["b", "a"]);
   });
@@ -143,19 +160,27 @@ describe("Query.inventory", () => {
       inventoryItem({ id: "pantry-1", location: "PANTRY" }),
     ]);
 
-    const result = await resolvers.Query.inventory(null, { location: "PANTRY" });
+    const result = await resolvers.Query.inventory(null, { location: "PANTRY" }, ctx());
 
     expect(result.map((i) => i.id)).toEqual(["pantry-1"]);
+  });
+
+  it("scopes the lookup to the caller's pantryPk", async () => {
+    getAllItems.mockResolvedValue([]);
+
+    await resolvers.Query.inventory(null, {}, ctx({ pantryPk: "USER#abc" }));
+
+    expect(getAllItems).toHaveBeenCalledWith("USER#abc");
   });
 });
 
 describe("Query.inventoryItem", () => {
-  it("delegates to getItem", async () => {
+  it("delegates to getItem, scoped to the caller's pantryPk", async () => {
     getItem.mockResolvedValue(inventoryItem({ id: "x" }));
 
-    const result = await resolvers.Query.inventoryItem(null, { id: "x" });
+    const result = await resolvers.Query.inventoryItem(null, { id: "x" }, ctx());
 
-    expect(getItem).toHaveBeenCalledWith("x");
+    expect(getItem).toHaveBeenCalledWith(TEST_PK, "x");
     expect((result as InventoryItem).id).toBe("x");
   });
 });
@@ -167,25 +192,43 @@ describe("Query.shoppingList", () => {
       shoppingListEntry({ id: "earlier", addedAt: "2026-01-01T00:00:00.000Z" }),
     ]);
 
-    const result = await resolvers.Query.shoppingList();
+    const result = await resolvers.Query.shoppingList(null, null, ctx());
 
     expect(result.map((e) => e.id)).toEqual(["earlier", "later"]);
   });
 });
 
 describe("Query.settings / priceSyncStatus", () => {
-  it("settings delegates to getSettings", async () => {
+  it("settings delegates to getSettings, scoped to the caller's pantryPk", async () => {
     const settings = { view: "location" } as PantrySettings;
     getSettings.mockResolvedValue(settings);
 
-    await expect(resolvers.Query.settings()).resolves.toBe(settings);
+    await expect(resolvers.Query.settings(null, null, ctx())).resolves.toBe(settings);
+    expect(getSettings).toHaveBeenCalledWith(TEST_PK);
   });
 
-  it("priceSyncStatus delegates to getPriceSyncStatus", async () => {
+  it("priceSyncStatus delegates to getPriceSyncStatus, scoped to the caller's pantryPk", async () => {
     const status = { running: false } as PriceSyncStatus;
     getPriceSyncStatus.mockResolvedValue(status);
 
-    await expect(resolvers.Query.priceSyncStatus()).resolves.toBe(status);
+    await expect(resolvers.Query.priceSyncStatus(null, null, ctx())).resolves.toBe(status);
+    expect(getPriceSyncStatus).toHaveBeenCalledWith(TEST_PK);
+  });
+});
+
+describe("Query.me", () => {
+  it("returns null when unauthenticated (using the default pantry)", () => {
+    expect(resolvers.Query.me(null, null, ctx())).toBeNull();
+  });
+
+  it("returns the signed-in account's id/email when authenticated", () => {
+    const result = resolvers.Query.me(
+      null,
+      null,
+      ctx({ userId: "sub-123", email: "user@example.com", pantryPk: "USER#sub-123" })
+    );
+
+    expect(result).toEqual({ id: "sub-123", email: "user@example.com" });
   });
 });
 
@@ -226,7 +269,7 @@ describe("Query.parseCommand", () => {
 });
 
 describe("Mutation.addInventoryItem", () => {
-  it("checks the rate limiter, then creates and persists the item", async () => {
+  it("checks the rate limiter, then creates and persists the item under the caller's pantryPk", async () => {
     const item = inventoryItem();
     createItem.mockReturnValue(item);
 
@@ -238,7 +281,7 @@ describe("Mutation.addInventoryItem", () => {
 
     expect(assertNotRateLimited).toHaveBeenCalledWith("5.5.5.5");
     expect(createItem).toHaveBeenCalledWith({ name: "Milk", location: "FRIDGE", quantity: 1 });
-    expect(putItem).toHaveBeenCalledWith(item);
+    expect(putItem).toHaveBeenCalledWith(TEST_PK, item);
     expect(result).toBe(item);
   });
 
@@ -271,7 +314,7 @@ describe("Mutation.recordPurchase", () => {
       ctx()
     );
 
-    expect(putItem).toHaveBeenCalledWith(newItem);
+    expect(putItem).toHaveBeenCalledWith(TEST_PK, newItem);
     expect(result).toBe(newItem);
   });
 
@@ -295,7 +338,7 @@ describe("Mutation.recordPurchase", () => {
     expect(result.id).toBe("existing");
     expect(result.quantity).toBe(3);
     expect(result.purchases).toEqual([{ date: "2026-02-01", price: 5, quantity: 2 }]);
-    expect(putItem).toHaveBeenCalledWith(expect.objectContaining({ id: "existing", quantity: 3 }));
+    expect(putItem).toHaveBeenCalledWith(TEST_PK, expect.objectContaining({ id: "existing", quantity: 3 }));
   });
 
   it("does not merge into an item with the same name but a different location", async () => {
@@ -349,7 +392,7 @@ describe("Mutation.updateInventoryItem", () => {
     expect(result.quantity).toBe(2);
     expect(result.unit).toBe("L");
     expect(result.category).toBe("Dairy");
-    expect(putItem).toHaveBeenCalledWith(expect.objectContaining({ quantity: 2, unit: "L" }));
+    expect(putItem).toHaveBeenCalledWith(TEST_PK, expect.objectContaining({ quantity: 2, unit: "L" }));
   });
 });
 
@@ -360,8 +403,8 @@ describe("Mutation.removeInventoryItem", () => {
 
     const result = await resolvers.Mutation.removeInventoryItem(null, { id: "x" }, ctx());
 
-    expect(upsertShoppingListEntry).toHaveBeenCalledWith("Milk", null, null, null, true, "Dairy");
-    expect(deleteItem).toHaveBeenCalledWith("x");
+    expect(upsertShoppingListEntry).toHaveBeenCalledWith(TEST_PK, "Milk", null, null, null, true, "Dairy");
+    expect(deleteItem).toHaveBeenCalledWith(TEST_PK, "x");
     expect(result).toBe(true);
   });
 
@@ -397,7 +440,17 @@ describe("Mutation.addToShoppingList", () => {
     );
 
     expect(assertNotRateLimited).toHaveBeenCalledWith("7.7.7.7");
-    expect(upsertShoppingListEntry).toHaveBeenCalledWith("Bread", null, null, null, false, null, null, false);
+    expect(upsertShoppingListEntry).toHaveBeenCalledWith(
+      TEST_PK,
+      "Bread",
+      null,
+      null,
+      null,
+      false,
+      null,
+      null,
+      false
+    );
     expect(result).toBe(entry);
   });
 
@@ -420,6 +473,7 @@ describe("Mutation.addToShoppingList", () => {
     );
 
     expect(upsertShoppingListEntry).toHaveBeenCalledWith(
+      TEST_PK,
       "Bread",
       2,
       "loaves",
@@ -452,7 +506,10 @@ describe("Mutation.updateShoppingListEntry", () => {
 
     expect(result.quantity).toBe(2);
     expect(result.unit).toBe("g");
-    expect(putShoppingListEntry).toHaveBeenCalledWith(expect.objectContaining({ quantity: 2, unit: "g" }));
+    expect(putShoppingListEntry).toHaveBeenCalledWith(
+      TEST_PK,
+      expect.objectContaining({ quantity: 2, unit: "g" })
+    );
   });
 });
 
@@ -467,7 +524,7 @@ describe("Mutation.removeFromShoppingList", () => {
     );
 
     expect(assertNotRateLimited).toHaveBeenCalledWith("1.1.1.1");
-    expect(deleteShoppingListEntry).toHaveBeenCalledWith("x");
+    expect(deleteShoppingListEntry).toHaveBeenCalledWith(TEST_PK, "x");
     expect(result).toBe(true);
   });
 });
@@ -480,7 +537,10 @@ describe("Mutation.updateSettings", () => {
 
     expect(result.view).toBe("grid");
     expect(result.sort).toBe("recent");
-    expect(putSettings).toHaveBeenCalledWith(expect.objectContaining({ view: "grid", sort: "recent" }));
+    expect(putSettings).toHaveBeenCalledWith(
+      TEST_PK,
+      expect.objectContaining({ view: "grid", sort: "recent" })
+    );
   });
 
   it("ignores explicitly-undefined input fields (does not overwrite with undefined)", async () => {
@@ -493,11 +553,11 @@ describe("Mutation.updateSettings", () => {
 });
 
 describe("Mutation.syncPricesNow", () => {
-  it("checks the rate limiter and triggers the price sync Lambda", async () => {
+  it("checks the rate limiter and triggers the price sync Lambda for the caller's pantryPk", async () => {
     const result = await resolvers.Mutation.syncPricesNow(null, {}, ctx({ sourceIp: "2.2.2.2" }));
 
     expect(assertNotRateLimited).toHaveBeenCalledWith("2.2.2.2");
-    expect(triggerPriceSync).toHaveBeenCalled();
+    expect(triggerPriceSync).toHaveBeenCalledWith(TEST_PK);
     expect(result).toBe(true);
   });
 
@@ -522,7 +582,11 @@ describe("Mutation.checkPriceNow", () => {
     expect(assertAiNotRateLimited).toHaveBeenCalledWith("3.3.3.3");
     expect(assertNotRateLimited).not.toHaveBeenCalled();
     expect(checkPrice).toHaveBeenCalledWith("Milk", undefined);
-    expect(setLastKnownPrice).toHaveBeenCalledWith("inv-1", expect.objectContaining({ colesPrice: 3.5 }));
+    expect(setLastKnownPrice).toHaveBeenCalledWith(
+      TEST_PK,
+      "inv-1",
+      expect.objectContaining({ colesPrice: 3.5 })
+    );
     expect(setShoppingListLastKnownPrice).not.toHaveBeenCalled();
     expect(result).toBe(true);
   });
@@ -535,6 +599,7 @@ describe("Mutation.checkPriceNow", () => {
 
     expect(checkPrice).toHaveBeenCalledWith("Eggs", undefined);
     expect(setShoppingListLastKnownPrice).toHaveBeenCalledWith(
+      TEST_PK,
       "sl-1",
       expect.objectContaining({ colesPrice: 6 })
     );
@@ -556,5 +621,23 @@ describe("Mutation.checkPriceNow", () => {
     await expect(
       resolvers.Mutation.checkPriceNow(null, { id: "missing", list: "shoppingList" }, ctx())
     ).rejects.toThrow('No shopping list entry found with id "missing".');
+  });
+});
+
+describe("Mutation.ensureAccount", () => {
+  it("throws when not signed in", async () => {
+    await expect(resolvers.Mutation.ensureAccount(null, null, ctx())).rejects.toThrow("Not signed in.");
+    expect(registerUser).not.toHaveBeenCalled();
+  });
+
+  it("registers the signed-in account under its pantryPk and returns it", async () => {
+    const result = await resolvers.Mutation.ensureAccount(
+      null,
+      null,
+      ctx({ userId: "sub-123", email: "user@example.com", pantryPk: "USER#sub-123" })
+    );
+
+    expect(registerUser).toHaveBeenCalledWith("USER#sub-123", "user@example.com");
+    expect(result).toEqual({ id: "sub-123", email: "user@example.com" });
   });
 });

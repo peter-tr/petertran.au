@@ -1,4 +1,5 @@
 import { createGraphQLClient } from "../shared/graphqlClient";
+import { getAuthHeader } from "./lib/auth";
 import { StorageLocation, PantryActionType } from "./api-schema-types.generated";
 import type {
   AddInventoryItemInput as SchemaAddInventoryItemInput,
@@ -26,6 +27,7 @@ import type {
   CheckPriceNowMutation,
   PriceSyncStatusQuery,
   ParseCommandQuery,
+  MeQuery,
 } from "./api.generated";
 
 // Separate endpoint, separate service - the pantry API (api/src/pantry/) is
@@ -39,7 +41,14 @@ import type {
 // the queries it's there to check.
 export const PANTRY_ENDPOINT = import.meta.env?.VITE_PANTRY_GRAPHQL_ENDPOINT as string | undefined;
 
-export const runPantryQuery = createGraphQLClient(PANTRY_ENDPOINT, "VITE_PANTRY_GRAPHQL_ENDPOINT");
+// getAuthHeader (not a fixed value) - see lib/auth.ts's doc comment on why
+// every request needs to resolve it fresh rather than this module capturing
+// one at import time.
+export const runPantryQuery = createGraphQLClient(
+  PANTRY_ENDPOINT,
+  "VITE_PANTRY_GRAPHQL_ENDPOINT",
+  getAuthHeader
+);
 
 export { StorageLocation };
 
@@ -360,6 +369,17 @@ export const PRICE_SYNC_STATUS_QUERY = /* GraphQL */ `
 `;
 
 export type PriceSyncStatusResult = PriceSyncStatusQuery;
+
+export const ME_QUERY = /* GraphQL */ `
+  query Me {
+    me {
+      id
+      email
+    }
+  }
+`;
+
+export type MeResult = MeQuery;
 
 export { PantryActionType };
 

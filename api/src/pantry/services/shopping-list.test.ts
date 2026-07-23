@@ -1,7 +1,7 @@
 import { mockClient } from "aws-sdk-client-mock";
 import { GetCommand, PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { beforeEach, describe, expect, it } from "vitest";
-import { ddb, PK } from "../lib/aws/ddb";
+import { ddb } from "../lib/aws/ddb";
 import { UNKNOWN_DEBUG_INFO } from "./inventory";
 import {
   getShoppingListEntry,
@@ -13,6 +13,7 @@ import {
 } from "./shopping-list";
 
 const ddbMock = mockClient(ddb);
+const TEST_PK = "PANTRY";
 
 // A row shaped the way it would have been written before isStaple, urgent,
 // trackPrice, and lastKnownPrice.debugInfo existed - see CLAUDE.md's
@@ -40,7 +41,7 @@ describe("getShoppingListEntry backfill", () => {
   it("backfills isStaple/urgent/trackPrice to false on an old-shaped row", async () => {
     ddbMock.on(GetCommand).resolves({ Item: { data: oldShapedRow() } });
 
-    const entry = await getShoppingListEntry("entry-1");
+    const entry = await getShoppingListEntry(TEST_PK, "entry-1");
 
     expect(entry).not.toBeNull();
     expect(entry!.isStaple).toBe(false);
@@ -54,7 +55,7 @@ describe("getShoppingListEntry backfill", () => {
       Item: { data: oldShapedRow({ isStaple: true, urgent: true, trackPrice: true }) },
     });
 
-    const entry = await getShoppingListEntry("entry-1");
+    const entry = await getShoppingListEntry(TEST_PK, "entry-1");
 
     expect(entry!.isStaple).toBe(true);
     expect(entry!.urgent).toBe(true);
@@ -65,7 +66,7 @@ describe("getShoppingListEntry backfill", () => {
     const bareRow = { id: "entry-1", name: "Eggs", addedAt: "2026-01-01T00:00:00.000Z" };
     ddbMock.on(GetCommand).resolves({ Item: { data: bareRow } });
 
-    const entry = await getShoppingListEntry("entry-1");
+    const entry = await getShoppingListEntry(TEST_PK, "entry-1");
 
     expect(entry).toMatchObject({
       quantity: null,
@@ -89,7 +90,7 @@ describe("getShoppingListEntry backfill", () => {
       },
     });
 
-    const entry = await getShoppingListEntry("entry-1");
+    const entry = await getShoppingListEntry(TEST_PK, "entry-1");
 
     expect(entry!.lastKnownPrice).toEqual({
       colesPrice: 5,
@@ -103,7 +104,7 @@ describe("getShoppingListEntry backfill", () => {
   it("returns null when nothing is stored", async () => {
     ddbMock.on(GetCommand).resolves({});
 
-    await expect(getShoppingListEntry("missing")).resolves.toBeNull();
+    await expect(getShoppingListEntry(TEST_PK, "missing")).resolves.toBeNull();
   });
 });
 
@@ -117,7 +118,7 @@ describe("getShoppingList backfill (used by the digest Lambda too)", () => {
       Items: [{ data: oldShapedRow({ id: "a" }) }, { data: oldShapedRow({ id: "b", urgent: true }) }],
     });
 
-    const entries = await getShoppingList();
+    const entries = await getShoppingList(TEST_PK);
 
     expect(entries).toHaveLength(2);
     expect(entries[0].urgent).toBe(false);
@@ -127,10 +128,10 @@ describe("getShoppingList backfill (used by the digest Lambda too)", () => {
   it("queries under the SHOPLIST# prefix within the pantry partition", async () => {
     ddbMock.on(QueryCommand).resolves({ Items: [] });
 
-    await getShoppingList();
+    await getShoppingList(TEST_PK);
 
     const input = ddbMock.call(0).args[0].input as { ExpressionAttributeValues: Record<string, string> };
-    expect(input.ExpressionAttributeValues).toEqual({ ":pk": PK, ":prefix": "SHOPLIST#" });
+    expect(input.ExpressionAttributeValues).toEqual({ ":pk": TEST_PK, ":prefix": "SHOPLIST#" });
   });
 });
 
@@ -157,7 +158,7 @@ describe("putShoppingListEntry", () => {
       addedAt: "2026-01-01T00:00:00.000Z",
     };
 
-    await putShoppingListEntry(entry);
+    await putShoppingListEntry(TEST_PK, entry);
 
     const input = ddbMock.call(0).args[0].input as { Item: { sk: string; type: string } };
     expect(input.Item.sk).toBe("SHOPLIST#entry-9");
@@ -174,7 +175,7 @@ describe("setShoppingListLastKnownPrice", () => {
     ddbMock.on(GetCommand).resolves({});
 
     await expect(
-      setShoppingListLastKnownPrice("missing", {
+      setShoppingListLastKnownPrice(TEST_PK, "missing", {
         colesPrice: 1,
         productUrl: null,
         note: null,
@@ -196,7 +197,7 @@ describe("setShoppingListLastKnownPrice", () => {
       debugInfo: UNKNOWN_DEBUG_INFO,
     };
 
-    await setShoppingListLastKnownPrice("entry-1", price);
+    await setShoppingListLastKnownPrice(TEST_PK, "entry-1", price);
 
     const putInput = ddbMock.commandCalls(PutCommand)[0].args[0].input as unknown as {
       Item: { data: ShoppingListEntry };
@@ -216,6 +217,7 @@ describe("upsertShoppingListEntry", () => {
     ddbMock.on(PutCommand).resolves({});
 
     const entry = await upsertShoppingListEntry(
+      TEST_PK,
       "Milk",
       2,
       "liters",
@@ -245,7 +247,7 @@ describe("upsertShoppingListEntry", () => {
     ddbMock.on(PutCommand).resolves({});
 
     // "eggs" (plural) normalizes to the same needle as stored "Eggs".
-    const entry = await upsertShoppingListEntry("eggs", 2, "dozen");
+    const entry = await upsertShoppingListEntry(TEST_PK, "eggs", 2, "dozen");
 
     expect(entry.id).toBe("existing");
     expect(entry.quantity).toBe(2);
@@ -257,7 +259,7 @@ describe("upsertShoppingListEntry", () => {
     });
     ddbMock.on(PutCommand).resolves({});
 
-    const entry = await upsertShoppingListEntry("Eggs", null, null, null, false, null, null, false);
+    const entry = await upsertShoppingListEntry(TEST_PK, "Eggs", null, null, null, false, null, null, false);
 
     expect(entry.isStaple).toBe(true);
     expect(entry.urgent).toBe(true);
@@ -280,7 +282,7 @@ describe("upsertShoppingListEntry", () => {
     });
     ddbMock.on(PutCommand).resolves({});
 
-    const entry = await upsertShoppingListEntry("Eggs", null, null, null);
+    const entry = await upsertShoppingListEntry(TEST_PK, "Eggs", null, null, null);
 
     expect(entry.quantity).toBe(3);
     expect(entry.unit).toBe("kg");
