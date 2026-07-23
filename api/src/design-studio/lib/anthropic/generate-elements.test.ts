@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import type { DesignElementRecord } from "../design";
 
 const messagesParse = vi.fn();
 const getAnthropicClient = vi.fn(async () => ({ messages: { parse: messagesParse } }));
@@ -38,7 +39,7 @@ function rawElement(overrides: Record<string, unknown> = {}) {
 
 describe("generateDesignElements", () => {
   it("rejects an empty prompt without calling Anthropic", async () => {
-    await expect(generateDesignElements("  ", 900, 600, "1.2.3.4", undefined)).rejects.toThrow(
+    await expect(generateDesignElements("  ", 900, 600, undefined, "1.2.3.4", undefined)).rejects.toThrow(
       "A prompt is required."
     );
     expect(getAnthropicClient).not.toHaveBeenCalled();
@@ -49,9 +50,9 @@ describe("generateDesignElements", () => {
       new Error("Too many requests - please wait a moment and try again.")
     );
 
-    await expect(generateDesignElements("a poster", 900, 600, "1.2.3.4", undefined)).rejects.toThrow(
-      "Too many requests"
-    );
+    await expect(
+      generateDesignElements("a poster", 900, 600, undefined, "1.2.3.4", undefined)
+    ).rejects.toThrow("Too many requests");
     expect(getAnthropicClient).not.toHaveBeenCalled();
   });
 
@@ -60,7 +61,7 @@ describe("generateDesignElements", () => {
       parsed_output: { elements: [rawElement({ x: 10 }), rawElement({ type: "TEXT", text: "Hi" })] },
     });
 
-    const result = await generateDesignElements("a poster", 900, 600, "1.2.3.4", undefined);
+    const result = await generateDesignElements("a poster", 900, 600, undefined, "1.2.3.4", undefined);
 
     expect(result).toHaveLength(2);
     expect(result[0].zIndex).toBe(0);
@@ -75,7 +76,7 @@ describe("generateDesignElements", () => {
       },
     });
 
-    const [el] = await generateDesignElements("a poster", 900, 600, "1.2.3.4", undefined);
+    const [el] = await generateDesignElements("a poster", 900, 600, undefined, "1.2.3.4", undefined);
 
     expect(el.x).toBeGreaterThanOrEqual(0);
     expect(el.y).toBeGreaterThanOrEqual(0);
@@ -88,7 +89,7 @@ describe("generateDesignElements", () => {
       parsed_output: { elements: [rawElement({ type: "ELLIPSE" })] },
     });
 
-    const [el] = await generateDesignElements("a poster", 900, 600, "1.2.3.4", undefined);
+    const [el] = await generateDesignElements("a poster", 900, 600, undefined, "1.2.3.4", undefined);
 
     expect(el.text).toBeUndefined();
     expect(el.fontFamily).toBeUndefined();
@@ -101,7 +102,7 @@ describe("generateDesignElements", () => {
       parsed_output: { elements: [rawElement({ type: "TEXT", text: "Hi", fontSize: 0 })] },
     });
 
-    const [el] = await generateDesignElements("a poster", 900, 600, "1.2.3.4", undefined);
+    const [el] = await generateDesignElements("a poster", 900, 600, undefined, "1.2.3.4", undefined);
 
     expect(el.text).toBe("Hi");
     expect(el.fontFamily).toBe("IBM Plex Sans");
@@ -112,9 +113,9 @@ describe("generateDesignElements", () => {
   it("throws when Claude returns no elements", async () => {
     messagesParse.mockResolvedValueOnce({ parsed_output: { elements: [] } });
 
-    await expect(generateDesignElements("a poster", 900, 600, "1.2.3.4", undefined)).rejects.toThrow(
-      "didn't return a usable design"
-    );
+    await expect(
+      generateDesignElements("a poster", 900, 600, undefined, "1.2.3.4", undefined)
+    ).rejects.toThrow("didn't return a usable design");
   });
 
   it("caps the number of returned elements", async () => {
@@ -122,8 +123,49 @@ describe("generateDesignElements", () => {
       parsed_output: { elements: Array.from({ length: 20 }, () => rawElement()) },
     });
 
-    const result = await generateDesignElements("a poster", 900, 600, "1.2.3.4", undefined);
+    const result = await generateDesignElements("a poster", 900, 600, undefined, "1.2.3.4", undefined);
 
     expect(result.length).toBeLessThanOrEqual(12);
+  });
+
+  it("includes the current draft in the prompt and mentions refinement in the system prompt when currentElements is given", async () => {
+    messagesParse.mockResolvedValueOnce({
+      parsed_output: { elements: [rawElement()] },
+    });
+
+    const currentElements: DesignElementRecord[] = [
+      {
+        id: "a",
+        type: "RECTANGLE",
+        x: 0,
+        y: 0,
+        width: 900,
+        height: 600,
+        rotation: 0,
+        zIndex: 0,
+        fill: "#000",
+        stroke: "",
+        strokeWidth: 0,
+      },
+    ];
+
+    await generateDesignElements("make it bigger", 900, 600, currentElements, "1.2.3.4", undefined);
+
+    const call = messagesParse.mock.calls.at(-1)![0];
+    expect(call.system).toContain("follow-up refinement");
+    expect(call.messages[0].content).toContain("Current draft (JSON)");
+    expect(call.messages[0].content).toContain("make it bigger");
+  });
+
+  it("does not mention refinement when currentElements is empty", async () => {
+    messagesParse.mockResolvedValueOnce({
+      parsed_output: { elements: [rawElement()] },
+    });
+
+    await generateDesignElements("a poster", 900, 600, [], "1.2.3.4", undefined);
+
+    const call = messagesParse.mock.calls.at(-1)![0];
+    expect(call.system).not.toContain("follow-up refinement");
+    expect(call.messages[0].content).toBe("a poster");
   });
 });

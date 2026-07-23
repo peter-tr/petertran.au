@@ -13,13 +13,23 @@ import { STARTER_TEMPLATES } from "../lib/templates";
 // mockParseCommand, so the dev server never needs an API key. Produces a
 // simple background + heading + accent layout, using the prompt itself as
 // the heading text so it's obvious in the UI that this came from the typed
-// prompt rather than being a fixed template.
+// prompt rather than being a fixed template. When currentElements is given
+// (a chat-style refinement), just relabels the existing draft's heading
+// with the new instruction rather than regenerating it - enough to exercise
+// the refinement code path locally without needing real Anthropic calls.
 async function mockGenerateDesignElements(
   prompt: string,
   width: number,
-  height: number
+  height: number,
+  currentElements: DesignElementRecord[] | undefined
 ): Promise<DesignElementRecord[]> {
   const heading = prompt.trim().slice(0, 60) || "Untitled design";
+
+  if (currentElements?.length) {
+    return currentElements.map((el) =>
+      el.type === "TEXT" ? { ...el, text: `${el.text} → ${heading}` } : el
+    );
+  }
 
   return [
     {
@@ -131,6 +141,8 @@ class InMemoryDesignStore implements DesignStore {
   }
 }
 
-export const devResolvers = createDesignStudioResolvers(new InMemoryDesignStore(), (prompt, width, height) =>
-  mockGenerateDesignElements(prompt, width, height)
+export const devResolvers = createDesignStudioResolvers(
+  new InMemoryDesignStore(),
+  (prompt, width, height, currentElements) =>
+    mockGenerateDesignElements(prompt, width, height, currentElements)
 );

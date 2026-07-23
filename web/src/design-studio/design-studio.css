@@ -283,69 +283,6 @@
   cursor: not-allowed;
 }
 
-.design-studio-ai-form {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  justify-content: center;
-  margin: 0 0 0.8rem;
-}
-
-.design-studio-ai-form input {
-  font-family: var(--font-sans);
-  font-size: 0.85rem;
-  color: var(--paper);
-  background: var(--panel-2);
-  border: 1px solid var(--rule);
-  border-radius: var(--radius);
-  padding: 0.4rem 0.6rem;
-  min-width: 22rem;
-  max-width: 100%;
-}
-
-.design-studio-ai-form button {
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-  color: var(--paper);
-  background: var(--panel-2);
-  border: 1px solid var(--rule);
-  border-radius: var(--radius);
-  padding: 0.4rem 0.7rem;
-  cursor: pointer;
-}
-
-.design-studio-ai-form button:disabled {
-  color: var(--muted-dim);
-  cursor: not-allowed;
-}
-
-.design-studio-draft-banner {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.6rem;
-  justify-content: center;
-  margin: 0 0 0.8rem;
-  padding: 0.5rem 0.8rem;
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-  color: var(--paper);
-  background: var(--panel-2);
-  border: 1px dashed #f2a93b;
-  border-radius: var(--radius);
-}
-
-.design-studio-draft-banner button {
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-  color: var(--paper);
-  background: var(--panel);
-  border: 1px solid var(--rule);
-  border-radius: var(--radius);
-  padding: 0.3rem 0.7rem;
-  cursor: pointer;
-}
-
 .design-studio-workspace {
   display: flex;
   gap: 1rem;
@@ -396,7 +333,8 @@
   }
 
   .design-studio-layers,
-  .design-studio-properties {
+  .design-studio-properties,
+  .design-studio-ai-panel {
     flex: 1 1 12rem;
   }
 
@@ -407,7 +345,8 @@
 
 .design-studio-toolbar,
 .design-studio-layers,
-.design-studio-properties {
+.design-studio-properties,
+.design-studio-ai-panel {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -483,12 +422,99 @@
 }
 
 .design-studio-layers h2,
-.design-studio-properties h2 {
+.design-studio-properties h2,
+.design-studio-ai-panel h2 {
   font-family: var(--font-mono);
   font-size: 0.85rem;
   font-weight: 600;
   margin: 0 0 0.2rem;
   color: var(--muted);
+}
+
+.design-studio-ai-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.design-studio-ai-panel-header h2 {
+  margin: 0;
+}
+
+.design-studio-ai-panel-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.design-studio-ai-panel-actions button {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--paper);
+  background: var(--panel-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 0.3rem 0.6rem;
+  cursor: pointer;
+}
+
+/* Discard first (secondary/left), Accept last (primary/right) - the
+   conventional dialog button order, so the affirmative action lands where
+   users expect it. */
+.design-studio-ai-panel-actions button:last-child {
+  color: var(--type);
+  border-color: var(--type);
+}
+
+.design-studio-ai-panel-log {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-height: 12rem;
+  overflow-y: auto;
+}
+
+.design-studio-ai-panel-message {
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  color: var(--paper);
+  background: var(--panel-2);
+  border-radius: var(--radius);
+  padding: 0.4rem 0.6rem;
+  margin: 0;
+}
+
+.design-studio-ai-panel-input {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.design-studio-ai-panel-input input {
+  flex: 1;
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  color: var(--paper);
+  background: var(--panel-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 0.4rem 0.6rem;
+  min-width: 0;
+}
+
+.design-studio-ai-panel-input button {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--paper);
+  background: var(--panel-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 0.4rem 0.7rem;
+  cursor: pointer;
+}
+
+.design-studio-ai-panel-input button:disabled {
+  color: var(--muted-dim);
+  cursor: not-allowed;
 }
 
 .design-studio-empty {

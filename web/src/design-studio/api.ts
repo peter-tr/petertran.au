@@ -194,8 +194,18 @@ export async function saveAsTemplate(input: SaveAsTemplateArgs): Promise<Templat
 }
 
 export const GENERATE_DESIGN_ELEMENTS_MUTATION = /* GraphQL */ `
-  mutation GenerateDesignElements($prompt: String!, $width: Float!, $height: Float!) {
-    generateDesignElements(prompt: $prompt, width: $width, height: $height) {
+  mutation GenerateDesignElements(
+    $prompt: String!
+    $width: Float!
+    $height: Float!
+    $currentElements: [DesignElementInput!]
+  ) {
+    generateDesignElements(
+      prompt: $prompt
+      width: $width
+      height: $height
+      currentElements: $currentElements
+    ) {
       id
       type
       x

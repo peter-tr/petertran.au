@@ -151,6 +151,16 @@ type Mutation {
   to fit within width/height. Pure generation - nothing is persisted here;
   the returned elements are a draft the caller decides whether to keep,
   typically via a normal saveDesign call once accepted.
+
+  Pass `currentElements` (the caller's own in-progress draft, if any) to
+  make this a refinement instead of a fresh generation - e.g. "make the
+  text bigger" - so a chat-style back-and-forth can iterate on one draft
+  rather than starting over each time.
   """
-  generateDesignElements(prompt: String!, width: Float!, height: Float!): [DesignElement!]!
+  generateDesignElements(
+    prompt: String!
+    width: Float!
+    height: Float!
+    currentElements: [DesignElementInput!]
+  ): [DesignElement!]!
 }
