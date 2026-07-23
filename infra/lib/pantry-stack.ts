@@ -91,7 +91,6 @@ export class PantryStack extends Stack {
       userPoolName: "pantry-users",
       selfSignUpEnabled: true,
       signInAliases: { email: true },
-      standardAttributes: { email: { required: true, mutable: true } },
       // Cognito's floor is 6 - as close to "no restriction" as it allows.
       passwordPolicy: {
         minLength: 6,
