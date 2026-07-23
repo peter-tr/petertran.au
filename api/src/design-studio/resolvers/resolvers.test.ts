@@ -145,7 +145,21 @@ describe("createDesignStudioResolvers", () => {
     const context = { sourceIp: "1.2.3.4", xraySegment: undefined };
     const result = await resolvers.Mutation.generateDesignElements({}, args, context);
 
-    expect(generate).toHaveBeenCalledWith("a bold sale poster", 900, 600, "1.2.3.4", undefined);
+    expect(generate).toHaveBeenCalledWith("a bold sale poster", 900, 600, undefined, "1.2.3.4", undefined);
     expect(result).toBe(generated);
+  });
+
+  it("Mutation.generateDesignElements passes currentElements through as a refinement hint", async () => {
+    const generated = [makeTemplate().elements[0]];
+    const generate = vi.fn().mockResolvedValue(generated);
+    const store = makeStore();
+    const resolvers = createDesignStudioResolvers(store, generate);
+
+    const currentElements = [makeTemplate().elements[0]];
+    const args = { prompt: "make it bigger", width: 900, height: 600, currentElements };
+    const context = { sourceIp: "1.2.3.4", xraySegment: undefined };
+    await resolvers.Mutation.generateDesignElements({}, args, context);
+
+    expect(generate).toHaveBeenCalledWith("make it bigger", 900, 600, currentElements, "1.2.3.4", undefined);
   });
 });

@@ -250,10 +250,17 @@ const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
                   y,
                   rotation: element.rotation,
                   fill: element.fill,
-                  stroke: "#f2a93b",
-                  strokeWidth: Math.max(element.strokeWidth, 2),
-                  dash: [10, 6],
-                  opacity: 0.85,
+                  // A vivid, high-contrast color plus a glow (via
+                  // shadowColor/shadowBlur) rather than relying on stroke
+                  // color alone for visibility - a plain outline can blend
+                  // into a design that happens to share its hue, but the
+                  // glow reads regardless of the underlying palette.
+                  stroke: "#ff2d78",
+                  strokeWidth: Math.max(element.strokeWidth, 3),
+                  dash: [12, 8],
+                  shadowColor: "#ff2d78",
+                  shadowBlur: 16,
+                  shadowOpacity: 0.75,
                   draggable: true,
                   onClick: () => onSelectDraft?.(element.id),
                   onTap: () => onSelectDraft?.(element.id),

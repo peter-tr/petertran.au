@@ -75,7 +75,11 @@ const GENERATE_ELEMENTS_SCHEMA = {
   additionalProperties: false,
 } as const;
 
-function buildSystemPrompt(width: number, height: number): string {
+function buildSystemPrompt(width: number, height: number, isRefinement: boolean): string {
+  const refinementNote = isRefinement
+    ? `\n\nThe user already has a draft, provided as JSON in their message alongside the instruction. Treat the instruction as a follow-up refinement of that draft (e.g. "make the text bigger", "change the colors to blue", "add a subtitle") rather than a request to start over. Return the COMPLETE updated set of elements - everything from the existing draft that the instruction didn't ask to change should come back unchanged, not be dropped.`
+    : "";
+
   return `You generate a small set of design elements for a poster/slide/resume-style canvas editor (like a simplified Canva), from a short natural-language prompt.
 
 The canvas is ${width}x${height} px, origin (0,0) at the top-left. Generate between 2 and ${MAX_ELEMENTS} elements that together form a coherent, reasonably attractive layout matching the prompt - typically a background rectangle, a heading, supporting text, and a couple of accent shapes.
@@ -86,7 +90,7 @@ Rules:
 - Only TEXT elements set "text"/"fontFamily"/"fontSize"/"fontWeight" (fontWeight 400 for regular, 600-700 for bold) - set all four to null for RECTANGLE/ELLIPSE.
 - "rotation" is degrees, 0 unless the prompt implies an angled element.
 - Order elements back-to-front (large background shapes first, text and accents last) - the caller assigns stacking order from this array's order, not from any field you return.
-- Use a cohesive color palette (2-4 colors) that fits the prompt's mood/theme rather than random colors per element.`;
+- Use a cohesive color palette (2-4 colors) that fits the prompt's mood/theme rather than random colors per element.${refinementNote}`;
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -136,6 +140,7 @@ export async function generateDesignElements(
   prompt: string,
   width: number,
   height: number,
+  currentElements: DesignElementRecord[] | undefined,
   sourceIp: string | undefined,
   xraySegment: Context["xraySegment"]
 ): Promise<DesignElementRecord[]> {
@@ -148,6 +153,11 @@ export async function generateDesignElements(
 
   await assertAiNotRateLimited(sourceIp);
 
+  const isRefinement = !!currentElements?.length;
+  const userContent = isRefinement
+    ? `Current draft (JSON): ${JSON.stringify(currentElements)}\n\nInstruction: ${trimmed}`
+    : trimmed;
+
   const client = await getAnthropicClient();
   const response = await traced(
     ANTHROPIC_API_SEGMENT_NAME,
@@ -155,8 +165,8 @@ export async function generateDesignElements(
       client.messages.parse({
         model: "claude-haiku-4-5",
         max_tokens: 2048,
-        system: buildSystemPrompt(width, height),
-        messages: [{ role: "user", content: trimmed }],
+        system: buildSystemPrompt(width, height, isRefinement),
+        messages: [{ role: "user", content: userContent }],
         output_config: { format: { type: "json_schema", schema: GENERATE_ELEMENTS_SCHEMA } },
       }),
     xraySegment

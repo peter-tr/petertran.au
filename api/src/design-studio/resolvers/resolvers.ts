@@ -29,6 +29,7 @@ export type GenerateDesignElementsFn = (
   prompt: string,
   width: number,
   height: number,
+  currentElements: DesignElementRecord[] | undefined,
   sourceIp: string | undefined,
   xraySegment: Context["xraySegment"]
 ) => Promise<DesignElementRecord[]>;
@@ -69,10 +70,22 @@ export function createDesignStudioResolvers(
         }),
       generateDesignElements: (
         _: unknown,
-        args: { prompt: string; width: number; height: number },
+        args: {
+          prompt: string;
+          width: number;
+          height: number;
+          currentElements?: DesignElementRecord[] | null;
+        },
         context: Context
       ) =>
-        generateDesignElements(args.prompt, args.width, args.height, context.sourceIp, context.xraySegment),
+        generateDesignElements(
+          args.prompt,
+          args.width,
+          args.height,
+          args.currentElements ?? undefined,
+          context.sourceIp,
+          context.xraySegment
+        ),
     },
   };
 }

@@ -3,6 +3,7 @@ import Canvas, { type CanvasHandle } from "./Canvas";
 import Toolbar from "./Toolbar";
 import LayersPanel from "./LayersPanel";
 import PropertyPanel from "./PropertyPanel";
+import AiPanel, { type AiMessage } from "./AiPanel";
 import { useEventHistory } from "../lib/history/useEventHistory";
 import type { HistoryEvent } from "../lib/history/reducer";
 import {
@@ -50,13 +51,16 @@ export default function EditorWorkspace({
   const [templateTags, setTemplateTags] = useState("");
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [templateMessage, setTemplateMessage] = useState<string | null>(null);
-  const [showAiForm, setShowAiForm] = useState(false);
+  const [showAiPanel, setShowAiPanel] = useState(false);
+  const [aiMessages, setAiMessages] = useState<AiMessage[]>([]);
   const [aiPrompt, setAiPrompt] = useState("");
   const [generating, setGenerating] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   // A pending AI-generated draft - kept entirely outside useEventHistory
   // (see the reducer.ts doc comment on HistoryEvent) so nothing is
-  // undoable/persisted until the user explicitly accepts it.
+  // undoable/persisted until the user explicitly accepts it. Re-sent as
+  // currentElements on the next prompt, so a follow-up like "make it
+  // bigger" refines this draft instead of starting a fresh generation.
   const [draftElements, setDraftElements] = useState<DesignElement[] | null>(null);
   const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null);
   const canvasRef = useRef<CanvasHandle>(null);
@@ -175,21 +179,31 @@ export default function EditorWorkspace({
   }, [name, templateCategory, templateTags, elements, width, height]);
 
   const handleGenerate = useCallback(async () => {
-    if (!aiPrompt.trim()) return;
+    const trimmed = aiPrompt.trim();
+    if (!trimmed) return;
 
     setGenerating(true);
     setAiError(null);
     try {
-      const generated = await generateDesignElements({ prompt: aiPrompt.trim(), width, height });
+      const generated = await generateDesignElements({
+        prompt: trimmed,
+        width,
+        height,
+        // Re-sending the current draft (if any) turns this into a
+        // refinement of it rather than a fresh generation - see the
+        // backend's isRefinement branch in generate-elements.ts.
+        currentElements: draftElements ? draftElements.map(toElementInput) : undefined,
+      });
       setDraftElements(generated.map(fromWireElement));
       setSelectedDraftId(null);
-      setShowAiForm(false);
+      setAiMessages((current) => [...current, { id: crypto.randomUUID(), prompt: trimmed }]);
+      setAiPrompt("");
     } catch {
       setAiError("Couldn't generate a design - try a different prompt.");
     } finally {
       setGenerating(false);
     }
-  }, [aiPrompt, width, height]);
+  }, [aiPrompt, width, height, draftElements]);
 
   const handleAcceptDraft = useCallback(() => {
     if (!draftElements) return;
@@ -197,11 +211,14 @@ export default function EditorWorkspace({
     for (const element of draftElements) dispatch({ type: "add", element });
     setDraftElements(null);
     setSelectedDraftId(null);
+    setAiMessages([]);
+    setShowAiPanel(false);
   }, [draftElements, dispatch]);
 
   const handleDiscardDraft = useCallback(() => {
     setDraftElements(null);
     setSelectedDraftId(null);
+    setAiMessages([]);
   }, []);
 
   const handleDraftChange = useCallback((before: DesignElement, after: DesignElement) => {
@@ -253,7 +270,7 @@ export default function EditorWorkspace({
           <button type="button" onClick={() => setShowTemplateForm((v) => !v)}>
             Save as template
           </button>
-          <button type="button" onClick={() => setShowAiForm((v) => !v)}>
+          <button type="button" onClick={() => setShowAiPanel((v) => !v)}>
             Generate with AI
           </button>
         </div>
@@ -288,38 +305,6 @@ export default function EditorWorkspace({
         </div>
       )}
       {templateMessage && <p className="status-line">// {templateMessage}</p>}
-      {showAiForm && (
-        <div className="design-studio-ai-form">
-          <input
-            type="text"
-            placeholder="Describe what you want, e.g. “bold sale poster in teal and orange”"
-            value={aiPrompt}
-            onChange={(e) => setAiPrompt(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleGenerate();
-            }}
-            aria-label="AI design prompt"
-          />
-          <button type="button" onClick={handleGenerate} disabled={generating || !aiPrompt.trim()}>
-            {generating ? "Generating…" : "Generate"}
-          </button>
-          <button type="button" onClick={() => setShowAiForm(false)}>
-            Cancel
-          </button>
-        </div>
-      )}
-      {aiError && <p className="status-line">// {aiError}</p>}
-      {draftElements && (
-        <div className="design-studio-draft-banner">
-          <span>AI draft ready - drag/resize it, then accept or discard.</span>
-          <button type="button" onClick={handleAcceptDraft}>
-            Accept
-          </button>
-          <button type="button" onClick={handleDiscardDraft}>
-            Discard
-          </button>
-        </div>
-      )}
       <div className="design-studio-workspace">
         <Toolbar onAdd={handleAdd} onExport={() => canvasRef.current?.exportPNG()} />
         <div className="design-studio-canvas-frame">
@@ -338,6 +323,19 @@ export default function EditorWorkspace({
           />
         </div>
         <div className="design-studio-side-panels">
+          {showAiPanel && (
+            <AiPanel
+              messages={aiMessages}
+              prompt={aiPrompt}
+              onPromptChange={setAiPrompt}
+              onSend={handleGenerate}
+              generating={generating}
+              error={aiError}
+              hasDraft={!!draftElements}
+              onAccept={handleAcceptDraft}
+              onDiscard={handleDiscardDraft}
+            />
+          )}
           <LayersPanel
             elements={elements}
             selectedId={selectedId}
