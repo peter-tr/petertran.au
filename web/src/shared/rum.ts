@@ -13,9 +13,16 @@ let rumClient: AwsRum | undefined;
 export function initRum(): void {
   const applicationId = import.meta.env.VITE_RUM_APP_MONITOR_ID;
   const identityPoolId = import.meta.env.VITE_RUM_IDENTITY_POOL_ID;
-  if (!applicationId || !identityPoolId) return;
+  const graphqlEndpoint = import.meta.env.VITE_GRAPHQL_ENDPOINT;
+  if (!applicationId || !identityPoolId || !graphqlEndpoint) return;
 
   try {
+    // Same origin for every one of this env's *_GRAPHQL_ENDPOINT vars (see
+    // web/.env.production/.env.test/.env.development) - reading it from
+    // config here instead of hardcoding the prod domain so this keeps
+    // matching if RUM is ever pointed at a non-prod environment too.
+    const apiOrigin = new URL(graphqlEndpoint).origin;
+
     const config: AwsRumConfig = {
       identityPoolId,
       allowCookies: true,
@@ -38,7 +45,7 @@ export function initRum(): void {
             // and send it as an `X-Amzn-Trace-Id` header instead of the
             // Lambda minting an unrelated one on arrival. Scoped to our own
             // API only, not any future third-party fetch this page might make.
-            addXRayTraceIdHeader: [/^https:\/\/api\.petertran\.au\//],
+            addXRayTraceIdHeader: [new RegExp(`^${apiOrigin.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/`)],
           },
         ],
       ],
