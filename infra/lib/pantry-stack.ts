@@ -66,48 +66,53 @@ export class PantryStack extends Stack {
     // Own pool, deliberately not reusing zero-trust-lab's - that one is a
     // fully-isolated learning-exercise IdP with its own quirks (opaque
     // token, KMS-signed short-lived JWT, plain-username sign-in). This is a
-    // normal real-user pool: self-signup, email sign-in, Cognito's own
-    // Hosted UI for the actual login page rather than a hand-rolled form -
-    // real password storage/verification/reset for free.
+    // normal real-user pool, but Hosted UI's authorization-code flow turned
+    // out to be a dead end for a pure client-side SPA: Cognito's
+    // /oauth2/token endpoint doesn't send CORS headers back to a browser
+    // fetch, so the in-app code-for-tokens exchange after the Hosted UI
+    // redirect always failed. Switched to calling Cognito's IdP API
+    // (InitiateAuth/SignUp) directly from an in-app form instead - that API
+    // does support CORS for a public client's unauthenticated actions - with
+    // an inline email/password form, no redirect round-trip. Deliberately
+    // frictionless (no email verification, no MFA, minimal password policy)
+    // per explicit ask - this is a personal app, not something that needs
+    // bank-grade signup friction.
+    const autoConfirmFn = new lambda.Function(this, "PantryAutoConfirmFunction", {
+      functionName: "pantry-auto-confirm",
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: "index.handler",
+      code: lambda.Code.fromInline(
+        "exports.handler = async (event) => { event.response.autoConfirmUser = true; event.response.autoVerifyEmail = true; return event; };"
+      ),
+      timeout: Duration.seconds(5),
+    });
+
     const userPool = new cognito.UserPool(this, "PantryUserPool", {
       userPoolName: "pantry-users",
       selfSignUpEnabled: true,
       signInAliases: { email: true },
-      autoVerify: { email: true },
+      standardAttributes: { email: { required: true, mutable: true } },
+      // Cognito's floor is 6 - as close to "no restriction" as it allows.
+      passwordPolicy: {
+        minLength: 6,
+        requireLowercase: false,
+        requireUppercase: false,
+        requireDigits: false,
+        requireSymbols: false,
+      },
+      mfa: cognito.Mfa.OFF,
+      lambdaTriggers: { preSignUp: autoConfirmFn },
       removalPolicy: props.isTestEnv ? RemovalPolicy.DESTROY : RemovalPolicy.RETAIN,
     });
 
-    const userPoolDomain = userPool.addDomain("PantryUserPoolDomain", {
-      cognitoDomain: { domainPrefix: `petertran-pantry-${this.account}` },
-    });
-
-    // Public SPA client (no secret - PKCE covers the authorization-code
-    // exchange instead) - the web app calls Cognito's Hosted UI/token
-    // endpoints directly, there's no server-side OAuth participant of its
-    // own the way zero-trust-lab's idp-bridge is. Callback/logout URLs
-    // mirror api-shared http.ts's corsHeaders ALLOWED_ORIGINS list (prod,
-    // the on-demand test env, and local dev) plus the /pantry route itself.
-    const pantryUrls = [
-      "https://www.petertran.au/pantry",
-      "https://petertran.au/pantry",
-      "https://test.petertran.au/pantry",
-      "https://www.test.petertran.au/pantry",
-      "http://localhost:5173/pantry",
-      "http://localhost:3000/pantry",
-    ];
+    // Public client (no secret), USER_PASSWORD_AUTH so the app can call
+    // InitiateAuth directly with a plain username/password instead of
+    // Hosted UI's redirect.
     const userPoolClient = userPool.addClient("PantryUserPoolClient", {
       generateSecret: false,
-      oAuth: {
-        flows: { authorizationCodeGrant: true },
-        scopes: [cognito.OAuthScope.OPENID, cognito.OAuthScope.EMAIL],
-        callbackUrls: pantryUrls,
-        logoutUrls: pantryUrls,
-      },
+      authFlows: { userPassword: true },
     });
 
-    new CfnOutput(this, "PantryCognitoDomain", {
-      value: `https://${userPoolDomain.domainName}.auth.${this.region}.amazoncognito.com`,
-    });
     new CfnOutput(this, "PantryCognitoClientId", { value: userPoolClient.userPoolClientId });
 
     const apiFn = new lambda.Function(this, "PantryGraphQLFunction", {
