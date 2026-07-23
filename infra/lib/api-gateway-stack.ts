@@ -121,7 +121,12 @@ export class ApiGatewayStack extends Stack {
           "http://localhost:3000",
         ],
         allowMethods: ["GET", "POST"],
-        allowHeaders: ["content-type", "apollo-require-preflight"],
+        // x-amzn-trace-id: RUM's fetch instrumentation attaches this header
+        // when enableXRay is on (see web/src/shared/rum.ts) to link a
+        // recorded session to the backend X-Ray trace it caused - without it
+        // in the allowlist, the browser's preflight would reject every
+        // GraphQL call outright.
+        allowHeaders: ["content-type", "apollo-require-preflight", "x-amzn-trace-id"],
         maxAge: Duration.hours(1),
       },
     });
