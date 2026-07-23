@@ -1,7 +1,7 @@
 import { mockClient } from "aws-sdk-client-mock";
 import { GetCommand, PutCommand, QueryCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
 import { beforeEach, describe, expect, it } from "vitest";
-import { ddb, PK } from "../lib/aws/ddb";
+import { ddb } from "../lib/aws/ddb";
 import {
   getItem,
   getAllItems,
@@ -14,6 +14,7 @@ import {
 } from "./inventory";
 
 const ddbMock = mockClient(ddb);
+const TEST_PK = "PANTRY";
 
 // A row shaped the way it would have been written before isStaple,
 // lowPriority, nearlyEmpty, trackPrice, and lastKnownPrice.debugInfo
@@ -47,7 +48,7 @@ describe("getItem backfill", () => {
   it("backfills isStaple/lowPriority/nearlyEmpty/trackPrice to false on an old-shaped row", async () => {
     ddbMock.on(GetCommand).resolves({ Item: { data: oldShapedRow() } });
 
-    const item = await getItem("item-1");
+    const item = await getItem(TEST_PK, "item-1");
 
     expect(item).not.toBeNull();
     expect(item!.isStaple).toBe(false);
@@ -64,7 +65,7 @@ describe("getItem backfill", () => {
       },
     });
 
-    const item = await getItem("item-1");
+    const item = await getItem(TEST_PK, "item-1");
 
     expect(item!.isStaple).toBe(true);
     expect(item!.lowPriority).toBe(true);
@@ -81,7 +82,7 @@ describe("getItem backfill", () => {
       },
     });
 
-    const item = await getItem("item-1");
+    const item = await getItem(TEST_PK, "item-1");
 
     expect(item!.lastKnownPrice).toEqual({
       colesPrice: 3.5,
@@ -108,7 +109,7 @@ describe("getItem backfill", () => {
       },
     });
 
-    const item = await getItem("item-1");
+    const item = await getItem(TEST_PK, "item-1");
 
     expect(item!.lastKnownPrice!.debugInfo).toEqual(debugInfo);
   });
@@ -116,7 +117,7 @@ describe("getItem backfill", () => {
   it("returns null when nothing is stored", async () => {
     ddbMock.on(GetCommand).resolves({});
 
-    await expect(getItem("missing")).resolves.toBeNull();
+    await expect(getItem(TEST_PK, "missing")).resolves.toBeNull();
   });
 });
 
@@ -141,7 +142,7 @@ describe("getAllItems backfill", () => {
       ],
     });
 
-    const items = await getAllItems();
+    const items = await getAllItems(TEST_PK);
 
     expect(items).toHaveLength(2);
     expect(items[0].isStaple).toBe(false);
@@ -151,12 +152,12 @@ describe("getAllItems backfill", () => {
   it("queries under the ITEM# prefix within the pantry partition", async () => {
     ddbMock.on(QueryCommand).resolves({ Items: [] });
 
-    await getAllItems();
+    await getAllItems(TEST_PK);
 
     const input = ddbMock.call(0).args[0].input as {
       ExpressionAttributeValues: Record<string, string>;
     };
-    expect(input.ExpressionAttributeValues).toEqual({ ":pk": PK, ":prefix": "ITEM#" });
+    expect(input.ExpressionAttributeValues).toEqual({ ":pk": TEST_PK, ":prefix": "ITEM#" });
   });
 });
 
@@ -170,7 +171,7 @@ describe("putItem / deleteItem", () => {
 
     const item = createItem({ name: "Bread", location: "PANTRY", quantity: 1 });
 
-    await putItem(item);
+    await putItem(TEST_PK, item);
 
     const input = ddbMock.call(0).args[0].input as { Item: { sk: string; type: string } };
     expect(input.Item.sk).toBe(`ITEM#${item.id}`);
@@ -180,7 +181,7 @@ describe("putItem / deleteItem", () => {
   it("deleteItem returns whether anything was actually deleted", async () => {
     ddbMock.on(DeleteCommand).resolves({ Attributes: { id: "x" } });
 
-    await expect(deleteItem("x")).resolves.toBe(true);
+    await expect(deleteItem(TEST_PK, "x")).resolves.toBe(true);
   });
 });
 
@@ -193,7 +194,7 @@ describe("setLastKnownPrice", () => {
     ddbMock.on(GetCommand).resolves({});
 
     await expect(
-      setLastKnownPrice("missing", {
+      setLastKnownPrice(TEST_PK, "missing", {
         colesPrice: 1,
         productUrl: null,
         note: null,
@@ -215,7 +216,7 @@ describe("setLastKnownPrice", () => {
       debugInfo: UNKNOWN_DEBUG_INFO,
     };
 
-    await setLastKnownPrice("item-1", price);
+    await setLastKnownPrice(TEST_PK, "item-1", price);
 
     const putInput = ddbMock.commandCalls(PutCommand)[0].args[0].input as unknown as {
       Item: { data: InventoryItem };

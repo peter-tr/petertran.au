@@ -1,5 +1,5 @@
 import { GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
-import { ddb, TABLE_NAME, PK } from "../lib/aws/ddb";
+import { ddb, TABLE_NAME } from "../lib/aws/ddb";
 
 const SETTINGS_SK = "SETTINGS";
 
@@ -129,17 +129,17 @@ const DEFAULT_SETTINGS: PantrySettings = {
 // stored at all - a settings row saved before a new field (like `sort`) was
 // added would otherwise come back missing it, tripping the schema's
 // non-null check instead of just quietly defaulting.
-export async function getSettings(): Promise<PantrySettings> {
-  const res = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { pk: PK, sk: SETTINGS_SK } }));
+export async function getSettings(pk: string): Promise<PantrySettings> {
+  const res = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { pk, sk: SETTINGS_SK } }));
 
   return { ...DEFAULT_SETTINGS, ...(res.Item?.data as Partial<PantrySettings> | undefined) };
 }
 
-export async function putSettings(settings: PantrySettings): Promise<void> {
+export async function putSettings(pk: string, settings: PantrySettings): Promise<void> {
   await ddb.send(
     new PutCommand({
       TableName: TABLE_NAME,
-      Item: { pk: PK, sk: SETTINGS_SK, type: "SETTINGS", data: settings },
+      Item: { pk, sk: SETTINGS_SK, type: "SETTINGS", data: settings },
     })
   );
 }

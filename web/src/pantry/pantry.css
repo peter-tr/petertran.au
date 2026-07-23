@@ -26,6 +26,31 @@
   color: var(--muted);
 }
 
+.pantry-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.pantry-account {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--muted);
+  background: none;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 0.35rem 0.6rem;
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.pantry-account:hover {
+  color: var(--type);
+  border-color: var(--type);
+}
+
 .pantry-settings-cog {
   display: inline-flex;
   align-items: center;

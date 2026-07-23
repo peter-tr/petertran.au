@@ -4,6 +4,7 @@ import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as ses from "aws-cdk-lib/aws-ses";
+import * as cognito from "aws-cdk-lib/aws-cognito";
 import { Schedule, ScheduleExpression } from "aws-cdk-lib/aws-scheduler";
 import { LambdaInvoke } from "aws-cdk-lib/aws-scheduler-targets";
 import * as path from "path";
@@ -62,6 +63,53 @@ export class PantryStack extends Stack {
       "petertran-au/anthropic-api-key"
     );
 
+    // Own pool, deliberately not reusing zero-trust-lab's - that one is a
+    // fully-isolated learning-exercise IdP with its own quirks (opaque
+    // token, KMS-signed short-lived JWT, plain-username sign-in). This is a
+    // normal real-user pool: self-signup, email sign-in, Cognito's own
+    // Hosted UI for the actual login page rather than a hand-rolled form -
+    // real password storage/verification/reset for free.
+    const userPool = new cognito.UserPool(this, "PantryUserPool", {
+      userPoolName: "pantry-users",
+      selfSignUpEnabled: true,
+      signInAliases: { email: true },
+      autoVerify: { email: true },
+      removalPolicy: props.isTestEnv ? RemovalPolicy.DESTROY : RemovalPolicy.RETAIN,
+    });
+
+    const userPoolDomain = userPool.addDomain("PantryUserPoolDomain", {
+      cognitoDomain: { domainPrefix: `petertran-pantry-${this.account}` },
+    });
+
+    // Public SPA client (no secret - PKCE covers the authorization-code
+    // exchange instead) - the web app calls Cognito's Hosted UI/token
+    // endpoints directly, there's no server-side OAuth participant of its
+    // own the way zero-trust-lab's idp-bridge is. Callback/logout URLs
+    // mirror api-shared http.ts's corsHeaders ALLOWED_ORIGINS list (prod,
+    // the on-demand test env, and local dev) plus the /pantry route itself.
+    const pantryUrls = [
+      "https://www.petertran.au/pantry",
+      "https://petertran.au/pantry",
+      "https://test.petertran.au/pantry",
+      "https://www.test.petertran.au/pantry",
+      "http://localhost:5173/pantry",
+      "http://localhost:3000/pantry",
+    ];
+    const userPoolClient = userPool.addClient("PantryUserPoolClient", {
+      generateSecret: false,
+      oAuth: {
+        flows: { authorizationCodeGrant: true },
+        scopes: [cognito.OAuthScope.OPENID, cognito.OAuthScope.EMAIL],
+        callbackUrls: pantryUrls,
+        logoutUrls: pantryUrls,
+      },
+    });
+
+    new CfnOutput(this, "PantryCognitoDomain", {
+      value: `https://${userPoolDomain.domainName}.auth.${this.region}.amazoncognito.com`,
+    });
+    new CfnOutput(this, "PantryCognitoClientId", { value: userPoolClient.userPoolClientId });
+
     const apiFn = new lambda.Function(this, "PantryGraphQLFunction", {
       // Explicit, so it reads clearly in the X-Ray trace map instead of
       // CloudFormation's auto-generated name. Also lets ApiGatewayStack/
@@ -88,6 +136,8 @@ export class PantryStack extends Stack {
       environment: {
         TABLE_NAME: table.tableName,
         ANTHROPIC_SECRET_ARN: anthropicSecret.secretArn,
+        PANTRY_COGNITO_USER_POOL_ID: userPool.userPoolId,
+        PANTRY_COGNITO_CLIENT_ID: userPoolClient.userPoolClientId,
       },
       // Traces every invocation to X-Ray, same as the portfolio GraphQL
       // Lambda - needed for this Lambda's own DynamoDB/Anthropic subsegments

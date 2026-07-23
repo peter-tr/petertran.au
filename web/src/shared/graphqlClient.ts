@@ -24,7 +24,15 @@ function withOperationName(endpoint: string, query: string): string {
   return url.toString();
 }
 
-export function createGraphQLClient(endpoint: string | undefined, endpointEnvVar: string) {
+export function createGraphQLClient(
+  endpoint: string | undefined,
+  endpointEnvVar: string,
+  // Only pantry currently supplies this (see pantry/api.ts) - optional so
+  // the resume API's and imposter's own createGraphQLClient calls are
+  // unaffected. Called fresh on every request, not captured once, since the
+  // underlying token can be refreshed/cleared between calls.
+  getAuthHeader?: () => Promise<string | undefined>
+) {
   return async function runQuery<T = unknown>(
     query: string,
     variables?: Record<string, unknown>
@@ -33,9 +41,14 @@ export function createGraphQLClient(endpoint: string | undefined, endpointEnvVar
       throw new GraphQLRequestError(`${endpointEnvVar} is not configured.`);
     }
 
+    const authHeader = await getAuthHeader?.();
+
     const res = await fetch(withOperationName(endpoint, query), {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        ...(authHeader ? { authorization: authHeader } : {}),
+      },
       body: JSON.stringify({ query, variables }),
     });
 

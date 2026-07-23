@@ -33,38 +33,42 @@ import {
 } from "../services/settings";
 import { getPriceSyncStatus, type PriceSyncStatus } from "../services/price-sync-status";
 import { triggerPriceSync } from "../lib/aws/sync-prices";
+import { registerUser } from "../services/users";
 import type { Context } from "../context";
 
 export const resolvers = {
   Query: {
     inventory: async (
       _: unknown,
-      args: { location?: InventoryItem["location"] }
+      args: { location?: InventoryItem["location"] },
+      context: Context
     ): Promise<InventoryItem[]> => {
-      let items = await getAllItems();
+      let items = await getAllItems(context.pantryPk);
       if (args.location) {
         items = items.filter((i) => i.location === args.location);
       }
 
       return items.sort((a, b) => b.addedAt.localeCompare(a.addedAt));
     },
-    inventoryItem: (_: unknown, args: { id: string }) => getItem(args.id),
-    shoppingList: async (): Promise<ShoppingListEntry[]> => {
-      const entries = await getShoppingList();
+    inventoryItem: (_: unknown, args: { id: string }, context: Context) => getItem(context.pantryPk, args.id),
+    shoppingList: async (_: unknown, __: unknown, context: Context): Promise<ShoppingListEntry[]> => {
+      const entries = await getShoppingList(context.pantryPk);
 
       return entries.sort((a, b) => a.addedAt.localeCompare(b.addedAt));
     },
-    settings: (): Promise<PantrySettings> => getSettings(),
-    priceSyncStatus: (): Promise<PriceSyncStatus> => getPriceSyncStatus(),
+    settings: (_: unknown, __: unknown, context: Context): Promise<PantrySettings> =>
+      getSettings(context.pantryPk),
+    priceSyncStatus: (_: unknown, __: unknown, context: Context): Promise<PriceSyncStatus> =>
+      getPriceSyncStatus(context.pantryPk),
     parseCommand: async (
       _: unknown,
       args: { input: string; history?: { role: string; content: string }[] },
       context: Context
     ): Promise<ParsedCommandResult> => {
       const [inventory, shoppingList, settings] = await Promise.all([
-        getAllItems(),
-        getShoppingList(),
-        getSettings(),
+        getAllItems(context.pantryPk),
+        getShoppingList(context.pantryPk),
+        getSettings(context.pantryPk),
       ]);
 
       return parseCommand(
@@ -77,6 +81,10 @@ export const resolvers = {
         context.xraySegment
       );
     },
+    // Null when unauthenticated (using the default/shared pantry) - the
+    // client's account indicator treats that as "signed out", not an error.
+    me: (_: unknown, __: unknown, context: Context) =>
+      context.userId ? { id: context.userId, email: context.email ?? "" } : null,
   },
   Mutation: {
     addInventoryItem: async (
@@ -87,7 +95,7 @@ export const resolvers = {
       await assertNotRateLimited(context.sourceIp);
 
       const item = createItem(args.input);
-      await putItem(item);
+      await putItem(context.pantryPk, item);
 
       return item;
     },
@@ -100,14 +108,14 @@ export const resolvers = {
       await assertNotRateLimited(context.sourceIp);
 
       const needle = normalizeItemName(args.input.name);
-      const all = await getAllItems();
+      const all = await getAllItems(context.pantryPk);
       const existing = all.find(
         (i) => i.location === args.input.location && normalizeItemName(i.name) === needle
       );
 
       if (!existing) {
         const item = createItem(args.input);
-        await putItem(item);
+        await putItem(context.pantryPk, item);
 
         return item;
       }
@@ -129,7 +137,7 @@ export const resolvers = {
           : existing.purchases,
         updatedAt: new Date().toISOString(),
       };
-      await putItem(updated);
+      await putItem(context.pantryPk, updated);
 
       return updated;
     },
@@ -141,7 +149,7 @@ export const resolvers = {
     ): Promise<InventoryItem> => {
       await assertNotRateLimited(context.sourceIp);
 
-      const existing = await getItem(args.id);
+      const existing = await getItem(context.pantryPk, args.id);
       if (!existing) throw new Error(`No inventory item found with id "${args.id}".`);
 
       const input = { ...args.input };
@@ -153,7 +161,7 @@ export const resolvers = {
         updatedAt: new Date().toISOString(),
       };
 
-      await putItem(updated);
+      await putItem(context.pantryPk, updated);
 
       return updated;
     },
@@ -161,12 +169,20 @@ export const resolvers = {
     removeInventoryItem: async (_: unknown, args: { id: string }, context: Context): Promise<boolean> => {
       await assertNotRateLimited(context.sourceIp);
 
-      const existing = await getItem(args.id);
+      const existing = await getItem(context.pantryPk, args.id);
       if (existing?.isStaple) {
-        await upsertShoppingListEntry(existing.name, null, null, null, true, existing.category);
+        await upsertShoppingListEntry(
+          context.pantryPk,
+          existing.name,
+          null,
+          null,
+          null,
+          true,
+          existing.category
+        );
       }
 
-      return deleteItem(args.id);
+      return deleteItem(context.pantryPk, args.id);
     },
 
     addToShoppingList: async (
@@ -186,6 +202,7 @@ export const resolvers = {
       await assertNotRateLimited(context.sourceIp);
 
       return upsertShoppingListEntry(
+        context.pantryPk,
         args.name,
         args.quantity ?? null,
         args.unit ?? null,
@@ -204,7 +221,7 @@ export const resolvers = {
     ): Promise<ShoppingListEntry> => {
       await assertNotRateLimited(context.sourceIp);
 
-      const existing = await getShoppingListEntry(args.id);
+      const existing = await getShoppingListEntry(context.pantryPk, args.id);
       if (!existing) throw new Error(`No shopping list entry found with id "${args.id}".`);
 
       const input = { ...args.input };
@@ -215,7 +232,7 @@ export const resolvers = {
         ...Object.fromEntries(Object.entries(input).filter(([, v]) => v !== undefined)),
       };
 
-      await putShoppingListEntry(updated);
+      await putShoppingListEntry(context.pantryPk, updated);
 
       return updated;
     },
@@ -223,7 +240,7 @@ export const resolvers = {
     removeFromShoppingList: async (_: unknown, args: { id: string }, context: Context): Promise<boolean> => {
       await assertNotRateLimited(context.sourceIp);
 
-      return deleteShoppingListEntry(args.id);
+      return deleteShoppingListEntry(context.pantryPk, args.id);
     },
 
     updateSettings: async (
@@ -233,19 +250,19 @@ export const resolvers = {
     ): Promise<PantrySettings> => {
       await assertNotRateLimited(context.sourceIp);
 
-      const existing = await getSettings();
+      const existing = await getSettings(context.pantryPk);
       const updated: PantrySettings = {
         ...existing,
         ...Object.fromEntries(Object.entries(args.input).filter(([, v]) => v !== undefined)),
       };
-      await putSettings(updated);
+      await putSettings(context.pantryPk, updated);
 
       return updated;
     },
 
     syncPricesNow: async (_: unknown, args: unknown, context: Context): Promise<boolean> => {
       await assertNotRateLimited(context.sourceIp);
-      await triggerPriceSync();
+      await triggerPriceSync(context.pantryPk);
 
       return true;
     },
@@ -264,8 +281,8 @@ export const resolvers = {
 
       const name =
         args.list === "inventory"
-          ? (await getItem(args.id))?.name
-          : (await getShoppingListEntry(args.id))?.name;
+          ? (await getItem(context.pantryPk, args.id))?.name
+          : (await getShoppingListEntry(context.pantryPk, args.id))?.name;
       if (!name)
         throw new Error(
           `No ${args.list === "inventory" ? "inventory item" : "shopping list entry"} found with id "${args.id}".`
@@ -274,12 +291,29 @@ export const resolvers = {
       const result = await checkPrice(name, context.xraySegment);
       const price: LastKnownPrice = { ...result, checkedAt: new Date().toISOString() };
       if (args.list === "inventory") {
-        await setLastKnownPrice(args.id, price);
+        await setLastKnownPrice(context.pantryPk, args.id, price);
       } else {
-        await setShoppingListLastKnownPrice(args.id, price);
+        await setShoppingListLastKnownPrice(context.pantryPk, args.id, price);
       }
 
       return true;
+    },
+
+    // Idempotent registry upsert, called once by the client right after the
+    // Hosted UI OAuth callback exchanges its code for tokens - not on every
+    // request, so this write isn't on the hot path. Requires a verified
+    // token; there's no "ensure the default pantry" equivalent since that
+    // pk already always exists implicitly.
+    ensureAccount: async (
+      _: unknown,
+      __: unknown,
+      context: Context
+    ): Promise<{ id: string; email: string }> => {
+      if (!context.userId) throw new Error("Not signed in.");
+
+      await registerUser(context.pantryPk, context.email ?? "");
+
+      return { id: context.userId, email: context.email ?? "" };
     },
   },
 };

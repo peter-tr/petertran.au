@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { ddb, TABLE_NAME, PK } from "../lib/aws/ddb";
+import { ddb, TABLE_NAME } from "../lib/aws/ddb";
 import { normalizeItemName, normalizeUnit } from "../lib/util/normalize";
 import { UNKNOWN_DEBUG_INFO, type LastKnownPrice } from "./inventory";
 import { DynamoRepository } from "./dynamo-repository";
@@ -58,7 +58,7 @@ function withShoppingListDefaults(entry: ShoppingListEntry): ShoppingListEntry {
 
 class ShoppingListRepository extends DynamoRepository<ShoppingListEntry> {
   constructor() {
-    super({ ddb, tableName: TABLE_NAME, pk: PK, skPrefix: SHOPLIST_PREFIX, itemType: "SHOPLIST" });
+    super({ ddb, tableName: TABLE_NAME, skPrefix: SHOPLIST_PREFIX, itemType: "SHOPLIST" });
   }
 
   protected applyDefaults(entry: ShoppingListEntry): ShoppingListEntry {
@@ -68,31 +68,35 @@ class ShoppingListRepository extends DynamoRepository<ShoppingListEntry> {
 
 const shoppingListRepository = new ShoppingListRepository();
 
-export async function getShoppingListEntry(id: string): Promise<ShoppingListEntry | null> {
-  return shoppingListRepository.get(id);
+export async function getShoppingListEntry(pk: string, id: string): Promise<ShoppingListEntry | null> {
+  return shoppingListRepository.get(pk, id);
 }
 
 // Exported for the digest Lambda (lib/aws/send-digest.ts), which needs the
 // same query outside of any GraphQL resolver context.
-export async function getShoppingList(): Promise<ShoppingListEntry[]> {
-  return shoppingListRepository.getAll();
+export async function getShoppingList(pk: string): Promise<ShoppingListEntry[]> {
+  return shoppingListRepository.getAll(pk);
 }
 
-export async function putShoppingListEntry(entry: ShoppingListEntry): Promise<void> {
-  return shoppingListRepository.put(entry);
+export async function putShoppingListEntry(pk: string, entry: ShoppingListEntry): Promise<void> {
+  return shoppingListRepository.put(pk, entry);
 }
 
-export async function deleteShoppingListEntry(id: string): Promise<boolean> {
-  return shoppingListRepository.delete(id);
+export async function deleteShoppingListEntry(pk: string, id: string): Promise<boolean> {
+  return shoppingListRepository.delete(pk, id);
 }
 
 // Called only by the price-check Lambda (lib/anthropic/check-prices.ts), not
 // exposed as a GraphQL mutation - mirrors inventory.ts's setLastKnownPrice.
-export async function setShoppingListLastKnownPrice(id: string, price: LastKnownPrice): Promise<void> {
-  const existing = await getShoppingListEntry(id);
+export async function setShoppingListLastKnownPrice(
+  pk: string,
+  id: string,
+  price: LastKnownPrice
+): Promise<void> {
+  const existing = await getShoppingListEntry(pk, id);
   if (!existing) throw new Error(`No shopping list entry found with id "${id}".`);
 
-  await putShoppingListEntry({ ...existing, lastKnownPrice: price });
+  await putShoppingListEntry(pk, { ...existing, lastKnownPrice: price });
 }
 
 // Used both automatically (a staple running out), manually (the "add to
@@ -101,6 +105,7 @@ export async function setShoppingListLastKnownPrice(id: string, price: LastKnown
 // quantity/unit/note rather than duplicating one for the same normalized
 // name, if one's already there.
 export async function upsertShoppingListEntry(
+  pk: string,
   name: string,
   quantity: number | null,
   unit: string | null,
@@ -111,7 +116,7 @@ export async function upsertShoppingListEntry(
   urgent = false
 ): Promise<ShoppingListEntry> {
   const normalizedUnit = unit ? normalizeUnit(unit) : null;
-  const existing = await getShoppingList();
+  const existing = await getShoppingList(pk);
   const needle = normalizeItemName(name);
   const match = existing.find((e) => normalizeItemName(e.name) === needle);
 
@@ -143,7 +148,7 @@ export async function upsertShoppingListEntry(
         addedAt: new Date().toISOString(),
       };
 
-  await putShoppingListEntry(entry);
+  await putShoppingListEntry(pk, entry);
 
   return entry;
 }
