@@ -15,7 +15,9 @@ export default function PantryAuthForm({ pending, error, onSubmit, onClose }: Pa
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+
     const ok = await onSubmit(mode, email, password);
+
     if (ok) onClose();
   }
 
