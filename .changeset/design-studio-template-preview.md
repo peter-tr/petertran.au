@@ -1,5 +1,5 @@
 ---
-"api": minor
+"design-studio": minor
 "web": minor
 ---
 
