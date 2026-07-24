@@ -8,12 +8,21 @@ import {
 import * as AWSXRay from "aws-xray-sdk-core";
 import { traced, traceHeader } from "api-shared/xray";
 import { corsHeaders } from "api-shared/http";
-import type { Context } from "api-shared/context";
+import type { Context as SharedContext } from "api-shared/context";
 import type { APIGatewayProxyEvent, APIGatewayProxyResult, Context as LambdaContext } from "aws-lambda";
 import { SUPERGRAPH_SDL } from "./supergraph.generated";
 
 const apiBaseUrl = process.env.API_BASE_URL;
 if (!apiBaseUrl) throw new Error("API_BASE_URL is required");
+
+// Carries the client's own authorization header through to whichever
+// subgraph the gateway fans a request out to (pantry's is the only subgraph
+// that reads it today - see cognito-auth.ts) - RemoteGraphQLDataSource
+// doesn't forward the original request's headers on its own, only what
+// willSendRequest below explicitly copies from context.
+interface Context extends SharedContext {
+  authorization?: string;
+}
 
 // Without this, a subgraph fetch is invisible in X-Ray: ApolloGateway calls
 // out over plain HTTPS, not an AWS SDK client, so nothing auto-instruments
@@ -47,6 +56,7 @@ class TracedDataSource extends RemoteGraphQLDataSource<Context> {
     for (const [name, value] of Object.entries(traceHeader(context.xraySegment))) {
       request.http?.headers.set(name, value);
     }
+    if (context.authorization) request.http?.headers.set("authorization", context.authorization);
   }
 }
 
@@ -69,10 +79,14 @@ const apolloHandler = startServerAndCreateLambdaHandler(
   server,
   handlers.createAPIGatewayProxyEventRequestHandler(),
   {
-    context: async () => ({
+    context: async ({ event }) => ({
       // Captured synchronously, as early as possible in the invocation -
       // see xray.ts's traced() for why this can't be looked up later.
       xraySegment: process.env.AWS_LAMBDA_FUNCTION_NAME ? AWSXRay.getSegment() : undefined,
+      // API Gateway lower-cases header names for a Lambda proxy integration,
+      // but this handler type is shared code, not something worth trusting
+      // that invariant for - check both cases.
+      authorization: event.headers?.authorization ?? event.headers?.Authorization,
     }),
   }
 );
