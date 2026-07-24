@@ -85,6 +85,18 @@ async function main() {
       "override_subgraph_url:\n" +
       `${overrideLines}\n` +
       "\n" +
+      // pantry is the only subgraph that reads this today (see
+      // cognito-auth.ts) - without it, RemoteGraphQLDataSource's old
+      // Node equivalent already didn't forward client headers on its own,
+      // and Router doesn't either, so a signed-in pantry request would
+      // silently fall back to anonymous/shared-pantry behavior. Verified
+      // directly: a local echo subgraph confirmed this config actually
+      // forwards a real `authorization: Bearer ...` header through.
+      "headers:\n" +
+      "  all:\n" +
+      "    request:\n" +
+      '      - propagate:\n          named: "authorization"\n' +
+      "\n" +
       "supergraph:\n" +
       "  listen: 127.0.0.1:8080\n" +
       // ApiGatewayStack routes the exact path /graphql to this Lambda (see
