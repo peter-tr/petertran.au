@@ -11,6 +11,10 @@ import { createCognitoAuthVerifier } from "api-shared/cognito-auth";
 import { ddb, TABLE_NAME } from "./lib/aws/ddb";
 import { DEFAULT_PK, pkForUser, type Context } from "./context";
 
+// TEMPORARY - deploy-timing probe to verify the post-deploy PC reconcile
+// step, will be reverted in a follow-up commit right after.
+console.log("[deploy-verification-probe] pantry-graphql cold start");
+
 // Metrics keep living under the default/shared pantry's pk regardless of who
 // made the call - per-user operation metrics aren't worth the extra
 // dimension for a personal project, and this predates multi-user support.
