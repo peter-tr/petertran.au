@@ -25,12 +25,13 @@ export interface ProvisionedConcurrencyStackProps extends StackProps {
   pantryFnName: string;
   imposterFnName: string;
   supergraphFnName: string;
+  designStudioFnName: string;
   zeroTrustLabFnNames: ZeroTrustLabFunctionNames;
 }
 
 const WARM_SCHEDULE_PARAM_NAME = "/petertran-au/warm-schedule";
 
-type WarmScheduleKey = "portfolio" | "pantry" | "imposter" | "supergraph" | "zeroTrustLab";
+type WarmScheduleKey = "portfolio" | "pantry" | "imposter" | "supergraph" | "designStudio" | "zeroTrustLab";
 type Weekday = "MON" | "TUE" | "WED" | "THU" | "FRI" | "SAT" | "SUN";
 
 interface WarmSchedule {
@@ -60,16 +61,19 @@ const WARM_SCHEDULE_PROJECTS: WarmScheduleKey[] = [
   "pantry",
   "imposter",
   "supergraph",
+  "designStudio",
   "zeroTrustLab",
 ];
-// Slug used in each project's on/off Schedule name - "zero-trust-lab", not
-// the camelCase flag key, to match this codebase's EventBridge Schedule
-// naming convention elsewhere (e.g. the old warmup-* names).
+// Slug used in each project's on/off Schedule name - "zero-trust-lab"/
+// "design-studio", not the camelCase flag key, to match this codebase's
+// EventBridge Schedule naming convention elsewhere (e.g. the old warmup-*
+// names).
 const WARM_SCHEDULE_PROJECT_SLUGS: Record<WarmScheduleKey, string> = {
   portfolio: "portfolio",
   pantry: "pantry",
   imposter: "imposter",
   supergraph: "supergraph",
+  designStudio: "design-studio",
   zeroTrustLab: "zero-trust-lab",
 };
 
@@ -91,8 +95,9 @@ function warmScheduleArn(region: string, account: string, name: string): string 
 
 /**
  * Scheduled Provisioned Concurrency (PC) for portfolio/pantry/imposter/
- * supergraph's and zero-trust-lab's 5 Lambdas' `live` alias, per-project
- * configurable days/times (Sydney), settable from the portfolio Settings page.
+ * supergraph/design-studio's and zero-trust-lab's 5 Lambdas' `live` alias,
+ * per-project configurable days/times (Sydney), settable from the portfolio
+ * Settings page.
  * zero-trust-lab gets no organic traffic (see the old warmup schedule's
  * design notes in docs/warmup-and-provisioned-concurrency.md), so its PC
  * only speeds up manual testing/demos - kept as one combined `zeroTrustLab`
@@ -169,6 +174,7 @@ export class ProvisionedConcurrencyStack extends Stack {
       props.pantryFnName,
       props.imposterFnName,
       props.supergraphFnName,
+      props.designStudioFnName,
       ztl.idpBridge,
       ztl.internalSts,
       ztl.edgeAuthorizer,
@@ -204,6 +210,7 @@ export class ProvisionedConcurrencyStack extends Stack {
         PANTRY_FN_NAME: props.pantryFnName,
         IMPOSTER_FN_NAME: props.imposterFnName,
         SUPERGRAPH_FN_NAME: props.supergraphFnName,
+        DESIGN_STUDIO_FN_NAME: props.designStudioFnName,
         ZTL_IDP_BRIDGE_FN_NAME: ztl.idpBridge,
         ZTL_INTERNAL_STS_FN_NAME: ztl.internalSts,
         ZTL_EDGE_AUTHORIZER_FN_NAME: ztl.edgeAuthorizer,
@@ -297,7 +304,7 @@ export class ProvisionedConcurrencyStack extends Stack {
       }),
       description:
         "Backstop reconcile of scheduled Provisioned Concurrency for " +
-        "portfolio/pantry/imposter/supergraph/zero-trust-lab",
+        "portfolio/pantry/imposter/supergraph/design-studio/zero-trust-lab",
     });
 
     // Lets build-and-deploy.yml invoke this function directly with

@@ -19,6 +19,7 @@ process.env.PORTFOLIO_FN_NAME = "portfolio-fn";
 process.env.PANTRY_FN_NAME = "pantry-fn";
 process.env.IMPOSTER_FN_NAME = "imposter-fn";
 process.env.SUPERGRAPH_FN_NAME = "supergraph-fn";
+process.env.DESIGN_STUDIO_FN_NAME = "design-studio-fn";
 process.env.ZTL_IDP_BRIDGE_FN_NAME = "ztl-idp-bridge-fn";
 process.env.ZTL_INTERNAL_STS_FN_NAME = "ztl-internal-sts-fn";
 process.env.ZTL_EDGE_AUTHORIZER_FN_NAME = "ztl-edge-authorizer-fn";
@@ -29,6 +30,7 @@ process.env.WARM_SCHEDULE_NAMES = JSON.stringify({
   pantry: { on: "warm-on-pantry", off: "warm-off-pantry" },
   imposter: { on: "warm-on-imposter", off: "warm-off-imposter" },
   supergraph: { on: "warm-on-supergraph", off: "warm-off-supergraph" },
+  designStudio: { on: "warm-on-design-studio", off: "warm-off-design-studio" },
   zeroTrustLab: { on: "warm-on-zero-trust-lab", off: "warm-off-zero-trust-lab" },
 });
 
@@ -46,7 +48,14 @@ const ALL_ZTL_TARGETS = [
   "ztl-edge-proxy-fn",
   "ztl-domain-a-fn",
 ];
-const ALL_TARGETS = ["portfolio-fn", "pantry-fn", "imposter-fn", "supergraph-fn", ...ALL_ZTL_TARGETS];
+const ALL_TARGETS = [
+  "portfolio-fn",
+  "pantry-fn",
+  "imposter-fn",
+  "supergraph-fn",
+  "design-studio-fn",
+  ...ALL_ZTL_TARGETS,
+];
 
 const DEFAULT_SCHEDULE = {
   enabled: true,
@@ -60,6 +69,7 @@ const DEFAULT_CONFIG = {
   pantry: DEFAULT_SCHEDULE,
   imposter: DEFAULT_SCHEDULE,
   supergraph: DEFAULT_SCHEDULE,
+  designStudio: DEFAULT_SCHEDULE,
   zeroTrustLab: DEFAULT_SCHEDULE,
 };
 
@@ -160,7 +170,7 @@ describe("warm-schedule handler - config GET/POST", () => {
     );
     expect(result.statusCode).toBe(400);
     expect(JSON.parse(result.body as string).error).toContain(
-      "portfolio/pantry/imposter/supergraph/zeroTrustLab"
+      "portfolio/pantry/imposter/supergraph/designStudio/zeroTrustLab"
     );
   });
 
@@ -301,7 +311,7 @@ describe("warm-schedule handler - reconcile ping", () => {
 
     const putCalls = lambdaMock.commandCalls(PutProvisionedConcurrencyConfigCommand);
     expect(putCalls.map((c) => c.args[0].input.FunctionName).sort()).toEqual(
-      ["portfolio-fn", "pantry-fn", "imposter-fn", "supergraph-fn"].sort()
+      ["portfolio-fn", "pantry-fn", "imposter-fn", "supergraph-fn", "design-studio-fn"].sort()
     );
   });
 
@@ -374,7 +384,7 @@ describe("warm-schedule handler - reconcile ping", () => {
       .filter((c) => c.args[0].input.FunctionName !== "portfolio-fn")
       .map((c) => c.args[0].input.FunctionName);
     expect(succeededTargets.sort()).toEqual(
-      ["pantry-fn", "imposter-fn", "supergraph-fn", ...ALL_ZTL_TARGETS].sort()
+      ["pantry-fn", "imposter-fn", "supergraph-fn", "design-studio-fn", ...ALL_ZTL_TARGETS].sort()
     );
 
     consoleErrorSpy.mockRestore();

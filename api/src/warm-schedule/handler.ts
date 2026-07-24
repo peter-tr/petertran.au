@@ -21,7 +21,7 @@ const SCHEDULE_NAMES: Record<WarmScheduleKey, { on: string; off: string }> = JSO
   process.env.WARM_SCHEDULE_NAMES!
 );
 
-type WarmScheduleKey = "portfolio" | "pantry" | "imposter" | "supergraph" | "zeroTrustLab";
+type WarmScheduleKey = "portfolio" | "pantry" | "imposter" | "supergraph" | "designStudio" | "zeroTrustLab";
 type Weekday = "MON" | "TUE" | "WED" | "THU" | "FRI" | "SAT" | "SUN";
 
 interface WarmSchedule {
@@ -56,6 +56,7 @@ const TARGETS_BY_PROJECT: Record<WarmScheduleKey, string[]> = {
   pantry: [process.env.PANTRY_FN_NAME!],
   imposter: [process.env.IMPOSTER_FN_NAME!],
   supergraph: [process.env.SUPERGRAPH_FN_NAME!],
+  designStudio: [process.env.DESIGN_STUDIO_FN_NAME!],
   zeroTrustLab: [
     process.env.ZTL_IDP_BRIDGE_FN_NAME!,
     process.env.ZTL_INTERNAL_STS_FN_NAME!,
@@ -80,6 +81,7 @@ const DEFAULT_CONFIG: WarmScheduleConfig = {
   pantry: DEFAULT_SCHEDULE,
   imposter: DEFAULT_SCHEDULE,
   supergraph: DEFAULT_SCHEDULE,
+  designStudio: DEFAULT_SCHEDULE,
   zeroTrustLab: DEFAULT_SCHEDULE,
 };
 
@@ -314,8 +316,9 @@ async function processEvent(
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           error:
-            "project must be one of portfolio/pantry/imposter/supergraph/zeroTrustLab, schedule must be a " +
-            `valid { enabled, days, start, end, concurrency } (concurrency an integer 1-${MAX_CONCURRENCY})`,
+            "project must be one of portfolio/pantry/imposter/supergraph/designStudio/zeroTrustLab, " +
+            "schedule must be a valid { enabled, days, start, end, concurrency } " +
+            `(concurrency an integer 1-${MAX_CONCURRENCY})`,
         }),
       };
     }
