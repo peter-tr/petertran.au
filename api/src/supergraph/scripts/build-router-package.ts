@@ -124,6 +124,20 @@ export function buildRouterYaml(subgraphNames: string[]): string {
     "        aws_xray: true\n" +
     "      common:\n" +
     "        sampler: 1.0\n" +
+    // No service_name set = OTel's generic "unknown_service:<binary name>"
+    // fallback, i.e. "unknown_service:router" - confirmed literally
+    // appearing that way in ADOT collector logs before this. Setting both
+    // this and resource.service.name since a real-Lambda spike couldn't
+    // conclusively confirm which one (if either) the awsxrayexporter
+    // actually reads - batch-get-traces never returned Router's own
+    // OTel-originated segment to check directly (referenced as a parent_id
+    // by the API Gateway segment underneath it, but absent from the
+    // returned segment list, consistently across two independent spikes).
+    // Cosmetic and low-risk either way - confirmed this doesn't break
+    // startup or break trace connectivity.
+    '        service_name: "supergraph"\n' +
+    "        resource:\n" +
+    '          service.name: "supergraph"\n' +
     "\n" +
     "supergraph:\n" +
     "  listen: 127.0.0.1:8080\n" +
