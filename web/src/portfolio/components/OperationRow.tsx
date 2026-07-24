@@ -18,12 +18,13 @@ function formatVariables(raw: string | null): string | null {
   }
 }
 
-// A trace with just X-Ray's own platform "Lambda" wrapper segment (nothing
-// from our own SDK instrumentation nested inside it) almost always means
-// X-Ray hasn't finished indexing this invocation yet, not that it truly
-// only did one thing - the server already retries a couple of times for
-// this, but propagation is variable enough (seconds, sometimes 10+) that
-// it's worth polling here too rather than blocking one long request.
+// A trace with only platform wrapper segments (the Lambda invocation, the
+// api.petertran.au gateway hops) and nothing from our own SDK instrumentation
+// almost always means X-Ray hasn't finished indexing this invocation yet,
+// not that it truly only did that - the server already retries a couple of
+// times for this, but propagation is variable enough (seconds, sometimes
+// 10+) that it's worth polling here too rather than blocking one long
+// request.
 const MAX_CLIENT_POLL_ATTEMPTS = 5;
 const CLIENT_POLL_DELAY_MS = 2200;
 
@@ -50,7 +51,9 @@ export default function OperationRow({ op }: { op: OperationStat }) {
 
         const segments = result.meta.traceBreakdown;
         setTrace(segments);
-        if (segments.length <= 1 && pollAttempt.current < MAX_CLIENT_POLL_ATTEMPTS) {
+
+        const hasRealWork = segments.some((s) => !s.isPlatform);
+        if (!hasRealWork && pollAttempt.current < MAX_CLIENT_POLL_ATTEMPTS) {
           pollAttempt.current += 1;
           setTraceIndexing(true);
           setTimeout(() => {
@@ -123,6 +126,12 @@ export default function OperationRow({ op }: { op: OperationStat }) {
                   )}
                   {trace && trace.length === 0 && !traceIndexing && (
                     <p className="op-no-sample">// trace has expired or wasn&apos;t found.</p>
+                  )}
+                  {trace && trace.length > 0 && !traceIndexing && trace.every((s) => s.isPlatform) && (
+                    <p className="op-no-sample">
+                      // only X-Ray&apos;s platform segments landed in time - the real work never finished
+                      indexing.
+                    </p>
                   )}
                 </>
               )}

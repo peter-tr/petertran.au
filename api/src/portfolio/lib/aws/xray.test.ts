@@ -14,11 +14,12 @@ function segmentDoc(overrides: Record<string, unknown> = {}) {
   });
 }
 
-// getTraceBreakdown retries (via real setTimeout) whenever it sees <=1
-// segment, so every case below must run under fake timers and flush both
-// retry delays - otherwise a scenario that naturally yields 0 or 1 segments
-// (the "no traces"/"no segments" cases included) would hang waiting on a
-// real timer that fake-timers never advances on its own.
+// getTraceBreakdown retries (via real setTimeout) whenever every segment it
+// sees is a platform wrapper (Lambda/ApiGateway), so every case below must
+// run under fake timers and flush both retry delays - otherwise a scenario
+// that naturally yields no non-platform segments (the "no traces"/"no
+// segments" cases included) would hang waiting on a real timer that
+// fake-timers never advances on its own.
 async function runAndFlush(traceId: string) {
   const promise = getTraceBreakdown(traceId);
   await vi.advanceTimersByTimeAsync(700);
@@ -83,13 +84,13 @@ describe("getTraceBreakdown", () => {
       ],
     });
 
-    // More than one real segment lands on the first attempt, so no retries needed
+    // A non-platform segment lands on the first attempt, so no retries needed
     // (runAndFlush's timer advances are simply no-ops here).
     const result = await runAndFlush("trace-1");
 
     expect(result).toEqual([
-      { name: "handler", startOffsetMs: 0, durationMs: 500 },
-      { name: "DynamoDB", startOffsetMs: 100, durationMs: 100 },
+      { name: "handler", startOffsetMs: 0, durationMs: 500, isPlatform: false },
+      { name: "DynamoDB", startOffsetMs: 100, durationMs: 100, isPlatform: false },
     ]);
   });
 
@@ -126,7 +127,12 @@ describe("getTraceBreakdown", () => {
     const lambdaEntries = result.filter((s) => s.name === "Lambda");
     expect(lambdaEntries).toHaveLength(1);
     // Earliest Lambda-ish segment (start_time 100) wins.
-    expect(lambdaEntries[0]).toEqual({ name: "Lambda", startOffsetMs: 0, durationMs: 10000 });
+    expect(lambdaEntries[0]).toEqual({
+      name: "Lambda",
+      startOffsetMs: 0,
+      durationMs: 10000,
+      isPlatform: true,
+    });
     expect(result.some((s) => s.name === "Anthropic API")).toBe(true);
   });
 
@@ -163,6 +169,44 @@ describe("getTraceBreakdown", () => {
     const result = await runAndFlush("trace-1");
 
     expect(xrayMock.calls()).toHaveLength(3);
+    expect(result.some((s) => s.name === "DynamoDB")).toBe(true);
+  });
+
+  it("keeps retrying when only platform segments (Lambda + both ApiGateway hops) have landed, even though that's more than one segment", async () => {
+    xrayMock
+      .on(BatchGetTracesCommand)
+      .resolvesOnce({
+        Traces: [
+          {
+            Id: "trace-1",
+            Segments: [
+              { Document: segmentDoc({ name: "Lambda", origin: "AWS::Lambda" }) },
+              { Document: segmentDoc({ name: "api.petertran.au/", origin: "AWS::ApiGateway::Stage" }) },
+              { Document: segmentDoc({ name: "api.petertran.au/", origin: "AWS::ApiGateway::Stage" }) },
+            ],
+          },
+        ],
+      })
+      .resolves({
+        Traces: [
+          {
+            Id: "trace-1",
+            Segments: [
+              {
+                Document: segmentDoc({
+                  name: "our-handler-segment",
+                  origin: "AWS::Lambda::Function",
+                  subsegments: [{ name: "DynamoDB", start_time: 1000.1, end_time: 1000.2 }],
+                }),
+              },
+            ],
+          },
+        ],
+      });
+
+    const result = await runAndFlush("trace-1");
+
+    expect(xrayMock.calls().length).toBeGreaterThan(1);
     expect(result.some((s) => s.name === "DynamoDB")).toBe(true);
   });
 

@@ -105,8 +105,8 @@ describe("OperationRow", () => {
     runQuery.mockResolvedValue({
       meta: {
         traceBreakdown: [
-          { name: "Lambda: handler", startOffsetMs: 0, durationMs: 50 },
-          { name: "DynamoDB: GetItem", startOffsetMs: 10, durationMs: 20 },
+          { name: "Lambda: handler", startOffsetMs: 0, durationMs: 50, isPlatform: true },
+          { name: "DynamoDB: GetItem", startOffsetMs: 10, durationMs: 20, isPlatform: false },
         ],
       },
     });

@@ -289,6 +289,13 @@ type TraceSegment {
   How long this segment took, in milliseconds.
   """
   durationMs: Float!
+  """
+  True for AWS's own bookkeeping segments (the Lambda invocation wrapper, an
+  API Gateway stage hop) rather than a segment reflecting work the request
+  actually did - these land in X-Ray well before the real ones do, so they're
+  not a reliable "the trace finished indexing" signal on their own.
+  """
+  isPlatform: Boolean!
 }
 
 """

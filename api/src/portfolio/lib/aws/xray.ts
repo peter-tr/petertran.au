@@ -6,6 +6,7 @@ export interface TraceSegment {
   name: string;
   startOffsetMs: number;
   durationMs: number;
+  isPlatform: boolean;
 }
 
 interface RawSegment {
@@ -29,6 +30,18 @@ function displayName(node: RawSegment): string {
   // creates for the actual handler code report distinct `origin` values but
   // are both really "the Lambda" from a reader's point of view.
   return node.origin?.startsWith("AWS::Lambda") ? "Lambda" : node.name;
+}
+
+// True for AWS's own bookkeeping segments (the Lambda invocation wrapper, an
+// API Gateway stage hop) rather than a segment that reflects work our code
+// did. A request now hops through api.petertran.au twice (browser -> the
+// supergraph gateway, then supergraph -> the portfolio subgraph, both routed
+// through the same REST API), so two of these plus the Lambda wrapper can
+// land well before the real "Subgraph: portfolio"/DynamoDB/Anthropic
+// segments are indexed - "some segments landed" is no longer a reliable
+// signal that the interesting part of the trace has landed.
+function isPlatformWrapper(node: RawSegment): boolean {
+  return node.origin?.startsWith("AWS::Lambda") || node.origin?.startsWith("AWS::ApiGateway") || false;
 }
 
 async function fetchBreakdown(traceId: string): Promise<TraceSegment[]> {
@@ -63,6 +76,7 @@ async function fetchBreakdown(traceId: string): Promise<TraceSegment[]> {
       name,
       startOffsetMs: Math.round((node.start_time - rootStart) * 1000),
       durationMs: Math.round((end - node.start_time) * 1000),
+      isPlatform: isPlatformWrapper(node),
     });
   }
 
@@ -106,9 +120,10 @@ const RETRY_DELAYS_MS = [700, 1500];
 export async function getTraceBreakdown(traceId: string): Promise<TraceSegment[]> {
   let result = await fetchBreakdown(traceId);
   for (const delay of RETRY_DELAYS_MS) {
-    // More than one segment means the "work" segment (with its DynamoDB/
-    // Anthropic children) has landed, not just the bare platform wrapper.
-    if (result.length > 1) break;
+    // A non-platform segment landing means the real work (DynamoDB/
+    // Anthropic/subgraph) has been indexed, not just the Lambda/ApiGateway
+    // wrapper segments every trace gets regardless of indexing progress.
+    if (result.some((s) => !s.isPlatform)) break;
     await sleep(delay);
     result = await fetchBreakdown(traceId);
   }

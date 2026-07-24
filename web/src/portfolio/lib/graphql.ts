@@ -155,6 +155,7 @@ export const TRACE_BREAKDOWN_QUERY = /* GraphQL */ `
         name
         startOffsetMs
         durationMs
+        isPlatform
       }
     }
   }

@@ -1,13 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { PutCommand } from "@aws-sdk/lib-dynamodb";
 import { ddb, TABLE_NAME, PK } from "../lib/aws/ddb";
-import { generateQuery } from "../lib/anthropic/generate-query";
-import { getSystemStats } from "../lib/aws/system-stats";
-import { getTraceBreakdown } from "../lib/aws/xray";
-import { getAwsAllTimeCostUsd } from "../lib/aws/aws-cost";
-import { getAnthropicAllTimeCostUsd } from "../lib/anthropic/anthropic-cost";
 import { validateContactInput, CONTACT_CONFIRMATION_MESSAGE, type ContactInput } from "../lib/util/contact";
-import { sendContactNotification } from "../lib/aws/email";
 import type { Context } from "../context";
 import type { Education, Experience, Interests, Person, Program, Project, SkillCategory } from "../data";
 
@@ -22,7 +16,18 @@ async function itemsOfType<T>(context: Context, type: string): Promise<T[]> {
 // stays the true value from Anthropic's cost report.
 const ANTHROPIC_COST_ADJUSTMENT_USD = 5;
 
+// Dynamic imports below defer each field's heavy client (CloudWatch, X-Ray,
+// Cost Explorer, SES, Anthropic) to first use - none of the resume-content
+// queries (person/education/experience/...) touch these, so a plain page
+// load's cold start no longer pays for constructing all of them upfront.
+async function getAwsCostUsd(): Promise<number> {
+  const { getAwsAllTimeCostUsd } = await import("../lib/aws/aws-cost");
+
+  return getAwsAllTimeCostUsd();
+}
+
 async function getAdjustedAnthropicCostUsd(): Promise<number> {
+  const { getAnthropicAllTimeCostUsd } = await import("../lib/anthropic/anthropic-cost");
   const raw = await getAnthropicAllTimeCostUsd();
 
   return Math.max(0, raw - ANTHROPIC_COST_ADJUSTMENT_USD);
@@ -71,14 +76,25 @@ export const resolvers = {
     meta: () => ({}),
   },
   Meta: {
-    generateQuery: (_: unknown, args: { prompt: string }, context: Context) =>
-      generateQuery(args.prompt, context.sourceIp, context.runInternalQuery),
-    systemStats: (_: unknown, __: unknown, context: Context) => getSystemStats(context.functionName),
-    traceBreakdown: (_: unknown, args: { traceId: string }) => getTraceBreakdown(args.traceId),
-    awsCostUsd: () => getAwsAllTimeCostUsd(),
+    generateQuery: async (_: unknown, args: { prompt: string }, context: Context) => {
+      const { generateQuery } = await import("../lib/anthropic/generate-query");
+
+      return generateQuery(args.prompt, context.sourceIp, context.runInternalQuery);
+    },
+    systemStats: async (_: unknown, __: unknown, context: Context) => {
+      const { getSystemStats } = await import("../lib/aws/system-stats");
+
+      return getSystemStats(context.functionName);
+    },
+    traceBreakdown: async (_: unknown, args: { traceId: string }) => {
+      const { getTraceBreakdown } = await import("../lib/aws/xray");
+
+      return getTraceBreakdown(args.traceId);
+    },
+    awsCostUsd: () => getAwsCostUsd(),
     anthropicCostUsd: () => getAdjustedAnthropicCostUsd(),
     totalCostUsd: async () => {
-      const [aws, anthropic] = await Promise.all([getAwsAllTimeCostUsd(), getAdjustedAnthropicCostUsd()]);
+      const [aws, anthropic] = await Promise.all([getAwsCostUsd(), getAdjustedAnthropicCostUsd()]);
 
       return aws + anthropic;
     },
@@ -103,6 +119,7 @@ export const resolvers = {
       );
 
       try {
+        const { sendContactNotification } = await import("../lib/aws/email");
         await sendContactNotification(args.input, {
           receivedAt,
           sourceIp: context.sourceIp,

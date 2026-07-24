@@ -17,9 +17,9 @@ describe("TraceWaterfall", () => {
 
   it("renders one row per segment with its name and duration", () => {
     const segments: TraceSegment[] = [
-      { name: "Lambda: handler", startOffsetMs: 0, durationMs: 120 },
-      { name: "DynamoDB: GetItem", startOffsetMs: 10, durationMs: 30 },
-      { name: "Anthropic: messages.create", startOffsetMs: 40, durationMs: 900 },
+      { name: "Lambda: handler", startOffsetMs: 0, durationMs: 120, isPlatform: true },
+      { name: "DynamoDB: GetItem", startOffsetMs: 10, durationMs: 30, isPlatform: false },
+      { name: "Anthropic: messages.create", startOffsetMs: 40, durationMs: 900, isPlatform: false },
     ];
     const { container } = render(<TraceWaterfall segments={segments} />);
 
@@ -31,10 +31,10 @@ describe("TraceWaterfall", () => {
 
   it("colors bars by segment kind (Lambda/DynamoDB/Anthropic/other)", () => {
     const segments: TraceSegment[] = [
-      { name: "Lambda: handler", startOffsetMs: 0, durationMs: 10 },
-      { name: "DynamoDB: GetItem", startOffsetMs: 0, durationMs: 10 },
-      { name: "Anthropic: messages.create", startOffsetMs: 0, durationMs: 10 },
-      { name: "Something else", startOffsetMs: 0, durationMs: 10 },
+      { name: "Lambda: handler", startOffsetMs: 0, durationMs: 10, isPlatform: true },
+      { name: "DynamoDB: GetItem", startOffsetMs: 0, durationMs: 10, isPlatform: false },
+      { name: "Anthropic: messages.create", startOffsetMs: 0, durationMs: 10, isPlatform: false },
+      { name: "Something else", startOffsetMs: 0, durationMs: 10, isPlatform: false },
     ];
     const { container } = render(<TraceWaterfall segments={segments} />);
 
@@ -47,8 +47,8 @@ describe("TraceWaterfall", () => {
 
   it("positions bars proportionally to the total trace duration", () => {
     const segments: TraceSegment[] = [
-      { name: "First", startOffsetMs: 0, durationMs: 50 },
-      { name: "Second", startOffsetMs: 50, durationMs: 50 },
+      { name: "First", startOffsetMs: 0, durationMs: 50, isPlatform: false },
+      { name: "Second", startOffsetMs: 50, durationMs: 50, isPlatform: false },
     ];
     const { container } = render(<TraceWaterfall segments={segments} />);
 
@@ -60,8 +60,8 @@ describe("TraceWaterfall", () => {
 
   it("gives a very short segment a minimum visible width", () => {
     const segments: TraceSegment[] = [
-      { name: "Tiny", startOffsetMs: 0, durationMs: 1 },
-      { name: "Long", startOffsetMs: 0, durationMs: 1000 },
+      { name: "Tiny", startOffsetMs: 0, durationMs: 1, isPlatform: false },
+      { name: "Long", startOffsetMs: 0, durationMs: 1000, isPlatform: false },
     ];
     const { container } = render(<TraceWaterfall segments={segments} />);
 
