@@ -75,6 +75,26 @@ export function buildRouterYaml(subgraphNames: string[]): string {
     "    request:\n" +
     '      - propagate:\n          named: "authorization"\n' +
     "\n" +
+    // infra/lib/api-gateway-stack.ts's defaultCorsPreflightOptions only
+    // answers the browser's OPTIONS preflight via a mock integration that
+    // never reaches this Lambda - it does NOT add CORS headers to the
+    // actual GET/POST response coming back through the proxy integration.
+    // The old Node handler added them itself via api-shared/http.ts's
+    // corsHeaders() on every response; Router needs the equivalent here or
+    // browsers silently discard every real response (the request itself
+    // still succeeds - curl won't show anything wrong, only a real browser
+    // enforcing CORS will). Keep this origin list in sync with both
+    // corsHeaders()'s ALLOWED_ORIGINS and api-gateway-stack.ts's
+    // allowOrigins.
+    "cors:\n" +
+    "  origins:\n" +
+    "    - https://www.petertran.au\n" +
+    "    - https://petertran.au\n" +
+    "    - https://test.petertran.au\n" +
+    "    - https://www.test.petertran.au\n" +
+    "    - http://localhost:5173\n" +
+    "    - http://localhost:3000\n" +
+    "\n" +
     "supergraph:\n" +
     "  listen: 127.0.0.1:8080\n" +
     // ApiGatewayStack routes the exact path /graphql to this Lambda (see

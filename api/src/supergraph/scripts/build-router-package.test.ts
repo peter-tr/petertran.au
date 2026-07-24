@@ -45,6 +45,20 @@ describe("buildRouterYaml", () => {
     expect(yaml).toContain('named: "authorization"');
   });
 
+  it("allows CORS from prod, test-env, and local dev origins on the actual response", () => {
+    // Regression test: API Gateway's mock integration only answers the
+    // OPTIONS preflight - it does not add CORS headers to the actual
+    // GET/POST response, so without this config every browser (not curl)
+    // silently discards every real response.
+    expect(yaml).toContain("cors:");
+    expect(yaml).toContain("https://www.petertran.au");
+    expect(yaml).toContain("https://petertran.au");
+    expect(yaml).toContain("https://test.petertran.au");
+    expect(yaml).toContain("https://www.test.petertran.au");
+    expect(yaml).toContain("http://localhost:5173");
+    expect(yaml).toContain("http://localhost:3000");
+  });
+
   it("serves GraphQL at /graphql to match ApiGatewayStack's routing", () => {
     expect(yaml).toContain("path: /graphql");
   });
