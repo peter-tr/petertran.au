@@ -1,6 +1,6 @@
 import { DynamoDBDocumentClient, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { mockClient } from "aws-sdk-client-mock";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Context } from "../../context";
 
 vi.mock("../util/rate-limit", () => ({
@@ -11,17 +11,8 @@ vi.mock("api-shared/anthropic-client", () => ({
   getAnthropicClient: vi.fn(),
 }));
 
-vi.mock("api-shared/xray", () => ({
-  ANTHROPIC_API_SEGMENT_NAME: "Anthropic API",
-  traced: vi.fn((_name: string, fn: () => Promise<unknown>) => fn()),
-  // ddb.ts (transitively imported via "../aws/ddb") also pulls captureAwsClient
-  // from this module, so the mock factory needs to provide it too.
-  captureAwsClient: vi.fn((client: unknown) => client),
-}));
-
 import { assertNotRateLimited } from "../util/rate-limit";
 import { getAnthropicClient } from "api-shared/anthropic-client";
-import { traced } from "api-shared/xray";
 import { generateQuery } from "./generate-query";
 
 const ddbMock = mockClient(DynamoDBDocumentClient);
@@ -39,7 +30,6 @@ function makeAnthropicClient(parsedOutput: unknown, answerText: string | null = 
 
 describe("generateQuery", () => {
   const runInternalQuery = vi.fn<Context["runInternalQuery"]>();
-  const xraySegment = undefined;
 
   beforeEach(() => {
     ddbMock.reset();
@@ -48,20 +38,14 @@ describe("generateQuery", () => {
     runInternalQuery.mockReset();
   });
 
-  afterEach(() => {
-    vi.mocked(traced).mockClear();
-  });
-
   it("throws when the prompt is empty or whitespace-only", async () => {
-    await expect(generateQuery("   ", "1.2.3.4", runInternalQuery, xraySegment)).rejects.toThrow(
-      "prompt is required."
-    );
+    await expect(generateQuery("   ", "1.2.3.4", runInternalQuery)).rejects.toThrow("prompt is required.");
     expect(assertNotRateLimited).not.toHaveBeenCalled();
   });
 
   it("throws when the prompt exceeds the max length", async () => {
     const tooLong = "a".repeat(301);
-    await expect(generateQuery(tooLong, "1.2.3.4", runInternalQuery, xraySegment)).rejects.toThrow(
+    await expect(generateQuery(tooLong, "1.2.3.4", runInternalQuery)).rejects.toThrow(
       "Keep the prompt under 300 characters."
     );
   });
@@ -72,9 +56,7 @@ describe("generateQuery", () => {
     const client = makeAnthropicClient({ query: null, message: "hi" });
     vi.mocked(getAnthropicClient).mockResolvedValue(client as never);
 
-    await expect(generateQuery("hello", "1.2.3.4", runInternalQuery, xraySegment)).rejects.toThrow(
-      "Too many requests"
-    );
+    await expect(generateQuery("hello", "1.2.3.4", runInternalQuery)).rejects.toThrow("Too many requests");
     expect(client.messages.parse).not.toHaveBeenCalled();
   });
 
@@ -82,7 +64,7 @@ describe("generateQuery", () => {
     const client = makeAnthropicClient(null);
     vi.mocked(getAnthropicClient).mockResolvedValue(client as never);
 
-    await expect(generateQuery("hello", "1.2.3.4", runInternalQuery, xraySegment)).rejects.toThrow(
+    await expect(generateQuery("hello", "1.2.3.4", runInternalQuery)).rejects.toThrow(
       "Claude didn't return a valid response - try rephrasing."
     );
   });
@@ -91,7 +73,7 @@ describe("generateQuery", () => {
     const client = makeAnthropicClient({ query: null, message: "Ask me about the resume." });
     vi.mocked(getAnthropicClient).mockResolvedValue(client as never);
 
-    await generateQuery("what's the weather", "1.2.3.4", runInternalQuery, xraySegment);
+    await generateQuery("what's the weather", "1.2.3.4", runInternalQuery);
 
     const updateCalls = ddbMock.commandCalls(UpdateCommand);
     expect(updateCalls).toHaveLength(1);
@@ -102,7 +84,7 @@ describe("generateQuery", () => {
     const client = makeAnthropicClient({ query: null, message: "hi" });
     vi.mocked(getAnthropicClient).mockResolvedValue(client as never);
 
-    await generateQuery("hello", undefined, runInternalQuery, xraySegment);
+    await generateQuery("hello", undefined, runInternalQuery);
 
     expect(ddbMock.commandCalls(UpdateCommand)).toHaveLength(0);
   });
@@ -115,7 +97,7 @@ describe("generateQuery", () => {
     });
     vi.mocked(getAnthropicClient).mockResolvedValue(client as never);
 
-    const result = await generateQuery("I want to contact Peter", "1.2.3.4", runInternalQuery, xraySegment);
+    const result = await generateQuery("I want to contact Peter", "1.2.3.4", runInternalQuery);
 
     expect(result.answer).toBeNull();
     expect(runInternalQuery).not.toHaveBeenCalled();
@@ -125,7 +107,7 @@ describe("generateQuery", () => {
     const client = makeAnthropicClient({ query: null, message: "I can only answer resume questions." });
     vi.mocked(getAnthropicClient).mockResolvedValue(client as never);
 
-    const result = await generateQuery("what's the weather", "1.2.3.4", runInternalQuery, xraySegment);
+    const result = await generateQuery("what's the weather", "1.2.3.4", runInternalQuery);
 
     expect(result).toEqual({
       query: null,
@@ -140,7 +122,7 @@ describe("generateQuery", () => {
     vi.mocked(getAnthropicClient).mockResolvedValue(client as never);
     runInternalQuery.mockResolvedValue({ data: null, errors: ["boom"] });
 
-    const result = await generateQuery("what's his name", "1.2.3.4", runInternalQuery, xraySegment);
+    const result = await generateQuery("what's his name", "1.2.3.4", runInternalQuery);
 
     expect(runInternalQuery).toHaveBeenCalledWith("query FunFact { person { name } }");
     expect(result.answer).toBeNull();
@@ -152,7 +134,7 @@ describe("generateQuery", () => {
     vi.mocked(getAnthropicClient).mockResolvedValue(client as never);
     runInternalQuery.mockResolvedValue({ data: null });
 
-    const result = await generateQuery("what's his name", "1.2.3.4", runInternalQuery, xraySegment);
+    const result = await generateQuery("what's his name", "1.2.3.4", runInternalQuery);
 
     expect(result.answer).toBeNull();
   });
@@ -165,7 +147,7 @@ describe("generateQuery", () => {
     vi.mocked(getAnthropicClient).mockResolvedValue(client as never);
     runInternalQuery.mockResolvedValue({ data: { person: { name: "Ada" } } });
 
-    const result = await generateQuery("what's his name", "1.2.3.4", runInternalQuery, xraySegment);
+    const result = await generateQuery("what's his name", "1.2.3.4", runInternalQuery);
 
     expect(result).toEqual({
       query: "query FunFact { person { name } }",
@@ -173,16 +155,15 @@ describe("generateQuery", () => {
       answer: "Peter's name is Ada.",
     });
     expect(client.messages.create).toHaveBeenCalledOnce();
-    expect(traced).toHaveBeenCalledWith("Anthropic API (answer)", expect.any(Function), xraySegment);
   });
 
-  it("traces the initial generation call with the shared Anthropic segment name", async () => {
+  it("calls Anthropic's messages.parse for the initial generation", async () => {
     const client = makeAnthropicClient({ query: null, message: "hi" });
     vi.mocked(getAnthropicClient).mockResolvedValue(client as never);
 
-    await generateQuery("hello", "1.2.3.4", runInternalQuery, xraySegment);
+    await generateQuery("hello", "1.2.3.4", runInternalQuery);
 
-    expect(traced).toHaveBeenCalledWith("Anthropic API", expect.any(Function), xraySegment);
+    expect(client.messages.parse).toHaveBeenCalledOnce();
   });
 
   it("returns null answer when the answer response has no text block", async () => {
@@ -190,7 +171,7 @@ describe("generateQuery", () => {
     vi.mocked(getAnthropicClient).mockResolvedValue(client as never);
     runInternalQuery.mockResolvedValue({ data: { person: { name: "Ada" } } });
 
-    const result = await generateQuery("what's his name", "1.2.3.4", runInternalQuery, xraySegment);
+    const result = await generateQuery("what's his name", "1.2.3.4", runInternalQuery);
 
     expect(result.answer).toBeNull();
   });

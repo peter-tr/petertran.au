@@ -2,7 +2,6 @@ import { UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import type Anthropic from "@anthropic-ai/sdk";
 import { typeDefs } from "../../schema";
 import { getAnthropicClient } from "api-shared/anthropic-client";
-import { traced, ANTHROPIC_API_SEGMENT_NAME } from "api-shared/xray";
 import { assertNotRateLimited } from "../util/rate-limit";
 import { ddb, TABLE_NAME } from "../aws/ddb";
 import type { Context } from "../../context";
@@ -119,8 +118,7 @@ async function callAnswerAnthropic(
 export async function generateQuery(
   prompt: string,
   sourceIp: string | undefined,
-  runInternalQuery: Context["runInternalQuery"],
-  xraySegment: Context["xraySegment"]
+  runInternalQuery: Context["runInternalQuery"]
 ): Promise<GenerateQueryResult> {
   const trimmed = prompt.trim();
   if (!trimmed) throw new Error("prompt is required.");
@@ -132,11 +130,7 @@ export async function generateQuery(
 
   const client = await getAnthropicClient();
 
-  const response = await traced(
-    ANTHROPIC_API_SEGMENT_NAME,
-    () => callAnthropic(client, trimmed),
-    xraySegment
-  );
+  const response = await callAnthropic(client, trimmed);
   const parsed = response.parsed_output as RawGeneratedQuery | null;
   if (!parsed) throw new Error("Claude didn't return a valid response - try rephrasing.");
 
@@ -157,11 +151,7 @@ export async function generateQuery(
     return { ...parsed, answer: null };
   }
 
-  const answer = await traced(
-    `${ANTHROPIC_API_SEGMENT_NAME} (answer)`,
-    () => callAnswerAnthropic(client, trimmed, data),
-    xraySegment
-  );
+  const answer = await callAnswerAnthropic(client, trimmed, data);
 
   return { ...parsed, answer };
 }

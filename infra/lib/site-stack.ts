@@ -17,6 +17,7 @@ import { Schedule, ScheduleExpression } from "aws-cdk-lib/aws-scheduler";
 import { LambdaInvoke } from "aws-cdk-lib/aws-scheduler-targets";
 import * as path from "path";
 import { FUNCTION_NAMES, LIVE_ALIAS_NAME } from "./shared/function-names";
+import { applyApplicationSignals } from "./shared/application-signals";
 
 export interface SiteStackProps extends StackProps {
   domainName: string;
@@ -180,15 +181,15 @@ export class SiteStack extends Stack {
         CONTACT_FROM_EMAIL: "contact@petertran.au",
         CONTACT_TO_EMAIL: "peter2002tran@outlook.com",
       },
-      // Traces every invocation to X-Ray -- lets the systemStats dashboard
-      // show a real Lambda/DynamoDB/Anthropic timing breakdown per operation.
-      tracing: lambda.Tracing.ACTIVE,
+      // No lambda.Tracing.ACTIVE here - see applyApplicationSignals()'s doc
+      // comment for why.
     });
     table.grantReadWriteData(apiFn);
     anthropicSecret.grantRead(apiFn);
     anthropicAdminSecret.grantRead(apiFn);
     emailIdentity.grantSendEmail(apiFn);
     recipientIdentity.grantSendEmail(apiFn);
+    applyApplicationSignals(apiFn);
 
     // Qualifier ApiGatewayStack targets and ProvisionedConcurrencyStack
     // applies PC to - see LIVE_ALIAS_NAME's doc comment.
@@ -199,9 +200,10 @@ export class SiteStack extends Stack {
     // CloudWatch metrics (for the systemStats query), X-Ray traces (for
     // traceBreakdown), and Cost Explorer (for awsCostUsd) have no
     // resource-level scoping -- "*" is required here regardless of which
-    // function is asking. `Tracing.ACTIVE` above already grants write access
-    // (PutTraceSegments); this adds the read APIs needed to query a trace
-    // back out.
+    // function is asking. applyApplicationSignals() above grants write
+    // access (via the CloudWatchLambdaApplicationSignalsExecutionRolePolicy
+    // managed policy); this adds the read APIs needed to query a trace back
+    // out for the traceBreakdown dashboard feature.
     apiFn.addToRolePolicy(
       new iam.PolicyStatement({
         actions: [
@@ -235,13 +237,13 @@ export class SiteStack extends Stack {
           TABLE_NAME: table.tableName,
           ANTHROPIC_ADMIN_SECRET_ARN: anthropicAdminSecret.secretArn,
         },
-        tracing: lambda.Tracing.ACTIVE,
       });
       table.grantReadWriteData(costRefreshFn);
       anthropicAdminSecret.grantRead(costRefreshFn);
       costRefreshFn.addToRolePolicy(
         new iam.PolicyStatement({ actions: ["ce:GetCostAndUsage"], resources: ["*"] })
       );
+      applyApplicationSignals(costRefreshFn);
 
       // Early morning Sydney, well outside business hours - if this ever
       // runs long, it shouldn't contend with real traffic for anything.

@@ -46,9 +46,9 @@ describe("generateDesignElements", () => {
       new Error("Too many requests - please wait a moment and try again.")
     );
 
-    await expect(
-      generateDesignElements("a poster", 900, 600, undefined, "1.2.3.4")
-    ).rejects.toThrow("Too many requests");
+    await expect(generateDesignElements("a poster", 900, 600, undefined, "1.2.3.4")).rejects.toThrow(
+      "Too many requests"
+    );
     expect(getAnthropicClient).not.toHaveBeenCalled();
   });
 
@@ -109,9 +109,9 @@ describe("generateDesignElements", () => {
   it("throws when Claude returns no elements", async () => {
     messagesParse.mockResolvedValueOnce({ parsed_output: { elements: [] } });
 
-    await expect(
-      generateDesignElements("a poster", 900, 600, undefined, "1.2.3.4")
-    ).rejects.toThrow("didn't return a usable design");
+    await expect(generateDesignElements("a poster", 900, 600, undefined, "1.2.3.4")).rejects.toThrow(
+      "didn't return a usable design"
+    );
   });
 
   it("caps the number of returned elements", async () => {
