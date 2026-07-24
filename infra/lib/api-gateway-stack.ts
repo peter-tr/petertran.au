@@ -60,7 +60,7 @@ export interface ApiGatewayStackProps extends StackProps {
  * reaches the invoked Lambda's `event.headers` but is never promoted into
  * its actual X-Ray trace context. Verified live: supergraph's subgraph
  * calls and portfolio/pantry/imposter's own invocations kept showing up as
- * separate, disconnected traces even after supergraph/handler.ts started
+ * separate, disconnected traces even after the supergraph gateway started
  * sending that header. REST API's `deployOptions.tracingEnabled` is the
  * AWS-native mechanism for this - see its doc comment below.
  *

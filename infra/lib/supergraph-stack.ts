@@ -32,8 +32,18 @@ export class SupergraphStack extends Stack {
 
     const gatewayFn = new lambda.Function(this, "SupergraphGatewayFunction", {
       functionName: props.functionName,
-      runtime: lambda.Runtime.NODEJS_20_X,
-      handler: "handler.handler",
+      // Apollo Router (Rust), not the Node @apollo/gateway this replaced -
+      // deployed as a provided.al2023 custom runtime via AWS's own Lambda
+      // Web Adapter, following their official rust-axum-zip example exactly
+      // (Handler: bootstrap, this same layer ARN). Verified directly against
+      // a real Lambda before this change: GLIBC 2.29 required vs. AL2023's
+      // 2.34, and real cold-start Init Duration of ~380-436ms vs. the Node
+      // gateway's ~1160-1245ms. See scripts/build-router-package.ts for how
+      // dist/ (bootstrap + router binary + router.yaml + composed SDL) gets
+      // assembled.
+      runtime: lambda.Runtime.PROVIDED_AL2023,
+      architecture: lambda.Architecture.X86_64,
+      handler: "bootstrap",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/src/supergraph/dist")),
       memorySize: 256,
       // Generous - even with the supergraph SDL composed at build time (see
@@ -41,9 +51,23 @@ export class SupergraphStack extends Stack {
       // 3 subgraphs over HTTPS, any of which may itself be a cold Lambda.
       timeout: Duration.seconds(30),
       environment: {
+        // router.yaml's override_subgraph_url entries read this via
+        // Router's `${env.API_BASE_URL}` config templating.
         API_BASE_URL: props.apiBaseUrl,
+        AWS_LWA_PORT: "8080",
       },
       tracing: lambda.Tracing.ACTIVE,
+      layers: [
+        // AWS's own published Lambda Web Adapter layer - proxies the
+        // Lambda Runtime API to an HTTP request against Router listening on
+        // AWS_LWA_PORT, translating the response back into the standard
+        // Lambda-proxy shape ApiGatewayStack's LambdaIntegration expects.
+        lambda.LayerVersion.fromLayerVersionArn(
+          this,
+          "LambdaAdapterLayer",
+          `arn:aws:lambda:${this.region}:753240598075:layer:LambdaAdapterLayerX86:28`
+        ),
+      ],
     });
     this.gatewayFn = gatewayFn;
 

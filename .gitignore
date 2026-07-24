@@ -8,6 +8,8 @@ cdk.out/
 .tsbuild/
 .prettiercache
 *.generated.ts
+*.generated.graphql
+api/src/supergraph/spike/
 .turbo/
 test-results/
 playwright-report/
