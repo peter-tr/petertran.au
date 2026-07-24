@@ -77,8 +77,7 @@ export const resolvers = {
         inventory,
         shoppingList,
         settings.categories,
-        context.sourceIp,
-        context.xraySegment
+        context.sourceIp
       );
     },
     // Null when unauthenticated (using the default/shared pantry) - the
@@ -288,7 +287,7 @@ export const resolvers = {
           `No ${args.list === "inventory" ? "inventory item" : "shopping list entry"} found with id "${args.id}".`
         );
 
-      const result = await checkPrice(name, context.xraySegment);
+      const result = await checkPrice(name);
       const price: LastKnownPrice = { ...result, checkedAt: new Date().toISOString() };
       if (args.list === "inventory") {
         await setLastKnownPrice(context.pantryPk, args.id, price);

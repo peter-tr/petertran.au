@@ -30,8 +30,7 @@ export type GenerateDesignElementsFn = (
   width: number,
   height: number,
   currentElements: DesignElementRecord[] | undefined,
-  sourceIp: string | undefined,
-  xraySegment: Context["xraySegment"]
+  sourceIp: string | undefined
 ) => Promise<DesignElementRecord[]>;
 
 // Shared resolver logic for both the real (Mongo) and dev (in-memory)
@@ -83,8 +82,7 @@ export function createDesignStudioResolvers(
           args.width,
           args.height,
           args.currentElements ?? undefined,
-          context.sourceIp,
-          context.xraySegment
+          context.sourceIp
         ),
     },
   };

@@ -87,7 +87,6 @@ const TEST_PK = "PANTRY";
 function ctx(overrides: Partial<Context> = {}): Context {
   return {
     sourceIp: "1.2.3.4",
-    xraySegment: undefined,
     pantryPk: TEST_PK,
     userId: null,
     email: null,
@@ -233,7 +232,7 @@ describe("Query.me", () => {
 });
 
 describe("Query.parseCommand", () => {
-  it("gathers inventory/shoppingList/settings and forwards categories, sourceIp, and xraySegment", async () => {
+  it("gathers inventory/shoppingList/settings and forwards categories and sourceIp", async () => {
     const inventory = [inventoryItem()];
     const shoppingList = [shoppingListEntry()];
     const settings = { categories: ["Dairy", "Produce"] } as PantrySettings;
@@ -251,8 +250,7 @@ describe("Query.parseCommand", () => {
       inventory,
       shoppingList,
       ["Dairy", "Produce"],
-      "9.9.9.9",
-      context.xraySegment
+      "9.9.9.9"
     );
   });
 
@@ -581,7 +579,7 @@ describe("Mutation.checkPriceNow", () => {
 
     expect(assertAiNotRateLimited).toHaveBeenCalledWith("3.3.3.3");
     expect(assertNotRateLimited).not.toHaveBeenCalled();
-    expect(checkPrice).toHaveBeenCalledWith("Milk", undefined);
+    expect(checkPrice).toHaveBeenCalledWith("Milk");
     expect(setLastKnownPrice).toHaveBeenCalledWith(
       TEST_PK,
       "inv-1",
@@ -597,7 +595,7 @@ describe("Mutation.checkPriceNow", () => {
 
     await resolvers.Mutation.checkPriceNow(null, { id: "sl-1", list: "shoppingList" }, ctx());
 
-    expect(checkPrice).toHaveBeenCalledWith("Eggs", undefined);
+    expect(checkPrice).toHaveBeenCalledWith("Eggs");
     expect(setShoppingListLastKnownPrice).toHaveBeenCalledWith(
       TEST_PK,
       "sl-1",

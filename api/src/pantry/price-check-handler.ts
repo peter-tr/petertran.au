@@ -1,4 +1,3 @@
-import * as AWSXRay from "aws-xray-sdk-core";
 import { checkTrackedPrices } from "./lib/anthropic/check-prices";
 import { DEFAULT_PK } from "./context";
 
@@ -11,8 +10,5 @@ import { DEFAULT_PK } from "./context";
 // runs real (billed) Anthropic calls, so one user's click must never fan out
 // into a price check for every other pantry too.
 export async function handler(event: { pk?: string } = {}): Promise<void> {
-  // Captured synchronously, as early as possible in the invocation - see
-  // xray.ts's traced() for why this can't be looked up later.
-  const xraySegment = process.env.AWS_LAMBDA_FUNCTION_NAME ? AWSXRay.getSegment() : undefined;
-  await checkTrackedPrices(event.pk ?? DEFAULT_PK, xraySegment);
+  await checkTrackedPrices(event.pk ?? DEFAULT_PK);
 }

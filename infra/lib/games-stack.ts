@@ -2,26 +2,10 @@ import { Stack, StackProps, Duration, RemovalPolicy } from "aws-cdk-lib";
 import { Construct } from "constructs";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
-import * as iam from "aws-cdk-lib/aws-iam";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as path from "path";
 import { FUNCTION_NAMES, LIVE_ALIAS_NAME } from "./shared/function-names";
-
-// Application Signals trial (imposter only, for now - see the doc comment on
-// imposterFn's layers below). Hardcoded rather than CDK's built-in
-// lambda.AdotLayerVersion.fromJavaScriptSdkLayerVersion() helper - that
-// helper's version mapping resolves to the older collector-based ADOT layer
-// (account 901920570463), which only ships /opt/otel-handler. Application
-// Signals specifically needs /opt/otel-instrument, which only exists in this
-// separately-published layer (account 615299751070 - AWS's own account,
-// same one the Lambda console's "Application Signals" toggle uses).
-// Confirmed live: deploying the CDK helper's layer with
-// AdotLambdaExecWrapper.INSTRUMENT_HANDLER broke every invocation
-// ("/opt/otel-instrument: does not exist", Runtime.ExitError) - this ARN was
-// verified directly against AWS (aws lambda get-layer-version-by-arn)
-// before use, not copied from a stale doc.
-const APPLICATION_SIGNALS_NODEJS_LAYER_ARN =
-  "arn:aws:lambda:ap-southeast-2:615299751070:layer:AWSOpenTelemetryDistroJs:14";
+import { applyApplicationSignals } from "./shared/application-signals";
 
 export interface GamesStackProps extends StackProps {
   // Optional, defaults to prod's current values - only the on-demand test
@@ -99,41 +83,13 @@ export class GamesStack extends Stack {
       environment: {
         TABLE_NAME: table.tableName,
         ANTHROPIC_SECRET_ARN: anthropicSecret.secretArn,
-        AWS_LAMBDA_EXEC_WRAPPER: "/opt/otel-instrument",
-        // The layer's own otel-instrument script defaults to
-        // "aws-sdk,aws-lambda,http" when this isn't set - confirmed by
-        // reading that script directly (downloaded + unzipped the deployed
-        // layer). "http" only covers Node's legacy http/https module, not
-        // the native fetch/undici stack the Anthropic SDK actually uses
-        // (confirmed in @anthropic-ai/sdk's internal/shims.mjs) - without
-        // "undici" here, that call gets silently zero tracing coverage.
-        // The script appends "aws-lambda,http" to whatever list is set
-        // here, so this ends up enabling all four.
-        OTEL_NODE_ENABLED_INSTRUMENTATIONS: "aws-sdk,undici",
       },
-      // No lambda.Tracing.ACTIVE here - confirmed live that running classic
-      // X-Ray daemon tracing alongside this ADOT layer produces duplicated,
-      // fragmented traces (two independent async-context-tracking systems -
-      // aws-xray-sdk-core's cls-hooked vs. OTel's AsyncLocalStorage - both
-      // instrumenting the same invocation). The ADOT layer's own auto-
-      // instrumentation (AWS SDK calls, outbound fetch/undici calls) fully
-      // replaces what Tracing.ACTIVE + this codebase's hand-rolled
-      // traced()/captureAwsClient() used to provide - see api/src/games/
-      // imposter's lib/aws/ddb.ts and lib/anthropic/ai.ts, which no longer
-      // reference either.
-      layers: [
-        lambda.LayerVersion.fromLayerVersionArn(
-          this,
-          "AppSignalsLayer",
-          APPLICATION_SIGNALS_NODEJS_LAYER_ARN
-        ),
-      ],
+      // No lambda.Tracing.ACTIVE here - see applyApplicationSignals()'s doc
+      // comment for why.
     });
     table.grantReadWriteData(imposterFn);
     anthropicSecret.grantRead(imposterFn);
-    imposterFn.role?.addManagedPolicy(
-      iam.ManagedPolicy.fromAwsManagedPolicyName("CloudWatchLambdaApplicationSignalsExecutionRolePolicy")
-    );
+    applyApplicationSignals(imposterFn);
     this.imposterFn = imposterFn;
 
     // Qualifier ApiGatewayStack targets and ProvisionedConcurrencyStack

@@ -2,7 +2,6 @@ import { ApolloServer } from "@apollo/server";
 import { startServerAndCreateLambdaHandler, handlers } from "@as-integrations/aws-lambda";
 import { buildSubgraphSchema } from "@apollo/subgraph";
 import { parse } from "graphql";
-import * as AWSXRay from "aws-xray-sdk-core";
 import type { APIGatewayProxyEvent, APIGatewayProxyResult, Context as LambdaContext } from "aws-lambda";
 import { typeDefs } from "./schema";
 import { resolvers } from "./resolvers/resolvers";
@@ -53,9 +52,6 @@ const apolloHandler = startServerAndCreateLambdaHandler(
 
       return {
         sourceIp: event.requestContext?.identity?.sourceIp,
-        // Captured synchronously, as early as possible in the invocation -
-        // see xray.ts's traced() for why this can't be looked up later.
-        xraySegment: process.env.AWS_LAMBDA_FUNCTION_NAME ? AWSXRay.getSegment() : undefined,
         pantryPk: pkForUser(user?.sub ?? null),
         userId: user?.sub ?? null,
         email: user?.email ?? null,

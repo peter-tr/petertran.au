@@ -13,8 +13,8 @@ vi.mock("api-shared/ddb", () => ({
 const { ddb, TABLE_NAME } = await import("./ddb");
 
 describe("pantry ddb client", () => {
-  it("configures createDdbClient with pantry's own default table name and xray enabled", () => {
-    expect(createDdbClient).toHaveBeenCalledWith({ defaultTableName: "petertran-au-pantry", xray: true });
+  it("configures createDdbClient with pantry's own default table name, relying on the ADOT layer's auto-instrumentation rather than manual X-Ray wrapping", () => {
+    expect(createDdbClient).toHaveBeenCalledWith({ defaultTableName: "petertran-au-pantry" });
   });
 
   it("re-exports the ddb client and table name from createDdbClient", () => {

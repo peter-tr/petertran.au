@@ -9,10 +9,6 @@ const assertAiNotRateLimited = vi.fn<(ip: string | undefined) => Promise<void>>(
 vi.mock("api-shared/anthropic-client", () => ({
   getAnthropicClient: () => getAnthropicClient(),
 }));
-vi.mock("api-shared/xray", () => ({
-  traced: (_name: string, fn: () => unknown) => fn(),
-  ANTHROPIC_API_SEGMENT_NAME: "Anthropic API",
-}));
 vi.mock("../util/ai-rate-limit", () => ({
   assertAiNotRateLimited: (ip: string | undefined) => assertAiNotRateLimited(ip),
 }));
@@ -114,8 +110,7 @@ async function run(
     opts.inventory ?? [],
     opts.shoppingList ?? [],
     ["Dairy"],
-    "1.2.3.4",
-    undefined
+    "1.2.3.4"
   );
 }
 

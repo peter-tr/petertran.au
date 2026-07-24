@@ -4,6 +4,7 @@ import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as path from "path";
 import { FUNCTION_NAMES, LIVE_ALIAS_NAME } from "./shared/function-names";
+import { applyApplicationSignals } from "./shared/application-signals";
 
 export interface DesignStudioStackProps extends StackProps {
   // Optional, defaults to prod's current value - only the on-demand test
@@ -64,10 +65,12 @@ export class DesignStudioStack extends Stack {
         MONGO_SECRET_ARN: mongoSecret.secretArn,
         ANTHROPIC_SECRET_ARN: anthropicSecret.secretArn,
       },
-      tracing: lambda.Tracing.ACTIVE,
+      // No lambda.Tracing.ACTIVE here - see applyApplicationSignals()'s doc
+      // comment for why.
     });
     mongoSecret.grantRead(designStudioFn);
     anthropicSecret.grantRead(designStudioFn);
+    applyApplicationSignals(designStudioFn);
     this.designStudioFn = designStudioFn;
 
     // Qualifier ApiGatewayStack targets and ProvisionedConcurrencyStack
