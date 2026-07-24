@@ -90,7 +90,7 @@ describe("operationStatsPlugin", () => {
     ).resolves.toBeUndefined();
   });
 
-  it.each(["IntrospectionQuery", "TraceBreakdown"])(
+  it.each(["IntrospectionQuery", "TraceBreakdown", "SystemStats"])(
     "does not emit a metric or record operation stats for the ignored operation %s",
     async (operationName) => {
       await fireWillSendResponse({ operationName, operationType: "query" });
