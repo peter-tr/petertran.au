@@ -3,18 +3,24 @@ import { runQuery, FOOTER_QUERY, type FooterQueryResult } from "../lib/graphql";
 
 type Cost = FooterQueryResult["meta"];
 
-export default function Footer({ email }: { email?: string }) {
+export default function Footer({ email, staggerDelayMs = 0 }: { email?: string; staggerDelayMs?: number }) {
   const [cost, setCost] = useState<Cost | null>(null);
   const [fetchedEmail, setFetchedEmail] = useState<string | null>(null);
 
+  // staggerDelayMs (see Home.tsx/useStaggerHomeFetches) lets Hero's request
+  // land first and claim a warm portfolio-graphql slot before this one fires.
   useEffect(() => {
-    runQuery<FooterQueryResult>(FOOTER_QUERY)
-      .then((result) => {
-        setCost(result.meta);
-        setFetchedEmail(result.person.email);
-      })
-      .catch(() => {});
-  }, []);
+    const timer = setTimeout(() => {
+      runQuery<FooterQueryResult>(FOOTER_QUERY)
+        .then((result) => {
+          setCost(result.meta);
+          setFetchedEmail(result.person.email);
+        })
+        .catch(() => {});
+    }, staggerDelayMs);
+
+    return () => clearTimeout(timer);
+  }, [staggerDelayMs]);
 
   // `email` lets a caller that already has resume data (Resume.tsx) skip
   // waiting on Footer's own fetch; pages without it (Home.tsx) fall back to
