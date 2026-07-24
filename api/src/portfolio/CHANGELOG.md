@@ -1,5 +1,18 @@
 # portfolio
 
+## 1.3.2
+
+### Patch Changes
+
+- 38dfeb2: migrate imposter/design-studio/pantry/portfolio off aws-xray-sdk-core to ADOT auto-instrumentation
+- 8e2dce8: cut portfolio-graphql cold path latency
+- 30e3720: stop trace polling from declaring victory on platform-only segments
+- b9ee226: replace Node @apollo/gateway with Apollo Router on Lambda
+- 4303308: pin internal api-shared dependency by wildcard ("*") instead of an exact version, avoiding an intermittent npm ci resolution conflict against an unrelated public package of the same name
+- 30e3720: reduce cold-start latency: lazy-load AI/AWS-SDK-heavy resolver paths, bundle AWS SDK v3 instead of externalizing it
+- Updated dependencies [0d1e57a]
+  - api-shared@1.2.0
+
 ## 1.3.1
 
 ### Patch Changes

@@ -1,5 +1,28 @@
 # infra
 
+## 1.5.0
+
+### Minor Changes
+
+- 2fd594a: extend scheduled Provisioned Concurrency to design-studio
+- d0654b9: redesign the monitoring dashboard, add a separate test-env dashboard
+- 5bf2b32: link CloudWatch RUM sessions to their X-Ray traces
+- e68ec68: restore X-Ray tracing for the Router-based supergraph Lambda
+- 46d2050: add Design Studio, a mock-Canva editor (MongoDB Atlas-backed)
+- 2356941: add AI-assisted design generation to Design Studio - a "Generate with AI" prompt that produces a set of design elements from a natural-language description (via a new `generateDesignElements` mutation, Anthropic structured output, and a Mongo-backed rate limiter since Design Studio has no DynamoDB table). The result renders as a dashed-outline draft overlay, draggable/resizable independently of the real canvas and outside undo/redo history, until the user explicitly Accepts (adding it to the design) or Discards it.
+- 0d1e57a: add multi-user support to pantry: sign in via a new Cognito Hosted UI pool to get a private inventory/shopping list/settings, scoped by `pk`. Anyone not signed in keeps using the existing shared/default pantry unchanged.
+
+### Patch Changes
+
+- 038fdde: cut cold-start latency from Mongo connection setup
+- 38dfeb2: migrate imposter/design-studio/pantry/portfolio off aws-xray-sdk-core to ADOT auto-instrumentation
+- db1ad33: reconcile provisioned concurrency immediately after deploy
+- 2015eae: bump portfolio/pantry/imposter/supergraph/design-studio Lambda memory to 1024MB
+- b9ee226: replace Node @apollo/gateway with Apollo Router on Lambda
+- 23c171e: fix(pantry): forward the authorization header through the API Gateway CORS allowlist and the supergraph gateway to subgraphs - two separate bugs meant a signed-in pantry request never actually reached the pantry Lambda authenticated: the browser's CORS preflight rejected `authorization` outright (it wasn't in the gateway's `Access-Control-Allow-Headers`), and even past that, `RemoteGraphQLDataSource` doesn't forward the original request's headers to a subgraph on its own - the supergraph handler now copies it from context in `willSendRequest`. Verified against the live deployed API: `ensureAccount`/`me` returned "Not signed in."/`null` for a valid Cognito token before this fix, and the account's own id/email after it.
+- 521d9ce: fix(pantry): drop `standardAttributes` from PantryUserPool - it modifies Cognito's User Pool `Schema`, which the `UpdateUserPool` API doesn't support changing on an existing pool. Deploying PR #151 failed on this (`Invalid AttributeDataType input`) and rolled back cleanly; email is already implied by `signInAliases: { email: true }`, so the prop was redundant anyway.
+- b9a786b: fix(pantry): replace Cognito Hosted UI sign-in with an in-app email/password form - Hosted UI's authorization-code flow never actually completed in production because Cognito's `/oauth2/token` endpoint doesn't return CORS headers for a browser `fetch`. Sign-in/sign-up now call Cognito's IdP API directly with USER_PASSWORD_AUTH, with no email verification step and no MFA (a new pre-sign-up Lambda trigger auto-confirms accounts), and the header now shows an explicit "Sign out" label once signed in.
+
 ## 1.4.0
 
 ### Minor Changes

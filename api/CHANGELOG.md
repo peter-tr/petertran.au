@@ -1,5 +1,20 @@
 # api
 
+## 1.4.0
+
+### Minor Changes
+
+- 2fd594a: extend scheduled Provisioned Concurrency to design-studio
+
+### Patch Changes
+
+- 038fdde: cut cold-start latency from Mongo connection setup
+- 38dfeb2: migrate imposter/design-studio/pantry/portfolio off aws-xray-sdk-core to ADOT auto-instrumentation
+- 5327745: derive RUM's X-Ray origin from config, deflake jwt.test.ts
+- c8deef2: add CORS headers to alerts-settings responses
+- 8e2dce8: cut portfolio-graphql cold path latency
+- 46d2050: add Design Studio, a mock-Canva editor (MongoDB Atlas-backed)
+
 ## 1.3.0
 
 ### Minor Changes
