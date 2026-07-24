@@ -95,6 +95,36 @@ export function buildRouterYaml(subgraphNames: string[]): string {
     "    - http://localhost:5173\n" +
     "    - http://localhost:3000\n" +
     "\n" +
+    // provided.al2023 gets zero automatic X-Ray instrumentation (that's
+    // baked into each AWS-managed language runtime's own wrapper, not a
+    // platform-universal Lambda feature) - the ADOT collector layer
+    // (infra/lib/supergraph-stack.ts) receives OTLP locally and exports to
+    // X-Ray; this just needs to actually send it there. aws_xray
+    // propagation makes Router read/emit the same X-Amzn-Trace-Id format
+    // API Gateway and the subgraph Lambdas already use, so this shows up as
+    // one connected trace, not an island - verified directly against a
+    // real Lambda: the resulting trace included both this function's own
+    // segments and the subgraph's. scheduled_delay: 1ms is load-bearing,
+    // not cosmetic - the default 5s batch flush interval is longer than a
+    // fast invocation survives before the execution environment freezes,
+    // so spans never left Router's buffer at all without this (confirmed:
+    // zero traces reached X-Ray with the 5s default, real traces appeared
+    // immediately once this was set near-zero).
+    "telemetry:\n" +
+    "  exporters:\n" +
+    "    tracing:\n" +
+    "      otlp:\n" +
+    "        enabled: true\n" +
+    "        endpoint: http://localhost:4317\n" +
+    "        protocol: grpc\n" +
+    "        batch_processor:\n" +
+    "          scheduled_delay: 1ms\n" +
+    "          max_export_timeout: 3s\n" +
+    "      propagation:\n" +
+    "        aws_xray: true\n" +
+    "      common:\n" +
+    "        sampler: 1.0\n" +
+    "\n" +
     "supergraph:\n" +
     "  listen: 127.0.0.1:8080\n" +
     // ApiGatewayStack routes the exact path /graphql to this Lambda (see

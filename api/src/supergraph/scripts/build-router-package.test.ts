@@ -63,6 +63,24 @@ describe("buildRouterYaml", () => {
     expect(yaml).toContain("path: /graphql");
   });
 
+  it("exports traces via OTLP to the local ADOT collector with X-Ray propagation", () => {
+    // provided.al2023 gets no automatic X-Ray instrumentation - this is
+    // what actually gets traces to X-Ray at all (verified against a real
+    // Lambda: zero traces without this, connected traces with it).
+    expect(yaml).toContain("otlp:");
+    expect(yaml).toContain("endpoint: http://localhost:4317");
+    expect(yaml).toContain("aws_xray: true");
+    expect(yaml).toContain("sampler: 1.0");
+  });
+
+  it("flushes trace spans almost immediately, not on the 5s default", () => {
+    // Regression test: confirmed directly against a real Lambda that the
+    // 5s default batch flush interval is longer than a fast invocation
+    // survives before the execution environment freezes - spans never
+    // left Router's buffer at all, so no trace ever reached X-Ray.
+    expect(yaml).toContain("scheduled_delay: 1ms");
+  });
+
   it("enables introspection for the dashboard's GraphiQL/schema tooling", () => {
     expect(yaml).toContain("introspection: true");
   });

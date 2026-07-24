@@ -53,7 +53,10 @@ describe("SupergraphStack", () => {
           AWS_LWA_PORT: "8080",
         },
       },
-      Layers: ["arn:aws:lambda:ap-southeast-2:753240598075:layer:LambdaAdapterLayerX86:28"],
+      Layers: [
+        "arn:aws:lambda:ap-southeast-2:753240598075:layer:LambdaAdapterLayerX86:28",
+        "arn:aws:lambda:ap-southeast-2:901920570463:layer:aws-otel-collector-amd64-ver-0-117-0:1",
+      ],
     });
     template.resourceCountIs("AWS::Lambda::Alias", 1);
     template.hasResourceProperties("AWS::Lambda::Alias", {
