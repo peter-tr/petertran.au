@@ -9,6 +9,7 @@ import { Schedule, ScheduleExpression } from "aws-cdk-lib/aws-scheduler";
 import { LambdaInvoke } from "aws-cdk-lib/aws-scheduler-targets";
 import * as path from "path";
 import { FUNCTION_NAMES, LIVE_ALIAS_NAME } from "./shared/function-names";
+import { applyApplicationSignals } from "./shared/application-signals";
 
 export interface PantryStackProps extends StackProps {
   // Optional, defaults to prod's current values - only the on-demand test
@@ -143,13 +144,12 @@ export class PantryStack extends Stack {
         PANTRY_COGNITO_USER_POOL_ID: userPool.userPoolId,
         PANTRY_COGNITO_CLIENT_ID: userPoolClient.userPoolClientId,
       },
-      // Traces every invocation to X-Ray, same as the portfolio GraphQL
-      // Lambda - needed for this Lambda's own DynamoDB/Anthropic subsegments
-      // regardless of ApiGatewayStack's own gateway-level tracing.
-      tracing: lambda.Tracing.ACTIVE,
+      // No lambda.Tracing.ACTIVE here - see applyApplicationSignals()'s doc
+      // comment for why.
     });
     table.grantReadWriteData(apiFn);
     anthropicSecret.grantRead(apiFn);
+    applyApplicationSignals(apiFn);
     this.apiFn = apiFn;
 
     // Qualifier ApiGatewayStack targets and ProvisionedConcurrencyStack
@@ -200,11 +200,11 @@ export class PantryStack extends Stack {
           CONTACT_FROM_EMAIL: "contact@petertran.au",
           CONTACT_TO_EMAIL: "peter2002tran@outlook.com",
         },
-        tracing: lambda.Tracing.ACTIVE,
       });
       table.grantReadData(digestFn);
       emailIdentity.grantSendEmail(digestFn);
       recipientIdentity.grantSendEmail(digestFn);
+      applyApplicationSignals(digestFn);
 
       // Fires every hour on the hour, Sydney-local - the actual send time is
       // a user-configurable app setting (PantrySettings.digestHour), not
@@ -237,10 +237,10 @@ export class PantryStack extends Stack {
           TABLE_NAME: table.tableName,
           ANTHROPIC_SECRET_ARN: anthropicSecret.secretArn,
         },
-        tracing: lambda.Tracing.ACTIVE,
       });
       table.grantReadWriteData(priceCheckFn);
       anthropicSecret.grantRead(priceCheckFn);
+      applyApplicationSignals(priceCheckFn);
 
       // No automatic schedule - lets the main GraphQL Lambda's syncPricesNow
       // mutation fire-and-forget invoke this one, purely on demand from the

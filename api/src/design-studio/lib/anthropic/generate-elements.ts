@@ -1,9 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { getAnthropicClient } from "api-shared/anthropic-client";
-import { traced, ANTHROPIC_API_SEGMENT_NAME } from "api-shared/xray";
 import { assertAiNotRateLimited } from "../util/ai-rate-limit";
 import type { DesignElementRecord, DesignElementType } from "../design";
-import type { Context } from "../../context";
 
 const MAX_PROMPT_LENGTH = 300;
 const MAX_ELEMENTS = 12;
@@ -141,8 +139,7 @@ export async function generateDesignElements(
   width: number,
   height: number,
   currentElements: DesignElementRecord[] | undefined,
-  sourceIp: string | undefined,
-  xraySegment: Context["xraySegment"]
+  sourceIp: string | undefined
 ): Promise<DesignElementRecord[]> {
   const trimmed = prompt.trim();
   if (!trimmed) throw new Error("A prompt is required.");
@@ -159,18 +156,13 @@ export async function generateDesignElements(
     : trimmed;
 
   const client = await getAnthropicClient();
-  const response = await traced(
-    ANTHROPIC_API_SEGMENT_NAME,
-    () =>
-      client.messages.parse({
-        model: "claude-haiku-4-5",
-        max_tokens: 2048,
-        system: buildSystemPrompt(width, height, isRefinement),
-        messages: [{ role: "user", content: userContent }],
-        output_config: { format: { type: "json_schema", schema: GENERATE_ELEMENTS_SCHEMA } },
-      }),
-    xraySegment
-  );
+  const response = await client.messages.parse({
+    model: "claude-haiku-4-5",
+    max_tokens: 2048,
+    system: buildSystemPrompt(width, height, isRefinement),
+    messages: [{ role: "user", content: userContent }],
+    output_config: { format: { type: "json_schema", schema: GENERATE_ELEMENTS_SCHEMA } },
+  });
 
   const parsed = response.parsed_output as RawGenerateResult | null;
   if (!parsed || !parsed.elements.length) {

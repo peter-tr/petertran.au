@@ -17,10 +17,6 @@ const finishPriceSync = vi.fn<(pk: string) => Promise<void>>();
 vi.mock("api-shared/anthropic-client", () => ({
   getAnthropicClient: () => getAnthropicClient(),
 }));
-vi.mock("api-shared/xray", () => ({
-  traced: (_name: string, fn: () => unknown) => fn(),
-  ANTHROPIC_API_SEGMENT_NAME: "Anthropic API",
-}));
 vi.mock("../../services/inventory", () => ({
   getAllItems: (pk: string) => getAllItems(pk),
   setLastKnownPrice: (pk: string, id: string, price: LastKnownPrice) => setLastKnownPrice(pk, id, price),
@@ -106,7 +102,7 @@ describe("checkPrice", () => {
       },
     });
 
-    const result = await checkPrice("Milk", undefined);
+    const result = await checkPrice("Milk");
 
     expect(result.colesPrice).toBe(3.5);
     expect(result.productUrl).toBe("https://www.coles.com.au/product/milk-2l");
@@ -117,7 +113,7 @@ describe("checkPrice", () => {
   it("returns nulls when the batch response has no entry for the requested name", async () => {
     messagesParse.mockResolvedValue({ usage: usage(), parsed_output: { results: [] } });
 
-    const result = await checkPrice("Milk", undefined);
+    const result = await checkPrice("Milk");
 
     expect(result.colesPrice).toBeNull();
     expect(result.productUrl).toBeNull();
@@ -132,7 +128,7 @@ describe("checkPrice", () => {
       },
     });
 
-    const result = await checkPrice("Milk", undefined);
+    const result = await checkPrice("Milk");
 
     expect(result.productUrl).toBeNull();
   });
@@ -152,7 +148,7 @@ describe("checkPrice", () => {
       },
     });
 
-    const result = await checkPrice("Milk", undefined);
+    const result = await checkPrice("Milk");
 
     expect(result.productUrl).toBe("https://www.coles.com.au/product/milk-2l");
   });
@@ -160,7 +156,7 @@ describe("checkPrice", () => {
   it("handles a null parsed_output by returning nulls rather than throwing", async () => {
     messagesParse.mockResolvedValue({ usage: usage(), parsed_output: null });
 
-    const result = await checkPrice("Milk", undefined);
+    const result = await checkPrice("Milk");
 
     expect(result.colesPrice).toBeNull();
   });
@@ -182,7 +178,7 @@ describe("checkTrackedPrices", () => {
     getAllItems.mockResolvedValue([inventoryItem({ trackPrice: false })]);
     getShoppingList.mockResolvedValue([shoppingListEntry({ trackPrice: false })]);
 
-    await checkTrackedPrices(TEST_PK, undefined);
+    await checkTrackedPrices(TEST_PK);
 
     expect(startPriceSync).not.toHaveBeenCalled();
     expect(messagesParse).not.toHaveBeenCalled();
@@ -201,7 +197,7 @@ describe("checkTrackedPrices", () => {
       },
     });
 
-    await checkTrackedPrices(TEST_PK, undefined);
+    await checkTrackedPrices(TEST_PK);
 
     expect(startPriceSync).toHaveBeenCalledWith(TEST_PK, 2);
     expect(setLastKnownPrice).toHaveBeenCalledWith(
@@ -228,7 +224,7 @@ describe("checkTrackedPrices", () => {
     getShoppingList.mockResolvedValue([]);
     messagesParse.mockResolvedValue({ usage: usage(), parsed_output: { results: [] } });
 
-    await checkTrackedPrices(TEST_PK, undefined);
+    await checkTrackedPrices(TEST_PK);
 
     expect(startPriceSync).toHaveBeenCalledWith(TEST_PK, 20);
 
@@ -244,7 +240,7 @@ describe("checkTrackedPrices", () => {
     getShoppingList.mockResolvedValue([]);
     messagesParse.mockRejectedValue(new Error("Anthropic API down"));
 
-    await checkTrackedPrices(TEST_PK, undefined);
+    await checkTrackedPrices(TEST_PK);
 
     expect(recordPriceCheckProgress).toHaveBeenCalledWith(
       TEST_PK,
@@ -259,7 +255,7 @@ describe("checkTrackedPrices", () => {
     getShoppingList.mockResolvedValue([]);
     messagesParse.mockResolvedValue({ usage: usage(), parsed_output: { results: [] } });
 
-    await checkTrackedPrices(TEST_PK, undefined);
+    await checkTrackedPrices(TEST_PK);
 
     expect(recordPriceCheckProgress).toHaveBeenCalledWith(
       TEST_PK,
@@ -280,7 +276,7 @@ describe("checkTrackedPrices", () => {
     });
     setLastKnownPrice.mockRejectedValue(new Error("write failed"));
 
-    await checkTrackedPrices(TEST_PK, undefined);
+    await checkTrackedPrices(TEST_PK);
 
     expect(recordPriceCheckProgress).toHaveBeenCalledWith(
       TEST_PK,
@@ -305,7 +301,7 @@ describe("checkTrackedPrices", () => {
       },
     });
 
-    await checkTrackedPrices(TEST_PK, undefined);
+    await checkTrackedPrices(TEST_PK);
 
     const [, , price1] = setLastKnownPrice.mock.calls[0];
     const [, , price2] = setLastKnownPrice.mock.calls[1];

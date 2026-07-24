@@ -1,6 +1,5 @@
 import { MongoClient, type Db } from "mongodb";
 import { SecretsManagerClient, GetSecretValueCommand } from "@aws-sdk/client-secrets-manager";
-import { captureAwsClient } from "api-shared/xray";
 
 let cachedDb: Promise<Db> | null = null;
 
@@ -30,7 +29,7 @@ async function fetchUriFromSecretsManager(): Promise<string> {
     throw new Error("Neither MONGO_URI nor MONGO_SECRET_ARN is configured.");
   }
 
-  const client = captureAwsClient(new SecretsManagerClient({}));
+  const client = new SecretsManagerClient({});
   const res = await client.send(new GetSecretValueCommand({ SecretId: secretArn }));
   if (!res.SecretString) {
     throw new Error("Mongo connection string secret has no string value.");

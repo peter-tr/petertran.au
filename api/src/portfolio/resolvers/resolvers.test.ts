@@ -224,15 +224,15 @@ describe("portfolio resolvers", () => {
   });
 
   describe("Meta.generateQuery", () => {
-    it("delegates to generateQuery with the context's sourceIp/runInternalQuery/xraySegment", async () => {
+    it("delegates to generateQuery with the context's sourceIp/runInternalQuery", async () => {
       vi.mocked(generateQuery).mockResolvedValue({ query: null, message: "hi", answer: null });
 
       const runInternalQuery = vi.fn();
-      const context = makeContext([], { sourceIp: "1.2.3.4", runInternalQuery, xraySegment: undefined });
+      const context = makeContext([], { sourceIp: "1.2.3.4", runInternalQuery });
 
       await resolvers.Meta.generateQuery({}, { prompt: "hello" }, context);
 
-      expect(generateQuery).toHaveBeenCalledWith("hello", "1.2.3.4", runInternalQuery, undefined);
+      expect(generateQuery).toHaveBeenCalledWith("hello", "1.2.3.4", runInternalQuery);
     });
   });
 

@@ -34,20 +34,20 @@ describe("generateAiWordPair", () => {
   it("checks the rate limiter before ever calling the Anthropic API", async () => {
     assertNotRateLimited.mockRejectedValueOnce(new Error("slow down"));
 
-    await expect(generateAiWordPair(undefined, "NORMAL", "1.2.3.4", undefined)).rejects.toThrow("slow down");
+    await expect(generateAiWordPair(undefined, "NORMAL", "1.2.3.4")).rejects.toThrow("slow down");
     expect(parse).not.toHaveBeenCalled();
   });
 
   it("passes the sourceIp through to the rate limiter", async () => {
     parse.mockResolvedValueOnce(parsedOutput());
-    await generateAiWordPair(undefined, "NORMAL", "9.9.9.9", undefined);
+    await generateAiWordPair(undefined, "NORMAL", "9.9.9.9");
     expect(assertNotRateLimited).toHaveBeenCalledWith("9.9.9.9");
   });
 
   it("returns a good first-attempt result as-is", async () => {
     parse.mockResolvedValueOnce(parsedOutput());
 
-    const result = await generateAiWordPair(undefined, "NORMAL", undefined, undefined);
+    const result = await generateAiWordPair(undefined, "NORMAL", undefined);
 
     expect(result).toEqual({ category: "Coffee drinks", civilian: "Latte", imposter: "Espresso" });
     expect(parse).toHaveBeenCalledTimes(1);
@@ -56,7 +56,7 @@ describe("generateAiWordPair", () => {
   it("trims whitespace from the returned civilian/imposter words", async () => {
     parse.mockResolvedValueOnce(parsedOutput({ civilian: "  Latte  ", imposter: " Espresso " }));
 
-    const result = await generateAiWordPair(undefined, "NORMAL", undefined, undefined);
+    const result = await generateAiWordPair(undefined, "NORMAL", undefined);
 
     expect(result.civilian).toBe("Latte");
     expect(result.imposter).toBe("Espresso");
@@ -66,7 +66,7 @@ describe("generateAiWordPair", () => {
     parse.mockResolvedValueOnce({ parsed_output: null });
     parse.mockResolvedValueOnce(parsedOutput());
 
-    const result = await generateAiWordPair(undefined, "NORMAL", undefined, undefined);
+    const result = await generateAiWordPair(undefined, "NORMAL", undefined);
 
     expect(parse).toHaveBeenCalledTimes(2);
     expect(result.civilian).toBe("Latte");
@@ -76,7 +76,7 @@ describe("generateAiWordPair", () => {
     parse.mockResolvedValueOnce(parsedOutput({ civilian: "Latte", imposter: "latte" }));
     parse.mockResolvedValueOnce(parsedOutput());
 
-    const result = await generateAiWordPair(undefined, "NORMAL", undefined, undefined);
+    const result = await generateAiWordPair(undefined, "NORMAL", undefined);
 
     expect(parse).toHaveBeenCalledTimes(2);
     expect(result).toEqual({ category: "Coffee drinks", civilian: "Latte", imposter: "Espresso" });
@@ -85,7 +85,7 @@ describe("generateAiWordPair", () => {
   it("falls back to a built-in word pair if every attempt is degenerate (identical words)", async () => {
     parse.mockResolvedValue(parsedOutput({ civilian: "Latte", imposter: "latte" }));
 
-    const result = await generateAiWordPair(undefined, "HARD", undefined, undefined);
+    const result = await generateAiWordPair(undefined, "HARD", undefined);
 
     expect(parse).toHaveBeenCalledTimes(3); // MAX_ATTEMPTS
 
@@ -97,7 +97,7 @@ describe("generateAiWordPair", () => {
   it("falls back to a built-in word pair if every attempt returns an unusable response", async () => {
     parse.mockResolvedValue({ parsed_output: null });
 
-    const result = await generateAiWordPair(undefined, "NORMAL", undefined, undefined);
+    const result = await generateAiWordPair(undefined, "NORMAL", undefined);
 
     expect(parse).toHaveBeenCalledTimes(3);
 
@@ -109,7 +109,7 @@ describe("generateAiWordPair", () => {
     parse.mockResolvedValueOnce(parsedOutput({ civilian: "Pizza" })); // echoes theme "Pizza"
     parse.mockResolvedValueOnce(parsedOutput({ civilian: "Margherita", imposter: "Pepperoni" }));
 
-    const result = await generateAiWordPair("Pizza", "NORMAL", undefined, undefined);
+    const result = await generateAiWordPair("Pizza", "NORMAL", undefined);
 
     expect(result).toEqual({ category: "Coffee drinks", civilian: "Margherita", imposter: "Pepperoni" });
     expect(parse).toHaveBeenCalledTimes(2);
@@ -118,7 +118,7 @@ describe("generateAiWordPair", () => {
   it("falls back to the best theme-echoing result if every attempt echoes the theme", async () => {
     parse.mockResolvedValue(parsedOutput({ civilian: "Pizza" }));
 
-    const result = await generateAiWordPair("Pizza", "NORMAL", undefined, undefined);
+    const result = await generateAiWordPair("Pizza", "NORMAL", undefined);
 
     expect(parse).toHaveBeenCalledTimes(3);
     expect(result).toEqual({ category: "Coffee drinks", civilian: "Pizza", imposter: "Espresso" });
@@ -129,7 +129,7 @@ describe("generateAiWordPair", () => {
 
     const longTheme = "x".repeat(100);
 
-    await generateAiWordPair(longTheme, "NORMAL", undefined, undefined);
+    await generateAiWordPair(longTheme, "NORMAL", undefined);
 
     const request = parse.mock.calls[0][0] as { messages: { content: string }[] };
     const userMessage = request.messages[0].content;
@@ -140,7 +140,7 @@ describe("generateAiWordPair", () => {
   it("uses a generic prompt when no theme is given", async () => {
     parse.mockResolvedValueOnce(parsedOutput());
 
-    await generateAiWordPair(undefined, "NORMAL", undefined, undefined);
+    await generateAiWordPair(undefined, "NORMAL", undefined);
 
     const request = parse.mock.calls[0][0] as { messages: { content: string }[] };
     expect(request.messages[0].content).toBe("Invent a new civilian/imposter word pair.");

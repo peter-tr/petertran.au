@@ -142,10 +142,10 @@ describe("createDesignStudioResolvers", () => {
     const resolvers = createDesignStudioResolvers(store, generate);
 
     const args = { prompt: "a bold sale poster", width: 900, height: 600 };
-    const context = { sourceIp: "1.2.3.4", xraySegment: undefined };
+    const context = { sourceIp: "1.2.3.4" };
     const result = await resolvers.Mutation.generateDesignElements({}, args, context);
 
-    expect(generate).toHaveBeenCalledWith("a bold sale poster", 900, 600, undefined, "1.2.3.4", undefined);
+    expect(generate).toHaveBeenCalledWith("a bold sale poster", 900, 600, undefined, "1.2.3.4");
     expect(result).toBe(generated);
   });
 
@@ -157,9 +157,9 @@ describe("createDesignStudioResolvers", () => {
 
     const currentElements = [makeTemplate().elements[0]];
     const args = { prompt: "make it bigger", width: 900, height: 600, currentElements };
-    const context = { sourceIp: "1.2.3.4", xraySegment: undefined };
+    const context = { sourceIp: "1.2.3.4" };
     await resolvers.Mutation.generateDesignElements({}, args, context);
 
-    expect(generate).toHaveBeenCalledWith("make it bigger", 900, 600, currentElements, "1.2.3.4", undefined);
+    expect(generate).toHaveBeenCalledWith("make it bigger", 900, 600, currentElements, "1.2.3.4");
   });
 });

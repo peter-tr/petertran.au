@@ -8,10 +8,6 @@ const assertAiNotRateLimited = vi.fn<(ip: string | undefined) => Promise<void>>(
 vi.mock("api-shared/anthropic-client", () => ({
   getAnthropicClient: () => getAnthropicClient(),
 }));
-vi.mock("api-shared/xray", () => ({
-  traced: (_name: string, fn: () => unknown) => fn(),
-  ANTHROPIC_API_SEGMENT_NAME: "Anthropic API",
-}));
 vi.mock("../util/ai-rate-limit", () => ({
   assertAiNotRateLimited: (ip: string | undefined) => assertAiNotRateLimited(ip),
 }));
@@ -39,7 +35,7 @@ function rawElement(overrides: Record<string, unknown> = {}) {
 
 describe("generateDesignElements", () => {
   it("rejects an empty prompt without calling Anthropic", async () => {
-    await expect(generateDesignElements("  ", 900, 600, undefined, "1.2.3.4", undefined)).rejects.toThrow(
+    await expect(generateDesignElements("  ", 900, 600, undefined, "1.2.3.4")).rejects.toThrow(
       "A prompt is required."
     );
     expect(getAnthropicClient).not.toHaveBeenCalled();
@@ -50,9 +46,9 @@ describe("generateDesignElements", () => {
       new Error("Too many requests - please wait a moment and try again.")
     );
 
-    await expect(
-      generateDesignElements("a poster", 900, 600, undefined, "1.2.3.4", undefined)
-    ).rejects.toThrow("Too many requests");
+    await expect(generateDesignElements("a poster", 900, 600, undefined, "1.2.3.4")).rejects.toThrow(
+      "Too many requests"
+    );
     expect(getAnthropicClient).not.toHaveBeenCalled();
   });
 
@@ -61,7 +57,7 @@ describe("generateDesignElements", () => {
       parsed_output: { elements: [rawElement({ x: 10 }), rawElement({ type: "TEXT", text: "Hi" })] },
     });
 
-    const result = await generateDesignElements("a poster", 900, 600, undefined, "1.2.3.4", undefined);
+    const result = await generateDesignElements("a poster", 900, 600, undefined, "1.2.3.4");
 
     expect(result).toHaveLength(2);
     expect(result[0].zIndex).toBe(0);
@@ -76,7 +72,7 @@ describe("generateDesignElements", () => {
       },
     });
 
-    const [el] = await generateDesignElements("a poster", 900, 600, undefined, "1.2.3.4", undefined);
+    const [el] = await generateDesignElements("a poster", 900, 600, undefined, "1.2.3.4");
 
     expect(el.x).toBeGreaterThanOrEqual(0);
     expect(el.y).toBeGreaterThanOrEqual(0);
@@ -89,7 +85,7 @@ describe("generateDesignElements", () => {
       parsed_output: { elements: [rawElement({ type: "ELLIPSE" })] },
     });
 
-    const [el] = await generateDesignElements("a poster", 900, 600, undefined, "1.2.3.4", undefined);
+    const [el] = await generateDesignElements("a poster", 900, 600, undefined, "1.2.3.4");
 
     expect(el.text).toBeUndefined();
     expect(el.fontFamily).toBeUndefined();
@@ -102,7 +98,7 @@ describe("generateDesignElements", () => {
       parsed_output: { elements: [rawElement({ type: "TEXT", text: "Hi", fontSize: 0 })] },
     });
 
-    const [el] = await generateDesignElements("a poster", 900, 600, undefined, "1.2.3.4", undefined);
+    const [el] = await generateDesignElements("a poster", 900, 600, undefined, "1.2.3.4");
 
     expect(el.text).toBe("Hi");
     expect(el.fontFamily).toBe("IBM Plex Sans");
@@ -113,9 +109,9 @@ describe("generateDesignElements", () => {
   it("throws when Claude returns no elements", async () => {
     messagesParse.mockResolvedValueOnce({ parsed_output: { elements: [] } });
 
-    await expect(
-      generateDesignElements("a poster", 900, 600, undefined, "1.2.3.4", undefined)
-    ).rejects.toThrow("didn't return a usable design");
+    await expect(generateDesignElements("a poster", 900, 600, undefined, "1.2.3.4")).rejects.toThrow(
+      "didn't return a usable design"
+    );
   });
 
   it("caps the number of returned elements", async () => {
@@ -123,7 +119,7 @@ describe("generateDesignElements", () => {
       parsed_output: { elements: Array.from({ length: 20 }, () => rawElement()) },
     });
 
-    const result = await generateDesignElements("a poster", 900, 600, undefined, "1.2.3.4", undefined);
+    const result = await generateDesignElements("a poster", 900, 600, undefined, "1.2.3.4");
 
     expect(result.length).toBeLessThanOrEqual(12);
   });
@@ -149,7 +145,7 @@ describe("generateDesignElements", () => {
       },
     ];
 
-    await generateDesignElements("make it bigger", 900, 600, currentElements, "1.2.3.4", undefined);
+    await generateDesignElements("make it bigger", 900, 600, currentElements, "1.2.3.4");
 
     const call = messagesParse.mock.calls.at(-1)![0];
     expect(call.system).toContain("follow-up refinement");
@@ -162,7 +158,7 @@ describe("generateDesignElements", () => {
       parsed_output: { elements: [rawElement()] },
     });
 
-    await generateDesignElements("a poster", 900, 600, [], "1.2.3.4", undefined);
+    await generateDesignElements("a poster", 900, 600, [], "1.2.3.4");
 
     const call = messagesParse.mock.calls.at(-1)![0];
     expect(call.system).not.toContain("follow-up refinement");
