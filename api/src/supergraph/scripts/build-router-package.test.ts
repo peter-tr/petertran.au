@@ -81,6 +81,18 @@ describe("buildRouterYaml", () => {
     expect(yaml).toContain("scheduled_delay: 1ms");
   });
 
+  it("names the trace service instead of leaving it as OTel's unknown_service fallback", () => {
+    // Without a service name, OTel defaults to "unknown_service:<binary
+    // name>" - confirmed literally appearing as "unknown_service:router" in
+    // ADOT collector logs before this. Sets both service_name and
+    // resource["service.name"] since a real-Lambda spike couldn't
+    // conclusively confirm which one the awsxrayexporter reads - X-Ray's
+    // batch-get-traces never returned Router's own OTel-originated segment
+    // to check directly. Cosmetic and confirmed low-risk either way.
+    expect(yaml).toContain('service_name: "supergraph"');
+    expect(yaml).toContain('service.name: "supergraph"');
+  });
+
   it("enables introspection for the dashboard's GraphiQL/schema tooling", () => {
     expect(yaml).toContain("introspection: true");
   });
