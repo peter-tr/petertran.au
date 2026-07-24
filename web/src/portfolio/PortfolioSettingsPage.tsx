@@ -11,6 +11,7 @@ const WARM_SCHEDULE_LABELS: Record<WarmScheduleKey, string> = {
   pantry: "pantry",
   imposter: "imposter",
   supergraph: "supergraph (GraphQL gateway in front of the three above)",
+  designStudio: "design-studio",
   zeroTrustLab: "zero-trust-lab (no real visitors - only speeds up your own testing of it)",
 };
 

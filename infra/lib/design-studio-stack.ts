@@ -74,8 +74,7 @@ export class DesignStudioStack extends Stack {
     this.designStudioFn = designStudioFn;
 
     // Qualifier ApiGatewayStack targets and ProvisionedConcurrencyStack
-    // would apply PC to (not wired up yet - see the project plan for why
-    // warming is deliberately skipped for this project's first pass).
+    // applies PC to.
     new lambda.Alias(this, "LiveAlias", {
       aliasName: LIVE_ALIAS_NAME,
       version: designStudioFn.currentVersion,
