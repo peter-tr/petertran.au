@@ -125,14 +125,13 @@ export class PantryStack extends Stack {
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "handler.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/src/pantry/dist")),
-      // 256, not 512 - measured peak memory used has been a stable 175MB
-      // across a full week/400+ invocations (never a rare spike a shorter
-      // window would've missed), so 256 still leaves ~46% headroom.
-      // Cold-start CPU (which scales with memory) no longer has to carry
-      // the whole latency story on its own now that ProvisionedConcurrencyStack
-      // keeps the `live` alias warm 8am-7pm Sydney for real visitors - see
-      // that stack's doc comment.
-      memorySize: 256,
+      // 1024, up from 256 (2026-07-24) - same reasoning as the portfolio
+      // GraphQL Lambda's identical comment (site-stack.ts): a cold trace
+      // outside the ProvisionedConcurrencyStack warm window showed Lambda
+      // Init (module load + Apollo Server schema build, invisible on the
+      // X-Ray waterfall since it runs before the tracer attaches) was the
+      // dominant cost, and that phase's CPU scales with memory.
+      memorySize: 1024,
       // Generous - "recipes" mode (esp. an open "what can I make?" request
       // returning several full recipes) has been observed taking 6-8s warm,
       // and a cold start (Secrets Manager fetch + Anthropic client init) on
