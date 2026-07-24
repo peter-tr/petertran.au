@@ -1,5 +1,5 @@
 ---
-"api": patch
+"design-studio": patch
 "web": patch
 ---
 
