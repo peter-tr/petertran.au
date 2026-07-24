@@ -1,5 +1,22 @@
 # pantry
 
+## 1.5.0
+
+### Minor Changes
+
+- 0d1e57a: add multi-user support to pantry: sign in via a new Cognito Hosted UI pool to get a private inventory/shopping list/settings, scoped by `pk`. Anyone not signed in keeps using the existing shared/default pantry unchanged.
+
+### Patch Changes
+
+- 6a16cb9: temporary deploy-timing probe for PC reconcile verification
+- 38dfeb2: migrate imposter/design-studio/pantry/portfolio off aws-xray-sdk-core to ADOT auto-instrumentation
+- 8e2dce8: cut portfolio-graphql cold path latency
+- 168cd47: remove pantry PC-reconcile deploy-timing probe
+- 4303308: pin internal api-shared dependency by wildcard ("*") instead of an exact version, avoiding an intermittent npm ci resolution conflict against an unrelated public package of the same name
+- 30e3720: reduce cold-start latency: lazy-load AI/AWS-SDK-heavy resolver paths, bundle AWS SDK v3 instead of externalizing it
+- Updated dependencies [0d1e57a]
+  - api-shared@1.2.0
+
 ## 1.4.1
 
 ### Patch Changes

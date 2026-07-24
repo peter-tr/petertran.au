@@ -1,5 +1,11 @@
 # api-shared
 
+## 1.2.0
+
+### Minor Changes
+
+- 0d1e57a: add multi-user support to pantry: sign in via a new Cognito Hosted UI pool to get a private inventory/shopping list/settings, scoped by `pk`. Anyone not signed in keeps using the existing shared/default pantry unchanged.
+
 ## 1.1.3
 
 ### Patch Changes
