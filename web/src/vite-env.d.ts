@@ -5,7 +5,6 @@ interface ImportMetaEnv {
   readonly VITE_IMPOSTER_GRAPHQL_ENDPOINT?: string;
   readonly VITE_WARM_SCHEDULE_ENDPOINT?: string;
   readonly VITE_PANTRY_GRAPHQL_ENDPOINT?: string;
-  readonly VITE_PANTRY_COGNITO_DOMAIN?: string;
   readonly VITE_PANTRY_COGNITO_CLIENT_ID?: string;
   readonly VITE_RUM_APP_MONITOR_ID?: string;
   readonly VITE_RUM_IDENTITY_POOL_ID?: string;

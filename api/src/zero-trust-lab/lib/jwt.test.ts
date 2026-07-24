@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, beforeAll } from "vitest";
 import { mockClient } from "aws-sdk-client-mock";
 import { KMSClient, SignCommand, GetPublicKeyCommand } from "@aws-sdk/client-kms";
 import { generateKeyPairSync } from "crypto";
@@ -71,9 +71,18 @@ describe("signJwt", () => {
 });
 
 describe("getJwks", () => {
-  it("converts a KMS DER-encoded SPKI public key into a JWK with the given kid", async () => {
+  // RSA keypair generation is real, CPU-bound work (unlike the mocked KMS
+  // call) - generating it once per test file instead of once per test
+  // avoids doubling that cost and flaking past vitest's 5s default timeout
+  // under a loaded/throttled CI runner (seen in practice on GitHub Actions).
+  let der: Buffer;
+
+  beforeAll(() => {
     const { publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
-    const der = publicKey.export({ format: "der", type: "spki" });
+    der = publicKey.export({ format: "der", type: "spki" });
+  });
+
+  it("converts a KMS DER-encoded SPKI public key into a JWK with the given kid", async () => {
     kmsMock.on(GetPublicKeyCommand).resolves({ PublicKey: der });
 
     const jwks = await getJwks("key-id", "kid-1");
@@ -89,8 +98,6 @@ describe("getJwks", () => {
   });
 
   it("passes the given KMS key id through to GetPublicKeyCommand", async () => {
-    const { publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
-    const der = publicKey.export({ format: "der", type: "spki" });
     kmsMock.on(GetPublicKeyCommand).resolves({ PublicKey: der });
 
     await getJwks("my-key-id", "kid-1");

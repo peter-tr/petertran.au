@@ -58,3 +58,10 @@ writeFileSync(
 );
 
 console.log(`[compose-supergraph] wrote ${outFile}`);
+
+// Raw SDL text (no JS wrapper) for tooling that wants a plain .graphql file,
+// e.g. Apollo Router's --supergraph flag - see api/src/supergraph/spike/.
+// Nothing in the build depends on this yet.
+const sdlOutFile = join(dirname(fileURLToPath(import.meta.url)), "..", "supergraph.generated.graphql");
+writeFileSync(sdlOutFile, result.supergraphSdl);
+console.log(`[compose-supergraph] wrote ${sdlOutFile}`);

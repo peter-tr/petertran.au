@@ -8,9 +8,10 @@ import type { Context } from "../../context";
 // IntrospectionQuery is standard tooling bookkeeping, not real usage --
 // GraphiQL fires it automatically on every page load to build its
 // autocomplete/docs, regardless of anything the visitor actually does.
-// TraceBreakdown is the dashboard looking at its own trace data -- tracking
-// it would mean every expanded row adds another row to expand.
-const IGNORED_OPERATIONS = new Set(["IntrospectionQuery", "TraceBreakdown"]);
+// TraceBreakdown and SystemStats are the dashboard looking at its own data --
+// tracking either would mean every dashboard load (and its poll interval)
+// inflates its own visitor/request counts.
+const IGNORED_OPERATIONS = new Set(["IntrospectionQuery", "TraceBreakdown", "SystemStats"]);
 
 function dayKey(date: Date): string {
   return date.toISOString().slice(0, 10);
