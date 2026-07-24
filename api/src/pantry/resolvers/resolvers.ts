@@ -1,8 +1,7 @@
 import { assertNotRateLimited } from "../lib/util/rate-limit";
 import { assertAiNotRateLimited } from "../lib/util/ai-rate-limit";
 import { normalizeItemName, normalizeUnit } from "../lib/util/normalize";
-import { parseCommand, type ParsedCommandResult } from "../lib/anthropic/parse-command";
-import { checkPrice } from "../lib/anthropic/check-prices";
+import type { ParsedCommandResult } from "../lib/anthropic/parse-command";
 import {
   getItem,
   getAllItems,
@@ -65,7 +64,11 @@ export const resolvers = {
       args: { input: string; history?: { role: string; content: string }[] },
       context: Context
     ): Promise<ParsedCommandResult> => {
-      const [inventory, shoppingList, settings] = await Promise.all([
+      // Dynamic import defers loading @anthropic-ai/sdk (via
+      // api-shared/anthropic-client) until a request actually needs it,
+      // instead of paying that module-eval cost on every cold start.
+      const [{ parseCommand }, inventory, shoppingList, settings] = await Promise.all([
+        import("../lib/anthropic/parse-command"),
         getAllItems(context.pantryPk),
         getShoppingList(context.pantryPk),
         getSettings(context.pantryPk),
@@ -287,6 +290,7 @@ export const resolvers = {
           `No ${args.list === "inventory" ? "inventory item" : "shopping list entry"} found with id "${args.id}".`
         );
 
+      const { checkPrice } = await import("../lib/anthropic/check-prices");
       const result = await checkPrice(name);
       const price: LastKnownPrice = { ...result, checkedAt: new Date().toISOString() };
       if (args.list === "inventory") {
