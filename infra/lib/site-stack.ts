@@ -158,14 +158,17 @@ export class SiteStack extends Stack {
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "handler.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/src/portfolio/dist")),
-      // 256, not 512 - measured peak memory used has been a stable 186MB
-      // across a full week/500+ invocations (never a rare spike a shorter
-      // window would've missed), so 256 still leaves ~27% headroom.
-      // Cold-start CPU (which scales with memory) no longer has to carry
-      // the whole latency story on its own now that ProvisionedConcurrencyStack
-      // keeps the `live` alias warm 8am-7pm Sydney for real visitors - see
-      // that stack's doc comment.
-      memorySize: 256,
+      // 1024, up from 256 (2026-07-24) - a cold trace outside the
+      // ProvisionedConcurrencyStack warm window (8am-7pm Sydney) showed the
+      // supergraph gateway's fan-out fetch to this Lambda dominated by an
+      // ~3.8s gap between API Gateway's invoke and this function's own
+      // traced segment starting - Lambda's Init phase (module load + Apollo
+      // Server schema build), which happens before X-Ray/OTel can attach so
+      // it's invisible on the trace waterfall. That phase's CPU scales with
+      // memory the same as everything else, so more memory directly cuts
+      // cold-start latency outside the PC window - not a peak-RSS headroom
+      // question the way the old 256 comment was.
+      memorySize: 1024,
       // 30s (not the default 15s): a backstop, not the primary safeguard,
       // for the all-time cost fields' worst case - CostRefreshFunction below
       // now refreshes both caches daily, so a real request only pays for

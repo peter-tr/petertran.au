@@ -45,7 +45,13 @@ export class SupergraphStack extends Stack {
       architecture: lambda.Architecture.X86_64,
       handler: "bootstrap",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/src/supergraph/dist")),
-      memorySize: 256,
+      // 1024, up from 256 (2026-07-24) - a cold trace outside the
+      // ProvisionedConcurrencyStack warm window showed this Lambda's own
+      // ~767ms Apollo Router "Init" span (apollo-router's embedded Rust
+      // telemetry, not Lambda's own cold-start phase) plus the surrounding
+      // module-load cost, both of which scale with memory the same as
+      // everything else.
+      memorySize: 1024,
       // Generous - even with the supergraph SDL composed at build time (see
       // scripts/compose-supergraph.ts), every request still fans out to all
       // 3 subgraphs over HTTPS, any of which may itself be a cold Lambda.

@@ -56,7 +56,13 @@ export class DesignStudioStack extends Stack {
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "handler.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/src/design-studio/dist")),
-      memorySize: 256,
+      // 1024, up from 256 (2026-07-24) - same reasoning as the portfolio/
+      // pantry/imposter/supergraph Lambdas (see site-stack.ts): cold-start
+      // CPU (module load + Apollo Server schema build, plus this Lambda's
+      // own MongoDB connection setup below) scales with memory, and none of
+      // that phase is visible on the X-Ray waterfall since it runs before
+      // Application Signals' tracer attaches.
+      memorySize: 1024,
       // Generous relative to the DynamoDB-backed projects' 15-30s - a cold
       // start here also pays for establishing a fresh MongoDB connection
       // (TLS handshake + auth) on top of the Secrets Manager fetch.
