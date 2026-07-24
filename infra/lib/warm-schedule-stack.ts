@@ -278,7 +278,18 @@ export class ProvisionedConcurrencyStack extends Stack {
 
     // Backstop only - self-heals a missed on/off trigger (e.g. a transient
     // Lambda error) within at most 30 min. Doesn't drive the window's
-    // precision, the exact per-project triggers above do that.
+    // precision, the exact per-project triggers above do that. It's also the
+    // only thing that used to catch a deploy publishing a new Lambda version:
+    // PutProvisionedConcurrencyConfig resolves `Qualifier: live` to a
+    // specific version *at call time*, so PC stays pinned to whatever version
+    // was live when it was last granted - a deploy that publishes a new
+    // version and moves the `live` alias forward leaves PC allocated to the
+    // now-stale version until this tick catches up, and every request to the
+    // new version cold-starts in the meantime (root-caused via an X-Ray trace
+    // showing a pantry-graphql cold start ~2.5h into a deploy's stale-PC
+    // window, well inside its configured warm hours - see build-and-deploy.yml's
+    // "Reconcile provisioned concurrency" step, which now closes this
+    // instead of waiting on this backstop).
     new Schedule(this, "WarmScheduleReconcile", {
       schedule: ScheduleExpression.rate(Duration.minutes(30)),
       target: new LambdaInvoke(warmScheduleFn, {
@@ -288,5 +299,26 @@ export class ProvisionedConcurrencyStack extends Stack {
         "Backstop reconcile of scheduled Provisioned Concurrency for " +
         "portfolio/pantry/imposter/supergraph/zero-trust-lab",
     });
+
+    // Lets build-and-deploy.yml invoke this function directly with
+    // {reconcile: true} right after `cdk deploy` publishes new versions,
+    // instead of leaving new versions' PC stale until the next scheduled
+    // tick above. The role is created outside CDK (see
+    // build-and-deploy.yml's aws-actions/configure-aws-credentials step), so
+    // this is imported with mutable: false - this stack must not touch that
+    // role's own policy. addGrantsToResources: true is required alongside
+    // it: without it, an immutable imported role makes grantInvoke() a
+    // silent no-op (it reports success without attaching a policy anywhere)
+    // rather than falling back to a resource policy on warmScheduleFn -
+    // confirmed by synthesizing this stack and finding no
+    // AWS::Lambda::Permission was actually produced without this flag.
+    warmScheduleFn.grantInvoke(
+      iam.Role.fromRoleArn(
+        this,
+        "GithubActionsDeployRole",
+        `arn:aws:iam::${this.account}:role/petertran-au-github-actions-deploy`,
+        { mutable: false, addGrantsToResources: true }
+      )
+    );
   }
 }
