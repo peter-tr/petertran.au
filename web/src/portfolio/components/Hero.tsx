@@ -73,7 +73,8 @@ export default function Hero() {
       .catch(() => setErrored(true));
   }, []);
 
-  const showResponse = typingDone && (result !== null || errored);
+  const dataReady = result !== null || errored;
+  const showResponse = typingDone && dataReady;
   const displayName = result?.name ?? "Peter Tran";
   const displayRole = result?.role ?? "Backend Software Engineer";
   const displayCompany = result?.company ?? "Commonwealth Bank of Australia";
@@ -102,8 +103,8 @@ export default function Hero() {
         <div className="terminal-bar">
           <span>hero.graphql</span>
           <span className="terminal-status">
-            <span className={`dot ${showResponse && !errored ? "live" : ""}`} />
-            {errored ? "offline" : showResponse ? "live" : "connecting…"}
+            <span className={`dot ${dataReady && !errored ? "live" : ""}`} />
+            {errored ? "offline" : dataReady ? "live" : "connecting…"}
           </span>
         </div>
         <div className="terminal-body">

@@ -177,12 +177,11 @@ export class MongoDesignStore implements DesignStore {
     return docs.map(toTemplateRecord);
   }
 
-  async getTemplate(id: string): Promise<TemplateRecord | null> {
-    if (!ObjectId.isValid(id)) return null;
-
+  async saveTemplate(args: Omit<TemplateRecord, "id">): Promise<TemplateRecord> {
     const collection = await getTemplatesCollection();
-    const doc = await collection.findOne({ _id: new ObjectId(id) });
+    const doc: TemplateDocument = { _id: new ObjectId(), ...args };
+    await collection.insertOne(doc);
 
-    return doc ? toTemplateRecord(doc) : null;
+    return toTemplateRecord(doc);
   }
 }

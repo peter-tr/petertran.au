@@ -51,7 +51,7 @@ function makeStore(overrides: Partial<DesignStore> = {}): DesignStore {
     saveDesign: vi.fn(),
     deleteDesign: vi.fn().mockResolvedValue(true),
     listTemplates: vi.fn().mockResolvedValue([]),
-    getTemplate: vi.fn().mockResolvedValue(null),
+    saveTemplate: vi.fn(),
     ...overrides,
   };
 }
@@ -107,32 +107,59 @@ describe("createDesignStudioResolvers", () => {
     expect(result).toEqual(templates);
   });
 
-  it("Mutation.useTemplate clones the template's elements with fresh ids into a new design", async () => {
-    const template = makeTemplate();
-    const saved = makeDesign({ id: "new-design", name: template.name });
-    const store = makeStore({
-      getTemplate: vi.fn().mockResolvedValue(template),
-      saveDesign: vi.fn().mockResolvedValue(saved),
-    });
+  it("Mutation.saveAsTemplate derives colors from the elements' fills and defaults popularity to 0", async () => {
+    const saved = makeTemplate({ id: "new-tpl" });
+    const store = makeStore({ saveTemplate: vi.fn().mockResolvedValue(saved) });
     const resolvers = createDesignStudioResolvers(store);
 
-    const result = await resolvers.Mutation.useTemplate({}, { templateId: "tpl-1" });
+    const input = {
+      name: "My template",
+      category: "Poster",
+      tags: ["fun"],
+      width: 900,
+      height: 600,
+      elements: [
+        { ...makeTemplate().elements[0], id: "a", fill: "#111111" },
+        { ...makeTemplate().elements[0], id: "b", fill: "#222222" },
+        { ...makeTemplate().elements[0], id: "c", fill: "#111111" },
+      ],
+    };
 
-    expect(store.getTemplate).toHaveBeenCalledWith("tpl-1");
+    const result = await resolvers.Mutation.saveAsTemplate({}, { input });
 
-    const [saveArgs] = vi.mocked(store.saveDesign).mock.calls[0];
-    expect(saveArgs.name).toBe(template.name);
-    expect(saveArgs.elements).toHaveLength(1);
-    expect(saveArgs.elements[0].id).not.toBe(template.elements[0].id);
-    expect(result.id).toBe("new-design");
+    expect(store.saveTemplate).toHaveBeenCalledWith({
+      ...input,
+      colors: ["#111111", "#222222"],
+      popularity: 0,
+    });
+    expect(result.id).toBe("new-tpl");
   });
 
-  it("Mutation.useTemplate throws when the template doesn't exist", async () => {
-    const store = makeStore({ getTemplate: vi.fn().mockResolvedValue(null) });
-    const resolvers = createDesignStudioResolvers(store);
+  it("Mutation.generateDesignElements delegates to the injected generate function with the request context", async () => {
+    const generated = [makeTemplate().elements[0]];
+    const generate = vi.fn().mockResolvedValue(generated);
+    const store = makeStore();
+    const resolvers = createDesignStudioResolvers(store, generate);
 
-    await expect(resolvers.Mutation.useTemplate({}, { templateId: "missing" })).rejects.toThrow(
-      "wasn't found"
-    );
+    const args = { prompt: "a bold sale poster", width: 900, height: 600 };
+    const context = { sourceIp: "1.2.3.4" };
+    const result = await resolvers.Mutation.generateDesignElements({}, args, context);
+
+    expect(generate).toHaveBeenCalledWith("a bold sale poster", 900, 600, undefined, "1.2.3.4");
+    expect(result).toBe(generated);
+  });
+
+  it("Mutation.generateDesignElements passes currentElements through as a refinement hint", async () => {
+    const generated = [makeTemplate().elements[0]];
+    const generate = vi.fn().mockResolvedValue(generated);
+    const store = makeStore();
+    const resolvers = createDesignStudioResolvers(store, generate);
+
+    const currentElements = [makeTemplate().elements[0]];
+    const args = { prompt: "make it bigger", width: 900, height: 600, currentElements };
+    const context = { sourceIp: "1.2.3.4" };
+    await resolvers.Mutation.generateDesignElements({}, args, context);
+
+    expect(generate).toHaveBeenCalledWith("make it bigger", 900, 600, currentElements, "1.2.3.4");
   });
 });

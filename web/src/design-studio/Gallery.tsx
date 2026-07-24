@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { listDesigns, deleteDesign, type Design } from "./api";
 import TemplatesSection from "./components/TemplatesSection";
+import { CANVAS_FORMATS } from "./lib/formats";
+import type { NewDesignLocationState } from "./Editor";
 import "./design-studio.css";
 
 export default function Gallery() {
@@ -25,9 +27,21 @@ export default function Gallery() {
     <div className="design-studio-gallery">
       <header className="design-studio-gallery-head">
         <h1>Design Studio</h1>
-        <Link to="/design-studio/new" className="design-studio-tool-btn">
-          New design
-        </Link>
+        <div className="design-studio-new-formats">
+          {CANVAS_FORMATS.map((format) => {
+            const state: NewDesignLocationState = {
+              seedName: `Untitled ${format.label.toLowerCase()}`,
+              seedWidth: format.width,
+              seedHeight: format.height,
+            };
+
+            return (
+              <Link key={format.id} to="/design-studio/new" state={state} className="design-studio-tool-btn">
+                New {format.label}
+              </Link>
+            );
+          })}
+        </div>
       </header>
 
       {error && <p className="status-line">// {error}</p>}

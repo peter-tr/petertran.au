@@ -6,12 +6,12 @@ vi.mock("api-shared/operation-metrics", () => ({
   emitOperationCountMetric: vi.fn(),
 }));
 
-vi.mock("aws-xray-sdk-core", () => ({
-  getSegment: vi.fn(),
+vi.mock("@opentelemetry/api", () => ({
+  trace: { getActiveSpan: vi.fn() },
 }));
 
 import { emitOperationCountMetric } from "api-shared/operation-metrics";
-import * as AWSXRay from "aws-xray-sdk-core";
+import { trace } from "@opentelemetry/api";
 import { operationStatsPlugin } from "./operation-stats-plugin";
 
 const ddbMock = mockClient(DynamoDBDocumentClient);
@@ -45,7 +45,7 @@ describe("operationStatsPlugin", () => {
     ddbMock.reset();
     ddbMock.on(UpdateCommand).resolves({});
     vi.mocked(emitOperationCountMetric).mockReset();
-    vi.mocked(AWSXRay.getSegment).mockReset();
+    vi.mocked(trace.getActiveSpan).mockReset();
     delete process.env.AWS_LAMBDA_FUNCTION_NAME;
   });
 
@@ -90,7 +90,7 @@ describe("operationStatsPlugin", () => {
     ).resolves.toBeUndefined();
   });
 
-  it.each(["IntrospectionQuery", "TraceBreakdown"])(
+  it.each(["IntrospectionQuery", "TraceBreakdown", "SystemStats"])(
     "does not emit a metric or record operation stats for the ignored operation %s",
     async (operationName) => {
       await fireWillSendResponse({ operationName, operationType: "query" });
@@ -164,14 +164,14 @@ describe("operationStatsPlugin", () => {
     expect(emitOperationCountMetric).toHaveBeenCalledWith("portfolio", "Anonymous", "query");
   });
 
-  it("does not call getSegment (and records no trace ID) outside of Lambda", async () => {
+  it("does not call getActiveSpan (and records no trace ID) outside of Lambda", async () => {
     await fireWillSendResponse({
       operationName: "Resume",
       operationType: "query",
       query: "query Resume { x }",
     });
 
-    expect(AWSXRay.getSegment).not.toHaveBeenCalled();
+    expect(trace.getActiveSpan).not.toHaveBeenCalled();
 
     const opCall = ddbMock
       .commandCalls(UpdateCommand)
@@ -179,9 +179,11 @@ describe("operationStatsPlugin", () => {
     expect(opCall!.args[0].input.UpdateExpression).not.toContain("lastTraceId");
   });
 
-  it("records the trace ID from a root segment when running in Lambda", async () => {
+  it("converts OTel's raw trace id to classic X-Ray format when running in Lambda", async () => {
     process.env.AWS_LAMBDA_FUNCTION_NAME = "portfolio-fn";
-    vi.mocked(AWSXRay.getSegment).mockReturnValue({ trace_id: "root-trace-id" } as never);
+    vi.mocked(trace.getActiveSpan).mockReturnValue({
+      spanContext: () => ({ traceId: "6a6312b90e9169d8191de6d06d11bbf3" }),
+    } as never);
 
     await fireWillSendResponse({
       operationName: "Resume",
@@ -192,12 +194,14 @@ describe("operationStatsPlugin", () => {
     const opCall = ddbMock
       .commandCalls(UpdateCommand)
       .find((c) => (c.args[0].input.Key as { sk: string }).sk.startsWith("OP#Resume#"));
-    expect(opCall!.args[0].input.ExpressionAttributeValues?.[":lastTraceId"]).toBe("root-trace-id");
+    expect(opCall!.args[0].input.ExpressionAttributeValues?.[":lastTraceId"]).toBe(
+      "1-6a6312b9-0e9169d8191de6d06d11bbf3"
+    );
   });
 
-  it("hops up via .segment.trace_id when getSegment returns a subsegment", async () => {
+  it("records no trace ID when there is no active span", async () => {
     process.env.AWS_LAMBDA_FUNCTION_NAME = "portfolio-fn";
-    vi.mocked(AWSXRay.getSegment).mockReturnValue({ segment: { trace_id: "sub-trace-id" } } as never);
+    vi.mocked(trace.getActiveSpan).mockReturnValue(undefined);
 
     await fireWillSendResponse({
       operationName: "Resume",
@@ -208,6 +212,6 @@ describe("operationStatsPlugin", () => {
     const opCall = ddbMock
       .commandCalls(UpdateCommand)
       .find((c) => (c.args[0].input.Key as { sk: string }).sk.startsWith("OP#Resume#"));
-    expect(opCall!.args[0].input.ExpressionAttributeValues?.[":lastTraceId"]).toBe("sub-trace-id");
+    expect(opCall!.args[0].input.UpdateExpression).not.toContain("lastTraceId");
   });
 });

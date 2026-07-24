@@ -58,9 +58,8 @@ const pantryStack = new PantryStack(app, "PetertranPantryStack", {
 // Mock Canva-style design editor - own Lambda, backed by MongoDB Atlas
 // (provisioned outside CDK) rather than a DynamoDB table, deliberately -
 // see infra/lib/design-studio-stack.ts's doc comment. Not part of the
-// on-demand test env or ProvisionedConcurrencyStack's warm schedule yet -
-// both are optional additions for later, not needed for this project's
-// first deploy.
+// on-demand test env yet - an optional addition for later, not needed for
+// this project's first deploy.
 const designStudioStack = new DesignStudioStack(app, "PetertranDesignStudioStack", {
   env: { account, region: "ap-southeast-2" },
 });
@@ -85,11 +84,12 @@ const zeroTrustLabFnNames = {
 };
 
 // Scheduled Provisioned Concurrency for portfolio/pantry/imposter/
-// supergraph's and zero-trust-lab's `live` aliases, per-project configurable
-// days/times (Sydney) - deliberately its own stack, an operational/cost
-// concern that cuts across all of them. Safe to deploy in any order relative
-// to the producing stacks (its own IAM policy referencing those aliases
-// doesn't require them to already exist). See infra/lib/warm-schedule-stack.ts.
+// supergraph/design-studio's and zero-trust-lab's `live` aliases, per-project
+// configurable days/times (Sydney) - deliberately its own stack, an
+// operational/cost concern that cuts across all of them. Safe to deploy in
+// any order relative to the producing stacks (its own IAM policy referencing
+// those aliases doesn't require them to already exist). See
+// infra/lib/warm-schedule-stack.ts.
 const provisionedConcurrencyStack = new ProvisionedConcurrencyStack(
   app,
   "PetertranProvisionedConcurrencyStack",
@@ -98,6 +98,7 @@ const provisionedConcurrencyStack = new ProvisionedConcurrencyStack(
     pantryFnName: FUNCTION_NAMES.pantry,
     imposterFnName: FUNCTION_NAMES.imposter,
     supergraphFnName: FUNCTION_NAMES.supergraph,
+    designStudioFnName: FUNCTION_NAMES.designStudio,
     zeroTrustLabFnNames,
     env: { account, region: "ap-southeast-2" },
   }

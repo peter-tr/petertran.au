@@ -40,6 +40,22 @@ describe("ApiGatewayStack", () => {
     template.hasResourceProperties("AWS::ApiGateway::Stage", {
       TracingEnabled: true,
     });
+    // Without "authorization" here, the browser's CORS preflight blocks
+    // pantry's signed-in requests before they ever reach a Lambda - see
+    // web/src/pantry/lib/auth.ts.
+    template.hasResourceProperties("AWS::ApiGateway::Method", {
+      HttpMethod: "OPTIONS",
+      Integration: {
+        IntegrationResponses: [
+          {
+            ResponseParameters: {
+              "method.response.header.Access-Control-Allow-Headers":
+                "'content-type,apollo-require-preflight,x-amzn-trace-id,authorization'",
+            },
+          },
+        ],
+      },
+    });
     // Asserts the cross-stack singleton collision (this stack + its
     // on-demand test-env twin, same account/region) never has a chance to
     // reappear - see the stack's cloudWatchRole comment.

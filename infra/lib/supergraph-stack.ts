@@ -32,18 +32,63 @@ export class SupergraphStack extends Stack {
 
     const gatewayFn = new lambda.Function(this, "SupergraphGatewayFunction", {
       functionName: props.functionName,
-      runtime: lambda.Runtime.NODEJS_20_X,
-      handler: "handler.handler",
+      // Apollo Router (Rust), not the Node @apollo/gateway this replaced -
+      // deployed as a provided.al2023 custom runtime via AWS's own Lambda
+      // Web Adapter, following their official rust-axum-zip example exactly
+      // (Handler: bootstrap, this same layer ARN). Verified directly against
+      // a real Lambda before this change: GLIBC 2.29 required vs. AL2023's
+      // 2.34, and real cold-start Init Duration of ~380-436ms vs. the Node
+      // gateway's ~1160-1245ms. See scripts/build-router-package.ts for how
+      // dist/ (bootstrap + router binary + router.yaml + composed SDL) gets
+      // assembled.
+      runtime: lambda.Runtime.PROVIDED_AL2023,
+      architecture: lambda.Architecture.X86_64,
+      handler: "bootstrap",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/src/supergraph/dist")),
-      memorySize: 256,
+      // 1024, up from 256 (2026-07-24) - a cold trace outside the
+      // ProvisionedConcurrencyStack warm window showed this Lambda's own
+      // ~767ms Apollo Router "Init" span (apollo-router's embedded Rust
+      // telemetry, not Lambda's own cold-start phase) plus the surrounding
+      // module-load cost, both of which scale with memory the same as
+      // everything else.
+      memorySize: 1024,
       // Generous - even with the supergraph SDL composed at build time (see
       // scripts/compose-supergraph.ts), every request still fans out to all
       // 3 subgraphs over HTTPS, any of which may itself be a cold Lambda.
       timeout: Duration.seconds(30),
       environment: {
+        // router.yaml's override_subgraph_url entries read this via
+        // Router's `${env.API_BASE_URL}` config templating.
         API_BASE_URL: props.apiBaseUrl,
+        AWS_LWA_PORT: "8080",
       },
       tracing: lambda.Tracing.ACTIVE,
+      layers: [
+        // AWS's own published Lambda Web Adapter layer - proxies the
+        // Lambda Runtime API to an HTTP request against Router listening on
+        // AWS_LWA_PORT, translating the response back into the standard
+        // Lambda-proxy shape ApiGatewayStack's LambdaIntegration expects.
+        lambda.LayerVersion.fromLayerVersionArn(
+          this,
+          "LambdaAdapterLayer",
+          `arn:aws:lambda:${this.region}:753240598075:layer:LambdaAdapterLayerX86:28`
+        ),
+        // provided.al2023 gets zero automatic X-Ray instrumentation - unlike
+        // Node/Python, that's baked into each AWS-managed language runtime's
+        // own wrapper, not a platform-universal Lambda feature (tracing:
+        // ACTIVE above only grants the IAM permissions to write to X-Ray, it
+        // doesn't make anything call it). This AWS-published ADOT collector
+        // layer runs as a Lambda extension, receives the OTLP traces Router
+        // exports (see build-router-package.ts's telemetry config) over
+        // localhost, and forwards them to X-Ray - verified directly against
+        // a real Lambda: the resulting trace connected this function's own
+        // segments with the subgraph Lambda's, not just an isolated span.
+        lambda.LayerVersion.fromLayerVersionArn(
+          this,
+          "AdotCollectorLayer",
+          `arn:aws:lambda:${this.region}:901920570463:layer:aws-otel-collector-amd64-ver-0-117-0:1`
+        ),
+      ],
     });
     this.gatewayFn = gatewayFn;
 

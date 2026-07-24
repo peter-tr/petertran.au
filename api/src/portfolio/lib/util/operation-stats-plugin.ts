@@ -1,6 +1,6 @@
 import type { ApolloServerPlugin } from "@apollo/server";
 import { UpdateCommand } from "@aws-sdk/lib-dynamodb";
-import * as AWSXRay from "aws-xray-sdk-core";
+import { trace } from "@opentelemetry/api";
 import { emitOperationCountMetric } from "api-shared/operation-metrics";
 import { ddb, TABLE_NAME } from "../aws/ddb";
 import type { Context } from "../../context";
@@ -8,9 +8,10 @@ import type { Context } from "../../context";
 // IntrospectionQuery is standard tooling bookkeeping, not real usage --
 // GraphiQL fires it automatically on every page load to build its
 // autocomplete/docs, regardless of anything the visitor actually does.
-// TraceBreakdown is the dashboard looking at its own trace data -- tracking
-// it would mean every expanded row adds another row to expand.
-const IGNORED_OPERATIONS = new Set(["IntrospectionQuery", "TraceBreakdown"]);
+// TraceBreakdown and SystemStats are the dashboard looking at its own data --
+// tracking either would mean every dashboard load (and its poll interval)
+// inflates its own visitor/request counts.
+const IGNORED_OPERATIONS = new Set(["IntrospectionQuery", "TraceBreakdown", "SystemStats"]);
 
 function dayKey(date: Date): string {
   return date.toISOString().slice(0, 10);
@@ -129,17 +130,18 @@ export const operationStatsPlugin: ApolloServerPlugin<Context> = {
           const sample = isMutation
             ? null
             : { query: requestContext.request.query ?? "", variables: requestContext.request.variables };
-          // getSegment() logs a noisy "context missing" error if called outside
-          // an active X-Ray context (e.g. local dev has no daemon/segment at
-          // all), so only call it in Lambda. It can return either the root
-          // Segment or a Subsegment depending on call context -- only the root
-          // carries trace_id, so a Subsegment needs one hop up via `.segment`.
-          const current = process.env.AWS_LAMBDA_FUNCTION_NAME ? AWSXRay.getSegment() : undefined;
-          const traceId = current
-            ? "segment" in current
-              ? current.segment.trace_id
-              : current.trace_id
-            : null;
+          // The ADOT layer's own instrumentation-aws-lambda span is active for
+          // the whole invocation, so this is available outside Lambda-only
+          // guards too - but OTel's raw trace id is a bare 32-hex-char string
+          // with no dashes, while getTraceBreakdown()'s BatchGetTraces call
+          // (and the classic X-Ray console) expect the classic
+          // "1-<8 hex>-<24 hex>" format - confirmed by hand-converting ids
+          // this same way against real deployed traces. Only meaningful in
+          // Lambda (no active span in local dev), same guard as before.
+          const rawTraceId = process.env.AWS_LAMBDA_FUNCTION_NAME
+            ? trace.getActiveSpan()?.spanContext().traceId
+            : undefined;
+          const traceId = rawTraceId ? `1-${rawTraceId.slice(0, 8)}-${rawTraceId.slice(8)}` : null;
 
           tasks.push(recordOperation(name, Date.now() - start, sample, traceId).catch(() => {}));
         }

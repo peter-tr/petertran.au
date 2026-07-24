@@ -8,6 +8,7 @@ import { warmUp } from "../shared/warmUp";
 import { PANTRY_ENDPOINT } from "../pantry/api";
 import { IMPOSTER_ENDPOINT } from "../games/imposter/lib/api";
 import { usePageLoadWarmup } from "./hooks/usePageLoadWarmup";
+import { useStaggerHomeFetches, STAGGER_DELAY_MS } from "./hooks/useStaggerHomeFetches";
 import "./portfolio.css";
 
 // Lazy-loaded on its own, separate from the rest of Home - GraphiQL pulls in
@@ -17,6 +18,8 @@ const Explorer = lazy(() => import("./components/Explorer"));
 
 export default function Home() {
   const { pageLoadWarmup } = usePageLoadWarmup();
+  const { staggerHomeFetches } = useStaggerHomeFetches();
+  const staggerDelayMs = staggerHomeFetches ? STAGGER_DELAY_MS : 0;
 
   // Most visitors land here first, then click through to /pantry or the
   // imposter game - warm those two Lambdas in the background so they're
@@ -37,8 +40,8 @@ export default function Home() {
         <Explorer />
       </Suspense>
       <ContactSection />
-      <SystemStatsSection />
-      <Footer />
+      <SystemStatsSection staggerDelayMs={staggerDelayMs} />
+      <Footer staggerDelayMs={staggerDelayMs} />
     </>
   );
 }

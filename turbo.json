@@ -32,13 +32,7 @@
       "outputs": ["src/**/*.generated.ts"]
     },
     "supergraph#codegen": {
-      "inputs": [
-        "$TURBO_DEFAULT$",
-        "../../portfolio/schema.graphql",
-        "../../pantry/schema.graphql",
-        "../../games/imposter/schema.graphql",
-        "../../design-studio/schema.graphql"
-      ],
+      "cache": false,
       "outputs": ["supergraph.generated.ts"]
     },
     "typecheck": {
@@ -47,6 +41,11 @@
     },
     "build": {
       "dependsOn": ["codegen"],
+      "outputs": ["dist/**"]
+    },
+    "supergraph#build": {
+      "dependsOn": ["codegen"],
+      "cache": false,
       "outputs": ["dist/**"]
     },
     "test": {

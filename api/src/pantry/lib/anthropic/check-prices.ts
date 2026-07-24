@@ -1,9 +1,7 @@
 import { getAnthropicClient } from "api-shared/anthropic-client";
-import { traced, ANTHROPIC_API_SEGMENT_NAME } from "api-shared/xray";
 import { getAllItems, setLastKnownPrice, type LastKnownPrice } from "../../services/inventory";
 import { getShoppingList, setShoppingListLastKnownPrice } from "../../services/shopping-list";
 import { startPriceSync, recordPriceCheckProgress, finishPriceSync } from "../../services/price-sync-status";
-import type { Context } from "../../context";
 import { buildDebugInfo, type AiCallDebugInfo } from "./debug-info";
 
 // Hard cap on tracked items processed per run - a safety net against cost
@@ -71,8 +69,7 @@ const BATCH_PRICE_CHECK_SCHEMA = {
 // scale with batch size so a bigger tracked list doesn't silently starve
 // itself of search/fetch calls or get cut off mid-response.
 async function checkPricesBatch(
-  names: string[],
-  xraySegment: Context["xraySegment"]
+  names: string[]
 ): Promise<{ results: Map<string, BatchPriceResult>; debugInfo: AiCallDebugInfo }> {
   const client = await getAnthropicClient();
   const startedAt = Date.now();
@@ -89,29 +86,24 @@ async function checkPricesBatch(
   const timeoutMs = Math.min(30_000 + names.length * 15_000, 300_000);
   const maxTokens = Math.min(400 + names.length * 200, 4096);
 
-  const response = await traced(
-    ANTHROPIC_API_SEGMENT_NAME,
-    () =>
-      client.messages.parse(
+  const response = await client.messages.parse(
+    {
+      model: "claude-haiku-4-5",
+      max_tokens: maxTokens,
+      system: BATCH_SYSTEM_PROMPT,
+      tools: [
+        { type: "web_search_20250305", name: "web_search", max_uses: toolBudget },
+        { type: "web_fetch_20250910", name: "web_fetch", max_uses: toolBudget },
+      ],
+      messages: [
         {
-          model: "claude-haiku-4-5",
-          max_tokens: maxTokens,
-          system: BATCH_SYSTEM_PROMPT,
-          tools: [
-            { type: "web_search_20250305", name: "web_search", max_uses: toolBudget },
-            { type: "web_fetch_20250910", name: "web_fetch", max_uses: toolBudget },
-          ],
-          messages: [
-            {
-              role: "user",
-              content: `Look up the current Coles price for each of these items:\n${names.map((n) => `- ${n}`).join("\n")}`,
-            },
-          ],
-          output_config: { format: { type: "json_schema", schema: BATCH_PRICE_CHECK_SCHEMA } },
+          role: "user",
+          content: `Look up the current Coles price for each of these items:\n${names.map((n) => `- ${n}`).join("\n")}`,
         },
-        { timeout: timeoutMs }
-      ),
-    xraySegment
+      ],
+      output_config: { format: { type: "json_schema", schema: BATCH_PRICE_CHECK_SCHEMA } },
+    },
+    { timeout: timeoutMs }
   );
 
   const debugInfo = buildDebugInfo(response.usage, Date.now() - startedAt);
@@ -142,11 +134,8 @@ export interface CheckPriceResult {
 // checked interactively. Deliberately just a batch of one rather than a
 // separate prompt/schema to maintain - same rules, same verification-via-
 // fetch behavior, one prompt to keep in sync instead of two.
-export async function checkPrice(
-  itemName: string,
-  xraySegment: Context["xraySegment"]
-): Promise<CheckPriceResult> {
-  const { results, debugInfo } = await checkPricesBatch([itemName], xraySegment);
+export async function checkPrice(itemName: string): Promise<CheckPriceResult> {
+  const { results, debugInfo } = await checkPricesBatch([itemName]);
   const entry = results.get(itemName);
 
   return {
@@ -173,8 +162,8 @@ interface TrackedTarget {
 // exhaustion incident) - a best-effort background refresh, not a data path
 // anything else depends on, so a failure just leaves lastKnownPrice stale
 // rather than anything user-visible breaking.
-export async function checkTrackedPrices(xraySegment: Context["xraySegment"]): Promise<void> {
-  const [items, shoppingList] = await Promise.all([getAllItems(), getShoppingList()]);
+export async function checkTrackedPrices(pk: string): Promise<void> {
+  const [items, shoppingList] = await Promise.all([getAllItems(pk), getShoppingList(pk)]);
 
   const targets: TrackedTarget[] = [
     ...items
@@ -183,7 +172,7 @@ export async function checkTrackedPrices(xraySegment: Context["xraySegment"]): P
         id: i.id,
         list: "inventory",
         name: i.name,
-        apply: (price) => setLastKnownPrice(i.id, price),
+        apply: (price) => setLastKnownPrice(pk, i.id, price),
       })),
     ...shoppingList
       .filter((e) => e.trackPrice)
@@ -191,25 +180,22 @@ export async function checkTrackedPrices(xraySegment: Context["xraySegment"]): P
         id: e.id,
         list: "shoppingList",
         name: e.name,
-        apply: (price) => setShoppingListLastKnownPrice(e.id, price),
+        apply: (price) => setShoppingListLastKnownPrice(pk, e.id, price),
       })),
   ].slice(0, MAX_ITEMS_PER_RUN);
 
   if (targets.length === 0) {
-    console.log("No trackPrice items - skipping price check.");
+    console.log(`No trackPrice items for pk="${pk}" - skipping price check.`);
 
     return;
   }
 
-  await startPriceSync(targets.length);
+  await startPriceSync(pk, targets.length);
 
   let batch: { results: Map<string, BatchPriceResult>; debugInfo: AiCallDebugInfo } | null = null;
   let batchError: string | null = null;
   try {
-    batch = await checkPricesBatch(
-      targets.map((t) => t.name),
-      xraySegment
-    );
+    batch = await checkPricesBatch(targets.map((t) => t.name));
   } catch (err) {
     batchError = err instanceof Error ? err.message : "Unknown error";
     console.error("Batch price check failed entirely:", err);
@@ -232,7 +218,7 @@ export async function checkTrackedPrices(xraySegment: Context["xraySegment"]): P
 
   for (const target of targets) {
     if (batchError) {
-      await recordPriceCheckProgress({
+      await recordPriceCheckProgress(pk, {
         itemName: target.name,
         message: batchError,
         occurredAt: new Date().toISOString(),
@@ -244,7 +230,7 @@ export async function checkTrackedPrices(xraySegment: Context["xraySegment"]): P
     if (!entry) {
       const message = "No result returned for this item in the batch response.";
       console.error(`Price check missing for "${target.name}"`);
-      await recordPriceCheckProgress({
+      await recordPriceCheckProgress(pk, {
         itemName: target.name,
         message,
         occurredAt: new Date().toISOString(),
@@ -264,10 +250,10 @@ export async function checkTrackedPrices(xraySegment: Context["xraySegment"]): P
       console.log(
         `Checked "${target.name}": Coles $${price.colesPrice ?? "?"}${price.note ? ` (${price.note})` : ""}`
       );
-      await recordPriceCheckProgress();
+      await recordPriceCheckProgress(pk);
     } catch (err) {
       console.error(`Failed to save price for "${target.name}":`, err);
-      await recordPriceCheckProgress({
+      await recordPriceCheckProgress(pk, {
         itemName: target.name,
         message: err instanceof Error ? err.message : "Unknown error",
         occurredAt: new Date().toISOString(),
@@ -275,5 +261,5 @@ export async function checkTrackedPrices(xraySegment: Context["xraySegment"]): P
     }
   }
 
-  await finishPriceSync();
+  await finishPriceSync(pk);
 }

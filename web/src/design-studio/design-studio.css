@@ -58,6 +58,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.6rem;
   max-width: 46rem;
   margin: 0 auto 1.2rem;
 }
@@ -67,6 +69,12 @@
   font-weight: 600;
   font-size: 1.4rem;
   margin: 0;
+}
+
+.design-studio-new-formats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
 .design-studio-gallery-grid {
@@ -241,6 +249,40 @@
   cursor: not-allowed;
 }
 
+.design-studio-template-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+  margin: 0 0 0.8rem;
+}
+
+.design-studio-template-form input {
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  color: var(--paper);
+  background: var(--panel-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 0.4rem 0.6rem;
+}
+
+.design-studio-template-form button {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--paper);
+  background: var(--panel-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 0.4rem 0.7rem;
+  cursor: pointer;
+}
+
+.design-studio-template-form button:disabled {
+  color: var(--muted-dim);
+  cursor: not-allowed;
+}
+
 .design-studio-workspace {
   display: flex;
   gap: 1rem;
@@ -291,7 +333,8 @@
   }
 
   .design-studio-layers,
-  .design-studio-properties {
+  .design-studio-properties,
+  .design-studio-ai-panel {
     flex: 1 1 12rem;
   }
 
@@ -302,7 +345,8 @@
 
 .design-studio-toolbar,
 .design-studio-layers,
-.design-studio-properties {
+.design-studio-properties,
+.design-studio-ai-panel {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -378,12 +422,99 @@
 }
 
 .design-studio-layers h2,
-.design-studio-properties h2 {
+.design-studio-properties h2,
+.design-studio-ai-panel h2 {
   font-family: var(--font-mono);
   font-size: 0.85rem;
   font-weight: 600;
   margin: 0 0 0.2rem;
   color: var(--muted);
+}
+
+.design-studio-ai-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.design-studio-ai-panel-header h2 {
+  margin: 0;
+}
+
+.design-studio-ai-panel-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.design-studio-ai-panel-actions button {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--paper);
+  background: var(--panel-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 0.3rem 0.6rem;
+  cursor: pointer;
+}
+
+/* Discard first (secondary/left), Accept last (primary/right) - the
+   conventional dialog button order, so the affirmative action lands where
+   users expect it. */
+.design-studio-ai-panel-actions button:last-child {
+  color: var(--type);
+  border-color: var(--type);
+}
+
+.design-studio-ai-panel-log {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-height: 12rem;
+  overflow-y: auto;
+}
+
+.design-studio-ai-panel-message {
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  color: var(--paper);
+  background: var(--panel-2);
+  border-radius: var(--radius);
+  padding: 0.4rem 0.6rem;
+  margin: 0;
+}
+
+.design-studio-ai-panel-input {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.design-studio-ai-panel-input input {
+  flex: 1;
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  color: var(--paper);
+  background: var(--panel-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 0.4rem 0.6rem;
+  min-width: 0;
+}
+
+.design-studio-ai-panel-input button {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--paper);
+  background: var(--panel-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 0.4rem 0.7rem;
+  cursor: pointer;
+}
+
+.design-studio-ai-panel-input button:disabled {
+  color: var(--muted-dim);
+  cursor: not-allowed;
 }
 
 .design-studio-empty {

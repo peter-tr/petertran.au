@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { listTemplates, applyTemplate, type Template } from "../api";
+import { listTemplates, type Template } from "../api";
+import type { NewDesignLocationState } from "../Editor";
 
 export default function TemplatesSection() {
   const navigate = useNavigate();
@@ -9,7 +10,6 @@ export default function TemplatesSection() {
   const [category, setCategory] = useState("");
   const [results, setResults] = useState<Template[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [creatingId, setCreatingId] = useState<string | null>(null);
 
   // Loaded once, unfiltered, purely to populate the category dropdown -
   // every actual search/filter combination still goes to the server below.
@@ -35,15 +35,18 @@ export default function TemplatesSection() {
     return () => clearTimeout(timeout);
   }, [search, category]);
 
-  async function handleUse(templateId: string) {
-    setCreatingId(templateId);
-    try {
-      const design = await applyTemplate(templateId);
-      navigate(`/design-studio/${design.id}`);
-    } catch {
-      setError("Couldn't create a design from that template - try again.");
-      setCreatingId(null);
-    }
+  // Just opens the template's elements into a fresh, unsaved editor session
+  // (same "new design" flow a blank canvas gets) - no server call, so
+  // nothing is actually persisted until the editor's own Save button is
+  // clicked.
+  function handleOpen(template: Template) {
+    const state: NewDesignLocationState = {
+      seedElements: template.elements,
+      seedName: template.name,
+      seedWidth: template.width,
+      seedHeight: template.height,
+    };
+    navigate("/design-studio/new", { state });
   }
 
   return (
@@ -84,12 +87,8 @@ export default function TemplatesSection() {
             </div>
             <span className="design-studio-template-name">{template.name}</span>
             <span className="design-studio-template-category">{template.category}</span>
-            <button
-              type="button"
-              disabled={creatingId === template.id}
-              onClick={() => handleUse(template.id)}
-            >
-              {creatingId === template.id ? "Creating…" : "Use template"}
+            <button type="button" onClick={() => handleOpen(template)}>
+              Use template
             </button>
           </li>
         ))}

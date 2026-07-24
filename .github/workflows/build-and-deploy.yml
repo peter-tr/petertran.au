@@ -177,6 +177,24 @@ jobs:
         working-directory: infra
         run: npx cdk deploy --app cdk.out ${{ inputs.stacks != '' && inputs.stacks || '--all' }} --concurrency 10 --require-approval never
 
+      # PutProvisionedConcurrencyConfig resolves the `live` alias to a
+      # specific version at call time and pins PC there - it does not follow
+      # the alias if it later moves. A deploy above just published a new
+      # version and moved `live` to it, so any warmed function's PC is now
+      # stranded on the version this deploy replaced: real traffic (routed to
+      # the new version) gets zero PC benefit and cold-starts, while the
+      # stranded PC unit keeps being billed against a version nothing is
+      # calling. Without this step that only self-heals on the next 30-min
+      # WarmScheduleReconcile tick (see warm-schedule-stack.ts) - root-caused
+      # via an X-Ray trace showing a pantry-graphql cold start ~2.5h into a
+      # deploy's stale-PC window. Skipped for the test env, which has no
+      # provisioned concurrency / warm-schedule stack of its own.
+      - name: Reconcile provisioned concurrency to newly deployed versions
+        if: ${{ !inputs.deploy-test-env }}
+        run: |
+          aws lambda invoke --function-name warm-schedule \
+            --payload '{"reconcile": true}' --cli-binary-format raw-in-base64-out /dev/null
+
       # Must run after "Deploy infrastructure", not chained into the build
       # step above - it fetches live data from VITE_GRAPHQL_ENDPOINT, and
       # whenever that endpoint's route is new (e.g. api.petertran.au/graphql

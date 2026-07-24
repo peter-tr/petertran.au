@@ -1,7 +1,7 @@
 import { mockClient } from "aws-sdk-client-mock";
 import { GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
 import { beforeEach, describe, expect, it } from "vitest";
-import { ddb, PK } from "../lib/aws/ddb";
+import { ddb } from "../lib/aws/ddb";
 import {
   getPriceSyncStatus,
   startPriceSync,
@@ -11,6 +11,7 @@ import {
 } from "./price-sync-status";
 
 const ddbMock = mockClient(ddb);
+const TEST_PK = "PANTRY";
 
 describe("getPriceSyncStatus", () => {
   beforeEach(() => {
@@ -20,7 +21,7 @@ describe("getPriceSyncStatus", () => {
   it("returns all defaults when nothing is stored", async () => {
     ddbMock.on(GetCommand).resolves({});
 
-    const status = await getPriceSyncStatus();
+    const status = await getPriceSyncStatus(TEST_PK);
 
     expect(status).toEqual({
       running: false,
@@ -35,10 +36,10 @@ describe("getPriceSyncStatus", () => {
   it("reads from the fixed PRICE_SYNC_STATUS sort key", async () => {
     ddbMock.on(GetCommand).resolves({});
 
-    await getPriceSyncStatus();
+    await getPriceSyncStatus(TEST_PK);
 
     const input = ddbMock.call(0).args[0].input as { Key: { pk: string; sk: string } };
-    expect(input.Key).toEqual({ pk: PK, sk: "PRICE_SYNC_STATUS" });
+    expect(input.Key).toEqual({ pk: TEST_PK, sk: "PRICE_SYNC_STATUS" });
   });
 
   // Same backfill-merge pattern as settings.ts (see CLAUDE.md) - a row
@@ -48,7 +49,7 @@ describe("getPriceSyncStatus", () => {
     const oldShapedRow: Partial<PriceSyncStatus> = { running: true, totalItems: 5 };
     ddbMock.on(GetCommand).resolves({ Item: { data: oldShapedRow } });
 
-    const status = await getPriceSyncStatus();
+    const status = await getPriceSyncStatus(TEST_PK);
 
     expect(status.running).toBe(true);
     expect(status.totalItems).toBe(5);
@@ -67,7 +68,7 @@ describe("startPriceSync", () => {
   it("writes a fresh running status with the given total and zeroed progress", async () => {
     ddbMock.on(PutCommand).resolves({});
 
-    await startPriceSync(7);
+    await startPriceSync(TEST_PK, 7);
 
     const input = ddbMock.call(0).args[0].input as { Item: { data: PriceSyncStatus } };
     expect(input.Item.data.running).toBe(true);
@@ -92,7 +93,7 @@ describe("recordPriceCheckProgress", () => {
     });
     ddbMock.on(PutCommand).resolves({});
 
-    await recordPriceCheckProgress();
+    await recordPriceCheckProgress(TEST_PK);
 
     const putInput = ddbMock.commandCalls(PutCommand)[0].args[0].input as unknown as {
       Item: { data: PriceSyncStatus };
@@ -109,7 +110,7 @@ describe("recordPriceCheckProgress", () => {
     });
     ddbMock.on(PutCommand).resolves({});
 
-    await recordPriceCheckProgress({
+    await recordPriceCheckProgress(TEST_PK, {
       itemName: "Milk",
       message: "boom",
       occurredAt: "2026-01-01T00:00:00.000Z",
@@ -144,7 +145,7 @@ describe("recordPriceCheckProgress", () => {
     });
     ddbMock.on(PutCommand).resolves({});
 
-    await recordPriceCheckProgress({ itemName: "New Item", message: "newest", occurredAt: "t-new" });
+    await recordPriceCheckProgress(TEST_PK, { itemName: "New Item", message: "newest", occurredAt: "t-new" });
 
     const putInput = ddbMock.commandCalls(PutCommand)[0].args[0].input as unknown as {
       Item: { data: PriceSyncStatus };
@@ -176,7 +177,7 @@ describe("finishPriceSync", () => {
     });
     ddbMock.on(PutCommand).resolves({});
 
-    await finishPriceSync();
+    await finishPriceSync(TEST_PK);
 
     const putInput = ddbMock.commandCalls(PutCommand)[0].args[0].input as unknown as {
       Item: { data: PriceSyncStatus };

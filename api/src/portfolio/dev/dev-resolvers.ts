@@ -71,7 +71,7 @@ export const devResolvers = {
   },
   Meta: {
     generateQuery: (_: unknown, args: { prompt: string }, context: Context) =>
-      generateQuery(args.prompt, context.sourceIp, context.runInternalQuery, context.xraySegment),
+      generateQuery(args.prompt, context.sourceIp, context.runInternalQuery),
     systemStats: () => ({
       requestsTotal: 128,
       avgDurationMs: 42.5,

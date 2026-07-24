@@ -4,18 +4,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PantrySettings } from "../../services/settings";
 import type { ShoppingListEntry } from "../../services/shopping-list";
 
-const getSettings = vi.fn<() => Promise<PantrySettings>>();
-const getShoppingList = vi.fn<() => Promise<ShoppingListEntry[]>>();
+const getSettings = vi.fn<(pk: string) => Promise<PantrySettings>>();
+const getShoppingList = vi.fn<(pk: string) => Promise<ShoppingListEntry[]>>();
 
 vi.mock("../../services/settings", () => ({
-  getSettings: () => getSettings(),
+  getSettings: (pk: string) => getSettings(pk),
 }));
 vi.mock("../../services/shopping-list", () => ({
-  getShoppingList: () => getShoppingList(),
+  getShoppingList: (pk: string) => getShoppingList(pk),
 }));
 
 // Imported after the mocks so the module under test picks them up.
 const { sendShoppingListDigest } = await import("./send-digest");
+
+const TEST_PK = "PANTRY";
 
 const sesMock = mockClient(SESv2Client);
 
@@ -98,7 +100,7 @@ describe("sendShoppingListDigest", () => {
   it("skips silently when CONTACT_FROM_EMAIL is not configured", async () => {
     delete process.env.CONTACT_FROM_EMAIL;
 
-    await sendShoppingListDigest();
+    await sendShoppingListDigest(TEST_PK);
 
     expect(sesMock.calls()).toHaveLength(0);
     expect(getSettings).not.toHaveBeenCalled();
@@ -107,7 +109,7 @@ describe("sendShoppingListDigest", () => {
   it("skips silently when CONTACT_TO_EMAIL is not configured", async () => {
     delete process.env.CONTACT_TO_EMAIL;
 
-    await sendShoppingListDigest();
+    await sendShoppingListDigest(TEST_PK);
 
     expect(sesMock.calls()).toHaveLength(0);
   });
@@ -115,7 +117,7 @@ describe("sendShoppingListDigest", () => {
   it("skips when digestEnabled is false, without checking the shopping list", async () => {
     getSettings.mockResolvedValue(baseSettings({ digestEnabled: false }));
 
-    await sendShoppingListDigest();
+    await sendShoppingListDigest(TEST_PK);
 
     expect(sesMock.calls()).toHaveLength(0);
     expect(getShoppingList).not.toHaveBeenCalled();
@@ -124,7 +126,7 @@ describe("sendShoppingListDigest", () => {
   it("skips when the current Sydney hour doesn't match the configured digestHour", async () => {
     getSettings.mockResolvedValue(baseSettings({ digestHour: (MATCHING_HOUR + 1) % 24 }));
 
-    await sendShoppingListDigest();
+    await sendShoppingListDigest(TEST_PK);
 
     expect(sesMock.calls()).toHaveLength(0);
     expect(getShoppingList).not.toHaveBeenCalled();
@@ -134,7 +136,7 @@ describe("sendShoppingListDigest", () => {
     getSettings.mockResolvedValue(baseSettings());
     getShoppingList.mockResolvedValue([entry({ urgent: false })]);
 
-    await sendShoppingListDigest();
+    await sendShoppingListDigest(TEST_PK);
 
     expect(sesMock.calls()).toHaveLength(0);
   });
@@ -148,7 +150,7 @@ describe("sendShoppingListDigest", () => {
     ]);
     sesMock.on(SendEmailCommand).resolves({ MessageId: "msg-123" });
 
-    await sendShoppingListDigest();
+    await sendShoppingListDigest(TEST_PK);
 
     expect(sesMock.calls()).toHaveLength(1);
 
@@ -171,7 +173,7 @@ describe("sendShoppingListDigest", () => {
     getShoppingList.mockResolvedValue([entry({ urgent: true })]);
     sesMock.on(SendEmailCommand).resolves({ MessageId: "msg-1" });
 
-    await sendShoppingListDigest();
+    await sendShoppingListDigest(TEST_PK);
 
     const input = sesMock.call(0).args[0].input as { Content: { Simple: { Subject: { Data: string } } } };
     expect(input.Content.Simple.Subject.Data).toBe("Pantry: 1 urgent item to buy");
@@ -184,7 +186,7 @@ describe("sendShoppingListDigest", () => {
     ]);
     sesMock.on(SendEmailCommand).resolves({ MessageId: "msg-1" });
 
-    await sendShoppingListDigest();
+    await sendShoppingListDigest(TEST_PK);
 
     const input = sesMock.call(0).args[0].input as {
       Content: { Simple: { Body: { Html: { Data: string } } } };

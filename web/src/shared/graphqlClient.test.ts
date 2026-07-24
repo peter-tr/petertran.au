@@ -79,4 +79,32 @@ describe("createGraphQLClient", () => {
     await expect(runQuery("query Foo { foo }")).rejects.toThrow("bad input; also bad");
     expect(recordRumError).toHaveBeenCalledTimes(1);
   });
+
+  it("attaches the authorization header from getAuthHeader when signed in", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => ({ data: {} }) });
+
+    const runQuery = createGraphQLClient(
+      "https://api.test/graphql",
+      "VITE_SOME_ENDPOINT",
+      async () => "Bearer test-token"
+    );
+    await runQuery("{ foo }");
+
+    const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(init.headers).toMatchObject({ authorization: "Bearer test-token" });
+  });
+
+  it("omits the authorization header when getAuthHeader resolves to undefined", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => ({ data: {} }) });
+
+    const runQuery = createGraphQLClient(
+      "https://api.test/graphql",
+      "VITE_SOME_ENDPOINT",
+      async () => undefined
+    );
+    await runQuery("{ foo }");
+
+    const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(init.headers).not.toHaveProperty("authorization");
+  });
 });

@@ -4,10 +4,12 @@ import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as ses from "aws-cdk-lib/aws-ses";
+import * as cognito from "aws-cdk-lib/aws-cognito";
 import { Schedule, ScheduleExpression } from "aws-cdk-lib/aws-scheduler";
 import { LambdaInvoke } from "aws-cdk-lib/aws-scheduler-targets";
 import * as path from "path";
 import { FUNCTION_NAMES, LIVE_ALIAS_NAME } from "./shared/function-names";
+import { applyApplicationSignals } from "./shared/application-signals";
 
 export interface PantryStackProps extends StackProps {
   // Optional, defaults to prod's current values - only the on-demand test
@@ -62,6 +64,57 @@ export class PantryStack extends Stack {
       "petertran-au/anthropic-api-key"
     );
 
+    // Own pool, deliberately not reusing zero-trust-lab's - that one is a
+    // fully-isolated learning-exercise IdP with its own quirks (opaque
+    // token, KMS-signed short-lived JWT, plain-username sign-in). This is a
+    // normal real-user pool, but Hosted UI's authorization-code flow turned
+    // out to be a dead end for a pure client-side SPA: Cognito's
+    // /oauth2/token endpoint doesn't send CORS headers back to a browser
+    // fetch, so the in-app code-for-tokens exchange after the Hosted UI
+    // redirect always failed. Switched to calling Cognito's IdP API
+    // (InitiateAuth/SignUp) directly from an in-app form instead - that API
+    // does support CORS for a public client's unauthenticated actions - with
+    // an inline email/password form, no redirect round-trip. Deliberately
+    // frictionless (no email verification, no MFA, minimal password policy)
+    // per explicit ask - this is a personal app, not something that needs
+    // bank-grade signup friction.
+    const autoConfirmFn = new lambda.Function(this, "PantryAutoConfirmFunction", {
+      functionName: "pantry-auto-confirm",
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: "index.handler",
+      code: lambda.Code.fromInline(
+        "exports.handler = async (event) => { event.response.autoConfirmUser = true; event.response.autoVerifyEmail = true; return event; };"
+      ),
+      timeout: Duration.seconds(5),
+    });
+
+    const userPool = new cognito.UserPool(this, "PantryUserPool", {
+      userPoolName: "pantry-users",
+      selfSignUpEnabled: true,
+      signInAliases: { email: true },
+      // Cognito's floor is 6 - as close to "no restriction" as it allows.
+      passwordPolicy: {
+        minLength: 6,
+        requireLowercase: false,
+        requireUppercase: false,
+        requireDigits: false,
+        requireSymbols: false,
+      },
+      mfa: cognito.Mfa.OFF,
+      lambdaTriggers: { preSignUp: autoConfirmFn },
+      removalPolicy: props.isTestEnv ? RemovalPolicy.DESTROY : RemovalPolicy.RETAIN,
+    });
+
+    // Public client (no secret), USER_PASSWORD_AUTH so the app can call
+    // InitiateAuth directly with a plain username/password instead of
+    // Hosted UI's redirect.
+    const userPoolClient = userPool.addClient("PantryUserPoolClient", {
+      generateSecret: false,
+      authFlows: { userPassword: true },
+    });
+
+    new CfnOutput(this, "PantryCognitoClientId", { value: userPoolClient.userPoolClientId });
+
     const apiFn = new lambda.Function(this, "PantryGraphQLFunction", {
       // Explicit, so it reads clearly in the X-Ray trace map instead of
       // CloudFormation's auto-generated name. Also lets ApiGatewayStack/
@@ -72,14 +125,13 @@ export class PantryStack extends Stack {
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "handler.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/src/pantry/dist")),
-      // 256, not 512 - measured peak memory used has been a stable 175MB
-      // across a full week/400+ invocations (never a rare spike a shorter
-      // window would've missed), so 256 still leaves ~46% headroom.
-      // Cold-start CPU (which scales with memory) no longer has to carry
-      // the whole latency story on its own now that ProvisionedConcurrencyStack
-      // keeps the `live` alias warm 8am-7pm Sydney for real visitors - see
-      // that stack's doc comment.
-      memorySize: 256,
+      // 1024, up from 256 (2026-07-24) - same reasoning as the portfolio
+      // GraphQL Lambda's identical comment (site-stack.ts): a cold trace
+      // outside the ProvisionedConcurrencyStack warm window showed Lambda
+      // Init (module load + Apollo Server schema build, invisible on the
+      // X-Ray waterfall since it runs before the tracer attaches) was the
+      // dominant cost, and that phase's CPU scales with memory.
+      memorySize: 1024,
       // Generous - "recipes" mode (esp. an open "what can I make?" request
       // returning several full recipes) has been observed taking 6-8s warm,
       // and a cold start (Secrets Manager fetch + Anthropic client init) on
@@ -88,14 +140,15 @@ export class PantryStack extends Stack {
       environment: {
         TABLE_NAME: table.tableName,
         ANTHROPIC_SECRET_ARN: anthropicSecret.secretArn,
+        PANTRY_COGNITO_USER_POOL_ID: userPool.userPoolId,
+        PANTRY_COGNITO_CLIENT_ID: userPoolClient.userPoolClientId,
       },
-      // Traces every invocation to X-Ray, same as the portfolio GraphQL
-      // Lambda - needed for this Lambda's own DynamoDB/Anthropic subsegments
-      // regardless of ApiGatewayStack's own gateway-level tracing.
-      tracing: lambda.Tracing.ACTIVE,
+      // No lambda.Tracing.ACTIVE here - see applyApplicationSignals()'s doc
+      // comment for why.
     });
     table.grantReadWriteData(apiFn);
     anthropicSecret.grantRead(apiFn);
+    applyApplicationSignals(apiFn);
     this.apiFn = apiFn;
 
     // Qualifier ApiGatewayStack targets and ProvisionedConcurrencyStack
@@ -146,11 +199,11 @@ export class PantryStack extends Stack {
           CONTACT_FROM_EMAIL: "contact@petertran.au",
           CONTACT_TO_EMAIL: "peter2002tran@outlook.com",
         },
-        tracing: lambda.Tracing.ACTIVE,
       });
       table.grantReadData(digestFn);
       emailIdentity.grantSendEmail(digestFn);
       recipientIdentity.grantSendEmail(digestFn);
+      applyApplicationSignals(digestFn);
 
       // Fires every hour on the hour, Sydney-local - the actual send time is
       // a user-configurable app setting (PantrySettings.digestHour), not
@@ -183,10 +236,10 @@ export class PantryStack extends Stack {
           TABLE_NAME: table.tableName,
           ANTHROPIC_SECRET_ARN: anthropicSecret.secretArn,
         },
-        tracing: lambda.Tracing.ACTIVE,
       });
       table.grantReadWriteData(priceCheckFn);
       anthropicSecret.grantRead(priceCheckFn);
+      applyApplicationSignals(priceCheckFn);
 
       // No automatic schedule - lets the main GraphQL Lambda's syncPricesNow
       // mutation fire-and-forget invoke this one, purely on demand from the

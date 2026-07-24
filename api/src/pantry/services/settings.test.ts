@@ -1,10 +1,11 @@
 import { mockClient } from "aws-sdk-client-mock";
 import { GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
 import { beforeEach, describe, expect, it } from "vitest";
-import { ddb, PK } from "../lib/aws/ddb";
+import { ddb } from "../lib/aws/ddb";
 import { getSettings, putSettings, type PantrySettings } from "./settings";
 
 const ddbMock = mockClient(ddb);
+const TEST_PK = "PANTRY";
 
 describe("getSettings", () => {
   beforeEach(() => {
@@ -14,7 +15,7 @@ describe("getSettings", () => {
   it("returns all defaults when nothing is stored", async () => {
     ddbMock.on(GetCommand).resolves({});
 
-    const settings = await getSettings();
+    const settings = await getSettings(TEST_PK);
 
     expect(settings.view).toBe("location");
     expect(settings.digestEnabled).toBe(true);
@@ -27,10 +28,10 @@ describe("getSettings", () => {
   it("reads from the fixed SETTINGS sort key under the pantry partition key", async () => {
     ddbMock.on(GetCommand).resolves({});
 
-    await getSettings();
+    await getSettings(TEST_PK);
 
     const input = ddbMock.call(0).args[0].input as { Key: { pk: string; sk: string } };
-    expect(input.Key).toEqual({ pk: PK, sk: "SETTINGS" });
+    expect(input.Key).toEqual({ pk: TEST_PK, sk: "SETTINGS" });
   });
 
   // This is the exact class of production outage documented in CLAUDE.md:
@@ -48,9 +49,9 @@ describe("getSettings", () => {
       // nerdModeInventory/nerdModeShoppingList/nerdModeCommandBar, and
       // several others - simulating a row written before those existed.
     };
-    ddbMock.on(GetCommand).resolves({ Item: { pk: PK, sk: "SETTINGS", data: oldShapedRow } });
+    ddbMock.on(GetCommand).resolves({ Item: { pk: TEST_PK, sk: "SETTINGS", data: oldShapedRow } });
 
-    const settings = await getSettings();
+    const settings = await getSettings(TEST_PK);
 
     // Stored fields win...
     expect(settings.view).toBe("grid");
@@ -71,9 +72,9 @@ describe("getSettings", () => {
   });
 
   it("backfills even when the stored row is a bare empty object", async () => {
-    ddbMock.on(GetCommand).resolves({ Item: { pk: PK, sk: "SETTINGS", data: {} } });
+    ddbMock.on(GetCommand).resolves({ Item: { pk: TEST_PK, sk: "SETTINGS", data: {} } });
 
-    const settings = await getSettings();
+    const settings = await getSettings(TEST_PK);
 
     expect(settings.view).toBe("location");
     expect(settings.digestHour).toBe(16);
@@ -81,10 +82,14 @@ describe("getSettings", () => {
 
   it("lets an explicit false/0/null stored value override the default (merge is shallow, not per-field-truthy)", async () => {
     ddbMock.on(GetCommand).resolves({
-      Item: { pk: PK, sk: "SETTINGS", data: { digestEnabled: false, digestHour: 0, categoryFilter: null } },
+      Item: {
+        pk: TEST_PK,
+        sk: "SETTINGS",
+        data: { digestEnabled: false, digestHour: 0, categoryFilter: null },
+      },
     });
 
-    const settings = await getSettings();
+    const settings = await getSettings(TEST_PK);
 
     expect(settings.digestEnabled).toBe(false);
     expect(settings.digestHour).toBe(0);
@@ -126,14 +131,14 @@ describe("putSettings", () => {
       nerdModeCommandBar: false,
     };
 
-    await putSettings(settings);
+    await putSettings(TEST_PK, settings);
 
     expect(ddbMock.calls()).toHaveLength(1);
 
     const input = ddbMock.call(0).args[0].input as {
       Item: { pk: string; sk: string; type: string; data: PantrySettings };
     };
-    expect(input.Item.pk).toBe(PK);
+    expect(input.Item.pk).toBe(TEST_PK);
     expect(input.Item.sk).toBe("SETTINGS");
     expect(input.Item.type).toBe("SETTINGS");
     expect(input.Item.data).toEqual(settings);

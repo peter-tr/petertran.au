@@ -20,27 +20,32 @@ describe("triggerPriceSync", () => {
   it("throws when PRICE_CHECK_FUNCTION_NAME is not configured", async () => {
     delete process.env.PRICE_CHECK_FUNCTION_NAME;
 
-    await expect(triggerPriceSync()).rejects.toThrow("PRICE_CHECK_FUNCTION_NAME not configured.");
+    await expect(triggerPriceSync("PANTRY")).rejects.toThrow("PRICE_CHECK_FUNCTION_NAME not configured.");
     expect(lambdaMock.calls()).toHaveLength(0);
   });
 
-  it("fire-and-forget invokes the configured function with InvocationType Event", async () => {
+  it("fire-and-forget invokes the configured function with InvocationType Event and the pk payload", async () => {
     process.env.PRICE_CHECK_FUNCTION_NAME = "my-price-check-fn";
     lambdaMock.on(InvokeCommand).resolves({});
 
-    await triggerPriceSync();
+    await triggerPriceSync("USER#abc");
 
     expect(lambdaMock.calls()).toHaveLength(1);
 
-    const input = lambdaMock.call(0).args[0].input as { FunctionName: string; InvocationType: string };
+    const input = lambdaMock.call(0).args[0].input as {
+      FunctionName: string;
+      InvocationType: string;
+      Payload: string;
+    };
     expect(input.FunctionName).toBe("my-price-check-fn");
     expect(input.InvocationType).toBe("Event");
+    expect(JSON.parse(input.Payload)).toEqual({ pk: "USER#abc" });
   });
 
   it("propagates an error from the Lambda invoke", async () => {
     process.env.PRICE_CHECK_FUNCTION_NAME = "my-price-check-fn";
     lambdaMock.on(InvokeCommand).rejects(new Error("throttled"));
 
-    await expect(triggerPriceSync()).rejects.toThrow("throttled");
+    await expect(triggerPriceSync("PANTRY")).rejects.toThrow("throttled");
   });
 });

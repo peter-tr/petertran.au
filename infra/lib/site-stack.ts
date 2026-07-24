@@ -17,6 +17,7 @@ import { Schedule, ScheduleExpression } from "aws-cdk-lib/aws-scheduler";
 import { LambdaInvoke } from "aws-cdk-lib/aws-scheduler-targets";
 import * as path from "path";
 import { FUNCTION_NAMES, LIVE_ALIAS_NAME } from "./shared/function-names";
+import { applyApplicationSignals } from "./shared/application-signals";
 
 export interface SiteStackProps extends StackProps {
   domainName: string;
@@ -157,14 +158,17 @@ export class SiteStack extends Stack {
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "handler.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/src/portfolio/dist")),
-      // 256, not 512 - measured peak memory used has been a stable 186MB
-      // across a full week/500+ invocations (never a rare spike a shorter
-      // window would've missed), so 256 still leaves ~27% headroom.
-      // Cold-start CPU (which scales with memory) no longer has to carry
-      // the whole latency story on its own now that ProvisionedConcurrencyStack
-      // keeps the `live` alias warm 8am-7pm Sydney for real visitors - see
-      // that stack's doc comment.
-      memorySize: 256,
+      // 1024, up from 256 (2026-07-24) - a cold trace outside the
+      // ProvisionedConcurrencyStack warm window (8am-7pm Sydney) showed the
+      // supergraph gateway's fan-out fetch to this Lambda dominated by an
+      // ~3.8s gap between API Gateway's invoke and this function's own
+      // traced segment starting - Lambda's Init phase (module load + Apollo
+      // Server schema build), which happens before X-Ray/OTel can attach so
+      // it's invisible on the trace waterfall. That phase's CPU scales with
+      // memory the same as everything else, so more memory directly cuts
+      // cold-start latency outside the PC window - not a peak-RSS headroom
+      // question the way the old 256 comment was.
+      memorySize: 1024,
       // 30s (not the default 15s): a backstop, not the primary safeguard,
       // for the all-time cost fields' worst case - CostRefreshFunction below
       // now refreshes both caches daily, so a real request only pays for
@@ -180,15 +184,15 @@ export class SiteStack extends Stack {
         CONTACT_FROM_EMAIL: "contact@petertran.au",
         CONTACT_TO_EMAIL: "peter2002tran@outlook.com",
       },
-      // Traces every invocation to X-Ray -- lets the systemStats dashboard
-      // show a real Lambda/DynamoDB/Anthropic timing breakdown per operation.
-      tracing: lambda.Tracing.ACTIVE,
+      // No lambda.Tracing.ACTIVE here - see applyApplicationSignals()'s doc
+      // comment for why.
     });
     table.grantReadWriteData(apiFn);
     anthropicSecret.grantRead(apiFn);
     anthropicAdminSecret.grantRead(apiFn);
     emailIdentity.grantSendEmail(apiFn);
     recipientIdentity.grantSendEmail(apiFn);
+    applyApplicationSignals(apiFn);
 
     // Qualifier ApiGatewayStack targets and ProvisionedConcurrencyStack
     // applies PC to - see LIVE_ALIAS_NAME's doc comment.
@@ -199,9 +203,10 @@ export class SiteStack extends Stack {
     // CloudWatch metrics (for the systemStats query), X-Ray traces (for
     // traceBreakdown), and Cost Explorer (for awsCostUsd) have no
     // resource-level scoping -- "*" is required here regardless of which
-    // function is asking. `Tracing.ACTIVE` above already grants write access
-    // (PutTraceSegments); this adds the read APIs needed to query a trace
-    // back out.
+    // function is asking. applyApplicationSignals() above grants write
+    // access (via the CloudWatchLambdaApplicationSignalsExecutionRolePolicy
+    // managed policy); this adds the read APIs needed to query a trace back
+    // out for the traceBreakdown dashboard feature.
     apiFn.addToRolePolicy(
       new iam.PolicyStatement({
         actions: [
@@ -235,13 +240,13 @@ export class SiteStack extends Stack {
           TABLE_NAME: table.tableName,
           ANTHROPIC_ADMIN_SECRET_ARN: anthropicAdminSecret.secretArn,
         },
-        tracing: lambda.Tracing.ACTIVE,
       });
       table.grantReadWriteData(costRefreshFn);
       anthropicAdminSecret.grantRead(costRefreshFn);
       costRefreshFn.addToRolePolicy(
         new iam.PolicyStatement({ actions: ["ce:GetCostAndUsage"], resources: ["*"] })
       );
+      applyApplicationSignals(costRefreshFn);
 
       // Early morning Sydney, well outside business hours - if this ever
       // runs long, it shouldn't contend with real traffic for anything.

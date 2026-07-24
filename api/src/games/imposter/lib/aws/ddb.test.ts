@@ -17,10 +17,10 @@ describe("imposter's ddb client wiring", () => {
     vi.resetModules();
   });
 
-  it("configures the shared ddb client factory with this project's default table name and X-Ray tracing on", async () => {
+  it("configures the shared ddb client factory with this project's default table name, relying on the ADOT layer's auto-instrumentation rather than manual X-Ray wrapping", async () => {
     await import("./ddb");
 
-    expect(createDdbClient).toHaveBeenCalledWith({ defaultTableName: "petertran-au-imposter", xray: true });
+    expect(createDdbClient).toHaveBeenCalledWith({ defaultTableName: "petertran-au-imposter" });
   });
 
   it("re-exports whatever the shared factory returns", async () => {

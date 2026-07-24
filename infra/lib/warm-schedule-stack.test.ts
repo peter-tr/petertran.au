@@ -22,13 +22,14 @@ afterAll(() => {
 });
 
 describe("ProvisionedConcurrencyStack", () => {
-  it("synthesizes with the warm-schedule Lambda, its SSM parameter, and 10 on/off schedules plus the backstop reconcile", () => {
+  it("synthesizes with the warm-schedule Lambda, its SSM parameter, and 12 on/off schedules plus the backstop reconcile", () => {
     const app = new App();
     const stack = new ProvisionedConcurrencyStack(app, "TestProvisionedConcurrencyStack", {
       portfolioFnName: "portfolio-graphql",
       pantryFnName: "pantry-graphql",
       imposterFnName: "imposter-graphql",
       supergraphFnName: "supergraph-graphql",
+      designStudioFnName: "design-studio-graphql",
       zeroTrustLabFnNames: {
         idpBridge: "ztl-idp-bridge",
         internalSts: "ztl-internal-sts",
@@ -47,7 +48,7 @@ describe("ProvisionedConcurrencyStack", () => {
     });
     template.resourceCountIs("AWS::SSM::Parameter", 1);
     // 2 (on/off) per project (portfolio, pantry, imposter, supergraph,
-    // zeroTrustLab) plus the one backstop reconcile schedule.
-    template.resourceCountIs("AWS::Scheduler::Schedule", 11);
+    // designStudio, zeroTrustLab) plus the one backstop reconcile schedule.
+    template.resourceCountIs("AWS::Scheduler::Schedule", 13);
   });
 });

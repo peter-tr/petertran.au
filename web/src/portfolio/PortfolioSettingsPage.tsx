@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { useShowAlsoBuilt } from "./hooks/useShowAlsoBuilt";
 import { usePageLoadWarmup } from "./hooks/usePageLoadWarmup";
+import { useStaggerHomeFetches } from "./hooks/useStaggerHomeFetches";
 import { useWarmSchedule, type WarmScheduleKey } from "./hooks/useWarmSchedule";
 import { useAlertsEnabled } from "./hooks/useAlertsEnabled";
 import WarmScheduleProject from "./components/WarmScheduleProject";
@@ -11,12 +12,14 @@ const WARM_SCHEDULE_LABELS: Record<WarmScheduleKey, string> = {
   pantry: "pantry",
   imposter: "imposter",
   supergraph: "supergraph (GraphQL gateway in front of the three above)",
+  designStudio: "design-studio",
   zeroTrustLab: "zero-trust-lab (no real visitors - only speeds up your own testing of it)",
 };
 
 export default function PortfolioSettingsPage() {
   const { showAlsoBuilt, setShowAlsoBuilt } = useShowAlsoBuilt();
   const { pageLoadWarmup, setPageLoadWarmup } = usePageLoadWarmup();
+  const { staggerHomeFetches, setStaggerHomeFetches } = useStaggerHomeFetches();
   const {
     config: warmScheduleConfig,
     pendingFn: warmSchedulePendingFn,
@@ -60,6 +63,19 @@ export default function PortfolioSettingsPage() {
             onChange={(e) => setPageLoadWarmup(e.target.checked)}
           />{" "}
           Warm pantry/imposter on page load (tighter timing, only helps this browser)
+        </label>
+      </div>
+
+      <div className="form-row">
+        <label className="form-label" htmlFor="stagger-home-fetches">
+          <input
+            id="stagger-home-fetches"
+            type="checkbox"
+            checked={staggerHomeFetches}
+            onChange={(e) => setStaggerHomeFetches(e.target.checked)}
+          />{" "}
+          Delay footer/stats queries slightly on home page load so Hero&apos;s query wins the warm Lambda slot
+          (only helps this browser)
         </label>
       </div>
 

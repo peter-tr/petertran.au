@@ -32,7 +32,6 @@ function makeRepo() {
   return new WidgetRepository({
     ddb,
     tableName: "test-table",
-    pk: "PK1",
     skPrefix: "WIDGET#",
     itemType: "WIDGET",
   });
@@ -49,7 +48,7 @@ describe("DynamoRepository", () => {
 
       const repo = makeRepo();
 
-      await expect(repo.get("missing-id")).resolves.toBeNull();
+      await expect(repo.get("PK1", "missing-id")).resolves.toBeNull();
     });
 
     it("looks up by pk and the prefixed sort key", async () => {
@@ -57,7 +56,7 @@ describe("DynamoRepository", () => {
 
       const repo = makeRepo();
 
-      await repo.get("abc");
+      await repo.get("PK1", "abc");
 
       const input = ddbMock.call(0).args[0].input as { TableName: string; Key: { pk: string; sk: string } };
       expect(input.TableName).toBe("test-table");
@@ -69,7 +68,7 @@ describe("DynamoRepository", () => {
 
       const repo = makeRepo();
 
-      const result = await repo.get("abc");
+      const result = await repo.get("PK1", "abc");
 
       expect(result).toEqual({ id: "abc", name: "Thing", flag: false });
       expect(repo.applyDefaultsCallCount).toBe(1);
@@ -80,7 +79,7 @@ describe("DynamoRepository", () => {
 
       const repo = makeRepo();
 
-      await repo.get("missing");
+      await repo.get("PK1", "missing");
 
       expect(repo.applyDefaultsCallCount).toBe(0);
     });
@@ -92,7 +91,7 @@ describe("DynamoRepository", () => {
 
       const repo = makeRepo();
 
-      await repo.getAll();
+      await repo.getAll("PK1");
 
       const input = ddbMock.call(0).args[0].input as {
         TableName: string;
@@ -109,7 +108,7 @@ describe("DynamoRepository", () => {
 
       const repo = makeRepo();
 
-      await expect(repo.getAll()).resolves.toEqual([]);
+      await expect(repo.getAll("PK1")).resolves.toEqual([]);
     });
 
     it("applies defaults to every returned item", async () => {
@@ -119,7 +118,7 @@ describe("DynamoRepository", () => {
 
       const repo = makeRepo();
 
-      const result = await repo.getAll();
+      const result = await repo.getAll("PK1");
 
       expect(result).toEqual([
         { id: "1", name: "A", flag: false },
@@ -136,7 +135,7 @@ describe("DynamoRepository", () => {
       const repo = makeRepo();
       const item: Widget = { id: "xyz", name: "Gadget", flag: true };
 
-      await repo.put(item);
+      await repo.put("PK1", item);
 
       const input = ddbMock.call(0).args[0].input as {
         TableName: string;
@@ -153,7 +152,7 @@ describe("DynamoRepository", () => {
 
       const repo = makeRepo();
 
-      await expect(repo.delete("abc")).resolves.toBe(true);
+      await expect(repo.delete("PK1", "abc")).resolves.toBe(true);
     });
 
     it("returns false when nothing existed to delete", async () => {
@@ -161,7 +160,7 @@ describe("DynamoRepository", () => {
 
       const repo = makeRepo();
 
-      await expect(repo.delete("missing")).resolves.toBe(false);
+      await expect(repo.delete("PK1", "missing")).resolves.toBe(false);
     });
 
     it("requests ALL_OLD return values so it can tell whether anything was deleted", async () => {
@@ -169,7 +168,7 @@ describe("DynamoRepository", () => {
 
       const repo = makeRepo();
 
-      await repo.delete("abc");
+      await repo.delete("PK1", "abc");
 
       const input = ddbMock.call(0).args[0].input as {
         ReturnValues: string;

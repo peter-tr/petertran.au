@@ -4,6 +4,7 @@ import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as path from "path";
 import { FUNCTION_NAMES, LIVE_ALIAS_NAME } from "./shared/function-names";
+import { applyApplicationSignals } from "./shared/application-signals";
 
 export interface DesignStudioStackProps extends StackProps {
   // Optional, defaults to prod's current value - only the on-demand test
@@ -33,10 +34,29 @@ export class DesignStudioStack extends Stack {
     // itself isn't a CDK-managed resource) - `fromSecretNameV2` just
     // imports the existing secret by name, same pattern as pantry-stack.ts's
     // anthropicSecret.
+    //
+    // Passed to the Lambda below as a plain MONGO_URI env var (via
+    // `.secretValue`, a CloudFormation dynamic reference resolved at deploy
+    // time) rather than as MONGO_SECRET_ARN fetched at runtime - every cold
+    // start was previously paying a GetSecretValue round-trip before it
+    // could even attempt the Mongo connection. Trade-off: the plaintext URI
+    // now sits in this Lambda's environment config (readable by anyone with
+    // lambda:GetFunctionConfiguration, a broader surface than the scoped
+    // secretsmanager:GetSecretValue grant this replaced) and only refreshes
+    // on redeploy, not on secret rotation. Acceptable here - single-user
+    // account, Atlas credentials aren't rotated out-of-band.
     const mongoSecret = secretsmanager.Secret.fromSecretNameV2(
       this,
       "MongoConnectionString",
       "petertran-au/design-studio-mongo-uri"
+    );
+    // Same secret every other Anthropic-calling Lambda in this repo already
+    // reads (see pantry-stack.ts's anthropicSecret) - reused here for the
+    // AI design-generation mutation, not a project-specific key.
+    const anthropicSecret = secretsmanager.Secret.fromSecretNameV2(
+      this,
+      "AnthropicApiKey",
+      "petertran-au/anthropic-api-key"
     );
 
     const designStudioFn = new lambda.Function(this, "DesignStudioFunction", {
@@ -47,22 +67,30 @@ export class DesignStudioStack extends Stack {
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "handler.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/src/design-studio/dist")),
-      memorySize: 256,
+      // 1024, up from 256 (2026-07-24) - same reasoning as the portfolio/
+      // pantry/imposter/supergraph Lambdas (see site-stack.ts): cold-start
+      // CPU (module load + Apollo Server schema build, plus this Lambda's
+      // own MongoDB connection setup below) scales with memory, and none of
+      // that phase is visible on the X-Ray waterfall since it runs before
+      // Application Signals' tracer attaches.
+      memorySize: 1024,
       // Generous relative to the DynamoDB-backed projects' 15-30s - a cold
       // start here also pays for establishing a fresh MongoDB connection
       // (TLS handshake + auth) on top of the Secrets Manager fetch.
       timeout: Duration.seconds(20),
       environment: {
-        MONGO_SECRET_ARN: mongoSecret.secretArn,
+        MONGO_URI: mongoSecret.secretValue.unsafeUnwrap(),
+        ANTHROPIC_SECRET_ARN: anthropicSecret.secretArn,
       },
-      tracing: lambda.Tracing.ACTIVE,
+      // No lambda.Tracing.ACTIVE here - see applyApplicationSignals()'s doc
+      // comment for why.
     });
-    mongoSecret.grantRead(designStudioFn);
+    anthropicSecret.grantRead(designStudioFn);
+    applyApplicationSignals(designStudioFn);
     this.designStudioFn = designStudioFn;
 
     // Qualifier ApiGatewayStack targets and ProvisionedConcurrencyStack
-    // would apply PC to (not wired up yet - see the project plan for why
-    // warming is deliberately skipped for this project's first pass).
+    // applies PC to.
     new lambda.Alias(this, "LiveAlias", {
       aliasName: LIVE_ALIAS_NAME,
       version: designStudioFn.currentVersion,

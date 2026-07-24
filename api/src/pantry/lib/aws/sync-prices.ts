@@ -1,7 +1,6 @@
 import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
-import { captureAwsClient } from "api-shared/xray";
 
-const lambda = captureAwsClient(new LambdaClient({}));
+const lambda = new LambdaClient({});
 
 // Fire-and-forget invoke of the price-check Lambda (see price-check-handler.ts
 // / lib/anthropic/check-prices.ts) - InvocationType "Event" returns as soon
@@ -12,7 +11,10 @@ const lambda = captureAwsClient(new LambdaClient({}));
 // Only ever called from the "sync prices now" settings button - there's no
 // automatic schedule and no per-toggle auto-trigger (both removed after a
 // real credit-exhaustion incident); this is the only way a price check runs.
-export async function triggerPriceSync(): Promise<void> {
+// `pk` is passed through the invoke payload so the price-check Lambda checks
+// only the pantry that actually clicked the button, not every registered
+// user's - see price-check-handler.ts's doc comment.
+export async function triggerPriceSync(pk: string): Promise<void> {
   const functionName = process.env.PRICE_CHECK_FUNCTION_NAME;
   if (!functionName) {
     throw new Error("PRICE_CHECK_FUNCTION_NAME not configured.");
@@ -22,6 +24,7 @@ export async function triggerPriceSync(): Promise<void> {
     new InvokeCommand({
       FunctionName: functionName,
       InvocationType: "Event",
+      Payload: JSON.stringify({ pk }),
     })
   );
 }

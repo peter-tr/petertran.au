@@ -1,5 +1,4 @@
 import { SecretsManagerClient, GetSecretValueCommand } from "@aws-sdk/client-secrets-manager";
-import { captureAwsClient } from "api-shared/xray";
 import { ddb, TABLE_NAME } from "../aws/ddb";
 import { CachedCostFetcher } from "../aws/cached-cost-fetcher";
 
@@ -19,7 +18,7 @@ async function getAnthropicAdminApiKey(): Promise<string | null> {
   const secretArn = process.env.ANTHROPIC_ADMIN_SECRET_ARN;
   if (!secretArn) return null;
 
-  const client = captureAwsClient(new SecretsManagerClient({}));
+  const client = new SecretsManagerClient({});
   const res = await client.send(new GetSecretValueCommand({ SecretId: secretArn }));
   if (!res.SecretString) return null;
 

@@ -5,12 +5,16 @@ import PantryCommandBar from "./components/PantryCommandBar";
 import PantryInventorySection from "./components/PantryInventorySection";
 import PantryManualAddSection from "./components/PantryManualAddSection";
 import PantryShoppingListSection from "./components/PantryShoppingListSection";
+import PantryAuthForm from "./components/PantryAuthForm";
 import { usePantryHome } from "./hooks/usePantryHome";
+import { usePantryAuth } from "./hooks/usePantryAuth";
 import "./pantry.css";
 
 export default function Pantry() {
   const { items, shoppingList, settings, error, refetch, updateSettings } = usePantryHome();
+  const { email, pending, error: authError, submit, signOut } = usePantryAuth();
   const [showAbout, setShowAbout] = useState(false);
+  const [authFormOpen, setAuthFormOpen] = useState(false);
 
   // Awaited by callers before re-enabling their own busy state (e.g. the
   // staple star toggle) - without that, a quick second click computes its
@@ -35,14 +39,35 @@ export default function Pantry() {
             i
           </button>
         </h1>
-        <Link
-          to="/pantry/settings"
-          className="pantry-settings-cog"
-          aria-label="Pantry settings"
-          title="Settings"
-        >
-          ⚙
-        </Link>
+        <div className="pantry-head-actions">
+          {email ? (
+            <button type="button" className="pantry-account" onClick={signOut} title="Sign out">
+              {email} · Sign out
+            </button>
+          ) : (
+            <div className="pantry-auth-wrap">
+              <button type="button" className="pantry-account" onClick={() => setAuthFormOpen((v) => !v)}>
+                Sign in
+              </button>
+              {authFormOpen && (
+                <PantryAuthForm
+                  pending={pending}
+                  error={authError}
+                  onSubmit={submit}
+                  onClose={() => setAuthFormOpen(false)}
+                />
+              )}
+            </div>
+          )}
+          <Link
+            to="/pantry/settings"
+            className="pantry-settings-cog"
+            aria-label="Pantry settings"
+            title="Settings"
+          >
+            ⚙
+          </Link>
+        </div>
       </header>
 
       {showAbout && (

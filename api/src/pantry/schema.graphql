@@ -318,9 +318,10 @@ input UpdateShoppingListEntryInput {
 }
 
 """
-Shared display/view preferences for the pantry page. There's no per-user
-login here, so these are simply global - one setting shared by everyone who
-visits, so a change made on one device shows up everywhere.
+Display/view preferences for the pantry page - scoped per-account for a
+signed-in user, or shared by everyone using the default pantry if not
+signed in, so a change made on one device shows up on every other device
+using that same pantry.
 """
 type PantrySettings {
   """
@@ -689,9 +690,26 @@ type ParsedCommand {
 }
 
 """
+A signed-in pantry account. Anyone not signed in uses the default/shared
+pantry instead, which has no corresponding User.
+"""
+type User {
+  """
+  Cognito's stable subject identifier for this account.
+  """
+  id: ID!
+  email: String!
+}
+
+"""
 Read-only entry point into pantry/fridge inventory.
 """
 type Query {
+  """
+  The signed-in account, or null when using the default/shared pantry
+  (no ID token, or an invalid/expired one).
+  """
+  me: User
   """
   Items currently in stock, most recently added first. Optionally filter to
   a single storage location.
@@ -851,4 +869,10 @@ type Mutation {
   runs automatically. `list` is "inventory" or "shoppingList".
   """
   checkPriceNow(id: ID!, list: String!): Boolean!
+  """
+  Registers (or re-confirms) the signed-in account so scheduled jobs
+  (digest email, price check) know this pantry exists - called once by the
+  client right after completing sign-in. Requires a valid ID token.
+  """
+  ensureAccount: User!
 }

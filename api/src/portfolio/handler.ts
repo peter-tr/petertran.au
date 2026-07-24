@@ -2,7 +2,6 @@ import { ApolloServer } from "@apollo/server";
 import { startServerAndCreateLambdaHandler, handlers } from "@as-integrations/aws-lambda";
 import { buildSubgraphSchema } from "@apollo/subgraph";
 import { parse } from "graphql";
-import * as AWSXRay from "aws-xray-sdk-core";
 import type { APIGatewayProxyEvent, APIGatewayProxyResult, Context as LambdaContext } from "aws-lambda";
 import { typeDefs } from "./schema";
 import { resolvers } from "./resolvers/resolvers";
@@ -22,14 +21,10 @@ const apolloHandler = startServerAndCreateLambdaHandler(
   handlers.createAPIGatewayProxyEventRequestHandler(),
   {
     context: async ({ event, context }) => {
-      // Captured synchronously, as early as possible in the invocation -
-      // see xray.ts's traced() for why this can't be looked up later.
-      const xraySegment = process.env.AWS_LAMBDA_FUNCTION_NAME ? AWSXRay.getSegment() : undefined;
       const baseContext: Context = {
         sourceIp: event.requestContext?.identity?.sourceIp,
         userAgent: event.headers?.["user-agent"],
         functionName: context.functionName,
-        xraySegment,
         getResumePartition: createResumePartitionLoader(),
         runInternalQuery: async (query: string) => {
           const res = await server.executeOperation({ query }, { contextValue: baseContext });

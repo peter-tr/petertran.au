@@ -1,7 +1,82 @@
 import { randomUUID } from "node:crypto";
 import { createDesignStudioResolvers, type DesignStore } from "../resolvers/resolvers";
-import type { DesignRecord, SaveDesignArgs, TemplateRecord, TemplateFilter } from "../lib/design";
+import type {
+  DesignElementRecord,
+  DesignRecord,
+  SaveDesignArgs,
+  TemplateRecord,
+  TemplateFilter,
+} from "../lib/design";
 import { STARTER_TEMPLATES } from "../lib/templates";
+
+// No real Anthropic call locally - same convention as pantry's
+// mockParseCommand, so the dev server never needs an API key. Produces a
+// simple background + heading + accent layout, using the prompt itself as
+// the heading text so it's obvious in the UI that this came from the typed
+// prompt rather than being a fixed template. When currentElements is given
+// (a chat-style refinement), just relabels the existing draft's heading
+// with the new instruction rather than regenerating it - enough to exercise
+// the refinement code path locally without needing real Anthropic calls.
+async function mockGenerateDesignElements(
+  prompt: string,
+  width: number,
+  height: number,
+  currentElements: DesignElementRecord[] | undefined
+): Promise<DesignElementRecord[]> {
+  const heading = prompt.trim().slice(0, 60) || "Untitled design";
+
+  if (currentElements?.length) {
+    return currentElements.map((el) =>
+      el.type === "TEXT" ? { ...el, text: `${el.text} → ${heading}` } : el
+    );
+  }
+
+  return [
+    {
+      id: randomUUID(),
+      type: "RECTANGLE",
+      x: 0,
+      y: 0,
+      width,
+      height,
+      rotation: 0,
+      zIndex: 0,
+      fill: "#1a2130",
+      stroke: "",
+      strokeWidth: 0,
+    },
+    {
+      id: randomUUID(),
+      type: "ELLIPSE",
+      x: width * 0.7,
+      y: height * -0.1,
+      width: width * 0.35,
+      height: width * 0.35,
+      rotation: 0,
+      zIndex: 1,
+      fill: "#63c7be",
+      stroke: "",
+      strokeWidth: 0,
+    },
+    {
+      id: randomUUID(),
+      type: "TEXT",
+      x: width * 0.08,
+      y: height * 0.4,
+      width: width * 0.8,
+      height: height * 0.15,
+      rotation: 0,
+      zIndex: 2,
+      fill: "#eae7de",
+      stroke: "",
+      strokeWidth: 0,
+      text: heading,
+      fontFamily: "IBM Plex Sans",
+      fontSize: 40,
+      fontWeight: 700,
+    },
+  ];
+}
 
 function matchesFilter(template: TemplateRecord, filter: TemplateFilter): boolean {
   if (filter.category && template.category !== filter.category) return false;
@@ -58,9 +133,16 @@ class InMemoryDesignStore implements DesignStore {
       .sort((a, b) => b.popularity - a.popularity);
   }
 
-  async getTemplate(id: string): Promise<TemplateRecord | null> {
-    return this.templates.find((template) => template.id === id) ?? null;
+  async saveTemplate(args: Omit<TemplateRecord, "id">): Promise<TemplateRecord> {
+    const template: TemplateRecord = { ...args, id: randomUUID() };
+    this.templates.push(template);
+
+    return template;
   }
 }
 
-export const devResolvers = createDesignStudioResolvers(new InMemoryDesignStore());
+export const devResolvers = createDesignStudioResolvers(
+  new InMemoryDesignStore(),
+  (prompt, width, height, currentElements) =>
+    mockGenerateDesignElements(prompt, width, height, currentElements)
+);

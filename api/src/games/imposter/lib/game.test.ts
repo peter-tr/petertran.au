@@ -6,12 +6,8 @@ const generateAiWordPair = vi.fn();
 // (imported below) picks up this mocked generateAiWordPair instead of ever
 // touching the real Anthropic client.
 vi.mock("./anthropic/ai", () => ({
-  generateAiWordPair: (
-    theme: string | undefined,
-    difficulty: string,
-    sourceIp: string | undefined,
-    xraySegment: unknown
-  ) => generateAiWordPair(theme, difficulty, sourceIp, xraySegment),
+  generateAiWordPair: (theme: string | undefined, difficulty: string, sourceIp: string | undefined) =>
+    generateAiWordPair(theme, difficulty, sourceIp),
 }));
 
 import {
@@ -88,7 +84,6 @@ describe("buildNewGameContent", () => {
     await expect(
       buildNewGameContent(
         { wordSource: "BUILTIN", categoryId: "animals", playerNames: samplePlayers(2) },
-        undefined,
         undefined
       )
     ).rejects.toThrow(/between 3 and 12 players/);
@@ -98,7 +93,6 @@ describe("buildNewGameContent", () => {
     await expect(
       buildNewGameContent(
         { wordSource: "BUILTIN", categoryId: "animals", playerNames: samplePlayers(13) },
-        undefined,
         undefined
       )
     ).rejects.toThrow(/between 3 and 12 players/);
@@ -107,7 +101,6 @@ describe("buildNewGameContent", () => {
   it("trims whitespace and drops blank names before counting/validating players", async () => {
     const content = await buildNewGameContent(
       { wordSource: "BUILTIN", categoryId: "animals", playerNames: ["  Alice ", "", "   ", "Bob", "Cara"] },
-      undefined,
       undefined
     );
     expect(content.players.map((p) => p.name)).toEqual(["Alice", "Bob", "Cara"]);
@@ -122,7 +115,6 @@ describe("buildNewGameContent", () => {
           playerNames: samplePlayers(3),
           imposterCount: 2, // maxImposterCount(3) === 1
         },
-        undefined,
         undefined
       )
     ).rejects.toThrow(/choose between 1 and 1 imposters/);
@@ -132,7 +124,6 @@ describe("buildNewGameContent", () => {
     await expect(
       buildNewGameContent(
         { wordSource: "BUILTIN", categoryId: "animals", playerNames: samplePlayers(4), imposterCount: 0 },
-        undefined,
         undefined
       )
     ).rejects.toThrow(/choose between 1 and/);
@@ -140,7 +131,7 @@ describe("buildNewGameContent", () => {
 
   it("requires a categoryId for BUILTIN word source", async () => {
     await expect(
-      buildNewGameContent({ wordSource: "BUILTIN", playerNames: samplePlayers(3) }, undefined, undefined)
+      buildNewGameContent({ wordSource: "BUILTIN", playerNames: samplePlayers(3) }, undefined)
     ).rejects.toThrow(/category is required/);
   });
 
@@ -148,7 +139,6 @@ describe("buildNewGameContent", () => {
     await expect(
       buildNewGameContent(
         { wordSource: "BUILTIN", categoryId: "not-a-real-category", playerNames: samplePlayers(3) },
-        undefined,
         undefined
       )
     ).rejects.toThrow(/Unknown category/);
@@ -158,7 +148,6 @@ describe("buildNewGameContent", () => {
     await expect(
       buildNewGameContent(
         { wordSource: "AI", customCategory: "x".repeat(61), playerNames: samplePlayers(3) },
-        undefined,
         undefined
       )
     ).rejects.toThrow(/under 60 characters/);
@@ -168,7 +157,6 @@ describe("buildNewGameContent", () => {
   it("builds a BUILTIN game with a word pair from the requested category", async () => {
     const content = await buildNewGameContent(
       { wordSource: "BUILTIN", categoryId: "animals", playerNames: samplePlayers(4) },
-      undefined,
       undefined
     );
     const category = WORD_CATEGORIES.find((c) => c.id === "animals")!;
@@ -191,7 +179,6 @@ describe("buildNewGameContent", () => {
     for (let i = 0; i < 20; i++) {
       const content = await buildNewGameContent(
         { wordSource: "BUILTIN", categoryId: "animals", playerNames: samplePlayers(8), imposterCount: 3 },
-        undefined,
         undefined
       );
       expect(content.imposterIndexes).toHaveLength(3);
@@ -207,7 +194,6 @@ describe("buildNewGameContent", () => {
     const category = WORD_CATEGORIES.find((c) => c.id === "animals")!;
     const content = await buildNewGameContent(
       { wordSource: "BUILTIN", categoryId: "animals", playerNames: samplePlayers(3), difficulty: "HARD" },
-      undefined,
       undefined
     );
     expect(category.hardPairs).toContainEqual({
@@ -219,7 +205,6 @@ describe("buildNewGameContent", () => {
   it("hides the imposter word (but not the civilian word) when hintEnabled is false", async () => {
     const content = await buildNewGameContent(
       { wordSource: "BUILTIN", categoryId: "animals", playerNames: samplePlayers(3), hintEnabled: false },
-      undefined,
       undefined
     );
     expect(content.imposterWord).toBeNull();
@@ -236,11 +221,10 @@ describe("buildNewGameContent", () => {
 
     const content = await buildNewGameContent(
       { wordSource: "AI", customCategory: "coffee", playerNames: samplePlayers(3) },
-      "1.2.3.4",
-      undefined
+      "1.2.3.4"
     );
 
-    expect(generateAiWordPair).toHaveBeenCalledWith("coffee", "NORMAL", "1.2.3.4", undefined);
+    expect(generateAiWordPair).toHaveBeenCalledWith("coffee", "NORMAL", "1.2.3.4");
     expect(content.categoryLabel).toBe("Coffee drinks");
     expect(content.civilianWord).toBe("Latte");
     expect(content.imposterWord).toBe("Espresso");

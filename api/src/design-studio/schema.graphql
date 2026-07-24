@@ -106,6 +106,19 @@ type Template {
 }
 
 """
+Input for saving the current editor contents as a new, reusable template.
+Unlike Design, there's no update path - templates are create-only for now.
+"""
+input SaveAsTemplateInput {
+  name: String!
+  category: String!
+  tags: [String!]!
+  width: Float!
+  height: Float!
+  elements: [DesignElementInput!]!
+}
+
+"""
 Standalone schema for the Design Studio mock-Canva editor - served by its
 own Lambda, entirely separate from petertran.au's resume API.
 """
@@ -129,7 +142,25 @@ type Mutation {
   saveDesign(input: SaveDesignInput!): Design!
   deleteDesign(id: ID!): Boolean!
   """
-  Clones a template's elements into a brand-new saved design.
+  Saves the given elements as a new template. `colors` is derived
+  automatically from the elements' fills, not part of the input.
   """
-  useTemplate(templateId: ID!): Design!
+  saveAsTemplate(input: SaveAsTemplateInput!): Template!
+  """
+  Generates a set of design elements from a natural-language prompt, sized
+  to fit within width/height. Pure generation - nothing is persisted here;
+  the returned elements are a draft the caller decides whether to keep,
+  typically via a normal saveDesign call once accepted.
+
+  Pass `currentElements` (the caller's own in-progress draft, if any) to
+  make this a refinement instead of a fresh generation - e.g. "make the
+  text bigger" - so a chat-style back-and-forth can iterate on one draft
+  rather than starting over each time.
+  """
+  generateDesignElements(
+    prompt: String!
+    width: Float!
+    height: Float!
+    currentElements: [DesignElementInput!]
+  ): [DesignElement!]!
 }

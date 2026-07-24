@@ -5,7 +5,8 @@ on:
     inputs:
       tag:
         description: >-
-          Package version tag to redeploy, e.g. pantry@1.4.0. See the repo's
+          Package version tag to redeploy, e.g. pantry@1.4.0. One of pantry,
+          imposter, portfolio, web, supergraph, design-studio. See the repo's
           Releases page or `git tag -l '*@*'` for available values.
         required: true
         type: string
@@ -51,8 +52,16 @@ jobs:
               echo "stacks=PetertranSiteStack" >> "$GITHUB_OUTPUT"
               echo "sync-web=true" >> "$GITHUB_OUTPUT"
               ;;
+            supergraph)
+              echo "stacks=PetertranSupergraphStack" >> "$GITHUB_OUTPUT"
+              echo "sync-web=false" >> "$GITHUB_OUTPUT"
+              ;;
+            design-studio)
+              echo "stacks=PetertranDesignStudioStack" >> "$GITHUB_OUTPUT"
+              echo "sync-web=false" >> "$GITHUB_OUTPUT"
+              ;;
             *)
-              echo "Unknown package '$PACKAGE' in tag '$TAG' - expected one of pantry, imposter, portfolio, web." >&2
+              echo "Unknown package '$PACKAGE' in tag '$TAG' - expected one of pantry, imposter, portfolio, web, supergraph, design-studio." >&2
               exit 1
               ;;
           esac

@@ -1,5 +1,6 @@
 import { Stack, StackProps, Duration } from "aws-cdk-lib";
 import { Construct } from "constructs";
+import * as applicationsignals from "aws-cdk-lib/aws-applicationsignals";
 import * as cloudwatch from "aws-cdk-lib/aws-cloudwatch";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as iam from "aws-cdk-lib/aws-iam";
@@ -213,6 +214,16 @@ export class MonitoringStack extends Stack {
         displayName: "petertran.au alarms",
       });
       alarmTopic.addSubscription(new subscriptions.EmailSubscription(ALARM_EMAIL));
+
+      // One-time, account/region-wide opt-in that grants Application Signals
+      // permission to discover instrumented resources (xray:GetServiceGraph,
+      // logs:StartQuery, cloudwatch:GetMetricData, etc - see CDK's
+      // aws_applicationsignals.CfnDiscovery docs). Gated to prod only, same
+      // as alarmTopic above - this stack also deploys as
+      // PetertranTestMonitoringStack for the on-demand test env, and this
+      // resource is account-wide, not per-stack, so a second copy would just
+      // fight over the same underlying service-linked role.
+      new applicationsignals.CfnDiscovery(this, "ApplicationSignalsServiceRole", {});
     }
 
     const projects = new Map<string, ProjectData>();

@@ -9,7 +9,9 @@ import type {
   DeleteDesignMutation,
   TemplatesQuery,
   TemplatesQueryVariables,
-  UseTemplateMutation,
+  SaveAsTemplateMutation,
+  GenerateDesignElementsMutation,
+  GenerateDesignElementsMutationVariables,
 } from "./api.generated";
 
 // Separate endpoint, separate service, same reasoning as pantry/imposter's
@@ -98,6 +100,25 @@ const TEMPLATE_FIELDS = /* GraphQL */ `
     tags
     colors
     popularity
+    width
+    height
+    elements {
+      id
+      type
+      x
+      y
+      width
+      height
+      rotation
+      zIndex
+      fill
+      stroke
+      strokeWidth
+      text
+      fontFamily
+      fontSize
+      fontWeight
+    }
   }
 `;
 
@@ -110,13 +131,13 @@ export const TEMPLATES_QUERY = /* GraphQL */ `
   ${TEMPLATE_FIELDS}
 `;
 
-export const USE_TEMPLATE_MUTATION = /* GraphQL */ `
-  mutation UseTemplate($templateId: ID!) {
-    useTemplate(templateId: $templateId) {
-      ...DesignFields
+export const SAVE_AS_TEMPLATE_MUTATION = /* GraphQL */ `
+  mutation SaveAsTemplate($input: SaveAsTemplateInput!) {
+    saveAsTemplate(input: $input) {
+      ...TemplateFields
     }
   }
-  ${DESIGN_FIELDS}
+  ${TEMPLATE_FIELDS}
 `;
 
 export async function listDesigns(): Promise<Design[]> {
@@ -157,11 +178,60 @@ export async function listTemplates(filter: TemplatesQueryVariables = {}): Promi
   return data.templates;
 }
 
-// Named applyTemplate, not useTemplate (matching the GraphQL mutation name)
-// - "use..." reads as a React Hook name to eslint-plugin-react-hooks, and
-// this is a plain async call, not a hook.
-export async function applyTemplate(templateId: string): Promise<Design> {
-  const data = await runDesignStudioQuery<UseTemplateMutation>(USE_TEMPLATE_MUTATION, { templateId });
+export interface SaveAsTemplateArgs {
+  name: string;
+  category: string;
+  tags: string[];
+  width: number;
+  height: number;
+  elements: DesignElementInput[];
+}
 
-  return data.useTemplate;
+export async function saveAsTemplate(input: SaveAsTemplateArgs): Promise<Template> {
+  const data = await runDesignStudioQuery<SaveAsTemplateMutation>(SAVE_AS_TEMPLATE_MUTATION, { input });
+
+  return data.saveAsTemplate;
+}
+
+export const GENERATE_DESIGN_ELEMENTS_MUTATION = /* GraphQL */ `
+  mutation GenerateDesignElements(
+    $prompt: String!
+    $width: Float!
+    $height: Float!
+    $currentElements: [DesignElementInput!]
+  ) {
+    generateDesignElements(
+      prompt: $prompt
+      width: $width
+      height: $height
+      currentElements: $currentElements
+    ) {
+      id
+      type
+      x
+      y
+      width
+      height
+      rotation
+      zIndex
+      fill
+      stroke
+      strokeWidth
+      text
+      fontFamily
+      fontSize
+      fontWeight
+    }
+  }
+`;
+
+export async function generateDesignElements(
+  args: GenerateDesignElementsMutationVariables
+): Promise<Design["elements"]> {
+  const data = await runDesignStudioQuery<GenerateDesignElementsMutation>(
+    GENERATE_DESIGN_ELEMENTS_MUTATION,
+    args
+  );
+
+  return data.generateDesignElements;
 }

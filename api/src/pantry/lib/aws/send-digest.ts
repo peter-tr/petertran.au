@@ -1,9 +1,8 @@
 import { SESv2Client, SendEmailCommand } from "@aws-sdk/client-sesv2";
-import { captureAwsClient } from "api-shared/xray";
 import { getSettings } from "../../services/settings";
 import { getShoppingList, type ShoppingListEntry } from "../../services/shopping-list";
 
-const ses = captureAwsClient(new SESv2Client({}));
+const ses = new SESv2Client({});
 
 // The schedule itself fires once an hour (see infra/lib/pantry-stack.ts) -
 // the actual "what time" the user configured in Settings lives in app data,
@@ -57,7 +56,7 @@ function formatEntryHtml(e: ShoppingListEntry): string {
 // sends is gated by settings.digestEnabled/digestHour, checked below, so
 // the user can turn it off or change the time from Pantry settings without
 // a redeploy.
-export async function sendShoppingListDigest(): Promise<void> {
+export async function sendShoppingListDigest(pk: string): Promise<void> {
   const from = process.env.CONTACT_FROM_EMAIL;
   const to = process.env.CONTACT_TO_EMAIL;
   if (!from || !to) {
@@ -66,9 +65,9 @@ export async function sendShoppingListDigest(): Promise<void> {
     return;
   }
 
-  const settings = await getSettings();
+  const settings = await getSettings(pk);
   if (!settings.digestEnabled) {
-    console.log("Digest email disabled in settings - skipping.");
+    console.log(`Digest email disabled in settings for pk="${pk}" - skipping.`);
 
     return;
   }
@@ -82,7 +81,7 @@ export async function sendShoppingListDigest(): Promise<void> {
     return;
   }
 
-  const entries = (await getShoppingList()).filter((e) => e.urgent);
+  const entries = (await getShoppingList(pk)).filter((e) => e.urgent);
   if (entries.length === 0) {
     console.log("No urgent shopping list items - skipping digest.");
 
