@@ -24,7 +24,7 @@ afterAll(() => {
 });
 
 describe("DesignStudioStack", () => {
-  it("synthesizes with the Lambda, no DynamoDB table, and the Mongo secret granted", () => {
+  it("synthesizes with the Lambda, no DynamoDB table, and the Mongo URI resolved at deploy time", () => {
     const app = new App();
     const stack = new DesignStudioStack(app, "TestDesignStudioStack", {
       env: { account: "123456789012", region: "ap-southeast-2" },
@@ -38,16 +38,21 @@ describe("DesignStudioStack", () => {
       FunctionName: "design-studio-graphql",
       Environment: {
         Variables: {
-          MONGO_SECRET_ARN: Match.anyValue(),
+          // A CloudFormation dynamic reference (`{{resolve:secretsmanager:...}}`)
+          // resolved at deploy time, not a runtime-fetched ARN - see
+          // design-studio-stack.ts's doc comment on why. Match.anyValue() only
+          // confirms the key is present; the exact Fn::Join token shape isn't
+          // worth pinning in a test.
+          MONGO_URI: Match.anyValue(),
         },
       },
     });
     template.hasResourceProperties("AWS::Lambda::Alias", {
       Name: "live",
     });
-    // grantRead(designStudioFn) - confirms the Lambda's role can actually
-    // read the Mongo connection string secret, not just that an env var
-    // pointing at its ARN exists.
+    // anthropicSecret.grantRead(designStudioFn) - the Mongo secret is no
+    // longer read at runtime (see MONGO_URI above), so this policy now only
+    // covers the Anthropic API key used by the AI design-generation mutation.
     template.hasResourceProperties("AWS::IAM::Policy", {
       PolicyDocument: {
         Statement: Match.arrayWith([

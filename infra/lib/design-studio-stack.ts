@@ -34,6 +34,17 @@ export class DesignStudioStack extends Stack {
     // itself isn't a CDK-managed resource) - `fromSecretNameV2` just
     // imports the existing secret by name, same pattern as pantry-stack.ts's
     // anthropicSecret.
+    //
+    // Passed to the Lambda below as a plain MONGO_URI env var (via
+    // `.secretValue`, a CloudFormation dynamic reference resolved at deploy
+    // time) rather than as MONGO_SECRET_ARN fetched at runtime - every cold
+    // start was previously paying a GetSecretValue round-trip before it
+    // could even attempt the Mongo connection. Trade-off: the plaintext URI
+    // now sits in this Lambda's environment config (readable by anyone with
+    // lambda:GetFunctionConfiguration, a broader surface than the scoped
+    // secretsmanager:GetSecretValue grant this replaced) and only refreshes
+    // on redeploy, not on secret rotation. Acceptable here - single-user
+    // account, Atlas credentials aren't rotated out-of-band.
     const mongoSecret = secretsmanager.Secret.fromSecretNameV2(
       this,
       "MongoConnectionString",
@@ -68,13 +79,12 @@ export class DesignStudioStack extends Stack {
       // (TLS handshake + auth) on top of the Secrets Manager fetch.
       timeout: Duration.seconds(20),
       environment: {
-        MONGO_SECRET_ARN: mongoSecret.secretArn,
+        MONGO_URI: mongoSecret.secretValue.unsafeUnwrap(),
         ANTHROPIC_SECRET_ARN: anthropicSecret.secretArn,
       },
       // No lambda.Tracing.ACTIVE here - see applyApplicationSignals()'s doc
       // comment for why.
     });
-    mongoSecret.grantRead(designStudioFn);
     anthropicSecret.grantRead(designStudioFn);
     applyApplicationSignals(designStudioFn);
     this.designStudioFn = designStudioFn;
