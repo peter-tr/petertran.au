@@ -1,51 +1,44 @@
-// Cognito Hosted UI sign-in for pantry - OAuth authorization-code + PKCE,
-// no client secret (public SPA client, see infra/lib/pantry-stack.ts).
-// Tokens live in localStorage (this app has no other session infra); the
-// PKCE verifier only needs to survive the redirect round-trip, so it lives
-// in sessionStorage instead. Deliberately doesn't import from ./api.ts
-// (which imports getAuthHeader from here) - ensureAccount below uses a raw
-// fetch instead of api.ts's runPantryQuery to avoid a circular import.
+// Cognito username(email)+password sign-in for pantry, called directly
+// against Cognito's IdP API - no Hosted UI redirect. Hosted UI's
+// authorization-code flow turned out to be a dead end for a pure
+// client-side SPA: Cognito's /oauth2/token endpoint doesn't send CORS
+// headers back to a browser fetch, so the in-app code-for-tokens exchange
+// after the Hosted UI redirect always failed in prod. InitiateAuth/SignUp
+// (this file) are the unauthenticated actions Cognito's IdP API does allow
+// CORS for from a public client, so an inline form works instead. No email
+// verification and no MFA by design - see infra/lib/pantry-stack.ts's
+// PantryAutoConfirmFunction. Tokens live in localStorage (this app has no
+// other session infra). Deliberately doesn't import from ./api.ts (which
+// imports getAuthHeader from here) - ensureAccount below uses a raw fetch
+// instead of api.ts's runPantryQuery to avoid a circular import.
 
-const COGNITO_DOMAIN = import.meta.env?.VITE_PANTRY_COGNITO_DOMAIN as string | undefined;
 const CLIENT_ID = import.meta.env?.VITE_PANTRY_COGNITO_CLIENT_ID as string | undefined;
 const GRAPHQL_ENDPOINT = import.meta.env?.VITE_PANTRY_GRAPHQL_ENDPOINT as string | undefined;
+
+// Every pantry stack is deployed in this one region (see infra/bin/app.ts) -
+// Cognito's IdP API endpoint is region-scoped in its hostname, not
+// something the client ID alone reveals.
+const COGNITO_IDP_ENDPOINT = "https://cognito-idp.ap-southeast-2.amazonaws.com/";
 
 const ID_TOKEN_KEY = "pantry_id_token";
 const REFRESH_TOKEN_KEY = "pantry_refresh_token";
 const EXPIRES_AT_KEY = "pantry_token_expires_at";
-const VERIFIER_KEY = "pantry_pkce_verifier";
 
-function redirectUri(): string {
-  return `${window.location.origin}/pantry`;
+export class PantryAuthError extends Error {}
+
+interface AuthenticationResult {
+  IdToken: string;
+  RefreshToken?: string;
+  ExpiresIn: number;
 }
 
-function base64url(bytes: Uint8Array): string {
-  let binary = "";
-  for (const b of bytes) binary += String.fromCharCode(b);
-
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
-async function pkcePair(): Promise<{ verifier: string; challenge: string }> {
-  const verifier = base64url(crypto.getRandomValues(new Uint8Array(32)));
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
-
-  return { verifier, challenge: base64url(new Uint8Array(digest)) };
-}
-
-interface TokenResponse {
-  id_token: string;
-  refresh_token?: string;
-  expires_in: number;
-}
-
-function storeTokens(tokens: TokenResponse): void {
-  localStorage.setItem(ID_TOKEN_KEY, tokens.id_token);
-  if (tokens.refresh_token) localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refresh_token);
+function storeTokens(result: AuthenticationResult): void {
+  localStorage.setItem(ID_TOKEN_KEY, result.IdToken);
+  if (result.RefreshToken) localStorage.setItem(REFRESH_TOKEN_KEY, result.RefreshToken);
   // A minute of slack, so getAuthHeader refreshes ahead of actual expiry
   // rather than sending a token that's already dead by the time the
   // request lands.
-  localStorage.setItem(EXPIRES_AT_KEY, String(Date.now() + (tokens.expires_in - 60) * 1000));
+  localStorage.setItem(EXPIRES_AT_KEY, String(Date.now() + (result.ExpiresIn - 60) * 1000));
 }
 
 function clearTokens(): void {
@@ -54,37 +47,50 @@ function clearTokens(): void {
   localStorage.removeItem(EXPIRES_AT_KEY);
 }
 
-// Redirects away to Cognito's Hosted UI login page - there's no in-app form,
-// see CLAUDE.md-adjacent design notes on preferring Cognito's real login
-// page over a hand-rolled one.
-export async function beginSignIn(): Promise<void> {
-  if (!COGNITO_DOMAIN || !CLIENT_ID) return;
-
-  const { verifier, challenge } = await pkcePair();
-  sessionStorage.setItem(VERIFIER_KEY, verifier);
-
-  const url = new URL(`${COGNITO_DOMAIN}/oauth2/authorize`);
-  url.searchParams.set("client_id", CLIENT_ID);
-  url.searchParams.set("response_type", "code");
-  url.searchParams.set("scope", "openid email");
-  url.searchParams.set("redirect_uri", redirectUri());
-  url.searchParams.set("code_challenge_method", "S256");
-  url.searchParams.set("code_challenge", challenge);
-  window.location.href = url.toString();
+function friendlyMessage(errorType: string | undefined, message: string | undefined): string {
+  switch (errorType) {
+    case "UsernameExistsException":
+      return "An account with that email already exists - try signing in instead.";
+    case "NotAuthorizedException":
+      return "Incorrect email or password.";
+    case "UserNotFoundException":
+      return "No account with that email - try creating one.";
+    case "InvalidPasswordException":
+      return "Password must be at least 6 characters.";
+    case "InvalidParameterException":
+      return "Enter a valid email and password.";
+    case "LimitExceededException":
+    case "TooManyRequestsException":
+      return "Too many attempts - wait a moment and try again.";
+    default:
+      return message || "Something went wrong. Try again.";
+  }
 }
 
-export function signOut(): void {
-  clearTokens();
-  if (!COGNITO_DOMAIN || !CLIENT_ID) {
-    window.location.href = "/pantry";
+// Cognito's IdentityProvider API is a single POST-everything JSON RPC
+// surface - the action lives in the X-Amz-Target header, not the URL path.
+// SignUp/InitiateAuth are unauthenticated actions for a public (no-secret)
+// app client, so this needs no AWS credentials/signing.
+async function cognitoRequest<T>(action: string, body: Record<string, unknown>): Promise<T> {
+  if (!CLIENT_ID) throw new PantryAuthError("Sign-in isn't configured.");
 
-    return;
+  const res = await fetch(COGNITO_IDP_ENDPOINT, {
+    method: "POST",
+    headers: {
+      "content-type": "application/x-amz-json-1.1",
+      "x-amz-target": `AWSCognitoIdentityProviderService.${action}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  const json = await res.json();
+  if (!res.ok) {
+    throw new PantryAuthError(
+      friendlyMessage(json.__type as string | undefined, json.message as string | undefined)
+    );
   }
 
-  const url = new URL(`${COGNITO_DOMAIN}/logout`);
-  url.searchParams.set("client_id", CLIENT_ID);
-  url.searchParams.set("logout_uri", redirectUri());
-  window.location.href = url.toString();
+  return json as T;
 }
 
 // Registers the account in pantry's user registry so scheduled jobs
@@ -103,66 +109,57 @@ async function ensureAccount(): Promise<void> {
   }).catch(() => undefined);
 }
 
-async function exchangeCodeForTokens(code: string): Promise<void> {
-  const verifier = sessionStorage.getItem(VERIFIER_KEY);
-  if (!verifier || !COGNITO_DOMAIN || !CLIENT_ID) return;
-  sessionStorage.removeItem(VERIFIER_KEY);
-
-  const res = await fetch(`${COGNITO_DOMAIN}/oauth2/token`, {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "authorization_code",
-      client_id: CLIENT_ID,
-      code,
-      redirect_uri: redirectUri(),
-      code_verifier: verifier,
-    }),
+export async function signUp(email: string, password: string): Promise<void> {
+  await cognitoRequest("SignUp", {
+    ClientId: CLIENT_ID,
+    Username: email,
+    Password: password,
+    UserAttributes: [{ Name: "email", Value: email }],
   });
-  if (!res.ok) return;
+  // No confirmation code step - PantryAutoConfirmFunction already marked
+  // the account confirmed/verified, so it can sign in immediately.
+  await signIn(email, password);
+}
 
-  storeTokens((await res.json()) as TokenResponse);
+export async function signIn(email: string, password: string): Promise<void> {
+  const result = await cognitoRequest<{ AuthenticationResult: AuthenticationResult }>("InitiateAuth", {
+    ClientId: CLIENT_ID,
+    AuthFlow: "USER_PASSWORD_AUTH",
+    AuthParameters: { USERNAME: email, PASSWORD: password },
+  });
+  storeTokens(result.AuthenticationResult);
   await ensureAccount();
 }
 
-// Call once, near app start (Pantry.tsx) - a no-op unless the URL has an
-// OAuth ?code= from just completing Hosted UI sign-in, in which case it
-// exchanges it for tokens and cleans the URL back to a bare /pantry.
-export async function completeSignInIfNeeded(): Promise<void> {
-  const code = new URLSearchParams(window.location.search).get("code");
-  if (!code) return;
-
-  await exchangeCodeForTokens(code);
-  window.history.replaceState({}, "", redirectUri());
+export function signOut(): void {
+  clearTokens();
 }
 
 async function refreshIdToken(): Promise<string | null> {
   const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
-  if (!refreshToken || !COGNITO_DOMAIN || !CLIENT_ID) return null;
+  if (!refreshToken || !CLIENT_ID) return null;
 
-  const res = await fetch(`${COGNITO_DOMAIN}/oauth2/token`, {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "refresh_token",
-      client_id: CLIENT_ID,
-      refresh_token: refreshToken,
-    }),
-  });
-  if (!res.ok) {
+  try {
+    const result = await cognitoRequest<{ AuthenticationResult: AuthenticationResult }>("InitiateAuth", {
+      ClientId: CLIENT_ID,
+      AuthFlow: "REFRESH_TOKEN_AUTH",
+      AuthParameters: { REFRESH_TOKEN: refreshToken },
+    });
+    // A refresh response doesn't always include a new refresh_token - keep
+    // the existing one when it doesn't.
+    storeTokens({
+      ...result.AuthenticationResult,
+      RefreshToken: result.AuthenticationResult.RefreshToken ?? refreshToken,
+    });
+
+    return result.AuthenticationResult.IdToken;
+  } catch {
     // Refresh token expired/revoked - drop everything rather than retrying
     // a request that will keep failing the same way.
     clearTokens();
 
     return null;
   }
-
-  const tokens = (await res.json()) as TokenResponse;
-  // A refresh response doesn't always include a new refresh_token - keep
-  // the existing one when it doesn't.
-  storeTokens({ ...tokens, refresh_token: tokens.refresh_token ?? refreshToken });
-
-  return tokens.id_token;
 }
 
 // Passed to createGraphQLClient (see api.ts) - resolves to "Bearer <token>"

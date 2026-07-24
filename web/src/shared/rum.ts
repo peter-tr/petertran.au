@@ -13,9 +13,16 @@ let rumClient: AwsRum | undefined;
 export function initRum(): void {
   const applicationId = import.meta.env.VITE_RUM_APP_MONITOR_ID;
   const identityPoolId = import.meta.env.VITE_RUM_IDENTITY_POOL_ID;
-  if (!applicationId || !identityPoolId) return;
+  const graphqlEndpoint = import.meta.env.VITE_GRAPHQL_ENDPOINT;
+  if (!applicationId || !identityPoolId || !graphqlEndpoint) return;
 
   try {
+    // Same origin for every one of this env's *_GRAPHQL_ENDPOINT vars (see
+    // web/.env.production/.env.test/.env.development) - reading it from
+    // config here instead of hardcoding the prod domain so this keeps
+    // matching if RUM is ever pointed at a non-prod environment too.
+    const apiOrigin = new URL(graphqlEndpoint).origin;
+
     const config: AwsRumConfig = {
       identityPoolId,
       allowCookies: true,
@@ -23,13 +30,29 @@ export function initRum(): void {
       telemetries: [
         "errors",
         "performance",
-        // recordAllRequests: the default (false) only records an http_event
-        // for a non-2xx response - useless for this app, since every
-        // GraphQL call returns 200 even when the response body's `errors`
-        // array is populated. true records every request, so latency and
-        // volume per operation actually show up in RUM.
-        ["http", { recordAllRequests: true }],
+        [
+          "http",
+          {
+            // recordAllRequests: the default (false) only records an
+            // http_event for a non-2xx response - useless for this app,
+            // since every GraphQL call returns 200 even when the response
+            // body's `errors` array is populated. true records every
+            // request, so latency and volume per operation actually show up
+            // in RUM.
+            recordAllRequests: true,
+            // Links each RUM-recorded fetch to the X-Ray trace the Lambda
+            // behind it produces, by having the client generate the trace ID
+            // and send it as an `X-Amzn-Trace-Id` header instead of the
+            // Lambda minting an unrelated one on arrival. Scoped to our own
+            // API only, not any future third-party fetch this page might make.
+            addXRayTraceIdHeader: [new RegExp(`^${apiOrigin.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/`)],
+          },
+        ],
       ],
+      // Global switch the http plugin's addXRayTraceIdHeader option above
+      // checks before it does anything - without this, the matching regex
+      // has no effect.
+      enableXRay: true,
       // aws-rum-web's own default config pre-populates `endpoint` to the
       // us-west-2 dataplane URL, and that populated value wins over the
       // `region` constructor arg during its internal config merge unless

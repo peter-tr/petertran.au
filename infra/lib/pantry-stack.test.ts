@@ -30,8 +30,9 @@ describe("PantryStack", () => {
 
     const template = Template.fromStack(stack);
 
-    // PantryGraphQLFunction, PantryDigestFunction, PantryPriceCheckFunction.
-    template.resourceCountIs("AWS::Lambda::Function", 3);
+    // PantryGraphQLFunction, PantryDigestFunction, PantryPriceCheckFunction,
+    // PantryAutoConfirmFunction (the pre-sign-up trigger).
+    template.resourceCountIs("AWS::Lambda::Function", 4);
     template.resourceCountIs("AWS::DynamoDB::Table", 1);
     template.hasResourceProperties("AWS::DynamoDB::Table", {
       TableName: "pantry",
@@ -41,7 +42,14 @@ describe("PantryStack", () => {
     // only scheduler:: Schedule this stack creates.
     template.resourceCountIs("AWS::Scheduler::Schedule", 1);
     template.resourceCountIs("AWS::Cognito::UserPool", 1);
-    template.hasResourceProperties("AWS::Cognito::UserPool", { UserPoolName: "pantry-users" });
+    template.hasResourceProperties("AWS::Cognito::UserPool", {
+      UserPoolName: "pantry-users",
+      Policies: { PasswordPolicy: { MinimumLength: 6, RequireLowercase: false, RequireSymbols: false } },
+      MfaConfiguration: "OFF",
+    });
+    template.hasResourceProperties("AWS::Cognito::UserPoolClient", {
+      ExplicitAuthFlows: ["ALLOW_USER_PASSWORD_AUTH", "ALLOW_REFRESH_TOKEN_AUTH"],
+    });
   });
 
   it("isTestEnv: skips the digest/price-check Lambdas and schedule, drops table protection", () => {
@@ -55,9 +63,10 @@ describe("PantryStack", () => {
 
     const template = Template.fromStack(stack);
 
-    // Just PantryGraphQLFunction - no digest/price-check Lambdas, neither
-    // of which is part of what the test env exists to validate.
-    template.resourceCountIs("AWS::Lambda::Function", 1);
+    // PantryGraphQLFunction + PantryAutoConfirmFunction only - no
+    // digest/price-check Lambdas, neither of which is part of what the test
+    // env exists to validate.
+    template.resourceCountIs("AWS::Lambda::Function", 2);
     template.hasResourceProperties("AWS::Lambda::Function", {
       FunctionName: "pantry-graphql-test",
     });
