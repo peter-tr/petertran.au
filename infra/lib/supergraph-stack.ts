@@ -67,6 +67,21 @@ export class SupergraphStack extends Stack {
           "LambdaAdapterLayer",
           `arn:aws:lambda:${this.region}:753240598075:layer:LambdaAdapterLayerX86:28`
         ),
+        // provided.al2023 gets zero automatic X-Ray instrumentation - unlike
+        // Node/Python, that's baked into each AWS-managed language runtime's
+        // own wrapper, not a platform-universal Lambda feature (tracing:
+        // ACTIVE above only grants the IAM permissions to write to X-Ray, it
+        // doesn't make anything call it). This AWS-published ADOT collector
+        // layer runs as a Lambda extension, receives the OTLP traces Router
+        // exports (see build-router-package.ts's telemetry config) over
+        // localhost, and forwards them to X-Ray - verified directly against
+        // a real Lambda: the resulting trace connected this function's own
+        // segments with the subgraph Lambda's, not just an isolated span.
+        lambda.LayerVersion.fromLayerVersionArn(
+          this,
+          "AdotCollectorLayer",
+          `arn:aws:lambda:${this.region}:901920570463:layer:aws-otel-collector-amd64-ver-0-117-0:1`
+        ),
       ],
     });
     this.gatewayFn = gatewayFn;
