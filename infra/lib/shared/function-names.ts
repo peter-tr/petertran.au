@@ -24,19 +24,21 @@ export const FUNCTION_NAMES = {
   alertsSettings: "alerts-settings",
 } as const;
 
-// Test-env counterparts of the 4 GraphQL Lambda names above, passed to
-// SiteStack/PantryStack/GamesStack/SupergraphStack's functionName prop and
-// ApiGatewayStack's portfolio/pantry/imposter/supergraphFnName props when
-// DEPLOY_TEST_ENV=true (see infra/bin/app.ts). Suffixed so they can never
-// collide with the real prod Lambdas they're testing changes against,
-// since the test env deploys alongside prod, not instead of it - no
-// zero-trust-lab/warm-schedule counterparts, since those aren't part of
-// what the test env exists to validate.
+// Test-env counterparts of the 5 GraphQL Lambda names above, passed to
+// SiteStack/PantryStack/GamesStack/SupergraphStack/DesignStudioStack's
+// functionName prop and ApiGatewayStack's portfolio/pantry/imposter/
+// supergraph/designStudioFnName props when DEPLOY_TEST_ENV=true (see
+// infra/bin/app.ts). Suffixed so they can never collide with the real prod
+// Lambdas they're testing changes against, since the test env deploys
+// alongside prod, not instead of it - no zero-trust-lab/warm-schedule
+// counterparts, since those aren't part of what the test env exists to
+// validate.
 export const TEST_FUNCTION_NAMES = {
   portfolio: "portfolio-graphql-test",
   pantry: "pantry-graphql-test",
   imposter: "imposter-graphql-test",
   supergraph: "supergraph-graphql-test",
+  designStudio: "design-studio-graphql-test",
 } as const;
 
 // Alias name portfolio/pantry/imposter each publish a "live" Lambda Alias

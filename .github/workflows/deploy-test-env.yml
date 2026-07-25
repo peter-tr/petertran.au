@@ -26,11 +26,11 @@ jobs:
       ref: ${{ inputs.ref }}
       # Space-separated, not comma-separated - cdk's CLI takes each stack name
       # as its own positional argument, so a comma-joined string gets treated
-      # as one (nonexistent) literal stack name. Same 5 stack "shapes" as
-      # prod (infra/bin/app.ts reuses CertStack/SiteStack/PantryStack/
-      # GamesStack/ApiGatewayStack directly), just the test-specific
-      # instantiation of each.
-      stacks: "PetertranTestCertStack PetertranTestSiteStack PetertranTestPantryStack PetertranTestGamesStack PetertranTestSupergraphStack PetertranTestApiGatewayStack"
+      # as one (nonexistent) literal stack name. Same stack "shapes" as prod
+      # (infra/bin/app.ts reuses CertStack/SiteStack/PantryStack/GamesStack/
+      # DesignStudioStack/SupergraphStack/MonitoringStack/ApiGatewayStack
+      # directly), just the test-specific instantiation of each.
+      stacks: "PetertranTestCertStack PetertranTestSiteStack PetertranTestPantryStack PetertranTestGamesStack PetertranTestDesignStudioStack PetertranTestSupergraphStack PetertranTestMonitoringStack PetertranTestApiGatewayStack"
       sync-web: true
       deploy-test-env: true
       # The test stacks are disposable and have no prior deployed state to

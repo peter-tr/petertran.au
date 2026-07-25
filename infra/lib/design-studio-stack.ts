@@ -10,6 +10,11 @@ export interface DesignStudioStackProps extends StackProps {
   // Optional, defaults to prod's current value - only the on-demand test
   // environment would pass this, matching every other project's stack.
   functionName?: string;
+  // True only for the on-demand test env - points the Lambda at a
+  // "design-studio-test" database instead of "design-studio", isolating it
+  // within the same Atlas cluster/secret rather than needing a second
+  // manually-provisioned cluster. See lib/db/client.ts's MONGO_DB_NAME.
+  isTestEnv?: boolean;
 }
 
 /**
@@ -80,6 +85,7 @@ export class DesignStudioStack extends Stack {
       timeout: Duration.seconds(20),
       environment: {
         MONGO_URI: mongoSecret.secretValue.unsafeUnwrap(),
+        MONGO_DB_NAME: props.isTestEnv ? "design-studio-test" : "design-studio",
         ANTHROPIC_SECRET_ARN: anthropicSecret.secretArn,
       },
       // No lambda.Tracing.ACTIVE here - see applyApplicationSignals()'s doc

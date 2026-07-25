@@ -57,9 +57,9 @@ const pantryStack = new PantryStack(app, "PetertranPantryStack", {
 
 // Mock Canva-style design editor - own Lambda, backed by MongoDB Atlas
 // (provisioned outside CDK) rather than a DynamoDB table, deliberately -
-// see infra/lib/design-studio-stack.ts's doc comment. Not part of the
-// on-demand test env yet - an optional addition for later, not needed for
-// this project's first deploy.
+// see infra/lib/design-studio-stack.ts's doc comment. Has an on-demand
+// test-env counterpart below (isolated by Mongo database name, not a
+// separate Atlas cluster).
 const designStudioStack = new DesignStudioStack(app, "PetertranDesignStudioStack", {
   env: { account, region: "ap-southeast-2" },
 });
@@ -223,7 +223,13 @@ if (process.env.DEPLOY_TEST_ENV === "true") {
     env: { account, region: "ap-southeast-2" },
   });
 
-  // Federation gateway composing the three test subgraphs above - mirrors
+  const testDesignStudioStack = new DesignStudioStack(app, "PetertranTestDesignStudioStack", {
+    functionName: TEST_FUNCTION_NAMES.designStudio,
+    isTestEnv: true,
+    env: { account, region: "ap-southeast-2" },
+  });
+
+  // Federation gateway composing the four test subgraphs above - mirrors
   // prod's supergraphStack instantiation above.
   const testSupergraphStack = new SupergraphStack(app, "PetertranTestSupergraphStack", {
     apiBaseUrl: `https://api.test.${hostedZoneName}`,
@@ -250,6 +256,7 @@ if (process.env.DEPLOY_TEST_ENV === "true") {
     pantryFnName: TEST_FUNCTION_NAMES.pantry,
     imposterFnName: TEST_FUNCTION_NAMES.imposter,
     supergraphFnName: TEST_FUNCTION_NAMES.supergraph,
+    designStudioFnName: TEST_FUNCTION_NAMES.designStudio,
     env: { account, region: "ap-southeast-2" },
   });
   // Same fix as prod's apiGatewayStack.addDependency calls above, and even
@@ -261,5 +268,6 @@ if (process.env.DEPLOY_TEST_ENV === "true") {
   testApiGatewayStack.addDependency(testSiteStack);
   testApiGatewayStack.addDependency(testPantryStack);
   testApiGatewayStack.addDependency(testGamesStack);
+  testApiGatewayStack.addDependency(testDesignStudioStack);
   testApiGatewayStack.addDependency(testSupergraphStack);
 }

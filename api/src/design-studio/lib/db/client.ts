@@ -43,7 +43,12 @@ async function connect(): Promise<Db> {
   const client = new MongoClient(uri);
   await client.connect();
 
-  return client.db("design-studio");
+  // Same Atlas cluster/secret as prod - the on-demand test env isolates by
+  // database name instead (set to "design-studio-test"), same "-test"
+  // suffix convention the DynamoDB-backed projects use for table names.
+  // Mongo creates the database lazily on first write, so no manual Atlas
+  // provisioning is needed the way a CDK-managed DynamoDB table would.
+  return client.db(process.env.MONGO_DB_NAME ?? "design-studio");
 }
 
 async function fetchUriFromSecretsManager(): Promise<string> {
