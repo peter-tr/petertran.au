@@ -3,6 +3,7 @@ import type { ElementType } from "../lib/elements";
 interface ToolbarProps {
   onAdd: (type: ElementType) => void;
   onExport: () => void;
+  exporting: boolean;
 }
 
 const TOOLS: { type: ElementType; label: string }[] = [
@@ -11,7 +12,7 @@ const TOOLS: { type: ElementType; label: string }[] = [
   { type: "text", label: "Text" },
 ];
 
-export default function Toolbar({ onAdd, onExport }: ToolbarProps) {
+export default function Toolbar({ onAdd, onExport, exporting }: ToolbarProps) {
   return (
     <div className="design-studio-toolbar">
       {TOOLS.map((tool) => (
@@ -25,8 +26,8 @@ export default function Toolbar({ onAdd, onExport }: ToolbarProps) {
         </button>
       ))}
       <hr className="design-studio-toolbar-rule" />
-      <button type="button" className="design-studio-tool-btn" onClick={onExport}>
-        Export PNG
+      <button type="button" className="design-studio-tool-btn" onClick={onExport} disabled={exporting}>
+        {exporting ? "Exporting…" : "Export PNG"}
       </button>
     </div>
   );

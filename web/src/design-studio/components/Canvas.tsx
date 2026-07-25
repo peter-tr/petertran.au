@@ -22,7 +22,7 @@ interface CanvasProps {
 }
 
 export interface CanvasHandle {
-  exportPNG: () => void;
+  exportPNG: () => Promise<void>;
 }
 
 // Every element's x/y in our own data model is its bounding box's top-left
@@ -63,14 +63,25 @@ const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
   const [editingValue, setEditingValue] = useState("");
 
   useImperativeHandle(ref, () => ({
-    exportPNG: () => {
+    exportPNG: async () => {
       const stage = stageRef.current;
       if (!stage) return;
 
-      const link = document.createElement("a");
-      link.download = "design.png";
-      link.href = stage.toDataURL({ pixelRatio: 2 });
-      link.click();
+      // toBlob's PNG encoding runs via the browser's async canvas.toBlob
+      // rather than synchronously on the main thread like toDataURL, so a
+      // large/busy stage no longer freezes the UI while it encodes.
+      const blob = (await stage.toBlob({ pixelRatio: 2, mimeType: "image/png" })) as Blob | null;
+      if (!blob) return;
+
+      const url = URL.createObjectURL(blob);
+      try {
+        const link = document.createElement("a");
+        link.download = "design.png";
+        link.href = url;
+        link.click();
+      } finally {
+        URL.revokeObjectURL(url);
+      }
     },
   }));
 
