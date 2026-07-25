@@ -171,7 +171,13 @@ const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
           }
         }}
       >
-        <Layer>
+        {/* Dimmed while a draft overlay is showing (see the second Layer
+            below) - the draft is a preview of the complete post-accept
+            state, not an addition to this one, so at full strength the two
+            fully-opaque layers just visually duplicate every element the
+            draft echoed back unchanged. Full opacity again once there's no
+            draft. */}
+        <Layer opacity={draftElements && draftElements.length > 0 ? 0.35 : 1}>
           <Rect x={0} y={0} width={width} height={height} fill="#ffffff" listening={false} />
           {sorted.map((element) => {
             const { x, y } = centerOf(element);
@@ -250,17 +256,22 @@ const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
                   y,
                   rotation: element.rotation,
                   fill: element.fill,
-                  // A vivid, high-contrast color plus a glow (via
+                  // A high-contrast color plus a glow (via
                   // shadowColor/shadowBlur) rather than relying on stroke
                   // color alone for visibility - a plain outline can blend
                   // into a design that happens to share its hue, but the
-                  // glow reads regardless of the underlying palette.
-                  stroke: "#ff2d78",
+                  // glow reads regardless of the underlying palette. Konva
+                  // draws to canvas, so this can't reference the CSS custom
+                  // property directly - #63c7be is design-studio.css's
+                  // --type token, the app's own accent, not an invented
+                  // color (a plain vivid red/magenta here read as an error
+                  // state rather than a draft preview).
+                  stroke: "#63c7be",
                   strokeWidth: Math.max(element.strokeWidth, 3),
                   dash: [12, 8],
-                  shadowColor: "#ff2d78",
+                  shadowColor: "#63c7be",
                   shadowBlur: 16,
-                  shadowOpacity: 0.75,
+                  shadowOpacity: 0.6,
                   draggable: true,
                   onClick: () => onSelectDraft?.(element.id),
                   onTap: () => onSelectDraft?.(element.id),

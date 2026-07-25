@@ -198,14 +198,19 @@ export default function EditorWorkspace({
     setGenerating(true);
     setAiError(null);
     try {
+      // Ground generation in whatever's already there: the AI's own
+      // in-progress draft if one exists (continuing a refinement), else
+      // the real committed elements on the canvas - so a first prompt on
+      // a non-empty design is a refinement of what's already there
+      // instead of an independent draft the model has no idea sits on
+      // top of existing content. See the backend's isRefinement branch
+      // in generate-elements.ts.
+      const baseElements = draftElements ?? (elements.length > 0 ? elements : undefined);
       const generated = await generateDesignElements({
         prompt: trimmed,
         width,
         height,
-        // Re-sending the current draft (if any) turns this into a
-        // refinement of it rather than a fresh generation - see the
-        // backend's isRefinement branch in generate-elements.ts.
-        currentElements: draftElements ? draftElements.map(toElementInput) : undefined,
+        currentElements: baseElements?.map(toElementInput),
       });
       setDraftElements(generated.map(fromWireElement));
       setSelectedDraftId(null);
@@ -216,17 +221,25 @@ export default function EditorWorkspace({
     } finally {
       setGenerating(false);
     }
-  }, [aiPrompt, width, height, draftElements]);
+  }, [aiPrompt, width, height, draftElements, elements]);
 
   const handleAcceptDraft = useCallback(() => {
     if (!draftElements) return;
 
+    // The draft may echo back elements already on the real canvas (when
+    // generation was grounded in them - see handleGenerate above) under
+    // fresh ids of their own, since the backend never trusts the model's
+    // identity for existing elements (see sanitizeElement's doc comment).
+    // Replace rather than append, or accepting would duplicate anything
+    // the draft echoed back unchanged. A no-op remove loop when the
+    // canvas was empty to begin with.
+    for (const element of elements) dispatch({ type: "remove", element });
     for (const element of draftElements) dispatch({ type: "add", element });
     setDraftElements(null);
     setSelectedDraftId(null);
     setAiMessages([]);
     setShowAiPanel(false);
-  }, [draftElements, dispatch]);
+  }, [draftElements, elements, dispatch]);
 
   const handleDiscardDraft = useCallback(() => {
     setDraftElements(null);
