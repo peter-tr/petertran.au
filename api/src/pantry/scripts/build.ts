@@ -1,23 +1,6 @@
-import { build } from "esbuild";
 import { cpSync } from "node:fs";
+import { buildCjsLambdas } from "../../../scripts/build-lambda";
 
-const HANDLERS = ["handler.ts", "digest-handler.ts", "price-check-handler.ts"];
-
-await Promise.all(
-  HANDLERS.map((entry) =>
-    build({
-      entryPoints: [entry],
-      outfile: `dist/${entry.replace(/\.ts$/, ".mjs")}`,
-      bundle: true,
-      minify: true,
-      platform: "node",
-      target: "node20",
-      format: "esm",
-      banner: {
-        js: "import { createRequire } from 'module'; const require = createRequire(import.meta.url);",
-      },
-    })
-  )
-);
+await buildCjsLambdas(["handler.ts", "digest-handler.ts", "price-check-handler.ts"]);
 
 cpSync("schema.graphql", "dist/schema.graphql");
