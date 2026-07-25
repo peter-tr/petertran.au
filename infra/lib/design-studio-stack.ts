@@ -84,13 +84,12 @@ export class DesignStudioStack extends Stack {
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "handler.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/src/design-studio/dist")),
-      // 1024, up from 256 (2026-07-24) - same reasoning as the portfolio/
-      // pantry/imposter/supergraph Lambdas (see site-stack.ts): cold-start
-      // CPU (module load + Apollo Server schema build, plus this Lambda's
-      // own MongoDB connection setup below) scales with memory, and none of
-      // that phase is visible on the X-Ray waterfall since it runs before
-      // Application Signals' tracer attaches.
-      memorySize: 1024,
+      // 512, down from 1024 (2026-07-25) - same reasoning as the portfolio
+      // GraphQL Lambda's identical comment (site-stack.ts): the 1024 bump's
+      // premise (more memory directly cuts cold-start latency) didn't hold
+      // up under isolation testing, and halving memory + doubling PC count
+      // is cost-neutral while fixing PC's actual capacity shortfall.
+      memorySize: 512,
       // 30s, up from 20s (2026-07-25) - generateDesignElements on the
       // SONNET tier runs adaptive thinking (see generate-elements.ts),
       // which measured 10-11s end-to-end even at the lowest effort level;

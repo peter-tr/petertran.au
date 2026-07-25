@@ -5,6 +5,9 @@ import {
   DeleteProvisionedConcurrencyConfigCommand,
   GetFunctionConfigurationCommand,
   GetProvisionedConcurrencyConfigCommand,
+  UpdateFunctionConfigurationCommand,
+  PublishVersionCommand,
+  UpdateAliasCommand,
   ResourceNotFoundException,
   ProvisionedConcurrencyConfigNotFoundException,
 } from "@aws-sdk/client-lambda";
@@ -33,6 +36,7 @@ interface WarmSchedule {
   start: string; // "HH:MM", 24h, Sydney-local
   end: string; // "HH:MM", must be > start - same-day windows only
   concurrency: number; // ProvisionedConcurrentExecutions granted to every target while within window
+  memoryMb: number; // every target's Lambda memory, applied via reconcileMemory()
 }
 
 type WarmScheduleConfig = Record<WarmScheduleKey, WarmSchedule>;
@@ -58,8 +62,11 @@ interface ProjectCost {
   // $/hr this project is costing right now, from each target's real
   // (queried) memory size times its real allocated concurrency.
   liveHourlyCostUsd: number;
-  // $/mo if the configured schedule runs as set - real memory size times
-  // the configured `concurrency`, times the schedule's actual weekly hours.
+  // $/mo if the configured schedule runs as set - configured `memoryMb`
+  // times the configured `concurrency`, times the schedule's actual weekly
+  // hours. Uses the schedule's own memoryMb (not the live-queried one) so
+  // this reflects what a pending memory choice will cost once reconciled,
+  // not what's costing right now.
   scheduledMonthlyCostUsd: number;
 }
 
@@ -74,6 +81,14 @@ const ALL_WEEKDAYS: Weekday[] = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"
 // 14h/day window). web/src/portfolio/hooks/useWarmSchedule.ts mirrors this
 // value for the settings page's own input bound - keep the two in sync.
 const MAX_CONCURRENCY = 5;
+
+// Curated, not free-form - these are this codebase's own actually-tested
+// tiers (see the 2026-07-25 cold-start investigation): 512MB showed a real
+// but small warm-invocation cost (~10-20ms) against a real DynamoDB-backed
+// query, while 1536/2048/3008 showed no further Init Duration improvement
+// over 1024MB at all. web/src/portfolio/hooks/useWarmSchedule.ts mirrors
+// this value for the settings page's own dropdown - keep the two in sync.
+const MEMORY_OPTIONS_MB = [512, 1024, 1536, 2048] as const;
 
 // One flag/schedule can cover more than one target function - zero-trust-lab's
 // 5 Lambdas only work as a pipeline (edge-authorizer needs internal-sts warm
@@ -104,6 +119,7 @@ const DEFAULT_SCHEDULE: WarmSchedule = {
   start: "08:00",
   end: "19:00",
   concurrency: 1,
+  memoryMb: 512,
 };
 const DEFAULT_CONFIG: WarmScheduleConfig = {
   portfolio: DEFAULT_SCHEDULE,
@@ -212,14 +228,16 @@ async function getTargetLiveState(
 async function computeProjectCost(key: WarmScheduleKey, schedule: WarmSchedule): Promise<ProjectCost> {
   const targetStates = await Promise.all(TARGETS_BY_PROJECT[key].map(getTargetLiveState));
 
+  const scheduledMemoryGb = schedule.memoryMb / 1024;
   let liveConcurrency = 0;
   let liveHourlyCostUsd = 0;
   let scheduledHourlyCostUsd = 0;
   for (const { memoryMb, allocatedConcurrency } of targetStates) {
-    const memoryGb = memoryMb / 1024;
+    const liveMemoryGb = memoryMb / 1024;
     liveConcurrency += allocatedConcurrency;
-    liveHourlyCostUsd += memoryGb * allocatedConcurrency * PC_PRICE_PER_GB_SECOND_USD * SECONDS_PER_HOUR;
-    scheduledHourlyCostUsd += memoryGb * schedule.concurrency * PC_PRICE_PER_GB_SECOND_USD * SECONDS_PER_HOUR;
+    liveHourlyCostUsd += liveMemoryGb * allocatedConcurrency * PC_PRICE_PER_GB_SECOND_USD * SECONDS_PER_HOUR;
+    scheduledHourlyCostUsd +=
+      scheduledMemoryGb * schedule.concurrency * PC_PRICE_PER_GB_SECOND_USD * SECONDS_PER_HOUR;
   }
 
   return {
@@ -238,17 +256,62 @@ async function computeAllProjectCosts(
   return Object.fromEntries(keys.map((key, i) => [key, costs[i]])) as Record<WarmScheduleKey, ProjectCost>;
 }
 
-// Never throws - applying PC is best-effort. The flag itself (what the user
-// asked for) is already durably saved in SSM by the time this runs; if AWS
-// can't actually grant PC right now (e.g. the account's concurrency quota
-// has no room), that's a transient infra condition, not a reason to fail the
-// request or the other targets' reconciliation in the same tick.
+// Memory is baked into each published Lambda Version, unlike PC (a
+// lightweight grant against an alias qualifier) - changing it means
+// UpdateFunctionConfiguration (mutates $LATEST) -> wait for that to land ->
+// PublishVersion -> UpdateAlias (move `live` to the new version). Only runs
+// the sequence when live memory actually differs from desired.
+//
+// No separate "clean up the old version's PC" step - verified live against
+// a throwaway Lambda that PC granted on an alias qualifier automatically
+// re-provisions against wherever the alias points after UpdateAlias
+// (list-provisioned-concurrency-configs showed exactly one record the whole
+// time, keyed to the alias, not a version), so the existing PC grant/delete
+// call below (which reconcileTarget already runs on every tick regardless)
+// is sufficient on its own.
+async function reconcileMemory(functionName: string, desiredMemoryMb: number): Promise<void> {
+  const { MemorySize } = await lambdaClient.send(
+    new GetFunctionConfigurationCommand({ FunctionName: functionName, Qualifier: ALIAS_NAME })
+  );
+  if (MemorySize === desiredMemoryMb) return;
+
+  await lambdaClient.send(
+    new UpdateFunctionConfigurationCommand({ FunctionName: functionName, MemorySize: desiredMemoryMb })
+  );
+
+  // UpdateFunctionConfiguration is asynchronous - PublishVersion while an
+  // update is still in progress either fails or snapshots stale config, so
+  // wait for it to land first. In practice this completes in a few seconds;
+  // 15 attempts at 2s apart is a generous ceiling, not an expected duration.
+  for (let attempt = 0; attempt < 15; attempt++) {
+    const { LastUpdateStatus } = await lambdaClient.send(
+      new GetFunctionConfigurationCommand({ FunctionName: functionName })
+    );
+    if (LastUpdateStatus !== "InProgress") break;
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+  }
+
+  const { Version } = await lambdaClient.send(new PublishVersionCommand({ FunctionName: functionName }));
+  await lambdaClient.send(
+    new UpdateAliasCommand({ FunctionName: functionName, Name: ALIAS_NAME, FunctionVersion: Version })
+  );
+}
+
+// Never throws - applying memory/PC is best-effort. The flag itself (what
+// the user asked for) is already durably saved in SSM by the time this
+// runs; if AWS can't actually apply it right now (e.g. the account's
+// concurrency quota has no room), that's a transient infra condition, not a
+// reason to fail the request or the other targets' reconciliation in the
+// same tick.
 async function reconcileTarget(
   functionName: string,
   shouldBeWarm: boolean,
-  concurrency: number
+  concurrency: number,
+  memoryMb: number
 ): Promise<void> {
   try {
+    await reconcileMemory(functionName, memoryMb);
+
     if (shouldBeWarm) {
       await lambdaClient.send(
         new PutProvisionedConcurrencyConfigCommand({
@@ -267,17 +330,20 @@ async function reconcileTarget(
   } catch (err) {
     // Already in the desired (no PC) state - not an error.
     if (err instanceof ResourceNotFoundException) return;
-    console.error(`reconcileTarget(${functionName}) failed - PC left as-is, will retry next tick`, err);
+    console.error(`reconcileTarget(${functionName}) failed - left as-is, will retry next tick`, err);
   }
 }
 
 async function reconcileProjectTo(
   key: WarmScheduleKey,
   shouldBeWarm: boolean,
-  concurrency: number
+  concurrency: number,
+  memoryMb: number
 ): Promise<void> {
   await Promise.all(
-    TARGETS_BY_PROJECT[key].map((functionName) => reconcileTarget(functionName, shouldBeWarm, concurrency))
+    TARGETS_BY_PROJECT[key].map((functionName) =>
+      reconcileTarget(functionName, shouldBeWarm, concurrency, memoryMb)
+    )
   );
 }
 
@@ -287,7 +353,7 @@ async function reconcileProjectTo(
 // directly by the POST handler for just the project that changed, so an
 // edit takes effect immediately instead of waiting for the next trigger.
 async function reconcileProject(key: WarmScheduleKey, schedule: WarmSchedule, now: Date): Promise<void> {
-  await reconcileProjectTo(key, isWithinWindow(schedule, now), schedule.concurrency);
+  await reconcileProjectTo(key, isWithinWindow(schedule, now), schedule.concurrency, schedule.memoryMb);
 }
 
 // Builds the AWS cron fields for a project's on/off EventBridge Schedule
@@ -378,7 +444,9 @@ function isValidSchedule(value: unknown): value is WarmSchedule {
     typeof s.concurrency === "number" &&
     Number.isInteger(s.concurrency) &&
     s.concurrency >= 1 &&
-    s.concurrency <= MAX_CONCURRENCY
+    s.concurrency <= MAX_CONCURRENCY &&
+    typeof s.memoryMb === "number" &&
+    (MEMORY_OPTIONS_MB as readonly number[]).includes(s.memoryMb)
   );
 }
 
@@ -398,12 +466,18 @@ async function processEvent(
   }
 
   if (isWarmScheduleTrigger(event)) {
-    // Unlike the on/off action, concurrency isn't part of the trigger
-    // payload itself (the EventBridge Schedule's input is just
+    // Unlike the on/off action, concurrency/memory aren't part of the
+    // trigger payload itself (the EventBridge Schedule's input is just
     // {project, action}, set once at CDK synth time / on a settings save) -
-    // fetch the current config to know how much concurrency to grant.
+    // fetch the current config to know how much concurrency to grant and
+    // which memory size to reconcile toward.
     const config = await getConfig();
-    await reconcileProjectTo(event.project, event.action === "on", config[event.project].concurrency);
+    await reconcileProjectTo(
+      event.project,
+      event.action === "on",
+      config[event.project].concurrency,
+      config[event.project].memoryMb
+    );
 
     return { statusCode: 200, body: "reconciled" };
   }
@@ -417,8 +491,8 @@ async function processEvent(
         body: JSON.stringify({
           error:
             "project must be one of portfolio/pantry/imposter/supergraph/designStudio/zeroTrustLab, " +
-            "schedule must be a valid { enabled, days, start, end, concurrency } " +
-            `(concurrency an integer 1-${MAX_CONCURRENCY})`,
+            "schedule must be a valid { enabled, days, start, end, concurrency, memoryMb } " +
+            `(concurrency an integer 1-${MAX_CONCURRENCY}, memoryMb one of ${MEMORY_OPTIONS_MB.join("/")})`,
         }),
       };
     }

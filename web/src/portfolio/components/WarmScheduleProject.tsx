@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   MAX_CONCURRENCY,
+  MEMORY_OPTIONS_MB,
   type WarmScheduleKey,
   type WarmSchedule,
   type Weekday,
@@ -24,6 +25,7 @@ function schedulesEqual(a: WarmSchedule, b: WarmSchedule): boolean {
     a.start === b.start &&
     a.end === b.end &&
     a.concurrency === b.concurrency &&
+    a.memoryMb === b.memoryMb &&
     a.days.length === b.days.length &&
     a.days.every((d) => b.days.includes(d))
   );
@@ -74,7 +76,8 @@ export default function WarmScheduleProject({
       draft.start >= draft.end ||
       !Number.isInteger(draft.concurrency) ||
       draft.concurrency < 1 ||
-      draft.concurrency > MAX_CONCURRENCY);
+      draft.concurrency > MAX_CONCURRENCY ||
+      !(MEMORY_OPTIONS_MB as readonly number[]).includes(draft.memoryMb));
 
   return (
     <div className="warm-schedule">
@@ -128,6 +131,19 @@ export default function WarmScheduleProject({
           value={draft.concurrency}
           onChange={(e) => setDraft((d) => ({ ...d, concurrency: Number(e.target.value) }))}
         />
+        <span className="warm-schedule-times-sep">@</span>
+        <select
+          className="form-input"
+          aria-label={`${label} memory size`}
+          value={draft.memoryMb}
+          onChange={(e) => setDraft((d) => ({ ...d, memoryMb: Number(e.target.value) }))}
+        >
+          {MEMORY_OPTIONS_MB.map((mb) => (
+            <option key={mb} value={mb}>
+              {mb}MB
+            </option>
+          ))}
+        </select>
         <button
           className="run-btn"
           type="button"
@@ -147,7 +163,8 @@ export default function WarmScheduleProject({
       )}
       {invalid && (
         <p className="section-hint">
-          Pick at least one day, with start before end, and concurrency between 1 and {MAX_CONCURRENCY}.
+          Pick at least one day, with start before end, concurrency between 1 and {MAX_CONCURRENCY}, and a
+          valid memory size.
         </p>
       )}
     </div>

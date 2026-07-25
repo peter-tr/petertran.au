@@ -40,6 +40,7 @@ interface WarmSchedule {
   start: string; // "HH:MM", 24h, Sydney-local
   end: string; // "HH:MM"
   concurrency: number; // ProvisionedConcurrentExecutions granted while within window
+  memoryMb: number; // every target's Lambda memory, applied via handler.ts's reconcileMemory()
 }
 
 const ALL_WEEKDAYS: Weekday[] = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
@@ -54,6 +55,7 @@ const DEFAULT_SCHEDULE: WarmSchedule = {
   start: "08:00",
   end: "19:00",
   concurrency: 1,
+  memoryMb: 512,
 };
 
 const WARM_SCHEDULE_PROJECTS: WarmScheduleKey[] = [
@@ -143,10 +145,12 @@ export class ProvisionedConcurrencyStack extends Stack {
     // adding `supergraph` here on 2026-07-21 reset every project's
     // real schedule back to this literal (confirmed via WarmScheduleParam's
     // UPDATE_COMPLETE stack event timestamp - see
-    // docs/warmup-and-provisioned-concurrency.md), and adding `concurrency`
+    // docs/warmup-and-provisioned-concurrency.md), adding `concurrency`
     // to WarmSchedule/DEFAULT_SCHEDULE on 2026-07-22 did it again even
-    // though no project key was touched - the serialized string still
-    // changed, which is all CloudFormation's diff actually looks at.
+    // though no project key was touched, and adding `memoryMb` on
+    // 2026-07-25 (to let memory size become a settings-page control
+    // alongside concurrency) does it a third time - the serialized string
+    // still changed, which is all CloudFormation's diff actually looks at.
     //
     // A newly added project or field needs no change here at all: handler.ts's
     // getConfig() already merges `{ ...DEFAULT_CONFIG[key], ...stored[key] }`
@@ -202,7 +206,12 @@ export class ProvisionedConcurrencyStack extends Stack {
       handler: "warm-schedule/handler.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/dist")),
       memorySize: 128,
-      timeout: Duration.seconds(10),
+      // 10s wasn't enough once a settings save could also change a target's
+      // memory - that path (UpdateFunctionConfiguration -> poll for
+      // completion -> PublishVersion -> UpdateAlias, see handler.ts's
+      // reconcileMemory()) completes in a few seconds in practice but polls
+      // with real margin built in.
+      timeout: Duration.seconds(60),
       environment: {
         LIVE_ALIAS_NAME,
         WARM_SCHEDULE_PARAM_NAME: scheduleParam.parameterName,
@@ -230,6 +239,30 @@ export class ProvisionedConcurrencyStack extends Stack {
           "lambda:PutProvisionedConcurrencyConfig",
           "lambda:DeleteProvisionedConcurrencyConfig",
         ],
+        resources: targetFnNames.map((name) => liveAliasArn(this.region, this.account, name)),
+      })
+    );
+    // Memory-size reconciliation (handler.ts's reconcileMemory()) - unlike
+    // PC, memory is baked into each published Version, so changing it needs
+    // UpdateFunctionConfiguration/PublishVersion against the bare (unqualified)
+    // function - these actions don't accept an alias qualifier the way the PC
+    // calls above do - plus UpdateAlias against the `live` alias itself to
+    // move it onto the newly-published version.
+    warmScheduleFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: [
+          "lambda:GetFunctionConfiguration",
+          "lambda:UpdateFunctionConfiguration",
+          "lambda:PublishVersion",
+        ],
+        resources: targetFnNames.map(
+          (name) => `arn:aws:lambda:${this.region}:${this.account}:function:${name}`
+        ),
+      })
+    );
+    warmScheduleFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["lambda:UpdateAlias"],
         resources: targetFnNames.map((name) => liveAliasArn(this.region, this.account, name)),
       })
     );

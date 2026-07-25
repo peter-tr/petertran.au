@@ -72,13 +72,12 @@ export class GamesStack extends Stack {
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "handler.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/src/games/imposter/dist")),
-      // 1024, up from 256 (2026-07-24) - same reasoning as the portfolio
-      // GraphQL Lambda's identical comment (site-stack.ts): a cold trace
-      // outside the ProvisionedConcurrencyStack warm window showed Lambda
-      // Init (module load + Apollo Server schema build, invisible on the
-      // X-Ray waterfall since it runs before the tracer attaches) was the
-      // dominant cost, and that phase's CPU scales with memory.
-      memorySize: 1024,
+      // 512, down from 1024 (2026-07-25) - same reasoning as the portfolio
+      // GraphQL Lambda's identical comment (site-stack.ts): the 1024 bump's
+      // premise (more memory directly cuts cold-start latency) didn't hold
+      // up under isolation testing, and halving memory + doubling PC count
+      // is cost-neutral while fixing PC's actual capacity shortfall.
+      memorySize: 512,
       timeout: Duration.seconds(15),
       environment: {
         TABLE_NAME: table.tableName,

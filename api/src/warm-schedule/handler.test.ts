@@ -6,6 +6,9 @@ import {
   DeleteProvisionedConcurrencyConfigCommand,
   GetFunctionConfigurationCommand,
   GetProvisionedConcurrencyConfigCommand,
+  UpdateFunctionConfigurationCommand,
+  PublishVersionCommand,
+  UpdateAliasCommand,
   ResourceNotFoundException,
   ProvisionedConcurrencyConfigNotFoundException,
 } from "@aws-sdk/client-lambda";
@@ -66,6 +69,7 @@ const DEFAULT_SCHEDULE = {
   start: "08:00",
   end: "19:00",
   concurrency: 1,
+  memoryMb: 512,
 };
 const DEFAULT_CONFIG = {
   portfolio: DEFAULT_SCHEDULE,
@@ -96,9 +100,17 @@ beforeEach(() => {
   schedulerMock.reset();
   lambdaMock.on(PutProvisionedConcurrencyConfigCommand).resolves({});
   lambdaMock.on(DeleteProvisionedConcurrencyConfigCommand).resolves({});
-  // Cost lookups the GET/POST branches now do for every target - default to
-  // "256MB, no PC currently allocated" unless a test overrides it.
-  lambdaMock.on(GetFunctionConfigurationCommand).resolves({ MemorySize: 256 });
+  // Cost lookups (and reconcileMemory's live-memory check) the GET/POST/
+  // reconcile branches now do for every target - default to "256MB, no PC
+  // currently allocated" unless a test overrides it. Deliberately different
+  // from DEFAULT_SCHEDULE's memoryMb (512), so every existing reconcile
+  // test also exercises reconcileMemory's update/publish/move-alias path as
+  // a side effect, same as it would against a freshly-deployed real Lambda
+  // still sitting at its old memory.
+  lambdaMock.on(GetFunctionConfigurationCommand).resolves({ MemorySize: 256, LastUpdateStatus: "Successful" });
+  lambdaMock.on(UpdateFunctionConfigurationCommand).resolves({});
+  lambdaMock.on(PublishVersionCommand).resolves({ Version: "5" });
+  lambdaMock.on(UpdateAliasCommand).resolves({});
   // Real AWS behavior when a target currently has no PC config (e.g.
   // outside the warm window): GetProvisionedConcurrencyConfig rejects with
   // ProvisionedConcurrencyConfigNotFoundException, not ResourceNotFoundException.
@@ -152,12 +164,16 @@ describe("warm-schedule handler - config GET/POST", () => {
     const result = await handler(httpEvent("GET"));
     const { costs } = JSON.parse(result.body as string);
 
-    // pantry-fn: 256MB, 1 live unit, PC rate $0.000005236/GB-s.
+    // pantry-fn: live memory 256MB (from the beforeEach mock), 1 live unit,
+    // PC rate $0.000005236/GB-s.
     expect(costs.pantry.liveConcurrency).toBe(1);
     expect(costs.pantry.liveHourlyCostUsd).toBeCloseTo(0.25 * 1 * 0.000005236 * 3600, 10);
-    // Default schedule (8am-7pm every day, concurrency 1) -> 11h * 7 days/week.
+    // Scheduled cost uses the schedule's own memoryMb (512MB -> 0.5 factor),
+    // not the live-queried 256MB - it projects what the configured schedule
+    // will cost once reconciled, not what's costing right now. Default
+    // schedule (8am-7pm every day, concurrency 1) -> 11h * 7 days/week.
     expect(costs.pantry.scheduledMonthlyCostUsd).toBeCloseTo(
-      0.25 * 1 * 0.000005236 * 3600 * 77 * (365.25 / 7 / 12),
+      0.5 * 1 * 0.000005236 * 3600 * 77 * (365.25 / 7 / 12),
       6
     );
 
@@ -226,6 +242,7 @@ describe("warm-schedule handler - config GET/POST", () => {
       start: "07:30",
       end: "18:00",
       concurrency: 3,
+      memoryMb: 1024,
     };
     const result = await handler(httpEvent("POST", { project: "pantry", schedule: newSchedule }));
     expect(result.statusCode).toBe(200);
@@ -270,6 +287,81 @@ describe("warm-schedule handler - config GET/POST", () => {
     const deleteCalls = lambdaMock.commandCalls(DeleteProvisionedConcurrencyConfigCommand);
     expect(deleteCalls).toHaveLength(1);
     expect(deleteCalls[0].args[0].input.FunctionName).toBe("pantry-fn");
+  });
+});
+
+describe("warm-schedule handler - memory reconciliation", () => {
+  it("skips the update/publish/move-alias sequence when live memory already matches desired", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(WITHIN_WINDOW);
+    ssmMock.on(GetParameterCommand).resolves({});
+    // Every target's live memory matches DEFAULT_SCHEDULE.memoryMb (512) -
+    // overrides the beforeEach 256MB default for this test only.
+    lambdaMock
+      .on(GetFunctionConfigurationCommand)
+      .resolves({ MemorySize: 512, LastUpdateStatus: "Successful" });
+
+    await handler({ reconcile: true });
+
+    expect(lambdaMock.commandCalls(UpdateFunctionConfigurationCommand)).toHaveLength(0);
+    expect(lambdaMock.commandCalls(PublishVersionCommand)).toHaveLength(0);
+    expect(lambdaMock.commandCalls(UpdateAliasCommand)).toHaveLength(0);
+    // PC still gets (re-)granted as normal - memory being unchanged doesn't
+    // skip the rest of reconcileTarget.
+    expect(lambdaMock.commandCalls(PutProvisionedConcurrencyConfigCommand).length).toBeGreaterThan(0);
+  });
+
+  it("updates memory, publishes a version, and moves the live alias before granting PC when memory differs", async () => {
+    ssmMock.on(GetParameterCommand).resolves({});
+
+    const result = await handler({ project: "pantry", action: "on" });
+    expect(result).toEqual({ statusCode: 200, headers: {}, body: "reconciled" });
+
+    // beforeEach mocks live memory at 256MB; DEFAULT_SCHEDULE.memoryMb is 512.
+    const updateCalls = lambdaMock.commandCalls(UpdateFunctionConfigurationCommand);
+    expect(updateCalls).toHaveLength(1);
+    expect(updateCalls[0].args[0].input).toMatchObject({ FunctionName: "pantry-fn", MemorySize: 512 });
+
+    expect(lambdaMock.commandCalls(PublishVersionCommand)).toHaveLength(1);
+    expect(lambdaMock.commandCalls(PublishVersionCommand)[0].args[0].input.FunctionName).toBe("pantry-fn");
+
+    const aliasCalls = lambdaMock.commandCalls(UpdateAliasCommand);
+    expect(aliasCalls).toHaveLength(1);
+    // "5" is PublishVersionCommand's mocked return Version (see beforeEach).
+    expect(aliasCalls[0].args[0].input).toMatchObject({
+      FunctionName: "pantry-fn",
+      Name: "live",
+      FunctionVersion: "5",
+    });
+
+    // PC is granted after the memory dance, against the same target.
+    const putCalls = lambdaMock.commandCalls(PutProvisionedConcurrencyConfigCommand);
+    expect(putCalls).toHaveLength(1);
+    expect(putCalls[0].args[0].input.FunctionName).toBe("pantry-fn");
+  });
+
+  it("polls past an in-progress function update before publishing a version", async () => {
+    ssmMock.on(GetParameterCommand).resolves({});
+    // First call: the initial live-memory check (Qualifier: live). Second/
+    // third calls: polling $LATEST's LastUpdateStatus - InProgress once,
+    // then Successful, mirroring real AWS timing (confirmed live: typically
+    // completes within a couple of 2s polls).
+    lambdaMock
+      .on(GetFunctionConfigurationCommand)
+      .resolvesOnce({ MemorySize: 256, LastUpdateStatus: "Successful" })
+      .resolvesOnce({ LastUpdateStatus: "InProgress" })
+      .resolves({ LastUpdateStatus: "Successful" });
+
+    const timers = vi.useFakeTimers({ toFake: ["setTimeout"] });
+    const invokePromise = handler({ project: "pantry", action: "on" });
+    // Let the poll loop's setTimeout(2000) fire without waiting 2 real
+    // seconds - the loop awaits this before its next GetFunctionConfiguration.
+    await vi.advanceTimersByTimeAsync(2000);
+    const result = await invokePromise;
+    timers.useRealTimers();
+
+    expect(result).toEqual({ statusCode: 200, headers: {}, body: "reconciled" });
+    expect(lambdaMock.commandCalls(PublishVersionCommand)).toHaveLength(1);
   });
 });
 
