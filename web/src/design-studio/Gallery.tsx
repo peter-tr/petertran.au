@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { listDesigns, deleteDesign, type Design } from "./api";
+import { getGalleryData, listDesigns, deleteDesign, type Design, type Template } from "./api";
 import TemplatesSection from "./components/TemplatesSection";
 import { CANVAS_FORMATS } from "./lib/formats";
 import type { NewDesignLocationState } from "./Editor";
@@ -8,19 +8,29 @@ import "./design-studio.css";
 
 export default function Gallery() {
   const [designs, setDesigns] = useState<Design[] | null>(null);
+  const [templates, setTemplates] = useState<Template[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  function refetch() {
-    listDesigns()
-      .then(setDesigns)
+  // One combined request for both designs and templates - Gallery's own list
+  // and TemplatesSection's initial unfiltered list used to be 2 (really 3,
+  // see TemplatesSection) separate requests firing at mount, which could
+  // outrun provisioned concurrency and cold-start. Deleting a design only
+  // needs designs re-fetched, so that path stays on the plain listDesigns()
+  // query below rather than re-running this combined one.
+  useEffect(() => {
+    getGalleryData()
+      .then((data) => {
+        setDesigns(data.designs);
+        setTemplates(data.templates);
+      })
       .catch(() => setError("Couldn't load your designs right now."));
-  }
-
-  useEffect(refetch, []);
+  }, []);
 
   async function handleDelete(id: string) {
     await deleteDesign(id);
-    refetch();
+    listDesigns()
+      .then(setDesigns)
+      .catch(() => setError("Couldn't load your designs right now."));
   }
 
   return (
@@ -63,7 +73,7 @@ export default function Gallery() {
         ))}
       </ul>
 
-      <TemplatesSection />
+      <TemplatesSection initialTemplates={templates} />
     </div>
   );
 }
