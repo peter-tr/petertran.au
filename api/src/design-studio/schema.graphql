@@ -146,6 +146,9 @@ type AiSettings {
   modelTier: AiModelTier!
 }
 
+"""
+Input for updateAiSettings - omitted fields keep their current value.
+"""
 input AiSettingsInput {
   provider: AiProvider
   modelTier: AiModelTier

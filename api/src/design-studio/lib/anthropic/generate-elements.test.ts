@@ -186,6 +186,7 @@ describe("generateDesignElements", () => {
 
     expect(getAnthropicClient).toHaveBeenCalled();
     expect(getAnthropicBedrockClient).not.toHaveBeenCalled();
+
     const call = anthropicMessagesParse.mock.calls.at(-1)![0];
     expect(call.model).toBe("claude-haiku-4-5");
     expect(call.thinking).toBeUndefined();
@@ -206,6 +207,7 @@ describe("generateDesignElements", () => {
 
     expect(getAnthropicBedrockClient).toHaveBeenCalled();
     expect(getAnthropicClient).not.toHaveBeenCalled();
+
     const call = bedrockMessagesParse.mock.calls.at(-1)![0];
     expect(call.model).toBe("au.anthropic.claude-sonnet-4-6");
   });
