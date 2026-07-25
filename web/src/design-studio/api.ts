@@ -9,6 +9,7 @@ import type {
   DeleteDesignMutation,
   TemplatesQuery,
   TemplatesQueryVariables,
+  GalleryQuery,
   SaveAsTemplateMutation,
   GenerateDesignElementsMutation,
   GenerateDesignElementsMutationVariables,
@@ -139,6 +140,38 @@ export const SAVE_AS_TEMPLATE_MUTATION = /* GraphQL */ `
   }
   ${TEMPLATE_FIELDS}
 `;
+
+// Gallery.tsx's initial load needs designs (its own list) and templates
+// (unfiltered, for TemplatesSection's category dropdown + default results) at
+// the same time - one request for both instead of two separate ones, so the
+// page's first paint only ever needs 1 concurrent Lambda execution instead of
+// 2+ (a 3rd request - TemplatesSection's own debounced-filter effect re-firing
+// on mount with an empty filter - used to overflow even a 2-instance
+// provisioned-concurrency pool and cold-start; see TemplatesSection.tsx for
+// how that 3rd request was removed rather than just folded into this one).
+export const GALLERY_QUERY = /* GraphQL */ `
+  query Gallery {
+    designs {
+      ...DesignFields
+    }
+    templates {
+      ...TemplateFields
+    }
+  }
+  ${DESIGN_FIELDS}
+  ${TEMPLATE_FIELDS}
+`;
+
+export interface GalleryData {
+  designs: Design[];
+  templates: Template[];
+}
+
+export async function getGalleryData(): Promise<GalleryData> {
+  const data = await runDesignStudioQuery<GalleryQuery>(GALLERY_QUERY);
+
+  return { designs: data.designs, templates: data.templates };
+}
 
 export async function listDesigns(): Promise<Design[]> {
   const data = await runDesignStudioQuery<DesignsQuery>(DESIGNS_QUERY);
