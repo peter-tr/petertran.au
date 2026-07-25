@@ -102,14 +102,12 @@ beforeEach(() => {
   // Real AWS behavior when a target currently has no PC config (e.g.
   // outside the warm window): GetProvisionedConcurrencyConfig rejects with
   // ProvisionedConcurrencyConfigNotFoundException, not ResourceNotFoundException.
-  lambdaMock
-    .on(GetProvisionedConcurrencyConfigCommand)
-    .rejects(
-      new ProvisionedConcurrencyConfigNotFoundException({
-        message: "The specified configuration does not exist.",
-        $metadata: {},
-      })
-    );
+  lambdaMock.on(GetProvisionedConcurrencyConfigCommand).rejects(
+    new ProvisionedConcurrencyConfigNotFoundException({
+      message: "The specified configuration does not exist.",
+      $metadata: {},
+    })
+  );
   schedulerMock.on(GetScheduleCommand).resolves({
     FlexibleTimeWindow: { Mode: "OFF" },
     Target: {
