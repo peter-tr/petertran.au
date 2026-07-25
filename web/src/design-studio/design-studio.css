@@ -468,11 +468,23 @@
 
 .design-studio-ai-panel-settings {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
+  /* Column, not the wrapped row this started as - the side panel is a
+     fixed 14rem, and a select showing its full current value ("Sonnet 4.6
+     (better quality)") doesn't fit next to a label at that width. Wrapping
+     only rescues a row once an item fits on its own line; here neither
+     item does, so the overflow just pushed past the panel and off the
+     screen instead. */
+  flex-direction: column;
+  gap: 0.4rem;
   font-family: var(--font-mono);
   font-size: 0.75rem;
   color: var(--muted);
+}
+
+.design-studio-ai-panel-settings label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
 }
 
 .design-studio-ai-panel-settings select {
@@ -482,7 +494,15 @@
   background: var(--panel-2);
   border: 1px solid var(--rule);
   border-radius: var(--radius);
-  padding: 0.2rem 0.4rem;
+  padding: 0.3rem 0.4rem;
+  /* Without an explicit width, a <select> sizes to its longest content
+     (here, the current value's text) rather than its container - the
+     actual cause of the overflow. width: 100% + min-width: 0 makes it
+     respect the panel; the browser truncates the displayed text instead
+     of growing the box. */
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .design-studio-ai-panel-log {
