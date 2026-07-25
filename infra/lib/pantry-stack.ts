@@ -79,7 +79,12 @@ export class PantryStack extends Stack {
     // per explicit ask - this is a personal app, not something that needs
     // bank-grade signup friction.
     const autoConfirmFn = new lambda.Function(this, "PantryAutoConfirmFunction", {
-      functionName: "pantry-auto-confirm",
+      // Suffixed for the test env, same as every other named resource in
+      // this stack - missed when this trigger was added, which collided
+      // with prod's real "pantry-auto-confirm" Lambda on the first test-env
+      // deploy attempt after it existed (Lambda function names are unique
+      // per account/region, unlike the Cognito user pool name below).
+      functionName: props.isTestEnv ? "pantry-auto-confirm-test" : "pantry-auto-confirm",
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "index.handler",
       code: lambda.Code.fromInline(
