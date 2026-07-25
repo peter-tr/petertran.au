@@ -6,6 +6,7 @@ import {
   GetFunctionConfigurationCommand,
   GetProvisionedConcurrencyConfigCommand,
   ResourceNotFoundException,
+  ProvisionedConcurrencyConfigNotFoundException,
 } from "@aws-sdk/client-lambda";
 import { SSMClient, GetParameterCommand, PutParameterCommand } from "@aws-sdk/client-ssm";
 import { SchedulerClient, GetScheduleCommand, UpdateScheduleCommand } from "@aws-sdk/client-scheduler";
@@ -193,6 +194,10 @@ async function getTargetLiveState(
       .catch((err) => {
         // No PC currently configured for this target - 0 allocated, not an
         // error (same as reconcileTarget's own handling of this case).
+        // GetProvisionedConcurrencyConfig reports this as
+        // ProvisionedConcurrencyConfigNotFoundException, not the
+        // ResourceNotFoundException other Lambda PC calls use.
+        if (err instanceof ProvisionedConcurrencyConfigNotFoundException) return null;
         if (err instanceof ResourceNotFoundException) return null;
         throw err;
       }),
