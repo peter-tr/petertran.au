@@ -400,6 +400,13 @@ export class SiteStack extends Stack {
           // extrapolated one.
           sessionSampleRate: 1,
           telemetries: ["errors", "performance", "http"],
+          // Has RUM record browser-side segments (page load, resource
+          // timing) as X-Ray segments too, so they stitch into the same
+          // trace as the Lambda's own X-Ray spans instead of only sharing a
+          // trace ID - full client-to-backend traces in one X-Ray view.
+          // Complements the client SDK's own enableXRay in web/src/shared/rum.ts,
+          // which is what makes the browser generate and send that trace ID.
+          enableXRay: true,
         },
       });
 
