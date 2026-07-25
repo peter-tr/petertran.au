@@ -1,10 +1,42 @@
 import { randomUUID } from "node:crypto";
 import { getAnthropicClient } from "api-shared/anthropic-client";
+import { getAnthropicBedrockClient } from "api-shared/anthropic-bedrock-client";
 import { assertAiNotRateLimited } from "../util/ai-rate-limit";
-import type { DesignElementRecord, DesignElementType } from "../design";
+import type { AiSettingsRecord, DesignElementRecord, DesignElementType } from "../design";
 
 const MAX_PROMPT_LENGTH = 300;
 const MAX_ELEMENTS = 12;
+
+// Bedrock's inference-profile IDs don't match the direct API's bare model
+// IDs for the same model, so callers pick a capability tier (AiSettings)
+// rather than a raw ID, and this resolves the actual string per provider.
+// The BEDROCK IDs use the "au." cross-region inference profile prefix,
+// not "us." - this Lambda deploys to ap-southeast-2 (see
+// infra/bin/*.ts's DesignStudioStack instantiation), and on-demand
+// invocation of the bare model id fails there ("with on-demand throughput
+// isn't supported") the same way it does everywhere else; verified
+// invokable via `aws bedrock-runtime converse --region ap-southeast-2`.
+// Sonnet 5 isn't on this table yet - it's not been granted Bedrock model
+// access on this account, so SONNET currently means Sonnet 4.6 on both
+// providers. Bump both rows once that access lands.
+//
+// BEDROCK + HAIKU is deliberately not offered in the UI (see
+// AiPanel.tsx) - confirmed via a minimal repro that Bedrock rejects
+// structured JSON output (output_config.format) for Haiku 4.5 with
+// "Extra inputs are not permitted", while the identical shape against
+// Sonnet 4.6 on Bedrock succeeds. Re-test before re-enabling it; the
+// guard below exists so a stale client or a direct API call still fails
+// with a clear message instead of that raw 400.
+const MODEL_IDS: Record<AiSettingsRecord["provider"], Record<AiSettingsRecord["modelTier"], string>> = {
+  ANTHROPIC: {
+    HAIKU: "claude-haiku-4-5",
+    SONNET: "claude-sonnet-4-6",
+  },
+  BEDROCK: {
+    HAIKU: "au.anthropic.claude-haiku-4-5-20251001-v1:0",
+    SONNET: "au.anthropic.claude-sonnet-4-6",
+  },
+};
 
 interface RawElement {
   type: DesignElementType;
@@ -73,6 +105,79 @@ const GENERATE_ELEMENTS_SCHEMA = {
   additionalProperties: false,
 } as const;
 
+// A worked example on a fixed hypothetical canvas, showing what "coherent
+// layout" actually looks like rather than just stating rules about it -
+// margins, a simple alignment grid, a cohesive palette, and text/background
+// contrast are all much easier for the model to copy from a real example
+// than to derive correctly from prose alone. The prompt below is explicit
+// that the numbers are illustrative for THIS 800x1000 example canvas and
+// must be scaled proportionally, not copied onto the real one.
+const EXAMPLE_PROMPT = "A motivational quote poster with a sunset theme";
+const EXAMPLE_OUTPUT: RawGenerateResult = {
+  elements: [
+    {
+      type: "RECTANGLE",
+      x: 0,
+      y: 0,
+      width: 800,
+      height: 1000,
+      rotation: 0,
+      fill: "#1b1035",
+      stroke: "",
+      strokeWidth: 0,
+      text: null,
+      fontFamily: null,
+      fontSize: null,
+      fontWeight: null,
+    },
+    {
+      type: "ELLIPSE",
+      x: 200,
+      y: 560,
+      width: 400,
+      height: 400,
+      rotation: 0,
+      fill: "#ff6b4a",
+      stroke: "",
+      strokeWidth: 0,
+      text: null,
+      fontFamily: null,
+      fontSize: null,
+      fontWeight: null,
+    },
+    {
+      type: "TEXT",
+      x: 80,
+      y: 120,
+      width: 640,
+      height: 140,
+      rotation: 0,
+      fill: "#fdf3e7",
+      stroke: "",
+      strokeWidth: 0,
+      text: "Chase the Light",
+      fontFamily: "Fraunces",
+      fontSize: 64,
+      fontWeight: 700,
+    },
+    {
+      type: "TEXT",
+      x: 80,
+      y: 280,
+      width: 640,
+      height: 60,
+      rotation: 0,
+      fill: "#f5c9a8",
+      stroke: "",
+      strokeWidth: 0,
+      text: "Every sunset is a promise of a new dawn.",
+      fontFamily: "IBM Plex Sans",
+      fontSize: 24,
+      fontWeight: 400,
+    },
+  ],
+};
+
 function buildSystemPrompt(width: number, height: number, isRefinement: boolean): string {
   const refinementNote = isRefinement
     ? `\n\nThe user already has a draft, provided as JSON in their message alongside the instruction. Treat the instruction as a follow-up refinement of that draft (e.g. "make the text bigger", "change the colors to blue", "add a subtitle") rather than a request to start over. Return the COMPLETE updated set of elements - everything from the existing draft that the instruction didn't ask to change should come back unchanged, not be dropped.`
@@ -84,11 +189,19 @@ The canvas is ${width}x${height} px, origin (0,0) at the top-left. Generate betw
 
 Rules:
 - Keep every element's x/y/width/height fully within the canvas bounds (0..${width} horizontally, 0..${height} vertically) - nothing may hang off the edge.
+- Leave a margin of roughly 8-12% of the canvas's smaller dimension around the outer edge - text and accent shapes shouldn't crowd right up to the border unless the prompt explicitly asks for a full-bleed look.
+- Align elements to a simple shared grid rather than scattering them at arbitrary coordinates - e.g. reuse the same left edge for stacked text blocks, and center accent shapes on the canvas's horizontal or vertical midline when there's no other obvious anchor.
+- Give TEXT elements a clear size hierarchy: a heading should be noticeably larger and bolder than any subheading or body text under it (roughly 2-3x the font size, not a handful of pixels).
+- Every TEXT element's "fill" must contrast strongly against whatever it visually sits on top of (the background or an accent shape behind it) - light text (e.g. near-white) on a dark background, or dark text on a light background. Never pick a text color close in lightness to what's behind it.
 - "fill"/"stroke" are hex colors (e.g. "#1a1a2e"); use "stroke": "" and "strokeWidth": 0 when an element has no border.
 - Only TEXT elements set "text"/"fontFamily"/"fontSize"/"fontWeight" (fontWeight 400 for regular, 600-700 for bold) - set all four to null for RECTANGLE/ELLIPSE.
 - "rotation" is degrees, 0 unless the prompt implies an angled element.
 - Order elements back-to-front (large background shapes first, text and accents last) - the caller assigns stacking order from this array's order, not from any field you return.
-- Use a cohesive color palette (2-4 colors) that fits the prompt's mood/theme rather than random colors per element.${refinementNote}`;
+- Use a cohesive color palette (2-4 colors) that fits the prompt's mood/theme rather than random colors per element.${refinementNote}
+
+Example - for the prompt "${EXAMPLE_PROMPT}" on an 800x1000 canvas, a good response is:
+${JSON.stringify(EXAMPLE_OUTPUT)}
+(Illustrative only - it's sized for an 800x1000 canvas. Scale positions/sizes proportionally to this request's actual ${width}x${height} canvas rather than reusing these numbers, and pick colors/wording that fit this prompt, not the example's sunset theme.)`;
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -139,7 +252,8 @@ export async function generateDesignElements(
   width: number,
   height: number,
   currentElements: DesignElementRecord[] | undefined,
-  sourceIp: string | undefined
+  sourceIp: string | undefined,
+  aiSettings: AiSettingsRecord
 ): Promise<DesignElementRecord[]> {
   const trimmed = prompt.trim();
   if (!trimmed) throw new Error("A prompt is required.");
@@ -147,6 +261,11 @@ export async function generateDesignElements(
     throw new Error(`Keep the prompt under ${MAX_PROMPT_LENGTH} characters.`);
   }
   if (width <= 0 || height <= 0) throw new Error("width/height must be positive.");
+  if (aiSettings.provider === "BEDROCK" && aiSettings.modelTier === "HAIKU") {
+    throw new Error(
+      "Bedrock doesn't currently support this feature's structured output for Haiku 4.5 - pick Sonnet, or switch to the direct Anthropic API."
+    );
+  }
 
   await assertAiNotRateLimited(sourceIp);
 
@@ -155,13 +274,31 @@ export async function generateDesignElements(
     ? `Current draft (JSON): ${JSON.stringify(currentElements)}\n\nInstruction: ${trimmed}`
     : trimmed;
 
-  const client = await getAnthropicClient();
+  const model = MODEL_IDS[aiSettings.provider][aiSettings.modelTier];
+  const client = aiSettings.provider === "BEDROCK" ? getAnthropicBedrockClient() : await getAnthropicClient();
+
+  // Haiku doesn't support adaptive thinking or the effort parameter (errors
+  // if sent) - only the Sonnet tier gets a deliberation pass before it picks
+  // coordinates/colors, which is where layout quality actually comes from.
+  const supportsThinking = aiSettings.modelTier === "SONNET";
+
   const response = await client.messages.parse({
-    model: "claude-haiku-4-5",
-    max_tokens: 2048,
+    model,
+    // Thinking counts against max_tokens on models where it's enabled, so
+    // the Sonnet path gets more headroom than Haiku's fixed, small output.
+    max_tokens: supportsThinking ? 8192 : 2048,
     system: buildSystemPrompt(width, height, isRefinement),
     messages: [{ role: "user", content: userContent }],
-    output_config: { format: { type: "json_schema", schema: GENERATE_ELEMENTS_SCHEMA } },
+    ...(supportsThinking ? { thinking: { type: "adaptive" } } : {}),
+    output_config: {
+      format: { type: "json_schema", schema: GENERATE_ELEMENTS_SCHEMA },
+      // "low", not the "medium" default - measured against this exact
+      // prompt+schema, "medium" took ~83s (this Lambda's timeout is 30s),
+      // "low" ~10s with no visible quality drop. Layout generation is
+      // simple enough a task that low effort's lighter deliberation is
+      // still enough; re-measure before raising this.
+      ...(supportsThinking ? { effort: "low" } : {}),
+    },
   });
 
   const parsed = response.parsed_output as RawGenerateResult | null;

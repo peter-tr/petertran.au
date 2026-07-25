@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { createDesignStudioResolvers, type DesignStore } from "./resolvers";
-import type { DesignRecord, TemplateRecord } from "../lib/design";
+import type { AiSettingsRecord, DesignRecord, TemplateRecord } from "../lib/design";
+
+const DEFAULT_AI_SETTINGS: AiSettingsRecord = { provider: "ANTHROPIC", modelTier: "HAIKU" };
 
 function makeDesign(overrides: Partial<DesignRecord> = {}): DesignRecord {
   return {
@@ -52,6 +54,8 @@ function makeStore(overrides: Partial<DesignStore> = {}): DesignStore {
     deleteDesign: vi.fn().mockResolvedValue(true),
     listTemplates: vi.fn().mockResolvedValue([]),
     saveTemplate: vi.fn(),
+    getAiSettings: vi.fn().mockResolvedValue(DEFAULT_AI_SETTINGS),
+    updateAiSettings: vi.fn(),
     ...overrides,
   };
 }
@@ -135,7 +139,7 @@ describe("createDesignStudioResolvers", () => {
     expect(result.id).toBe("new-tpl");
   });
 
-  it("Mutation.generateDesignElements delegates to the injected generate function with the request context", async () => {
+  it("Mutation.generateDesignElements delegates to the injected generate function with the request context and stored AI settings", async () => {
     const generated = [makeTemplate().elements[0]];
     const generate = vi.fn().mockResolvedValue(generated);
     const store = makeStore();
@@ -145,7 +149,15 @@ describe("createDesignStudioResolvers", () => {
     const context = { sourceIp: "1.2.3.4" };
     const result = await resolvers.Mutation.generateDesignElements({}, args, context);
 
-    expect(generate).toHaveBeenCalledWith("a bold sale poster", 900, 600, undefined, "1.2.3.4");
+    expect(store.getAiSettings).toHaveBeenCalled();
+    expect(generate).toHaveBeenCalledWith(
+      "a bold sale poster",
+      900,
+      600,
+      undefined,
+      "1.2.3.4",
+      DEFAULT_AI_SETTINGS
+    );
     expect(result).toBe(generated);
   });
 
@@ -160,6 +172,33 @@ describe("createDesignStudioResolvers", () => {
     const context = { sourceIp: "1.2.3.4" };
     await resolvers.Mutation.generateDesignElements({}, args, context);
 
-    expect(generate).toHaveBeenCalledWith("make it bigger", 900, 600, currentElements, "1.2.3.4");
+    expect(generate).toHaveBeenCalledWith(
+      "make it bigger",
+      900,
+      600,
+      currentElements,
+      "1.2.3.4",
+      DEFAULT_AI_SETTINGS
+    );
+  });
+
+  it("Query.aiSettings returns the store's settings", async () => {
+    const settings: AiSettingsRecord = { provider: "BEDROCK", modelTier: "SONNET" };
+    const store = makeStore({ getAiSettings: vi.fn().mockResolvedValue(settings) });
+    const resolvers = createDesignStudioResolvers(store);
+
+    expect(await resolvers.Query.aiSettings()).toEqual(settings);
+  });
+
+  it("Mutation.updateAiSettings passes the input straight through to the store", async () => {
+    const updated: AiSettingsRecord = { provider: "BEDROCK", modelTier: "SONNET" };
+    const store = makeStore({ updateAiSettings: vi.fn().mockResolvedValue(updated) });
+    const resolvers = createDesignStudioResolvers(store);
+
+    const input = { provider: "BEDROCK" as const };
+    const result = await resolvers.Mutation.updateAiSettings({}, { input });
+
+    expect(store.updateAiSettings).toHaveBeenCalledWith(input);
+    expect(result).toEqual(updated);
   });
 });

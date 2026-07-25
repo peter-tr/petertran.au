@@ -1,5 +1,8 @@
 import { createGraphQLClient } from "../shared/graphqlClient";
-import type { DesignElementInput as SchemaDesignElementInput } from "./api-schema-types.generated";
+import type {
+  AiSettingsInput as SchemaAiSettingsInput,
+  DesignElementInput as SchemaDesignElementInput,
+} from "./api-schema-types.generated";
 import type {
   DesignFieldsFragment,
   TemplateFieldsFragment,
@@ -13,6 +16,9 @@ import type {
   SaveAsTemplateMutation,
   GenerateDesignElementsMutation,
   GenerateDesignElementsMutationVariables,
+  AiSettingsFieldsFragment,
+  AiSettingsQuery,
+  UpdateAiSettingsMutation,
 } from "./api.generated";
 
 // Separate endpoint, separate service, same reasoning as pantry/imposter's
@@ -29,6 +35,7 @@ export const runDesignStudioQuery = createGraphQLClient(
 
 export type Design = DesignFieldsFragment;
 export type DesignElementInput = SchemaDesignElementInput;
+export type AiSettingsInput = SchemaAiSettingsInput;
 
 const DESIGN_FIELDS = /* GraphQL */ `
   fragment DesignFields on Design {
@@ -267,4 +274,43 @@ export async function generateDesignElements(
   );
 
   return data.generateDesignElements;
+}
+
+const AI_SETTINGS_FIELDS = /* GraphQL */ `
+  fragment AiSettingsFields on AiSettings {
+    provider
+    modelTier
+  }
+`;
+
+export const AI_SETTINGS_QUERY = /* GraphQL */ `
+  query AiSettings {
+    aiSettings {
+      ...AiSettingsFields
+    }
+  }
+  ${AI_SETTINGS_FIELDS}
+`;
+
+export const UPDATE_AI_SETTINGS_MUTATION = /* GraphQL */ `
+  mutation UpdateAiSettings($input: AiSettingsInput!) {
+    updateAiSettings(input: $input) {
+      ...AiSettingsFields
+    }
+  }
+  ${AI_SETTINGS_FIELDS}
+`;
+
+export type AiSettings = AiSettingsFieldsFragment;
+
+export async function getAiSettings(): Promise<AiSettings> {
+  const data = await runDesignStudioQuery<AiSettingsQuery>(AI_SETTINGS_QUERY);
+
+  return data.aiSettings;
+}
+
+export async function updateAiSettings(input: AiSettingsInput): Promise<AiSettings> {
+  const data = await runDesignStudioQuery<UpdateAiSettingsMutation>(UPDATE_AI_SETTINGS_MUTATION, { input });
+
+  return data.updateAiSettings;
 }

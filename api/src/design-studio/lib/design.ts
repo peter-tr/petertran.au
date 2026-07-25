@@ -76,6 +76,25 @@ export interface SaveAsTemplateArgs {
   elements: DesignElementRecord[];
 }
 
+export type AiProvider = "ANTHROPIC" | "BEDROCK";
+export type AiModelTier = "HAIKU" | "SONNET";
+
+// Operator-configurable, not per-user - there's one editor, so one shared
+// setting. Deliberately decoupled from the raw model ID string: BEDROCK's
+// inference-profile IDs (e.g. "us.anthropic.claude-sonnet-4-6") don't match
+// ANTHROPIC's bare ones (e.g. "claude-sonnet-4-6"), so storing a tier lets
+// generate-elements.ts resolve the actual per-provider ID rather than the
+// caller needing to know both formats.
+export interface AiSettingsRecord {
+  provider: AiProvider;
+  modelTier: AiModelTier;
+}
+
+export interface AiSettingsInput {
+  provider?: AiProvider;
+  modelTier?: AiModelTier;
+}
+
 const MAX_DERIVED_COLORS = 4;
 
 // Templates carry `colors` for the swatch filter, but nobody hand-picks

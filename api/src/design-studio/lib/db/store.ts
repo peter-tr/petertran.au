@@ -1,6 +1,8 @@
 import { ObjectId, type Collection, type Filter } from "mongodb";
 import { getDb } from "./client";
 import type {
+  AiSettingsInput,
+  AiSettingsRecord,
   DesignElementRecord,
   DesignRecord,
   SaveDesignArgs,
@@ -8,6 +10,8 @@ import type {
   TemplateFilter,
 } from "../design";
 import type { DesignStore } from "../../resolvers/resolvers";
+
+const DEFAULT_AI_SETTINGS: AiSettingsRecord = { provider: "BEDROCK", modelTier: "SONNET" };
 
 interface DesignDocument {
   _id: ObjectId;
@@ -90,6 +94,18 @@ async function getTemplatesCollection(): Promise<Collection<TemplateDocument>> {
   await templateIndexesEnsured;
 
   return collection;
+}
+
+// Single-document collection - one shared setting for the whole editor, so
+// this is always looked up by the fixed "ai" id rather than a query filter.
+interface AiSettingsDocument extends AiSettingsRecord {
+  _id: "ai";
+}
+
+async function getSettingsCollection(): Promise<Collection<AiSettingsDocument>> {
+  const db = await getDb();
+
+  return db.collection<AiSettingsDocument>("settings");
 }
 
 function buildTemplateQuery(filter: TemplateFilter): Filter<TemplateDocument> {
@@ -183,5 +199,25 @@ export class MongoDesignStore implements DesignStore {
     await collection.insertOne(doc);
 
     return toTemplateRecord(doc);
+  }
+
+  async getAiSettings(): Promise<AiSettingsRecord> {
+    const collection = await getSettingsCollection();
+    const doc = await collection.findOne({ _id: "ai" });
+
+    // Spread order backfills defaults for fields missing on a document
+    // written before they existed - same discipline as
+    // withDesignDefaults()/pantry's getSettings() merge.
+    return { ...DEFAULT_AI_SETTINGS, ...doc };
+  }
+
+  async updateAiSettings(input: AiSettingsInput): Promise<AiSettingsRecord> {
+    const collection = await getSettingsCollection();
+    const current = await this.getAiSettings();
+    const updated: AiSettingsRecord = { ...current, ...input };
+
+    await collection.updateOne({ _id: "ai" }, { $set: updated }, { upsert: true });
+
+    return updated;
   }
 }

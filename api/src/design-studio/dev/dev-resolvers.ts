@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { createDesignStudioResolvers, type DesignStore } from "../resolvers/resolvers";
 import type {
+  AiSettingsInput,
+  AiSettingsRecord,
   DesignElementRecord,
   DesignRecord,
   SaveDesignArgs,
@@ -8,6 +10,8 @@ import type {
   TemplateFilter,
 } from "../lib/design";
 import { STARTER_TEMPLATES } from "../lib/templates";
+
+const DEFAULT_AI_SETTINGS: AiSettingsRecord = { provider: "BEDROCK", modelTier: "SONNET" };
 
 // No real Anthropic call locally - same convention as pantry's
 // mockParseCommand, so the dev server never needs an API key. Produces a
@@ -96,6 +100,7 @@ class InMemoryDesignStore implements DesignStore {
     ...template,
     id: randomUUID(),
   }));
+  private aiSettings: AiSettingsRecord = { ...DEFAULT_AI_SETTINGS };
 
   async listDesigns(): Promise<DesignRecord[]> {
     return [...this.designs.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
@@ -138,6 +143,16 @@ class InMemoryDesignStore implements DesignStore {
     this.templates.push(template);
 
     return template;
+  }
+
+  async getAiSettings(): Promise<AiSettingsRecord> {
+    return this.aiSettings;
+  }
+
+  async updateAiSettings(input: AiSettingsInput): Promise<AiSettingsRecord> {
+    this.aiSettings = { ...this.aiSettings, ...input };
+
+    return this.aiSettings;
   }
 }
 

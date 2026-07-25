@@ -14,7 +14,16 @@ import {
   type ElementType,
 } from "../lib/elements";
 import { toElementInput, fromWireElement } from "../lib/serialization";
-import { saveDesign, saveAsTemplate, generateDesignElements, type Design } from "../api";
+import {
+  saveDesign,
+  saveAsTemplate,
+  generateDesignElements,
+  getAiSettings,
+  updateAiSettings,
+  type AiSettings,
+  type AiSettingsInput,
+  type Design,
+} from "../api";
 
 interface EditorWorkspaceProps {
   designId: string | undefined;
@@ -56,6 +65,10 @@ export default function EditorWorkspace({
   const [aiPrompt, setAiPrompt] = useState("");
   const [generating, setGenerating] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  // Operator-configurable, not per-design - loaded lazily the first time the
+  // panel opens rather than on mount, since most page loads never touch AI
+  // generation at all.
+  const [aiSettings, setAiSettings] = useState<AiSettings | null>(null);
   // A pending AI-generated draft - kept entirely outside useEventHistory
   // (see the reducer.ts doc comment on HistoryEvent) so nothing is
   // undoable/persisted until the user explicitly accepts it. Re-sent as
@@ -221,6 +234,33 @@ export default function EditorWorkspace({
     setAiMessages([]);
   }, []);
 
+  useEffect(() => {
+    if (!showAiPanel || aiSettings) return;
+
+    getAiSettings()
+      .then(setAiSettings)
+      .catch(() => {
+        // Non-fatal - the picker just won't render until the next successful
+        // load; generation itself still works against whatever the server
+        // already has configured.
+      });
+  }, [showAiPanel, aiSettings]);
+
+  const handleAiSettingsChange = useCallback(async (input: AiSettingsInput) => {
+    // Optimistic-ish: the picker reflects the requested value immediately,
+    // then reconciles with whatever the server actually stored. The cast is
+    // safe here - this panel only ever sends a single defined field, never
+    // an explicit null to clear one (AiSettingsInput's wire type allows
+    // null since GraphQL input fields are nullable by default).
+    setAiSettings((current) => (current ? ({ ...current, ...input } as AiSettings) : current));
+    try {
+      const updated = await updateAiSettings(input);
+      setAiSettings(updated);
+    } catch {
+      setAiError("Couldn't update the AI model setting - try again.");
+    }
+  }, []);
+
   const handleDraftChange = useCallback((before: DesignElement, after: DesignElement) => {
     setDraftElements((current) => current?.map((el) => (el.id === before.id ? after : el)) ?? null);
   }, []);
@@ -334,6 +374,8 @@ export default function EditorWorkspace({
               hasDraft={!!draftElements}
               onAccept={handleAcceptDraft}
               onDiscard={handleDiscardDraft}
+              aiSettings={aiSettings}
+              onAiSettingsChange={handleAiSettingsChange}
             />
           )}
           <LayersPanel
