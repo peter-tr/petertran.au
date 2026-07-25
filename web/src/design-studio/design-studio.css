@@ -466,6 +466,25 @@
   border-color: var(--type);
 }
 
+.design-studio-ai-panel-settings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.design-studio-ai-panel-settings select {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--paper);
+  background: var(--panel-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 0.2rem 0.4rem;
+}
+
 .design-studio-ai-panel-log {
   display: flex;
   flex-direction: column;

@@ -2,9 +2,21 @@ import { Stack, StackProps, Duration } from "aws-cdk-lib";
 import { Construct } from "constructs";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
+import * as iam from "aws-cdk-lib/aws-iam";
 import * as path from "path";
 import { FUNCTION_NAMES, LIVE_ALIAS_NAME } from "./shared/function-names";
 import { applyApplicationSignals } from "./shared/application-signals";
+
+// The models the AI generation feature's AiSettings can select, on the
+// Bedrock path (see api/src/design-studio/lib/anthropic/generate-elements.ts's
+// MODEL_IDS - this list must stay in sync with the BEDROCK row there).
+const BEDROCK_MODELS = ["anthropic.claude-haiku-4-5-20251001-v1:0", "anthropic.claude-sonnet-4-6"];
+// "au." cross-region inference profiles route to both of these regions
+// regardless of which region the Lambda itself runs in (confirmed via
+// `aws bedrock get-inference-profile`) - granting only the caller's own
+// region would let ListFoundationModels succeed but InvokeModel fail
+// whenever Bedrock happened to route a request to the other one.
+const BEDROCK_MODEL_REGIONS = ["ap-southeast-2", "ap-southeast-4"];
 
 export interface DesignStudioStackProps extends StackProps {
   // Optional, defaults to prod's current value - only the on-demand test
@@ -79,10 +91,11 @@ export class DesignStudioStack extends Stack {
       // that phase is visible on the X-Ray waterfall since it runs before
       // Application Signals' tracer attaches.
       memorySize: 1024,
-      // Generous relative to the DynamoDB-backed projects' 15-30s - a cold
-      // start here also pays for establishing a fresh MongoDB connection
-      // (TLS handshake + auth) on top of the Secrets Manager fetch.
-      timeout: Duration.seconds(20),
+      // 30s, up from 20s (2026-07-25) - generateDesignElements on the
+      // SONNET tier runs adaptive thinking (see generate-elements.ts),
+      // which measured 10-11s end-to-end even at the lowest effort level;
+      // 20s left too little margin over that plus cold-start MongoDB setup.
+      timeout: Duration.seconds(30),
       environment: {
         MONGO_URI: mongoSecret.secretValue.unsafeUnwrap(),
         MONGO_DB_NAME: props.isTestEnv ? "design-studio-test" : "design-studio",
@@ -92,6 +105,27 @@ export class DesignStudioStack extends Stack {
       // comment for why.
     });
     anthropicSecret.grantRead(designStudioFn);
+
+    // Lets AiSettings.provider === "BEDROCK" actually invoke Claude via
+    // Bedrock (see api-shared/anthropic-bedrock-client.ts) - scoped to just
+    // the au. cross-region inference profiles this feature uses, plus the
+    // underlying per-region foundation models each profile can route to
+    // (Bedrock authorizes against both the profile ARN and whichever
+    // regional model ARN it ends up dispatching to).
+    designStudioFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
+        resources: [
+          ...BEDROCK_MODELS.map(
+            (model) => `arn:aws:bedrock:${this.region}:${this.account}:inference-profile/au.${model}`
+          ),
+          ...BEDROCK_MODEL_REGIONS.flatMap((region) =>
+            BEDROCK_MODELS.map((model) => `arn:aws:bedrock:${region}::foundation-model/${model}`)
+          ),
+        ],
+      })
+    );
+
     applyApplicationSignals(designStudioFn);
     this.designStudioFn = designStudioFn;
 

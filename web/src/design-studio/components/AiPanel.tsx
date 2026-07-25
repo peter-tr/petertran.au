@@ -1,3 +1,5 @@
+import type { AiSettings, AiSettingsInput } from "../api";
+
 export interface AiMessage {
   id: string;
   prompt: string;
@@ -13,6 +15,11 @@ interface AiPanelProps {
   hasDraft: boolean;
   onAccept: () => void;
   onDiscard: () => void;
+  // null until the first load resolves (see EditorWorkspace's lazy fetch) -
+  // the picker just doesn't render until then rather than showing a
+  // placeholder for a setting that isn't per-design anyway.
+  aiSettings: AiSettings | null;
+  onAiSettingsChange: (input: AiSettingsInput) => void;
 }
 
 // A persistent chat-style panel, not a one-shot form - it stays open across
@@ -29,6 +36,8 @@ export default function AiPanel({
   hasDraft,
   onAccept,
   onDiscard,
+  aiSettings,
+  onAiSettingsChange,
 }: AiPanelProps) {
   return (
     <div className="design-studio-ai-panel">
@@ -45,6 +54,45 @@ export default function AiPanel({
           </div>
         )}
       </div>
+      {aiSettings && (
+        <div className="design-studio-ai-panel-settings">
+          <label>
+            Provider{" "}
+            <select
+              aria-label="AI provider"
+              value={aiSettings.provider}
+              onChange={(e) => {
+                const provider = e.target.value as AiSettings["provider"];
+                // Bedrock doesn't currently support this feature's
+                // structured output for Haiku 4.5 (see generate-elements.ts)
+                // - steer off it automatically rather than letting the user
+                // land on a combination that's guaranteed to fail.
+                if (provider === "BEDROCK" && aiSettings.modelTier === "HAIKU") {
+                  onAiSettingsChange({ provider, modelTier: "SONNET" as AiSettings["modelTier"] });
+                } else {
+                  onAiSettingsChange({ provider });
+                }
+              }}
+            >
+              <option value="ANTHROPIC">Direct Anthropic API</option>
+              <option value="BEDROCK">AWS Bedrock</option>
+            </select>
+          </label>
+          <label>
+            Model{" "}
+            <select
+              aria-label="AI model"
+              value={aiSettings.modelTier}
+              onChange={(e) => onAiSettingsChange({ modelTier: e.target.value as AiSettings["modelTier"] })}
+            >
+              <option value="HAIKU" disabled={aiSettings.provider === "BEDROCK"}>
+                Haiku 4.5 (fast){aiSettings.provider === "BEDROCK" ? " - not available on Bedrock" : ""}
+              </option>
+              <option value="SONNET">Sonnet 4.6 (better quality)</option>
+            </select>
+          </label>
+        </div>
+      )}
       <div className="design-studio-ai-panel-log">
         {messages.length === 0 && (
           <p className="design-studio-empty">

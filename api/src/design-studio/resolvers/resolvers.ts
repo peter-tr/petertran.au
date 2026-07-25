@@ -1,6 +1,8 @@
 import {
   withDesignDefaults,
   deriveColors,
+  type AiSettingsInput,
+  type AiSettingsRecord,
   type DesignElementRecord,
   type DesignRecord,
   type SaveDesignArgs,
@@ -18,19 +20,22 @@ export interface DesignStore {
   deleteDesign(id: string): Promise<boolean>;
   listTemplates(filter: TemplateFilter): Promise<TemplateRecord[]>;
   saveTemplate(args: Omit<TemplateRecord, "id">): Promise<TemplateRecord>;
+  getAiSettings(): Promise<AiSettingsRecord>;
+  updateAiSettings(input: AiSettingsInput): Promise<AiSettingsRecord>;
 }
 
 // Kept separate from DesignStore - generation isn't a persistence concern,
 // so it's injected as its own dependency rather than bolted onto the store
 // interface. The real (Mongo) backend just uses the default (a real
-// Anthropic call); the dev backend passes a mock so the local dev server
-// never needs an Anthropic API key.
+// Anthropic/Bedrock call); the dev backend passes a mock so the local dev
+// server never needs real credentials for either provider.
 export type GenerateDesignElementsFn = (
   prompt: string,
   width: number,
   height: number,
   currentElements: DesignElementRecord[] | undefined,
-  sourceIp: string | undefined
+  sourceIp: string | undefined,
+  aiSettings: AiSettingsRecord
 ) => Promise<DesignElementRecord[]>;
 
 // Shared resolver logic for both the real (Mongo) and dev (in-memory)
@@ -53,6 +58,7 @@ export function createDesignStudioResolvers(
         return design ? withDesignDefaults(design) : null;
       },
       templates: (_: unknown, args: TemplateFilter) => store.listTemplates(args),
+      aiSettings: () => store.getAiSettings(),
     },
     Mutation: {
       saveDesign: async (_: unknown, args: { input: SaveDesignArgs }) => {
@@ -67,7 +73,7 @@ export function createDesignStudioResolvers(
           colors: deriveColors(args.input.elements),
           popularity: 0,
         }),
-      generateDesignElements: (
+      generateDesignElements: async (
         _: unknown,
         args: {
           prompt: string;
@@ -76,14 +82,19 @@ export function createDesignStudioResolvers(
           currentElements?: DesignElementRecord[] | null;
         },
         context: Context
-      ) =>
-        generateDesignElements(
+      ) => {
+        const aiSettings = await store.getAiSettings();
+
+        return generateDesignElements(
           args.prompt,
           args.width,
           args.height,
           args.currentElements ?? undefined,
-          context.sourceIp
-        ),
+          context.sourceIp,
+          aiSettings
+        );
+      },
+      updateAiSettings: (_: unknown, args: { input: AiSettingsInput }) => store.updateAiSettings(args.input),
     },
   };
 }

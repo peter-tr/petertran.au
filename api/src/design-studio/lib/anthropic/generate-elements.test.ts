@@ -1,18 +1,28 @@
-import { describe, expect, it, vi } from "vitest";
-import type { DesignElementRecord } from "../design";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { AiSettingsRecord, DesignElementRecord } from "../design";
 
-const messagesParse = vi.fn();
-const getAnthropicClient = vi.fn(async () => ({ messages: { parse: messagesParse } }));
+const anthropicMessagesParse = vi.fn();
+const bedrockMessagesParse = vi.fn();
+const getAnthropicClient = vi.fn(async () => ({ messages: { parse: anthropicMessagesParse } }));
+const getAnthropicBedrockClient = vi.fn(() => ({ messages: { parse: bedrockMessagesParse } }));
 const assertAiNotRateLimited = vi.fn<(ip: string | undefined) => Promise<void>>(async () => undefined);
 
 vi.mock("api-shared/anthropic-client", () => ({
   getAnthropicClient: () => getAnthropicClient(),
+}));
+vi.mock("api-shared/anthropic-bedrock-client", () => ({
+  getAnthropicBedrockClient: () => getAnthropicBedrockClient(),
 }));
 vi.mock("../util/ai-rate-limit", () => ({
   assertAiNotRateLimited: (ip: string | undefined) => assertAiNotRateLimited(ip),
 }));
 
 const { generateDesignElements } = await import("./generate-elements");
+
+const ANTHROPIC_HAIKU: AiSettingsRecord = { provider: "ANTHROPIC", modelTier: "HAIKU" };
+const ANTHROPIC_SONNET: AiSettingsRecord = { provider: "ANTHROPIC", modelTier: "SONNET" };
+const BEDROCK_HAIKU: AiSettingsRecord = { provider: "BEDROCK", modelTier: "HAIKU" };
+const BEDROCK_SONNET: AiSettingsRecord = { provider: "BEDROCK", modelTier: "SONNET" };
 
 function rawElement(overrides: Record<string, unknown> = {}) {
   return {
@@ -34,10 +44,14 @@ function rawElement(overrides: Record<string, unknown> = {}) {
 }
 
 describe("generateDesignElements", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it("rejects an empty prompt without calling Anthropic", async () => {
-    await expect(generateDesignElements("  ", 900, 600, undefined, "1.2.3.4")).rejects.toThrow(
-      "A prompt is required."
-    );
+    await expect(
+      generateDesignElements("  ", 900, 600, undefined, "1.2.3.4", ANTHROPIC_HAIKU)
+    ).rejects.toThrow("A prompt is required.");
     expect(getAnthropicClient).not.toHaveBeenCalled();
   });
 
@@ -46,18 +60,18 @@ describe("generateDesignElements", () => {
       new Error("Too many requests - please wait a moment and try again.")
     );
 
-    await expect(generateDesignElements("a poster", 900, 600, undefined, "1.2.3.4")).rejects.toThrow(
-      "Too many requests"
-    );
+    await expect(
+      generateDesignElements("a poster", 900, 600, undefined, "1.2.3.4", ANTHROPIC_HAIKU)
+    ).rejects.toThrow("Too many requests");
     expect(getAnthropicClient).not.toHaveBeenCalled();
   });
 
   it("assigns ids and sequential zIndex, ignoring whatever the model returned for them", async () => {
-    messagesParse.mockResolvedValueOnce({
+    anthropicMessagesParse.mockResolvedValueOnce({
       parsed_output: { elements: [rawElement({ x: 10 }), rawElement({ type: "TEXT", text: "Hi" })] },
     });
 
-    const result = await generateDesignElements("a poster", 900, 600, undefined, "1.2.3.4");
+    const result = await generateDesignElements("a poster", 900, 600, undefined, "1.2.3.4", ANTHROPIC_HAIKU);
 
     expect(result).toHaveLength(2);
     expect(result[0].zIndex).toBe(0);
@@ -66,13 +80,13 @@ describe("generateDesignElements", () => {
   });
 
   it("clamps out-of-bounds geometry to fit within the canvas", async () => {
-    messagesParse.mockResolvedValueOnce({
+    anthropicMessagesParse.mockResolvedValueOnce({
       parsed_output: {
         elements: [rawElement({ x: -50, y: 9999, width: 5000, height: 5000 })],
       },
     });
 
-    const [el] = await generateDesignElements("a poster", 900, 600, undefined, "1.2.3.4");
+    const [el] = await generateDesignElements("a poster", 900, 600, undefined, "1.2.3.4", ANTHROPIC_HAIKU);
 
     expect(el.x).toBeGreaterThanOrEqual(0);
     expect(el.y).toBeGreaterThanOrEqual(0);
@@ -81,11 +95,11 @@ describe("generateDesignElements", () => {
   });
 
   it("defaults text-only fields to undefined for non-TEXT elements", async () => {
-    messagesParse.mockResolvedValueOnce({
+    anthropicMessagesParse.mockResolvedValueOnce({
       parsed_output: { elements: [rawElement({ type: "ELLIPSE" })] },
     });
 
-    const [el] = await generateDesignElements("a poster", 900, 600, undefined, "1.2.3.4");
+    const [el] = await generateDesignElements("a poster", 900, 600, undefined, "1.2.3.4", ANTHROPIC_HAIKU);
 
     expect(el.text).toBeUndefined();
     expect(el.fontFamily).toBeUndefined();
@@ -94,11 +108,11 @@ describe("generateDesignElements", () => {
   });
 
   it("backfills sensible defaults for TEXT elements missing font fields", async () => {
-    messagesParse.mockResolvedValueOnce({
+    anthropicMessagesParse.mockResolvedValueOnce({
       parsed_output: { elements: [rawElement({ type: "TEXT", text: "Hi", fontSize: 0 })] },
     });
 
-    const [el] = await generateDesignElements("a poster", 900, 600, undefined, "1.2.3.4");
+    const [el] = await generateDesignElements("a poster", 900, 600, undefined, "1.2.3.4", ANTHROPIC_HAIKU);
 
     expect(el.text).toBe("Hi");
     expect(el.fontFamily).toBe("IBM Plex Sans");
@@ -107,25 +121,25 @@ describe("generateDesignElements", () => {
   });
 
   it("throws when Claude returns no elements", async () => {
-    messagesParse.mockResolvedValueOnce({ parsed_output: { elements: [] } });
+    anthropicMessagesParse.mockResolvedValueOnce({ parsed_output: { elements: [] } });
 
-    await expect(generateDesignElements("a poster", 900, 600, undefined, "1.2.3.4")).rejects.toThrow(
-      "didn't return a usable design"
-    );
+    await expect(
+      generateDesignElements("a poster", 900, 600, undefined, "1.2.3.4", ANTHROPIC_HAIKU)
+    ).rejects.toThrow("didn't return a usable design");
   });
 
   it("caps the number of returned elements", async () => {
-    messagesParse.mockResolvedValueOnce({
+    anthropicMessagesParse.mockResolvedValueOnce({
       parsed_output: { elements: Array.from({ length: 20 }, () => rawElement()) },
     });
 
-    const result = await generateDesignElements("a poster", 900, 600, undefined, "1.2.3.4");
+    const result = await generateDesignElements("a poster", 900, 600, undefined, "1.2.3.4", ANTHROPIC_HAIKU);
 
     expect(result.length).toBeLessThanOrEqual(12);
   });
 
   it("includes the current draft in the prompt and mentions refinement in the system prompt when currentElements is given", async () => {
-    messagesParse.mockResolvedValueOnce({
+    anthropicMessagesParse.mockResolvedValueOnce({
       parsed_output: { elements: [rawElement()] },
     });
 
@@ -145,23 +159,66 @@ describe("generateDesignElements", () => {
       },
     ];
 
-    await generateDesignElements("make it bigger", 900, 600, currentElements, "1.2.3.4");
+    await generateDesignElements("make it bigger", 900, 600, currentElements, "1.2.3.4", ANTHROPIC_HAIKU);
 
-    const call = messagesParse.mock.calls.at(-1)![0];
+    const call = anthropicMessagesParse.mock.calls.at(-1)![0];
     expect(call.system).toContain("follow-up refinement");
     expect(call.messages[0].content).toContain("Current draft (JSON)");
     expect(call.messages[0].content).toContain("make it bigger");
   });
 
   it("does not mention refinement when currentElements is empty", async () => {
-    messagesParse.mockResolvedValueOnce({
+    anthropicMessagesParse.mockResolvedValueOnce({
       parsed_output: { elements: [rawElement()] },
     });
 
-    await generateDesignElements("a poster", 900, 600, [], "1.2.3.4");
+    await generateDesignElements("a poster", 900, 600, [], "1.2.3.4", ANTHROPIC_HAIKU);
 
-    const call = messagesParse.mock.calls.at(-1)![0];
+    const call = anthropicMessagesParse.mock.calls.at(-1)![0];
     expect(call.system).not.toContain("follow-up refinement");
     expect(call.messages[0].content).toBe("a poster");
+  });
+
+  it("calls the direct Anthropic API with claude-haiku-4-5 and no thinking/effort for the ANTHROPIC/HAIKU tier", async () => {
+    anthropicMessagesParse.mockResolvedValueOnce({ parsed_output: { elements: [rawElement()] } });
+
+    await generateDesignElements("a poster", 900, 600, undefined, "1.2.3.4", ANTHROPIC_HAIKU);
+
+    expect(getAnthropicClient).toHaveBeenCalled();
+    expect(getAnthropicBedrockClient).not.toHaveBeenCalled();
+    const call = anthropicMessagesParse.mock.calls.at(-1)![0];
+    expect(call.model).toBe("claude-haiku-4-5");
+    expect(call.thinking).toBeUndefined();
+    expect(call.output_config.effort).toBeUndefined();
+  });
+
+  it("rejects BEDROCK/HAIKU without calling Bedrock - that combination 400s (structured output unsupported for Haiku there)", async () => {
+    await expect(
+      generateDesignElements("a poster", 900, 600, undefined, "1.2.3.4", BEDROCK_HAIKU)
+    ).rejects.toThrow("Bedrock doesn't currently support");
+    expect(getAnthropicBedrockClient).not.toHaveBeenCalled();
+  });
+
+  it("calls Bedrock with the sonnet inference profile for the BEDROCK/SONNET tier", async () => {
+    bedrockMessagesParse.mockResolvedValueOnce({ parsed_output: { elements: [rawElement()] } });
+
+    await generateDesignElements("a poster", 900, 600, undefined, "1.2.3.4", BEDROCK_SONNET);
+
+    expect(getAnthropicBedrockClient).toHaveBeenCalled();
+    expect(getAnthropicClient).not.toHaveBeenCalled();
+    const call = bedrockMessagesParse.mock.calls.at(-1)![0];
+    expect(call.model).toBe("au.anthropic.claude-sonnet-4-6");
+  });
+
+  it("enables adaptive thinking and effort, with a higher max_tokens, for the SONNET tier", async () => {
+    anthropicMessagesParse.mockResolvedValueOnce({ parsed_output: { elements: [rawElement()] } });
+
+    await generateDesignElements("a poster", 900, 600, undefined, "1.2.3.4", ANTHROPIC_SONNET);
+
+    const call = anthropicMessagesParse.mock.calls.at(-1)![0];
+    expect(call.model).toBe("claude-sonnet-4-6");
+    expect(call.thinking).toEqual({ type: "adaptive" });
+    expect(call.output_config.effort).toBe("low");
+    expect(call.max_tokens).toBeGreaterThan(2048);
   });
 });

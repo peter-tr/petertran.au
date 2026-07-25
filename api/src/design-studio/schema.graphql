@@ -119,6 +119,39 @@ input SaveAsTemplateInput {
 }
 
 """
+Which backend serves generateDesignElements calls.
+"""
+enum AiProvider {
+  ANTHROPIC
+  BEDROCK
+}
+
+"""
+Capability tier, decoupled from the raw model ID - Bedrock and the direct
+Anthropic API use differently-shaped model ID strings for the same model
+family, so the resolver maps (provider, modelTier) to the right ID rather
+than the caller needing to know either format.
+"""
+enum AiModelTier {
+  HAIKU
+  SONNET
+}
+
+"""
+Operator-configurable AI generation settings - one shared setting for the
+whole editor, not per-user. Persisted in Mongo.
+"""
+type AiSettings {
+  provider: AiProvider!
+  modelTier: AiModelTier!
+}
+
+input AiSettingsInput {
+  provider: AiProvider
+  modelTier: AiModelTier
+}
+
+"""
 Standalone schema for the Design Studio mock-Canva editor - served by its
 own Lambda, entirely separate from petertran.au's resume API.
 """
@@ -133,6 +166,10 @@ type Query {
   optional and combinable. `search` does a free-text match against name/tags.
   """
   templates(search: String, category: String, tags: [String!], color: String): [Template!]!
+  """
+  Which provider/model generateDesignElements currently calls.
+  """
+  aiSettings: AiSettings!
 }
 
 """
@@ -163,4 +200,9 @@ type Mutation {
     height: Float!
     currentElements: [DesignElementInput!]
   ): [DesignElement!]!
+  """
+  Updates any subset of the AI generation settings; omitted fields keep
+  their current value.
+  """
+  updateAiSettings(input: AiSettingsInput!): AiSettings!
 }
