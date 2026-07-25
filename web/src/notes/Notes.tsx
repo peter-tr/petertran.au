@@ -17,6 +17,134 @@ interface NoteEntry {
 // log.
 const ENTRIES: NoteEntry[] = [
   {
+    slug: "lambda-cold-starts-adot-esm",
+    railLabel: "Cold starts: PC was fine, OTel-on-ESM wasn't",
+    title: "Chasing a 3.7s cold start: it wasn't provisioned concurrency, it was ESM",
+    date: "2026-07-25",
+    tags: ["lambda", "cold-starts", "opentelemetry", "esbuild", "provisioned-concurrency"],
+    body: (
+      <>
+        <p>
+          Started from "the site loads cold, is provisioned concurrency not being hit?" - it was: PC was
+          correctly allocated and pinned to the live version on every project checked. The real problem was
+          narrower and worse - a single page load fires more than one concurrent GraphQL request (e.g. Hero
+          and Footer each fire their own query), which is enough to exceed PC=1 on its own, and every request
+          that spills past PC cold-starts at <strong>~3.7-3.8s</strong>. To find out why that number was so
+          high, I stood up a throwaway Lambda (deleted after), rebuilt it stage by stage with the exact
+          production bundle, layer, and IAM role, and read <code>Init Duration</code> straight off each cold
+          invoke.
+        </p>
+        <div className="note-table-wrap">
+          <table className="note-table">
+            <thead>
+              <tr>
+                <th>Stage</th>
+                <th>ADOT layer</th>
+                <th>Init Duration</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Bare Node 20 handler, zero deps</td>
+                <td>No</td>
+                <td>~130ms</td>
+              </tr>
+              <tr>
+                <td>+ bundled AWS SDK v3 client</td>
+                <td>No</td>
+                <td>~260ms</td>
+              </tr>
+              <tr>
+                <td>Same code</td>
+                <td>Yes</td>
+                <td>~1.7s</td>
+              </tr>
+              <tr>
+                <td>+ Apollo Server + real schema</td>
+                <td>No</td>
+                <td>~475ms</td>
+              </tr>
+              <tr>
+                <td>Same code</td>
+                <td>Yes</td>
+                <td>~3.2s</td>
+              </tr>
+              <tr>
+                <td>Real pantry bundle (ESM, as shipped)</td>
+                <td>No</td>
+                <td>~700ms</td>
+              </tr>
+              <tr>
+                <td>Real pantry bundle (ESM, as shipped)</td>
+                <td>Yes</td>
+                <td>~3.7s</td>
+              </tr>
+              <tr>
+                <td>Same real bundle, rebuilt as CJS</td>
+                <td>Yes</td>
+                <td>~870ms</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          Disabling every individual OTel instrumentation (<code>aws-sdk</code>, <code>undici</code>) changed
+          nothing - the cost wasn't the instrumentation itself, it was Node's{" "}
+          <code>import-in-the-middle</code> ESM loader hook that CloudWatch Application Signals'
+          auto-instrumentation registers, and its cost scales with how much module graph it has to hook.
+          Swapping esbuild's output format from ESM to CJS lets it use <code>require-in-the-middle</code>{" "}
+          instead, which is dramatically cheaper for the same code - confirmed by rebuilding the identical
+          bundle both ways and cold-starting each in isolation. One interop bug on the way: esbuild's CJS
+          named exports are non-configurable <code>Object.defineProperty</code> getters, which crashes{" "}
+          <code>require-in-the-middle</code>'s monkey-patch outright (
+          <code>Cannot redefine property: handler</code>) if it tries to patch the bundle directly - fixed
+          with a two-line unbundled wrapper file that does a plain{" "}
+          <code>exports.handler = require("./app.js").handler</code> reassignment instead.
+        </p>
+        <p>
+          Shipped across portfolio, pantry, imposter, and design-studio - every project carrying the ADOT
+          layer (supergraph is a Rust binary, unaffected; zero-trust-lab/warm-schedule don't carry the layer
+          at all). Verified against the real deployed functions post-merge by invoking <code>$LATEST</code>{" "}
+          directly - never provisioned, never touched by real traffic since API Gateway routes to the{" "}
+          <code>live</code> alias specifically - so the measurement couldn't disturb production either way.
+        </p>
+        <div className="note-table-wrap">
+          <table className="note-table">
+            <thead>
+              <tr>
+                <th>Function</th>
+                <th>Before</th>
+                <th>After</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>pantry-graphql</td>
+                <td>~3.7-3.8s</td>
+                <td>~890ms</td>
+              </tr>
+              <tr>
+                <td>portfolio-graphql</td>
+                <td>~3.7-3.8s</td>
+                <td>~860ms</td>
+              </tr>
+              <tr>
+                <td>imposter-graphql</td>
+                <td>not separately measured - same fix applied preemptively</td>
+                <td>~795ms</td>
+              </tr>
+              <tr>
+                <td>design-studio-graphql</td>
+                <td>not separately measured - same fix applied preemptively</td>
+                <td>~1.0s</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </>
+    ),
+  },
+  {
     slug: "warmup-scheduling",
     railLabel: "Warmup: pings vs provisioned concurrency",
     title: "Keeping Lambdas warm: ping-on-load, scheduled ping, then provisioned concurrency",
