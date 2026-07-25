@@ -540,7 +540,14 @@
   font-family: var(--font-sans);
   font-size: 0.8rem;
   color: var(--muted-dim);
-  margin: 0;
+  /* max-width + auto margins matches .design-studio-gallery-head/-grid/
+     -templates - Gallery's parent is full-viewport-width (100vw), so
+     without this the text sits flush at the page edge instead of aligning
+     with the centered content column. A no-op everywhere else this class
+     is used (LayersPanel/PropertyPanel/AiPanel's side panels are already
+     narrower than 46rem). */
+  max-width: 46rem;
+  margin: 0 auto;
 }
 
 .design-studio-layers ul {
