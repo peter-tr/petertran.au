@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
-import type { WarmSchedule } from "./useWarmSchedule";
+import type { ProjectCost, WarmSchedule } from "./useWarmSchedule";
 
 const DEFAULT_SCHEDULE: WarmSchedule = {
   enabled: true,
@@ -16,6 +16,15 @@ const DEFAULT_CONFIG = {
   imposter: DEFAULT_SCHEDULE,
   supergraph: DEFAULT_SCHEDULE,
   zeroTrustLab: DEFAULT_SCHEDULE,
+};
+
+const NO_COST: ProjectCost = { liveConcurrency: 0, liveHourlyCostUsd: 0, scheduledMonthlyCostUsd: 0 };
+const DEFAULT_COSTS = {
+  portfolio: NO_COST,
+  pantry: NO_COST,
+  imposter: NO_COST,
+  supergraph: NO_COST,
+  zeroTrustLab: NO_COST,
 };
 
 describe("useWarmSchedule", () => {
@@ -37,10 +46,12 @@ describe("useWarmSchedule", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("loads the config from the endpoint on mount when available", async () => {
+  it("loads the config and costs from the endpoint on mount when available", async () => {
     vi.stubEnv("VITE_WARM_SCHEDULE_ENDPOINT", "https://api.test/warm-schedule");
 
-    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ json: async () => DEFAULT_CONFIG });
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      json: async () => ({ schedules: DEFAULT_CONFIG, costs: DEFAULT_COSTS }),
+    });
 
     const { useWarmSchedule } = await import("./useWarmSchedule");
 
@@ -48,6 +59,7 @@ describe("useWarmSchedule", () => {
 
     expect(result.current.available).toBe(true);
     await waitFor(() => expect(result.current.config).toEqual(DEFAULT_CONFIG));
+    expect(result.current.costs).toEqual(DEFAULT_COSTS);
     expect(fetch).toHaveBeenCalledWith("https://api.test/warm-schedule");
   });
 
@@ -74,8 +86,8 @@ describe("useWarmSchedule", () => {
     };
     const updatedConfig = { ...DEFAULT_CONFIG, pantry: newSchedule };
     (fetch as ReturnType<typeof vi.fn>)
-      .mockResolvedValueOnce({ json: async () => DEFAULT_CONFIG })
-      .mockResolvedValueOnce({ json: async () => updatedConfig });
+      .mockResolvedValueOnce({ json: async () => ({ schedules: DEFAULT_CONFIG, costs: DEFAULT_COSTS }) })
+      .mockResolvedValueOnce({ json: async () => ({ schedules: updatedConfig, costs: DEFAULT_COSTS }) });
 
     const { useWarmSchedule } = await import("./useWarmSchedule");
 
@@ -110,8 +122,8 @@ describe("useWarmSchedule", () => {
     // nothing changed for.
     const fullResponseConfig = JSON.parse(JSON.stringify({ ...DEFAULT_CONFIG, pantry: newSchedule }));
     (fetch as ReturnType<typeof vi.fn>)
-      .mockResolvedValueOnce({ json: async () => DEFAULT_CONFIG })
-      .mockResolvedValueOnce({ json: async () => fullResponseConfig });
+      .mockResolvedValueOnce({ json: async () => ({ schedules: DEFAULT_CONFIG, costs: DEFAULT_COSTS }) })
+      .mockResolvedValueOnce({ json: async () => ({ schedules: fullResponseConfig, costs: DEFAULT_COSTS }) });
 
     const { useWarmSchedule } = await import("./useWarmSchedule");
 
@@ -135,7 +147,7 @@ describe("useWarmSchedule", () => {
     vi.stubEnv("VITE_WARM_SCHEDULE_ENDPOINT", "https://api.test/warm-schedule");
 
     (fetch as ReturnType<typeof vi.fn>)
-      .mockResolvedValueOnce({ json: async () => DEFAULT_CONFIG })
+      .mockResolvedValueOnce({ json: async () => ({ schedules: DEFAULT_CONFIG, costs: DEFAULT_COSTS }) })
       .mockRejectedValueOnce(new Error("network down"));
 
     const { useWarmSchedule } = await import("./useWarmSchedule");

@@ -4,6 +4,8 @@ import {
   LambdaClient,
   PutProvisionedConcurrencyConfigCommand,
   DeleteProvisionedConcurrencyConfigCommand,
+  GetFunctionConfigurationCommand,
+  GetProvisionedConcurrencyConfigCommand,
   ResourceNotFoundException,
 } from "@aws-sdk/client-lambda";
 import { SSMClient, GetParameterCommand, PutParameterCommand } from "@aws-sdk/client-ssm";
@@ -93,6 +95,12 @@ beforeEach(() => {
   schedulerMock.reset();
   lambdaMock.on(PutProvisionedConcurrencyConfigCommand).resolves({});
   lambdaMock.on(DeleteProvisionedConcurrencyConfigCommand).resolves({});
+  // Cost lookups the GET/POST branches now do for every target - default to
+  // "256MB, no PC currently allocated" unless a test overrides it.
+  lambdaMock.on(GetFunctionConfigurationCommand).resolves({ MemorySize: 256 });
+  lambdaMock
+    .on(GetProvisionedConcurrencyConfigCommand)
+    .rejects(new ResourceNotFoundException({ message: "no PC config found", $metadata: {} }));
   schedulerMock.on(GetScheduleCommand).resolves({
     FlexibleTimeWindow: { Mode: "OFF" },
     Target: {
@@ -113,7 +121,7 @@ describe("warm-schedule handler - config GET/POST", () => {
 
     const result = await handler(httpEvent("GET"));
     expect(result.statusCode).toBe(200);
-    expect(JSON.parse(result.body as string)).toEqual(DEFAULT_CONFIG);
+    expect(JSON.parse(result.body as string).schedules).toEqual(DEFAULT_CONFIG);
   });
 
   it("GET merges a stored partial project over the defaults", async () => {
@@ -122,10 +130,36 @@ describe("warm-schedule handler - config GET/POST", () => {
     });
 
     const result = await handler(httpEvent("GET"));
-    expect(JSON.parse(result.body as string)).toEqual({
+    expect(JSON.parse(result.body as string).schedules).toEqual({
       ...DEFAULT_CONFIG,
       portfolio: { ...DEFAULT_SCHEDULE, enabled: false },
     });
+  });
+
+  it("GET includes a real-price cost per project, from real memory size and live PC state", async () => {
+    ssmMock.on(GetParameterCommand).resolves({});
+    lambdaMock
+      .on(GetProvisionedConcurrencyConfigCommand, { FunctionName: "pantry-fn" })
+      .resolves({ AllocatedProvisionedConcurrentExecutions: 1, Status: "READY" });
+
+    const result = await handler(httpEvent("GET"));
+    const { costs } = JSON.parse(result.body as string);
+
+    // pantry-fn: 256MB, 1 live unit, PC rate $0.000005236/GB-s.
+    expect(costs.pantry.liveConcurrency).toBe(1);
+    expect(costs.pantry.liveHourlyCostUsd).toBeCloseTo(0.25 * 1 * 0.000005236 * 3600, 10);
+    // Default schedule (8am-7pm every day, concurrency 1) -> 11h * 7 days/week.
+    expect(costs.pantry.scheduledMonthlyCostUsd).toBeCloseTo(
+      0.25 * 1 * 0.000005236 * 3600 * 77 * (365.25 / 7 / 12),
+      6
+    );
+
+    // portfolio-fn never got PC granted in this test - currently costing $0.
+    expect(costs.portfolio.liveConcurrency).toBe(0);
+    expect(costs.portfolio.liveHourlyCostUsd).toBe(0);
+
+    // zeroTrustLab sums cost across its 5 targets, all defaulting to 256MB here.
+    expect(costs.zeroTrustLab.liveConcurrency).toBe(0);
   });
 
   it("POST with an invalid schedule returns 400", async () => {
@@ -188,7 +222,7 @@ describe("warm-schedule handler - config GET/POST", () => {
     };
     const result = await handler(httpEvent("POST", { project: "pantry", schedule: newSchedule }));
     expect(result.statusCode).toBe(200);
-    expect(JSON.parse(result.body as string)).toEqual({ ...DEFAULT_CONFIG, pantry: newSchedule });
+    expect(JSON.parse(result.body as string).schedules).toEqual({ ...DEFAULT_CONFIG, pantry: newSchedule });
 
     const putParamCalls = ssmMock.commandCalls(PutParameterCommand);
     expect(putParamCalls).toHaveLength(1);

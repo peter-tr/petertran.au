@@ -4,6 +4,7 @@ import {
   type WarmScheduleKey,
   type WarmSchedule,
   type Weekday,
+  type ProjectCost,
 } from "../hooks/useWarmSchedule";
 
 const ALL_DAYS: Weekday[] = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
@@ -32,6 +33,7 @@ interface WarmScheduleProjectProps {
   fn: WarmScheduleKey;
   label: string;
   schedule: WarmSchedule;
+  cost: ProjectCost | undefined;
   pending: boolean;
   onSave: (schedule: WarmSchedule) => void;
 }
@@ -43,6 +45,7 @@ export default function WarmScheduleProject({
   fn,
   label,
   schedule,
+  cost,
   pending,
   onSave,
 }: WarmScheduleProjectProps) {
@@ -134,6 +137,14 @@ export default function WarmScheduleProject({
           Save
         </button>
       </div>
+      {cost && (
+        <p className="section-hint">
+          {cost.liveConcurrency > 0
+            ? `Currently ${cost.liveConcurrency} warm instance${cost.liveConcurrency === 1 ? "" : "s"} ($${cost.liveHourlyCostUsd.toFixed(4)}/hr)`
+            : "Currently cold (no PC active)"}{" "}
+          · ~${cost.scheduledMonthlyCostUsd.toFixed(2)}/mo if this schedule runs as set
+        </p>
+      )}
       {invalid && (
         <p className="section-hint">
           Pick at least one day, with start before end, and concurrency between 1 and {MAX_CONCURRENCY}.
