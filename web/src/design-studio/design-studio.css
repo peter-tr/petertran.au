@@ -293,11 +293,10 @@
 /* Below this, the desktop 3-column row (toolbar + 900px canvas + side
    panels, ~1300px total) no longer fits - rather than let flexbox force it
    into an unscrollable, squeezed mess, stack everything vertically. The
-   canvas itself stays at its native 900x600 resolution (Konva computes
-   pointer/drag coordinates from the stage's actual bounding rect, so
-   CSS-scaling it down would throw off where clicks/drags land) and instead
-   scrolls horizontally within its own frame - a deliberately different,
-   simpler layout for a touch screen, not a shrunk copy of the desktop one. */
+   canvas itself is scaled down to fit via Canvas.tsx's ResizeObserver (see
+   .design-studio-scale-box below) rather than scrolled - Konva accounts for
+   CSS-transform scaling when mapping pointer coordinates, so this is safe
+   at any size, not just a desktop-only trick. */
 @media (max-width: 960px) {
   .design-studio-editor {
     padding: 1rem 0.75rem 1.5rem;
@@ -323,7 +322,6 @@
 
   .design-studio-canvas-frame {
     max-width: 100%;
-    overflow-x: auto;
   }
 
   .design-studio-side-panels {
@@ -333,13 +331,17 @@
   }
 
   .design-studio-layers,
-  .design-studio-properties,
-  .design-studio-ai-panel {
+  .design-studio-properties {
     flex: 1 1 12rem;
   }
 
   .design-studio-head {
     flex-wrap: wrap;
+  }
+
+  .design-studio-history-controls {
+    flex-wrap: wrap;
+    justify-content: center;
   }
 }
 
@@ -368,13 +370,14 @@
 }
 
 .design-studio-tool-btn {
+  position: relative;
   font-family: var(--font-mono);
   font-size: 0.85rem;
   color: var(--paper);
   background: var(--panel-2);
   border: 1px solid var(--rule);
   border-radius: var(--radius);
-  padding: 0.5rem 0.9rem;
+  padding: 0.5rem 1.6rem 0.5rem 0.9rem;
   cursor: pointer;
   transition:
     color 0.15s ease,
@@ -384,6 +387,25 @@
 .design-studio-tool-btn:hover {
   color: var(--type);
   border-color: var(--type);
+}
+
+/* Excalidraw-style number badge in the corner of each tool button, hinting
+   at the 1/2/3/... keyboard shortcut without needing a separate legend. */
+.design-studio-tool-shortcut {
+  position: absolute;
+  top: 50%;
+  right: 0.5rem;
+  transform: translateY(-50%);
+  font-size: 0.68rem;
+  color: var(--muted);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  width: 1.1rem;
+  height: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 
 .design-studio-canvas-frame {
@@ -398,6 +420,18 @@
   line-height: 0;
 }
 
+/* Measured by Canvas.tsx's ResizeObserver to compute how far to scale the
+   canvas down; .design-studio-scale-box then reserves exactly that shrunk
+   footprint in the page's layout flow so the transform below doesn't leave
+   dead space or force a scrollbar. */
+.design-studio-canvas-outer {
+  width: 100%;
+}
+
+.design-studio-scale-box {
+  margin: 0 auto;
+}
+
 .design-studio-stage-wrapper {
   position: relative;
 }
@@ -408,7 +442,14 @@
   margin: 0;
   padding: 0;
   border: 1px dashed var(--type);
-  background: rgba(255, 255, 255, 0.92);
+  /* Transparent, not a near-opaque white tint - the underlying Konva Text
+     node is hidden while editing (see Canvas.tsx's visible={element.id !==
+     editingId}), but everything else on the canvas stays visible behind
+     this overlay, so typed text renders in its real context. A fixed
+     light-colored backdrop here made light/white-fill text invisible while
+     editing even though it'd be perfectly readable against whatever's
+     actually behind it in the design. */
+  background: transparent;
   line-height: 1.1;
   resize: none;
   outline: none;
@@ -429,6 +470,18 @@
   font-weight: 600;
   margin: 0 0 0.2rem;
   color: var(--muted);
+}
+
+/* No longer one of the cramped 14rem side-panel columns (see
+   EditorWorkspace.tsx - moved out of .design-studio-side-panels into its
+   own full-width section) - sized like the page's other centered sections
+   (.design-studio-templates etc.) instead, since a chat-style prompt +
+   response log needs real width to be usable, not a rail sized for a list
+   of layer names. */
+.design-studio-ai-panel {
+  max-width: 46rem;
+  width: 100%;
+  margin: 0 auto 1rem;
 }
 
 .design-studio-ai-panel-header {
@@ -505,19 +558,23 @@
 
 .design-studio-ai-panel-input {
   display: flex;
-  gap: 0.4rem;
+  align-items: flex-end;
+  gap: 0.5rem;
 }
 
-.design-studio-ai-panel-input input {
+.design-studio-ai-panel-input textarea {
   flex: 1;
   font-family: var(--font-sans);
-  font-size: 0.82rem;
+  font-size: 0.9rem;
   color: var(--paper);
   background: var(--panel-2);
   border: 1px solid var(--rule);
   border-radius: var(--radius);
-  padding: 0.4rem 0.6rem;
+  padding: 0.6rem 0.7rem;
   min-width: 0;
+  min-height: 4.5rem;
+  resize: vertical;
+  line-height: 1.4;
 }
 
 .design-studio-ai-panel-input button {
@@ -527,7 +584,7 @@
   background: var(--panel-2);
   border: 1px solid var(--rule);
   border-radius: var(--radius);
-  padding: 0.4rem 0.7rem;
+  padding: 0.6rem 0.9rem;
   cursor: pointer;
 }
 

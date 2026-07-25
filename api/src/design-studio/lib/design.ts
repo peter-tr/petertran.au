@@ -1,4 +1,4 @@
-export type DesignElementType = "RECTANGLE" | "ELLIPSE" | "TEXT";
+export type DesignElementType = "RECTANGLE" | "ELLIPSE" | "TEXT" | "ARROW";
 
 export interface DesignElementRecord {
   id: string;

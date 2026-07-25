@@ -108,13 +108,19 @@ export default function AiPanel({
       </div>
       {error && <p className="status-line">// {error}</p>}
       <div className="design-studio-ai-panel-input">
-        <input
-          type="text"
+        <textarea
+          rows={3}
           placeholder={hasDraft ? "Refine the draft…" : "Describe what you want…"}
           value={prompt}
           onChange={(e) => onPromptChange(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") onSend();
+            // Enter sends, Shift+Enter inserts a newline - the usual
+            // chat-input convention, and necessary now that this is a
+            // multi-line textarea rather than a single-line input.
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              onSend();
+            }
           }}
           aria-label="AI design prompt"
         />
