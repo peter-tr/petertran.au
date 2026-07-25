@@ -26,7 +26,8 @@ jobs:
           aws-region: ap-southeast-2
 
       # `cdk destroy` still synths the app first (to know what's in it), and
-      # SiteStack/PantryStack/GamesStack/SupergraphStack's Lambdas all point
+      # SiteStack/PantryStack/GamesStack/DesignStudioStack/SupergraphStack's
+      # Lambdas all point
       # lambda.Code.fromAsset at their own dist/ - without building those
       # first, synth fails with CannotFindAsset before destroy ever runs.
       # web isn't built - nothing here needs web/dist.
@@ -37,19 +38,23 @@ jobs:
 
       # DEPLOY_TEST_ENV=true so infra/bin/app.ts registers the test stacks at
       # all - cdk destroy can't target a stack that isn't in the synthesized
-      # app. Tears down all 6 (4 test Lambdas, 3 test tables, the test
-      # HttpApi + its own cert, the test S3 bucket + CloudFront distribution
-      # + its own cert) - nothing else to clean up, RemovalPolicy.DESTROY +
-      # autoDeleteObjects handle the tables/bucket. PantryStack/GamesStack/
-      # SupergraphStack/ApiGatewayStack don't reference each other's or
-      # SiteStack's CloudFormation outputs (see api-gateway-stack.ts's doc
-      # comment on why), but SiteStack does depend on CertStack's live
-      # certificate reference, same as prod - cdk destroy resolves that real
-      # dependency itself regardless of the order listed here.
+      # app. Tears down all 8 (5 test Lambdas, 3 test tables, the test
+      # dashboard, the test HttpApi + its own cert, the test S3 bucket +
+      # CloudFront distribution + its own cert) - nothing else to clean up,
+      # RemovalPolicy.DESTROY + autoDeleteObjects handle the tables/bucket
+      # (design-studio's Mongo data isn't a CloudFormation resource, so it
+      # isn't touched here - it just sits unused in Atlas). PantryStack/
+      # GamesStack/DesignStudioStack/SupergraphStack/MonitoringStack/
+      # ApiGatewayStack don't reference each other's or SiteStack's
+      # CloudFormation outputs (see api-gateway-stack.ts's doc comment on
+      # why), but SiteStack does depend on CertStack's live certificate
+      # reference, same as prod - cdk destroy resolves that real dependency
+      # itself regardless of the order listed here.
       - name: Destroy test environment stacks
         working-directory: infra
         env:
           DEPLOY_TEST_ENV: "true"
         run: >
-          npx cdk destroy PetertranTestApiGatewayStack PetertranTestSupergraphStack PetertranTestGamesStack
+          npx cdk destroy PetertranTestApiGatewayStack PetertranTestMonitoringStack
+          PetertranTestSupergraphStack PetertranTestDesignStudioStack PetertranTestGamesStack
           PetertranTestPantryStack PetertranTestSiteStack PetertranTestCertStack --force

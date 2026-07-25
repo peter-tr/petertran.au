@@ -100,13 +100,14 @@ const PROD_FUNCTIONS: MonitoredFunction[] = [
   },
 ];
 
-// The on-demand test env's own 4 GraphQL Lambdas (see infra/bin/app.ts's
-// DEPLOY_TEST_ENV block) - no digest/price-check/warm-schedule/zero-trust-lab
-// counterparts exist there (pantry-stack.ts gates those behind
-// `if (!isTestEnv)`, and warm-schedule/zero-trust-lab were never part of
-// what the test env exists to validate - see TEST_FUNCTION_NAMES's doc
-// comment). Dashboard-only for this env, no alarms/SNS/toggle - see the
-// class doc comment for why.
+// 4 of the on-demand test env's 5 GraphQL Lambdas (see infra/bin/app.ts's
+// DEPLOY_TEST_ENV block) - design-studio has no entry here, matching
+// PROD_FUNCTIONS above (design-studio isn't monitored in prod either yet).
+// No digest/price-check/warm-schedule/zero-trust-lab counterparts exist in
+// the test env (pantry-stack.ts gates those behind `if (!isTestEnv)`, and
+// warm-schedule/zero-trust-lab were never part of what the test env exists
+// to validate - see TEST_FUNCTION_NAMES's doc comment). Dashboard-only for
+// this env, no alarms/SNS/toggle - see the class doc comment for why.
 const TEST_FUNCTIONS: MonitoredFunction[] = [
   {
     id: "Portfolio",
