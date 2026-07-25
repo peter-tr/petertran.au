@@ -7,6 +7,7 @@ import {
   GetFunctionConfigurationCommand,
   GetProvisionedConcurrencyConfigCommand,
   ResourceNotFoundException,
+  ProvisionedConcurrencyConfigNotFoundException,
 } from "@aws-sdk/client-lambda";
 import { SSMClient, GetParameterCommand, PutParameterCommand } from "@aws-sdk/client-ssm";
 import { SchedulerClient, GetScheduleCommand, UpdateScheduleCommand } from "@aws-sdk/client-scheduler";
@@ -98,9 +99,15 @@ beforeEach(() => {
   // Cost lookups the GET/POST branches now do for every target - default to
   // "256MB, no PC currently allocated" unless a test overrides it.
   lambdaMock.on(GetFunctionConfigurationCommand).resolves({ MemorySize: 256 });
-  lambdaMock
-    .on(GetProvisionedConcurrencyConfigCommand)
-    .rejects(new ResourceNotFoundException({ message: "no PC config found", $metadata: {} }));
+  // Real AWS behavior when a target currently has no PC config (e.g.
+  // outside the warm window): GetProvisionedConcurrencyConfig rejects with
+  // ProvisionedConcurrencyConfigNotFoundException, not ResourceNotFoundException.
+  lambdaMock.on(GetProvisionedConcurrencyConfigCommand).rejects(
+    new ProvisionedConcurrencyConfigNotFoundException({
+      message: "The specified configuration does not exist.",
+      $metadata: {},
+    })
+  );
   schedulerMock.on(GetScheduleCommand).resolves({
     FlexibleTimeWindow: { Mode: "OFF" },
     Target: {
