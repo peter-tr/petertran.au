@@ -54,6 +54,7 @@ export default function EditorWorkspace({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [name, setName] = useState(initialName);
   const [saving, setSaving] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [showTemplateForm, setShowTemplateForm] = useState(false);
   const [templateCategory, setTemplateCategory] = useState("");
@@ -162,6 +163,15 @@ export default function EditorWorkspace({
       setSaving(false);
     }
   }, [designId, name, elements, onSaved, width, height]);
+
+  const handleExport = useCallback(async () => {
+    setExporting(true);
+    try {
+      await canvasRef.current?.exportPNG();
+    } finally {
+      setExporting(false);
+    }
+  }, []);
 
   const handleSaveAsTemplate = useCallback(async () => {
     if (!templateCategory.trim()) return;
@@ -359,7 +369,7 @@ export default function EditorWorkspace({
       )}
       {templateMessage && <p className="status-line">// {templateMessage}</p>}
       <div className="design-studio-workspace">
-        <Toolbar onAdd={handleAdd} onExport={() => canvasRef.current?.exportPNG()} />
+        <Toolbar onAdd={handleAdd} onExport={handleExport} exporting={exporting} />
         <div className="design-studio-canvas-frame">
           <Canvas
             ref={canvasRef}
