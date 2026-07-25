@@ -225,6 +225,7 @@ export class ProvisionedConcurrencyStack extends Stack {
     warmScheduleFn.addToRolePolicy(
       new iam.PolicyStatement({
         actions: [
+          "lambda:GetFunctionConfiguration",
           "lambda:GetProvisionedConcurrencyConfig",
           "lambda:PutProvisionedConcurrencyConfig",
           "lambda:DeleteProvisionedConcurrencyConfig",

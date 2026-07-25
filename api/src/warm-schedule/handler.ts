@@ -3,6 +3,8 @@ import {
   LambdaClient,
   PutProvisionedConcurrencyConfigCommand,
   DeleteProvisionedConcurrencyConfigCommand,
+  GetFunctionConfigurationCommand,
+  GetProvisionedConcurrencyConfigCommand,
   ResourceNotFoundException,
 } from "@aws-sdk/client-lambda";
 import { SSMClient, GetParameterCommand, PutParameterCommand } from "@aws-sdk/client-ssm";
@@ -33,6 +35,32 @@ interface WarmSchedule {
 }
 
 type WarmScheduleConfig = Record<WarmScheduleKey, WarmSchedule>;
+
+// Real ap-southeast-2 Provisioned Concurrency rate (AWS Pricing API,
+// effective 2026-07-01) - see the 2026-07-20 PC rollout's pricing pull.
+// Charged per GB-second regardless of invocation - this is what makes a
+// concurrency unit's cost purely a function of memory size + how long it's
+// granted for, independent of traffic.
+const PC_PRICE_PER_GB_SECOND_USD = 0.000005236;
+const SECONDS_PER_HOUR = 3600;
+// Calendar months aren't a whole number of weeks - average weeks/month
+// (365.25 / 7 / 12) so a schedule's cost projects consistently regardless
+// of which month it's viewed in.
+const WEEKS_PER_MONTH = 365.25 / 7 / 12;
+
+interface ProjectCost {
+  // Real, currently-allocated PC units across every target Lambda in this
+  // project right now (0 outside the window, or while AWS is still
+  // provisioning/tearing down) - not the configured `concurrency`, which is
+  // only the desired value.
+  liveConcurrency: number;
+  // $/hr this project is costing right now, from each target's real
+  // (queried) memory size times its real allocated concurrency.
+  liveHourlyCostUsd: number;
+  // $/mo if the configured schedule runs as set - real memory size times
+  // the configured `concurrency`, times the schedule's actual weekly hours.
+  scheduledMonthlyCostUsd: number;
+}
 
 const ALL_WEEKDAYS: Weekday[] = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 
@@ -136,6 +164,73 @@ function isWithinWindow(schedule: WarmSchedule, now: Date): boolean {
   const { weekday, time } = sydneyNow(now);
 
   return schedule.days.includes(weekday) && schedule.start <= time && time < schedule.end;
+}
+
+function hoursPerWeek(schedule: WarmSchedule): number {
+  if (!schedule.enabled) return 0;
+
+  const [startHour, startMinute] = schedule.start.split(":").map(Number);
+  const [endHour, endMinute] = schedule.end.split(":").map(Number);
+  const hoursPerDay = endHour + endMinute / 60 - (startHour + startMinute / 60);
+
+  return schedule.days.length * hoursPerDay;
+}
+
+// Real, currently-allocated memory + PC count for one Lambda's `live`
+// alias - queried live rather than trusted from config, since the actual
+// allocated count can lag the desired one (still provisioning/tearing
+// down) and memory size can change independent of this stack (a manual
+// rightsizing pass, e.g. the 2026-07-20 512MB -> 256MB change).
+async function getTargetLiveState(
+  functionName: string
+): Promise<{ memoryMb: number; allocatedConcurrency: number }> {
+  const [configResult, pcResult] = await Promise.all([
+    lambdaClient.send(
+      new GetFunctionConfigurationCommand({ FunctionName: functionName, Qualifier: ALIAS_NAME })
+    ),
+    lambdaClient
+      .send(new GetProvisionedConcurrencyConfigCommand({ FunctionName: functionName, Qualifier: ALIAS_NAME }))
+      .catch((err) => {
+        // No PC currently configured for this target - 0 allocated, not an
+        // error (same as reconcileTarget's own handling of this case).
+        if (err instanceof ResourceNotFoundException) return null;
+        throw err;
+      }),
+  ]);
+
+  return {
+    memoryMb: configResult.MemorySize ?? 0,
+    allocatedConcurrency: pcResult?.AllocatedProvisionedConcurrentExecutions ?? 0,
+  };
+}
+
+async function computeProjectCost(key: WarmScheduleKey, schedule: WarmSchedule): Promise<ProjectCost> {
+  const targetStates = await Promise.all(TARGETS_BY_PROJECT[key].map(getTargetLiveState));
+
+  let liveConcurrency = 0;
+  let liveHourlyCostUsd = 0;
+  let scheduledHourlyCostUsd = 0;
+  for (const { memoryMb, allocatedConcurrency } of targetStates) {
+    const memoryGb = memoryMb / 1024;
+    liveConcurrency += allocatedConcurrency;
+    liveHourlyCostUsd += memoryGb * allocatedConcurrency * PC_PRICE_PER_GB_SECOND_USD * SECONDS_PER_HOUR;
+    scheduledHourlyCostUsd += memoryGb * schedule.concurrency * PC_PRICE_PER_GB_SECOND_USD * SECONDS_PER_HOUR;
+  }
+
+  return {
+    liveConcurrency,
+    liveHourlyCostUsd,
+    scheduledMonthlyCostUsd: scheduledHourlyCostUsd * hoursPerWeek(schedule) * WEEKS_PER_MONTH,
+  };
+}
+
+async function computeAllProjectCosts(
+  config: WarmScheduleConfig
+): Promise<Record<WarmScheduleKey, ProjectCost>> {
+  const keys = Object.keys(TARGETS_BY_PROJECT) as WarmScheduleKey[];
+  const costs = await Promise.all(keys.map((key) => computeProjectCost(key, config[key])));
+
+  return Object.fromEntries(keys.map((key, i) => [key, costs[i]])) as Record<WarmScheduleKey, ProjectCost>;
 }
 
 // Never throws - applying PC is best-effort. The flag itself (what the user
@@ -332,12 +427,23 @@ async function processEvent(
     await updateProjectSchedules(key, schedule);
     await reconcileProject(key, schedule, new Date());
 
-    return { statusCode: 200, headers: { "content-type": "application/json" }, body: JSON.stringify(config) };
+    const costs = await computeAllProjectCosts(config);
+
+    return {
+      statusCode: 200,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ schedules: config, costs }),
+    };
   }
 
   const config = await getConfig();
+  const costs = await computeAllProjectCosts(config);
 
-  return { statusCode: 200, headers: { "content-type": "application/json" }, body: JSON.stringify(config) };
+  return {
+    statusCode: 200,
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ schedules: config, costs }),
+  };
 }
 
 export async function handler(

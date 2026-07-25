@@ -22,6 +22,7 @@ export default function PortfolioSettingsPage() {
   const { staggerHomeFetches, setStaggerHomeFetches } = useStaggerHomeFetches();
   const {
     config: warmScheduleConfig,
+    costs: warmScheduleCosts,
     pendingFn: warmSchedulePendingFn,
     error: warmScheduleError,
     setSchedule: setWarmSchedule,
@@ -99,7 +100,8 @@ export default function PortfolioSettingsPage() {
         <div className="form-row">
           <p className="form-label">
             Keep warm with provisioned concurrency (Sydney time) - no cold starts for real visitors during the
-            window you set below, ~$1.58/mo each at 11h/day, 256MB
+            window you set below. Prices below are live, from each project's real Lambda memory size and
+            currently-allocated provisioned concurrency.
           </p>
           {warmScheduleConfig &&
             (Object.keys(WARM_SCHEDULE_LABELS) as WarmScheduleKey[]).map((fn) => (
@@ -108,6 +110,7 @@ export default function PortfolioSettingsPage() {
                 fn={fn}
                 label={WARM_SCHEDULE_LABELS[fn]}
                 schedule={warmScheduleConfig[fn]}
+                cost={warmScheduleCosts?.[fn]}
                 pending={warmSchedulePendingFn === fn}
                 onSave={(schedule) => setWarmSchedule(fn, schedule)}
               />

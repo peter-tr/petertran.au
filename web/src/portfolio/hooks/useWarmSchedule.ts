@@ -30,8 +30,30 @@ export const MAX_CONCURRENCY = 5;
 
 export type WarmScheduleConfig = Record<WarmScheduleKey, WarmSchedule>;
 
+// Real, dynamically-computed price per project - queried live from each
+// target Lambda's actual memory size and actual allocated Provisioned
+// Concurrency (see api/src/warm-schedule/handler.ts's computeProjectCost),
+// not a static estimate.
+export interface ProjectCost {
+  // Real PC units allocated right now (0 outside the window, or while AWS
+  // is still provisioning/tearing down) - not necessarily the configured
+  // `concurrency`, which is only the desired value.
+  liveConcurrency: number;
+  // $/hr this project is costing right now.
+  liveHourlyCostUsd: number;
+  // $/mo if the configured schedule runs as set.
+  scheduledMonthlyCostUsd: number;
+}
+export type WarmScheduleCosts = Record<WarmScheduleKey, ProjectCost>;
+
+interface WarmScheduleResponse {
+  schedules: WarmScheduleConfig;
+  costs: WarmScheduleCosts;
+}
+
 export function useWarmSchedule() {
   const [config, setConfigState] = useState<WarmScheduleConfig | null>(null);
+  const [costs, setCosts] = useState<WarmScheduleCosts | null>(null);
   // The project currently being saved, not a single shared flag - a save in
   // flight for one project shouldn't disable every other project's Save
   // button too.
@@ -42,7 +64,10 @@ export function useWarmSchedule() {
     if (!ENDPOINT) return;
     fetch(ENDPOINT)
       .then((res) => res.json())
-      .then((data: WarmScheduleConfig) => setConfigState(data))
+      .then((data: WarmScheduleResponse) => {
+        setConfigState(data.schedules);
+        setCosts(data.costs);
+      })
       .catch(() => setError("Couldn't load provisioned concurrency status"));
   }, []);
 
@@ -56,17 +81,20 @@ export function useWarmSchedule() {
       body: JSON.stringify({ project: fn, schedule }),
     })
       .then((res) => res.json())
-      .then((data: WarmScheduleConfig) =>
-        // Only replace the saved project's entry, not the whole config - a
-        // fresh object reference for every project (even ones nothing
-        // changed for) would otherwise reset every other row's in-progress
-        // draft too (see WarmScheduleProject's schedulesEqual-based reset
-        // check, which this keeps working correctly for untouched rows).
-        setConfigState((current) => (current ? { ...current, [fn]: data[fn] } : data))
-      )
+      .then((data: WarmScheduleResponse) => {
+        // Only replace the saved project's schedule entry, not the whole
+        // config - a fresh object reference for every project (even ones
+        // nothing changed for) would otherwise reset every other row's
+        // in-progress draft too (see WarmScheduleProject's
+        // schedulesEqual-based reset check, which this keeps working
+        // correctly for untouched rows). Costs are pure display, not tied
+        // to any draft state, so the whole map is replaced.
+        setConfigState((current) => (current ? { ...current, [fn]: data.schedules[fn] } : data.schedules));
+        setCosts(data.costs);
+      })
       .catch(() => setError("Couldn't update provisioned concurrency status"))
       .finally(() => setPendingFn(null));
   }, []);
 
-  return { config, pendingFn, error, setSchedule, available: Boolean(ENDPOINT) };
+  return { config, costs, pendingFn, error, setSchedule, available: Boolean(ENDPOINT) };
 }
