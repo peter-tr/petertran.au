@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import PantryArchitectureDiagram from "./components/PantryArchitectureDiagram";
 import { usePantrySettings } from "./hooks/usePantrySettings";
+import { clearPantryHomeCache } from "./lib/homeCache";
 import {
   runPantryQuery,
   SYNC_PRICES_NOW_MUTATION,
@@ -160,6 +161,41 @@ export default function PantrySettingsPage() {
                 </option>
               ))}
             </select>
+          </div>
+        </section>
+      )}
+
+      {settings && (
+        <section className="pantry-panel">
+          <div className="pantry-panel-header">
+            <h2 className="pantry-panel-title">Instant load</h2>
+          </div>
+
+          <p className="project-desc">
+            Paints the pantry page instantly from the last-loaded inventory/shopping list while a fresh copy
+            loads in the background, instead of waiting on the network every time. Turning this off also
+            clears whatever's currently cached.
+          </p>
+
+          <div className="form-row pantry-settings-row">
+            <label className="form-label" htmlFor="pantry-instant-load-cache">
+              <input
+                id="pantry-instant-load-cache"
+                type="checkbox"
+                checked={settings.instantLoadCache}
+                onChange={(e) => {
+                  updateSettings({ instantLoadCache: e.target.checked });
+                  // usePantryHome (Pantry.tsx) owns the actual cache and
+                  // would clear it on its own next background refetch
+                  // anyway (see its refetch), but that only happens on the
+                  // next /pantry visit - clear it here too so switching
+                  // this off takes effect immediately rather than lagging
+                  // one visit behind.
+                  if (!e.target.checked) clearPantryHomeCache();
+                }}
+              />{" "}
+              Cache the pantry page for instant loads
+            </label>
           </div>
         </section>
       )}

@@ -280,6 +280,7 @@ const SETTINGS_FIELDS = /* GraphQL */ `
     nerdModeInventory
     nerdModeShoppingList
     nerdModeCommandBar
+    instantLoadCache
   }
 `;
 

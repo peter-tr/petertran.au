@@ -38,6 +38,7 @@ function makeSettings(overrides: Partial<PantrySettings> = {}): PantrySettings {
     nerdModeInventory: false,
     nerdModeShoppingList: false,
     nerdModeCommandBar: false,
+    instantLoadCache: true,
     ...overrides,
   };
 }

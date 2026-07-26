@@ -32,6 +32,7 @@ let settings: PantrySettings = {
   nerdModeInventory: false,
   nerdModeShoppingList: false,
   nerdModeCommandBar: false,
+  instantLoadCache: true,
   commonItems: [
     "Milk",
     "Eggs",

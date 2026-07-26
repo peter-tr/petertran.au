@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import PantrySettingsPage from "./PantrySettingsPage";
 import { runPantryQuery } from "./api";
+import { clearPantryHomeCache } from "./lib/homeCache";
 import type { PantrySettings, PriceSyncStatus } from "./api";
 
 vi.mock("./api", async (importOriginal) => {
@@ -19,7 +20,12 @@ vi.mock("./components/PantryArchitectureDiagram", () => ({
   default: () => <div data-testid="architecture-diagram" />,
 }));
 
+vi.mock("./lib/homeCache", () => ({
+  clearPantryHomeCache: vi.fn(),
+}));
+
 const mockRunPantryQuery = vi.mocked(runPantryQuery);
+const mockClearPantryHomeCache = vi.mocked(clearPantryHomeCache);
 
 function makeSettings(overrides: Partial<PantrySettings> = {}): PantrySettings {
   return {
@@ -47,6 +53,7 @@ function makeSettings(overrides: Partial<PantrySettings> = {}): PantrySettings {
     nerdModeInventory: false,
     nerdModeShoppingList: false,
     nerdModeCommandBar: false,
+    instantLoadCache: true,
     ...overrides,
   };
 }
@@ -113,6 +120,42 @@ describe("PantrySettingsPage", () => {
     renderPage();
 
     await waitFor(() => expect(screen.getByLabelText("Send time (Australia/Sydney)")).toBeDisabled());
+  });
+
+  it("clears the pantry home cache immediately when the instant-load toggle is switched off", async () => {
+    mockRunPantryQuery
+      .mockResolvedValueOnce({ settings: makeSettings({ instantLoadCache: true }) })
+      .mockResolvedValueOnce({ priceSyncStatus: makeSyncStatus() })
+      .mockResolvedValueOnce({ updateSettings: makeSettings({ instantLoadCache: false }) });
+
+    renderPage();
+
+    const checkbox = await screen.findByLabelText(/Cache the pantry page for instant loads/);
+    await waitFor(() => expect(checkbox).toBeChecked());
+
+    await act(async () => {
+      fireEvent.click(checkbox);
+    });
+
+    expect(mockClearPantryHomeCache).toHaveBeenCalledTimes(1);
+  });
+
+  it("doesn't clear the pantry home cache when the instant-load toggle is switched on", async () => {
+    mockRunPantryQuery
+      .mockResolvedValueOnce({ settings: makeSettings({ instantLoadCache: false }) })
+      .mockResolvedValueOnce({ priceSyncStatus: makeSyncStatus() })
+      .mockResolvedValueOnce({ updateSettings: makeSettings({ instantLoadCache: true }) });
+
+    renderPage();
+
+    const checkbox = await screen.findByLabelText(/Cache the pantry page for instant loads/);
+    await waitFor(() => expect(checkbox).not.toBeChecked());
+
+    await act(async () => {
+      fireEvent.click(checkbox);
+    });
+
+    expect(mockClearPantryHomeCache).not.toHaveBeenCalled();
   });
 
   it("shows an error banner when settings fail to load", async () => {
