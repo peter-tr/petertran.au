@@ -19,6 +19,7 @@ export interface WarmSchedule {
   start: string; // "HH:MM", 24h, Sydney-local
   end: string; // "HH:MM"
   concurrency: number; // ProvisionedConcurrentExecutions granted while within window
+  memoryMb: number; // every target Lambda's memory
 }
 
 // Mirrors warm-schedule/handler.ts's own MAX_CONCURRENCY (the actual
@@ -27,6 +28,11 @@ export interface WarmSchedule {
 // the handler's own fallback. Only used here to bound the settings page's
 // number input before a save round-trips to the real check.
 export const MAX_CONCURRENCY = 5;
+
+// Mirrors warm-schedule/handler.ts's own MEMORY_OPTIONS_MB - the settings
+// page's memory dropdown offers exactly these curated, actually-tested
+// tiers rather than a free-form number input. Keep in sync by hand.
+export const MEMORY_OPTIONS_MB = [512, 1024, 1536, 2048] as const;
 
 export type WarmScheduleConfig = Record<WarmScheduleKey, WarmSchedule>;
 
@@ -41,7 +47,8 @@ export interface ProjectCost {
   liveConcurrency: number;
   // $/hr this project is costing right now.
   liveHourlyCostUsd: number;
-  // $/mo if the configured schedule runs as set.
+  // $/mo if the configured schedule runs as set - uses the schedule's own
+  // memoryMb, so this reflects a pending memory choice before it's saved.
   scheduledMonthlyCostUsd: number;
 }
 export type WarmScheduleCosts = Record<WarmScheduleKey, ProjectCost>;

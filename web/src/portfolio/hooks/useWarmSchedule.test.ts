@@ -8,6 +8,7 @@ const DEFAULT_SCHEDULE: WarmSchedule = {
   start: "08:00",
   end: "19:00",
   concurrency: 1,
+  memoryMb: 512,
 };
 
 const DEFAULT_CONFIG = {
@@ -83,6 +84,7 @@ describe("useWarmSchedule", () => {
       start: "07:30",
       end: "18:00",
       concurrency: 3,
+      memoryMb: 1024,
     };
     const updatedConfig = { ...DEFAULT_CONFIG, pantry: newSchedule };
     (fetch as ReturnType<typeof vi.fn>)
@@ -116,6 +118,7 @@ describe("useWarmSchedule", () => {
       start: "07:30",
       end: "18:00",
       concurrency: 3,
+      memoryMb: 1024,
     };
     // The server always responds with the full config, same as GET - but a
     // fresh JSON.parse means every key is a new object reference, even ones

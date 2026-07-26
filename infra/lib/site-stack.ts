@@ -158,17 +158,27 @@ export class SiteStack extends Stack {
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "handler.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../api/src/portfolio/dist")),
-      // 1024, up from 256 (2026-07-24) - a cold trace outside the
-      // ProvisionedConcurrencyStack warm window (8am-7pm Sydney) showed the
-      // supergraph gateway's fan-out fetch to this Lambda dominated by an
-      // ~3.8s gap between API Gateway's invoke and this function's own
-      // traced segment starting - Lambda's Init phase (module load + Apollo
-      // Server schema build), which happens before X-Ray/OTel can attach so
-      // it's invisible on the trace waterfall. That phase's CPU scales with
-      // memory the same as everything else, so more memory directly cuts
-      // cold-start latency outside the PC window - not a peak-RSS headroom
-      // question the way the old 256 comment was.
-      memorySize: 1024,
+      // 512, down from 1024 (2026-07-25) - the 1024 bump assumed more memory
+      // directly cut cold-start latency, but staged isolation testing (bare
+      // handler -> +bundled AWS SDK -> +ADOT layer -> +Apollo Server+schema)
+      // found the ~3.7-3.8s cold starts that motivated it were actually
+      // Node's ESM import-in-the-middle instrumentation hook under
+      // applyApplicationSignals() - fixed separately by building as CJS (see
+      // api/scripts/build-lambda.ts), which alone got real cold starts to
+      // ~800-900ms. A follow-up memory sweep (512/1024/1536/2048/3008MB)
+      // found 1536MB+ gave no further Init Duration improvement over 1024MB
+      // at all, and 512MB only cost ~10-20ms more on real DynamoDB-backed
+      // warm invocations - small next to this project's actual p50 request
+      // time. Combined with Provisioned Concurrency's GB-second pricing
+      // (1x1024MB costs the same as 2x512MB), halving memory and doubling PC
+      // count directly fixes PC capacity - the real root cause turned out to
+      // be a single page load firing >1 concurrent GraphQL request, enough
+      // to exceed PC=1 on its own - at zero extra cost. See ProvisionedConcurrencyStack's
+      // DEFAULT_SCHEDULE.memoryMb and the settings page's memory dropdown for
+      // the now-live-adjustable version of this value; this literal is only
+      // the bootstrap default for a project that's never had its schedule
+      // customized.
+      memorySize: 512,
       // 30s (not the default 15s): a backstop, not the primary safeguard,
       // for the all-time cost fields' worst case - CostRefreshFunction below
       // now refreshes both caches daily, so a real request only pays for
