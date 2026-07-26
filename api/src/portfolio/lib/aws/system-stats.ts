@@ -42,7 +42,7 @@ const METRICS_CACHE_TTL_MS = 60_000;
 let metricsCache: { functionName: string; data: LambdaMetrics; expiresAt: number } | null = null;
 
 async function getLambdaMetrics(functionName: string): Promise<LambdaMetrics> {
-  if (metricsCache && metricsCache.functionName === functionName && metricsCache.expiresAt > Date.now()) {
+  if (metricsCache?.functionName === functionName && metricsCache.expiresAt > Date.now()) {
     return metricsCache.data;
   }
 

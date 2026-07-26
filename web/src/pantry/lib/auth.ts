@@ -174,7 +174,7 @@ export function getPantryIdentity(): string {
 
   try {
     const payload = token.split(".")[1];
-    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const base64 = payload.replaceAll("-", "+").replaceAll("_", "/");
     const padCount = (4 - (base64.length % 4)) % 4;
     const claims = JSON.parse(atob(base64.padEnd(base64.length + padCount, "=")));
 

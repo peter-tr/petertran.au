@@ -15,7 +15,7 @@ function dayKey(date: Date): string {
 // Lambda is never the name the client actually sent. Stripping it back down
 // is what keeps the systemStats/CloudWatch breakdown keyed by "Footer"
 // instead of "Footer__portfolio__0".
-const FEDERATION_SUFFIX_PATTERN = /__[0-9A-Za-z_]+__\d+$/;
+const FEDERATION_SUFFIX_PATTERN = /__\w+__\d+$/;
 
 export function stripFederationSuffix(operationName: string): string {
   return operationName.replace(FEDERATION_SUFFIX_PATTERN, "");

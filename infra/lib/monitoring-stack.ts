@@ -4,10 +4,11 @@ import * as applicationsignals from "aws-cdk-lib/aws-applicationsignals";
 import * as cloudwatch from "aws-cdk-lib/aws-cloudwatch";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as iam from "aws-cdk-lib/aws-iam";
+import * as kms from "aws-cdk-lib/aws-kms";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as sns from "aws-cdk-lib/aws-sns";
 import * as subscriptions from "aws-cdk-lib/aws-sns-subscriptions";
-import * as path from "path";
+import * as path from "node:path";
 import { createLambdaAlarms } from "./shared/alarms";
 import { FUNCTION_NAMES, TEST_FUNCTION_NAMES } from "./shared/function-names";
 
@@ -213,6 +214,7 @@ export class MonitoringStack extends Stack {
       alarmTopic = new sns.Topic(this, "AlarmsTopic", {
         topicName: "petertran-au-alarms",
         displayName: "petertran.au alarms",
+        masterKey: kms.Alias.fromAliasName(this, "SnsManagedKey", "alias/aws/sns"),
       });
       alarmTopic.addSubscription(new subscriptions.EmailSubscription(ALARM_EMAIL));
 

@@ -12,7 +12,7 @@ describe("generateOpaqueToken", () => {
 
   it("encodes 32 random bytes (43 base64url characters, unpadded)", () => {
     const token = generateOpaqueToken();
-    expect(token.length).toBe(43);
+    expect(token).toHaveLength(43);
   });
 
   it("generates a different token on each call", () => {

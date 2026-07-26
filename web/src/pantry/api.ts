@@ -1,6 +1,5 @@
 import { createGraphQLClient } from "../shared/graphqlClient";
 import { getAuthHeader } from "./lib/auth";
-import { StorageLocation, PantryActionType, AiProvider, AiModelTier } from "./api-schema-types.generated";
 import type {
   AddInventoryItemInput as SchemaAddInventoryItemInput,
   UpdateInventoryItemInput as SchemaUpdateInventoryItemInput,
@@ -50,7 +49,7 @@ export const runPantryQuery = createGraphQLClient(
   getAuthHeader
 );
 
-export { StorageLocation, AiProvider, AiModelTier };
+export { StorageLocation, AiProvider, AiModelTier } from "./api-schema-types.generated";
 
 export type AiCallDebugInfo = AiCallDebugInfoFieldsFragment;
 
@@ -384,7 +383,7 @@ export const ME_QUERY = /* GraphQL */ `
 
 export type MeResult = MeQuery;
 
-export { PantryActionType };
+export { PantryActionType } from "./api-schema-types.generated";
 
 // No standalone GraphQL fragment - actions/recipes/ingredients below are only
 // ever selected inline as part of ParseCommand's response.

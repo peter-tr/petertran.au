@@ -266,7 +266,7 @@ export async function generateDesignElements(
   });
 
   const parsed = response.parsed_output as RawGenerateResult | null;
-  if (!parsed || !parsed.elements.length) {
+  if (!parsed?.elements.length) {
     throw new Error("Claude didn't return a usable design - try rephrasing the prompt.");
   }
 

@@ -121,7 +121,7 @@ async function checkPricesBatch(
     // Same URL validation as before - never pass through a malformed/
     // hallucinated link just because a field happened to be present.
     const rawUrl = r.productUrl?.replace(/[.,;)]+$/, "") ?? null;
-    const productUrl = rawUrl && /^https:\/\/www\.coles\.com\.au\/product\//.test(rawUrl) ? rawUrl : null;
+    const productUrl = rawUrl && rawUrl.startsWith("https://www.coles.com.au/product/") ? rawUrl : null;
     results.set(r.name, { ...r, productUrl });
   }
 

@@ -203,7 +203,7 @@ const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
 
   function commitTextEdit() {
     const element = editingId ? elements.find((el) => el.id === editingId) : undefined;
-    if (element && element.type === "text" && element.text !== editingValue) {
+    if (element?.type === "text" && element.text !== editingValue) {
       onChange(element, { ...element, text: editingValue });
     }
     setEditingId(null);
@@ -411,7 +411,7 @@ const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
               open. Sits inside the same scaled wrapper as the Stage, so it
               tracks the canvas's on-screen size/position at any zoom level
               without needing its own scale math. */}
-          {editingElement && editingElement.type === "text" && (
+          {editingElement?.type === "text" && (
             <textarea
               autoFocus
               className="design-studio-text-editor"

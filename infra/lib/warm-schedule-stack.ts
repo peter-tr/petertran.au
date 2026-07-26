@@ -5,7 +5,7 @@ import * as iam from "aws-cdk-lib/aws-iam";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 import { Schedule, ScheduleExpression, ScheduleTargetInput } from "aws-cdk-lib/aws-scheduler";
 import { LambdaInvoke } from "aws-cdk-lib/aws-scheduler-targets";
-import * as path from "path";
+import * as path from "node:path";
 import { FUNCTION_NAMES, LIVE_ALIAS_NAME, liveAliasArn } from "./shared/function-names";
 
 export interface ZeroTrustLabFunctionNames {

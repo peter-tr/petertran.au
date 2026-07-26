@@ -8,7 +8,7 @@ export function normalizeItemName(name: string): string {
     n = n.slice(0, -3) + "y"; // berries -> berry
   } else if (/(s|x|z|ch|sh)es$/.test(n)) {
     n = n.slice(0, -2); // tomatoes -> tomato, boxes -> box
-  } else if (/s$/.test(n) && !/ss$/.test(n)) {
+  } else if (n.endsWith("s") && !n.endsWith("ss")) {
     n = n.slice(0, -1); // eggs -> egg (but not "glass")
   }
 

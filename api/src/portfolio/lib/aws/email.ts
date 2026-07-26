@@ -18,11 +18,11 @@ export interface SubmissionMeta {
 
 function escapeHtml(value: string): string {
   return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
 
 // Best-effort notification, sent after the message is already durably stored
@@ -36,7 +36,7 @@ export async function sendContactNotification(input: ContactInput, meta: Submiss
   if (!from || !to) return;
 
   const { name, email, message } = input;
-  const htmlMessage = escapeHtml(message).replace(/\n/g, "<br>");
+  const htmlMessage = escapeHtml(message).replaceAll("\n", "<br>");
   const receivedAtAest = `${AEST_FORMATTER.format(new Date(meta.receivedAt))} AEST/AEDT`;
   const sourceIp = meta.sourceIp ?? "unknown";
   const userAgent = meta.userAgent ?? "unknown";

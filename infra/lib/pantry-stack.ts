@@ -8,7 +8,7 @@ import * as cognito from "aws-cdk-lib/aws-cognito";
 import * as iam from "aws-cdk-lib/aws-iam";
 import { Schedule, ScheduleExpression } from "aws-cdk-lib/aws-scheduler";
 import { LambdaInvoke } from "aws-cdk-lib/aws-scheduler-targets";
-import * as path from "path";
+import * as path from "node:path";
 import { FUNCTION_NAMES, LIVE_ALIAS_NAME } from "./shared/function-names";
 import { applyApplicationSignals } from "./shared/application-signals";
 import { bedrockInvokeResources } from "./shared/bedrock-models";

@@ -8,7 +8,7 @@ import {
 // In-memory stand-in for the DynamoDB game store - fine for local dev, where
 // state doesn't need to survive a server restart.
 class InMemoryImposterStore implements ImposterStore {
-  private games = new Map<string, GameRecord>();
+  private readonly games = new Map<string, GameRecord>();
 
   async getGame(gameId: string): Promise<GameRecord | null> {
     return this.games.get(gameId) ?? null;

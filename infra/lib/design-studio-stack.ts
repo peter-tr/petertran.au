@@ -3,7 +3,7 @@ import { Construct } from "constructs";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as iam from "aws-cdk-lib/aws-iam";
-import * as path from "path";
+import * as path from "node:path";
 import { FUNCTION_NAMES, LIVE_ALIAS_NAME } from "./shared/function-names";
 import { applyApplicationSignals } from "./shared/application-signals";
 import { bedrockInvokeResources } from "./shared/bedrock-models";
