@@ -1,8 +1,15 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useShowAlsoBuilt } from "./hooks/useShowAlsoBuilt";
 import { usePageLoadWarmup } from "./hooks/usePageLoadWarmup";
 import { useStaggerHomeFetches } from "./hooks/useStaggerHomeFetches";
-import { useWarmSchedule, type WarmScheduleKey } from "./hooks/useWarmSchedule";
+import {
+  useWarmSchedule,
+  schedulesEqual,
+  isScheduleValid,
+  type WarmScheduleKey,
+  type WarmSchedule,
+} from "./hooks/useWarmSchedule";
 import { useAlertsEnabled } from "./hooks/useAlertsEnabled";
 import WarmScheduleProject from "./components/WarmScheduleProject";
 import "./portfolio.css";
@@ -15,6 +22,7 @@ const WARM_SCHEDULE_LABELS: Record<WarmScheduleKey, string> = {
   designStudio: "design-studio",
   zeroTrustLab: "zero-trust-lab (no real visitors - only speeds up your own testing of it)",
 };
+const WARM_SCHEDULE_KEYS = Object.keys(WARM_SCHEDULE_LABELS) as WarmScheduleKey[];
 
 export default function PortfolioSettingsPage() {
   const { showAlsoBuilt, setShowAlsoBuilt } = useShowAlsoBuilt();
@@ -23,11 +31,38 @@ export default function PortfolioSettingsPage() {
   const {
     config: warmScheduleConfig,
     costs: warmScheduleCosts,
-    pendingFn: warmSchedulePendingFn,
+    saving: warmScheduleSaving,
     error: warmScheduleError,
-    setSchedule: setWarmSchedule,
+    saveAll: saveAllWarmSchedules,
     available: warmScheduleAvailable,
   } = useWarmSchedule();
+  // Every project's draft lives here (not inside each WarmScheduleProject
+  // row) so a single "Save all" button can see every row's unsaved edits at
+  // once. Reset from `config` whenever it gets a fresh object reference -
+  // that only happens on initial load and right after saveAll resolves, so
+  // this never clobbers an in-progress edit mid-typing.
+  const [warmScheduleDrafts, setWarmScheduleDrafts] = useState(warmScheduleConfig);
+  const [prevWarmScheduleConfig, setPrevWarmScheduleConfig] = useState(warmScheduleConfig);
+  if (warmScheduleConfig !== prevWarmScheduleConfig) {
+    setPrevWarmScheduleConfig(warmScheduleConfig);
+    setWarmScheduleDrafts(warmScheduleConfig);
+  }
+
+  const dirtyWarmSchedules: Partial<Record<WarmScheduleKey, WarmSchedule>> =
+    warmScheduleDrafts && warmScheduleConfig
+      ? Object.fromEntries(
+          WARM_SCHEDULE_KEYS.filter(
+            (fn) => !schedulesEqual(warmScheduleDrafts[fn], warmScheduleConfig[fn])
+          ).map((fn) => [fn, warmScheduleDrafts[fn]])
+        )
+      : {};
+  const hasDirtyWarmSchedules = Object.keys(dirtyWarmSchedules).length > 0;
+  const hasInvalidWarmSchedule = warmScheduleDrafts
+    ? WARM_SCHEDULE_KEYS.some((fn) => !isScheduleValid(warmScheduleDrafts[fn]))
+    : false;
+  const totalScheduledMonthlyCostUsd = warmScheduleCosts
+    ? WARM_SCHEDULE_KEYS.reduce((sum, fn) => sum + warmScheduleCosts[fn].scheduledMonthlyCostUsd, 0)
+    : 0;
   const {
     enabled: alertsEnabled,
     pending: alertsPending,
@@ -103,18 +138,33 @@ export default function PortfolioSettingsPage() {
             window you set below. Prices below are live, from each project's real Lambda memory size and
             currently-allocated provisioned concurrency.
           </p>
-          {warmScheduleConfig &&
-            (Object.keys(WARM_SCHEDULE_LABELS) as WarmScheduleKey[]).map((fn) => (
+          {warmScheduleDrafts &&
+            WARM_SCHEDULE_KEYS.map((fn) => (
               <WarmScheduleProject
                 key={fn}
                 fn={fn}
                 label={WARM_SCHEDULE_LABELS[fn]}
-                schedule={warmScheduleConfig[fn]}
+                draft={warmScheduleDrafts[fn]}
+                onChange={(schedule) =>
+                  setWarmScheduleDrafts((current) => (current ? { ...current, [fn]: schedule } : current))
+                }
                 cost={warmScheduleCosts?.[fn]}
-                pending={warmSchedulePendingFn === fn}
-                onSave={(schedule) => setWarmSchedule(fn, schedule)}
+                disabled={warmScheduleSaving}
               />
             ))}
+          {warmScheduleCosts && (
+            <p className="section-hint">
+              Total: ~${totalScheduledMonthlyCostUsd.toFixed(2)}/mo if all schedules run as set
+            </p>
+          )}
+          <button
+            className="run-btn"
+            type="button"
+            disabled={!hasDirtyWarmSchedules || hasInvalidWarmSchedule || warmScheduleSaving}
+            onClick={() => saveAllWarmSchedules(dirtyWarmSchedules)}
+          >
+            Save all
+          </button>
           {warmScheduleError && <p className="section-hint">{warmScheduleError}</p>}
         </div>
       )}
