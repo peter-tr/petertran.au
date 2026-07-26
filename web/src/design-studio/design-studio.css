@@ -283,10 +283,20 @@
   cursor: not-allowed;
 }
 
+/* Grid, not flex, with both flanking columns pinned to the same 14rem
+   width - the toolbar's own natural width (10rem) is narrower than the
+   side panels' (14rem), so centering the row as a single flex group (as
+   this used to do) put the canvas visibly off-center, shifted toward the
+   narrower toolbar side by half the difference. Reserving equal footprint
+   on both sides keeps the canvas column itself centered regardless of
+   that mismatch; .design-studio-toolbar's justify-self below pulls it
+   back flush against the canvas so the visible gap looks the same as
+   before. */
 .design-studio-workspace {
-  display: flex;
+  display: grid;
+  grid-template-columns: 14rem auto 14rem;
   gap: 1rem;
-  align-items: flex-start;
+  align-items: start;
   justify-content: center;
 }
 
@@ -303,6 +313,7 @@
   }
 
   .design-studio-workspace {
+    display: flex;
     flex-direction: column;
     align-items: stretch;
   }
@@ -360,6 +371,12 @@
 
 .design-studio-toolbar {
   width: 10rem;
+  /* Its grid column is 14rem (matching the side panels, so the canvas
+     column between them is centered - see .design-studio-workspace above)
+     but the toolbar itself stays 10rem; pin it to the column's end edge so
+     it still sits directly next to the canvas with the usual 1rem gap,
+     rather than at the column's start with a dead 4rem gap in between. */
+  justify-self: end;
 }
 
 .design-studio-toolbar-rule {
@@ -493,6 +510,13 @@
 
 .design-studio-ai-panel-header h2 {
   margin: 0;
+  /* Smaller than the shared .design-studio-layers/-properties/-ai-panel h2
+     rule above (0.85rem/600) - this panel is now a full 46rem-wide
+     section on its own line (see .design-studio-ai-panel's comment above),
+     not a compact side-panel rail, so that same size read as oversized
+     with nothing else around it to set the scale against. */
+  font-size: 0.75rem;
+  font-weight: 500;
 }
 
 .design-studio-ai-panel-actions {
@@ -573,6 +597,33 @@
   border-radius: var(--radius);
   padding: 0.4rem 0.6rem;
   margin: 0;
+}
+
+.design-studio-ai-panel-styles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.design-studio-ai-style-chip {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--muted);
+  background: var(--panel-2);
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  padding: 0.25rem 0.7rem;
+  cursor: pointer;
+}
+
+.design-studio-ai-style-chip:hover {
+  color: var(--paper);
+  border-color: var(--type);
+}
+
+.design-studio-ai-style-chip-active {
+  color: var(--type);
+  border-color: var(--type);
 }
 
 .design-studio-ai-panel-input {
