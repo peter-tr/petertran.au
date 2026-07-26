@@ -266,8 +266,8 @@ describe("portfolio resolvers", () => {
       expect(result).toBe(12.34);
     });
 
-    it("subtracts the $5 manual adjustment from the Anthropic cost", async () => {
-      vi.mocked(getAnthropicAllTimeCostUsd).mockResolvedValue(10);
+    it("subtracts the $10 manual adjustment from the Anthropic cost", async () => {
+      vi.mocked(getAnthropicAllTimeCostUsd).mockResolvedValue(15);
 
       const result = await resolvers.Meta.anthropicCostUsd();
       expect(result).toBe(5);
@@ -282,10 +282,10 @@ describe("portfolio resolvers", () => {
 
     it("sums AWS cost and the adjusted Anthropic cost for totalCostUsd", async () => {
       vi.mocked(getAwsAllTimeCostUsd).mockResolvedValue(2);
-      vi.mocked(getAnthropicAllTimeCostUsd).mockResolvedValue(10);
+      vi.mocked(getAnthropicAllTimeCostUsd).mockResolvedValue(15);
 
       const result = await resolvers.Meta.totalCostUsd();
-      expect(result).toBe(7); // 2 + max(0, 10 - 5)
+      expect(result).toBe(7); // 2 + max(0, 15 - 10)
     });
   });
 
