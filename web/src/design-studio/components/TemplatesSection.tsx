@@ -19,7 +19,8 @@ export default function TemplatesSection({ initialTemplates }: TemplatesSectionP
   const [error, setError] = useState<string | null>(null);
 
   const categories = useMemo(
-    () => [...new Set(initialTemplates.map((template) => template.category))].sort(),
+    () =>
+      [...new Set(initialTemplates.map((template) => template.category))].sort((a, b) => a.localeCompare(b)),
     [initialTemplates]
   );
 

@@ -1463,7 +1463,6 @@
   }
 
   .pantry-shopping-item-simple .pantry-shopping-item-name {
-    flex-basis: auto;
     flex: 1;
     min-width: 0;
     overflow: hidden;
