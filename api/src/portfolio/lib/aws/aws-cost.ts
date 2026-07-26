@@ -51,12 +51,15 @@ class AwsCostFetcher extends CachedCostFetcher {
     // margin under that, and this project's AWS resources are all much
     // younger than that anyway, so it effectively captures the account's
     // whole history.
-    const start = new Date(now.getFullYear(), now.getMonth() - 12, 1);
+    // Built in UTC (not local time): dateStr() below reads the date back out
+    // via toISOString(), which is UTC, so computing with local-time getters/
+    // constructor here would shift the result by the runner's UTC offset.
+    const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 12, 1));
     // Cost Explorer's End is exclusive, so End = today would exclude
     // today's usage entirely - use tomorrow instead to include today's
     // (estimated) spend, which Cost Explorer does support returning
     // same-day.
-    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
 
     return fetchAwsCostUsd(start, end);
   }
