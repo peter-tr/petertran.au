@@ -33,6 +33,10 @@ export interface PantrySettings {
   nerdModeInventory: boolean;
   nerdModeShoppingList: boolean;
   nerdModeCommandBar: boolean;
+  // Gates web/src/pantry/lib/homeCache.ts's stale-while-revalidate cache -
+  // see the schema.graphql doc comment on this field for what it actually
+  // controls.
+  instantLoadCache: boolean;
 }
 
 export interface PantrySettingsInput {
@@ -60,6 +64,7 @@ export interface PantrySettingsInput {
   nerdModeInventory?: boolean;
   nerdModeShoppingList?: boolean;
   nerdModeCommandBar?: boolean;
+  instantLoadCache?: boolean;
 }
 
 // Same starting list as the client used to seed localStorage with, so the
@@ -91,6 +96,7 @@ const DEFAULT_SETTINGS: PantrySettings = {
   nerdModeInventory: false,
   nerdModeShoppingList: false,
   nerdModeCommandBar: false,
+  instantLoadCache: true,
   commonItems: [
     "Milk",
     "Eggs",

@@ -162,6 +162,28 @@ async function refreshIdToken(): Promise<string | null> {
   }
 }
 
+// Cache-key namespace for lib/homeCache.ts's localStorage cache - decodes
+// the ID token's `sub` claim locally (no network round trip, no signature
+// check) so a synchronous cache read on mount doesn't have to wait for
+// Query.me to resolve. Not a security boundary - just keeps one signed-in
+// account's cached inventory from showing up under another account, or
+// under the signed-out/shared pantry, on the same browser.
+export function getPantryIdentity(): string {
+  const token = localStorage.getItem(ID_TOKEN_KEY);
+  if (!token) return "guest";
+
+  try {
+    const payload = token.split(".")[1];
+    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const padCount = (4 - (base64.length % 4)) % 4;
+    const claims = JSON.parse(atob(base64.padEnd(base64.length + padCount, "=")));
+
+    return typeof claims.sub === "string" ? claims.sub : "guest";
+  } catch {
+    return "guest";
+  }
+}
+
 // Passed to createGraphQLClient (see api.ts) - resolves to "Bearer <token>"
 // when signed in (refreshing first if the stored token is stale), or
 // undefined when signed out, so the caller falls back to the default/shared

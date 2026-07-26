@@ -439,6 +439,14 @@ type PantrySettings {
   specific to either list.
   """
   nerdModeCommandBar: Boolean!
+  """
+  Whether the web client is allowed to paint the pantry page instantly from
+  its last cached PantryHome response before this query resolves (see
+  web/src/pantry/lib/homeCache.ts). Always refetches in the background
+  regardless - this only controls whether the stale copy is shown while
+  that happens. Off means the page waits for a fresh response every load.
+  """
+  instantLoadCache: Boolean!
 }
 
 """
@@ -469,6 +477,7 @@ input PantrySettingsInput {
   nerdModeInventory: Boolean
   nerdModeShoppingList: Boolean
   nerdModeCommandBar: Boolean
+  instantLoadCache: Boolean
 }
 
 """
