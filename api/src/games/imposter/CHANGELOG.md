@@ -1,5 +1,25 @@
 # imposter
 
+## 1.3.2
+
+### Patch Changes
+
+- 38dfeb2: migrate imposter/design-studio/pantry/portfolio off aws-xray-sdk-core to ADOT auto-instrumentation
+- 6f0ae76: fix(imposter): build Lambda bundle as CommonJS instead of ESM, bundle AWS SDK v3 instead of externalizing
+
+  Same ESM->CJS cold-start fix as pantry/portfolio (see pantry's changeset
+  for the measured numbers). Also drops `external: ["@aws-sdk/*"]`, matching
+  the fix already applied to pantry/portfolio earlier this cycle - relying on
+  the Lambda runtime's built-in SDK copy added dynamic-linking overhead at
+  Init time; bundling an explicit pinned copy avoided it.
+
+- 8e2dce8: cut portfolio-graphql cold path latency
+- 4303308: pin internal api-shared dependency by wildcard ("*") instead of an exact version, avoiding an intermittent npm ci resolution conflict against an unrelated public package of the same name
+- Updated dependencies [fce1369]
+- Updated dependencies [5e57e8f]
+- Updated dependencies [0d1e57a]
+  - api-shared@1.2.0
+
 ## 1.3.1
 
 ### Patch Changes

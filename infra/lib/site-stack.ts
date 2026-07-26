@@ -75,6 +75,21 @@ export class SiteStack extends Stack {
       deletionProtection: !props.isTestEnv,
     });
 
+    // Passed to the Lambdas below as plain ANTHROPIC_API_KEY/
+    // ANTHROPIC_ADMIN_API_KEY env vars (via `.secretValue`, a CloudFormation
+    // dynamic reference resolved at deploy time) rather than as a secret ARN
+    // fetched at runtime - same trade-off as design-studio-stack.ts's
+    // mongoSecret: X-Ray traces showed a ~300ms median GetSecretValue round
+    // trip on every cold start that actually touched the Anthropic client,
+    // and cold starts turned out to be 13-25% of invocations across these
+    // Lambdas over a 7-day sample, not the rare case the runtime-fetch
+    // design assumed. Trade-off: the plaintext key now sits in each
+    // Lambda's environment config (readable by anyone with
+    // lambda:GetFunctionConfiguration, a broader surface than the scoped
+    // secretsmanager:GetSecretValue grant this replaced) and only refreshes
+    // on redeploy, not on secret rotation - acceptable here since rotation
+    // already means updating one shared secret and redeploying every
+    // project that reads it.
     const anthropicSecret = secretsmanager.Secret.fromSecretNameV2(
       this,
       "AnthropicApiKey",
@@ -189,8 +204,8 @@ export class SiteStack extends Stack {
       timeout: Duration.seconds(30),
       environment: {
         TABLE_NAME: table.tableName,
-        ANTHROPIC_SECRET_ARN: anthropicSecret.secretArn,
-        ANTHROPIC_ADMIN_SECRET_ARN: anthropicAdminSecret.secretArn,
+        ANTHROPIC_API_KEY: anthropicSecret.secretValue.unsafeUnwrap(),
+        ANTHROPIC_ADMIN_API_KEY: anthropicAdminSecret.secretValue.unsafeUnwrap(),
         CONTACT_FROM_EMAIL: "contact@petertran.au",
         CONTACT_TO_EMAIL: "peter2002tran@outlook.com",
       },
@@ -198,8 +213,6 @@ export class SiteStack extends Stack {
       // comment for why.
     });
     table.grantReadWriteData(apiFn);
-    anthropicSecret.grantRead(apiFn);
-    anthropicAdminSecret.grantRead(apiFn);
     emailIdentity.grantSendEmail(apiFn);
     recipientIdentity.grantSendEmail(apiFn);
     applyApplicationSignals(apiFn);
@@ -248,11 +261,10 @@ export class SiteStack extends Stack {
         timeout: Duration.minutes(2),
         environment: {
           TABLE_NAME: table.tableName,
-          ANTHROPIC_ADMIN_SECRET_ARN: anthropicAdminSecret.secretArn,
+          ANTHROPIC_ADMIN_API_KEY: anthropicAdminSecret.secretValue.unsafeUnwrap(),
         },
       });
       table.grantReadWriteData(costRefreshFn);
-      anthropicAdminSecret.grantRead(costRefreshFn);
       costRefreshFn.addToRolePolicy(
         new iam.PolicyStatement({ actions: ["ce:GetCostAndUsage"], resources: ["*"] })
       );
