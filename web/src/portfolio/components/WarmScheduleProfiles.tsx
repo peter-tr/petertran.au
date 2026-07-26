@@ -32,7 +32,7 @@ export default function WarmScheduleProfiles({
   const [name, setName] = useState("");
   const trimmedName = name.trim();
   const busy = pending !== null;
-  const profileNames = profiles ? Object.keys(profiles).sort() : [];
+  const profileNames = profiles ? Object.keys(profiles).sort((a, b) => a.localeCompare(b)) : [];
 
   function handleSave(): void {
     onSave(trimmedName);
