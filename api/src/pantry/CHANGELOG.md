@@ -1,5 +1,36 @@
 # pantry
 
+## 1.5.0
+
+### Minor Changes
+
+- 0d1e57a: add multi-user support to pantry: sign in via a new Cognito Hosted UI pool to get a private inventory/shopping list/settings, scoped by `pk`. Anyone not signed in keeps using the existing shared/default pantry unchanged.
+
+### Patch Changes
+
+- 6a16cb9: temporary deploy-timing probe for PC reconcile verification
+- 38dfeb2: migrate imposter/design-studio/pantry/portfolio off aws-xray-sdk-core to ADOT auto-instrumentation
+- 6f0ae76: fix(pantry): build Lambda bundle as CommonJS instead of ESM to fix ADOT cold-start regression
+
+  ESM auto-instrumentation (import-in-the-middle) under the ADOT/Application
+  Signals layer added ~3s to every cold start vs. CommonJS's
+  require-in-the-middle - confirmed via live A/B testing against a throwaway
+  Lambda with the real bundle, real IAM config, and real GraphQL requests
+  (~3.7s ESM vs. ~890ms CJS, consistent across 6 samples). No source changes;
+  `api/scripts/build-lambda.ts`'s `buildCjsLambdas()` now builds each entry
+  as a bundled CJS file plus a thin unbundled wrapper (working around an
+  esbuild/OTel interop bug where non-configurable CJS export getters crash
+  require-in-the-middle's monkey-patching).
+
+- 8e2dce8: cut portfolio-graphql cold path latency
+- 168cd47: remove pantry PC-reconcile deploy-timing probe
+- 4303308: pin internal api-shared dependency by wildcard ("*") instead of an exact version, avoiding an intermittent npm ci resolution conflict against an unrelated public package of the same name
+- 30e3720: reduce cold-start latency: lazy-load AI/AWS-SDK-heavy resolver paths, bundle AWS SDK v3 instead of externalizing it
+- Updated dependencies [fce1369]
+- Updated dependencies [5e57e8f]
+- Updated dependencies [0d1e57a]
+  - api-shared@1.2.0
+
 ## 1.4.1
 
 ### Patch Changes
