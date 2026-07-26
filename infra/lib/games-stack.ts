@@ -55,7 +55,10 @@ export class GamesStack extends Stack {
     });
 
     // Reuses the same Anthropic key as the resume API's "Surprise Me" word
-    // pairs - it's the same underlying account/budget either way.
+    // pairs - it's the same underlying account/budget either way. Resolved
+    // into a plain ANTHROPIC_API_KEY env var at deploy time below rather
+    // than fetched via ARN at runtime - see site-stack.ts's identical
+    // comment on this same secret for why.
     const anthropicSecret = secretsmanager.Secret.fromSecretNameV2(
       this,
       "AnthropicApiKey",
@@ -81,13 +84,12 @@ export class GamesStack extends Stack {
       timeout: Duration.seconds(15),
       environment: {
         TABLE_NAME: table.tableName,
-        ANTHROPIC_SECRET_ARN: anthropicSecret.secretArn,
+        ANTHROPIC_API_KEY: anthropicSecret.secretValue.unsafeUnwrap(),
       },
       // No lambda.Tracing.ACTIVE here - see applyApplicationSignals()'s doc
       // comment for why.
     });
     table.grantReadWriteData(imposterFn);
-    anthropicSecret.grantRead(imposterFn);
     applyApplicationSignals(imposterFn);
     this.imposterFn = imposterFn;
 

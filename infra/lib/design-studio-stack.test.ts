@@ -38,26 +38,28 @@ describe("DesignStudioStack", () => {
       FunctionName: "design-studio-graphql",
       Environment: {
         Variables: {
-          // A CloudFormation dynamic reference (`{{resolve:secretsmanager:...}}`)
-          // resolved at deploy time, not a runtime-fetched ARN - see
-          // design-studio-stack.ts's doc comment on why. Match.anyValue() only
-          // confirms the key is present; the exact Fn::Join token shape isn't
-          // worth pinning in a test.
+          // Both are CloudFormation dynamic references
+          // (`{{resolve:secretsmanager:...}}`) resolved at deploy time, not
+          // runtime-fetched ARNs - see design-studio-stack.ts's doc comments
+          // on why. Match.anyValue() only confirms the key is present; the
+          // exact Fn::Join token shape isn't worth pinning in a test.
           MONGO_URI: Match.anyValue(),
+          ANTHROPIC_API_KEY: Match.anyValue(),
         },
       },
     });
     template.hasResourceProperties("AWS::Lambda::Alias", {
       Name: "live",
     });
-    // anthropicSecret.grantRead(designStudioFn) - the Mongo secret is no
-    // longer read at runtime (see MONGO_URI above), so this policy now only
-    // covers the Anthropic API key used by the AI design-generation mutation.
+    // Neither secret is read at runtime anymore (both resolved into env
+    // vars above), so designStudioFn's role policy - which still exists for
+    // the unconditional Bedrock grant below - should carry no
+    // secretsmanager:GetSecretValue action at all.
     template.hasResourceProperties("AWS::IAM::Policy", {
       PolicyDocument: {
-        Statement: Match.arrayWith([
-          Match.objectLike({ Action: Match.arrayWith(["secretsmanager:GetSecretValue"]) }),
-        ]),
+        Statement: Match.not(
+          Match.arrayWith([Match.objectLike({ Action: Match.arrayWith(["secretsmanager:GetSecretValue"]) })])
+        ),
       },
     });
   });
