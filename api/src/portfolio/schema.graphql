@@ -1,3 +1,5 @@
+# Test comment, no schema effect - verifying the GraphOS rover subgraph
+# check pipeline posts a status on this PR (see PR #194).
 """
 A person - in this schema, always Peter Tran.
 """
