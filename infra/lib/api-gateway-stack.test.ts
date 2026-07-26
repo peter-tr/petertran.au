@@ -60,6 +60,27 @@ describe("ApiGatewayStack", () => {
     // on-demand test-env twin, same account/region) never has a chance to
     // reappear - see the stack's cloudWatchRole comment.
     template.resourceCountIs("AWS::ApiGateway::Account", 0);
+    // Coarse per-IP outer defense layer, starting in COUNT (not BLOCK) -
+    // see the stack's doc comment above the WebACL for why.
+    template.resourceCountIs("AWS::WAFv2::WebACL", 1);
+    template.hasResourceProperties("AWS::WAFv2::WebACL", {
+      Scope: "REGIONAL",
+      DefaultAction: { Allow: {} },
+      Rules: [
+        {
+          Name: "RateLimitByIp",
+          Action: { Count: {} },
+          Statement: {
+            RateBasedStatement: {
+              Limit: 100,
+              AggregateKeyType: "IP",
+              EvaluationWindowSec: 60,
+            },
+          },
+        },
+      ],
+    });
+    template.resourceCountIs("AWS::WAFv2::WebACLAssociation", 1);
   });
 
   it("isTestEnv: routes portfolio/pantry/imposter/supergraph (no warm-schedule), under the given apiSubdomain", () => {

@@ -5,6 +5,7 @@ import * as acm from "aws-cdk-lib/aws-certificatemanager";
 import * as route53 from "aws-cdk-lib/aws-route53";
 import * as route53Targets from "aws-cdk-lib/aws-route53-targets";
 import * as apigateway from "aws-cdk-lib/aws-apigateway";
+import * as wafv2 from "aws-cdk-lib/aws-wafv2";
 import { LIVE_ALIAS_NAME, liveAliasArn } from "./shared/function-names";
 
 export interface ApiGatewayStackProps extends StackProps {
@@ -204,6 +205,71 @@ export class ApiGatewayStack extends Stack {
       resource.addMethod("GET", integration);
       resource.addMethod("POST", integration);
     }
+
+    // Coarse, per-IP outer defense layer, on top of (not instead of) each
+    // project's own app-level DynamoDB rate limiter (see
+    // api/src/shared/rate-limit.ts) - that limiter is fine-grained
+    // (different limits per operation cost) but only rejects a request
+    // after it's already paid for a full Lambda invocation and a DynamoDB
+    // write. A WAF rate-based rule rejects at the edge, before either of
+    // those happen, but can't see GraphQL operation names to differentiate
+    // cost - hence "in addition to", not "replacing".
+    //
+    // No explicit `name` here (same as RestApi above) - this stack deploys
+    // twice (prod and the on-demand test env, see infra/bin/app.ts), and a
+    // hardcoded literal name would collide between the two in the same
+    // account/region. CloudFormation's auto-generated physical name already
+    // incorporates the stack name, so the two stay distinct without one.
+    //
+    // Starts in COUNT (not BLOCK) - deliberately observational for now.
+    // Flip the rule's `action` to `{ block: {} }` in a follow-up change once
+    // the CountedRequests CloudWatch metric (dimensioned by this WebACL's
+    // Rule name below) shows what real traffic actually looks like, so the
+    // 100/min threshold can be validated (or adjusted) before it can ever
+    // reject a real visitor.
+    const rateLimitWebAcl = new wafv2.CfnWebACL(this, "ApiRateLimitWebAcl", {
+      scope: "REGIONAL",
+      defaultAction: { allow: {} },
+      visibilityConfig: {
+        sampledRequestsEnabled: true,
+        cloudWatchMetricsEnabled: true,
+        metricName: "ApiRateLimitWebAcl",
+      },
+      rules: [
+        {
+          name: "RateLimitByIp",
+          priority: 0,
+          action: { count: {} },
+          statement: {
+            rateBasedStatement: {
+              // Requests per IP per evaluationWindowSec before this rule
+              // counts (not yet blocks) a client - starting point for COUNT
+              // mode's observation window, not a validated number yet. All
+              // routes behind this one shared RestApi share this ceiling
+              // (portfolio/pantry/imposter/supergraph/design-studio), so
+              // it's sized well above what a single legitimate visitor
+              // bouncing between them in a minute would ever hit.
+              limit: 100,
+              aggregateKeyType: "IP",
+              // Shortest window WAF supports (60/120/300/600 are the only
+              // valid values) - closest match to the app-level limiters'
+              // own 1-minute buckets (see api/src/shared/rate-limit.ts).
+              evaluationWindowSec: 60,
+            },
+          },
+          visibilityConfig: {
+            sampledRequestsEnabled: true,
+            cloudWatchMetricsEnabled: true,
+            metricName: "RateLimitByIp",
+          },
+        },
+      ],
+    });
+
+    new wafv2.CfnWebACLAssociation(this, "ApiRateLimitWebAclAssociation", {
+      resourceArn: restApi.deploymentStage.stageArn,
+      webAclArn: rateLimitWebAcl.attrArn,
+    });
 
     const aliasTarget = route53.RecordTarget.fromAlias(
       new route53Targets.ApiGatewayDomain(restApi.domainName!)
