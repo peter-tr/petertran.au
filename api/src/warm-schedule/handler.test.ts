@@ -357,6 +357,7 @@ describe("warm-schedule handler - memory reconciliation", () => {
     // Let the poll loop's setTimeout(2000) fire without waiting 2 real
     // seconds - the loop awaits this before its next GetFunctionConfiguration.
     await vi.advanceTimersByTimeAsync(2000);
+
     const result = await invokePromise;
     timers.useRealTimers();
 
