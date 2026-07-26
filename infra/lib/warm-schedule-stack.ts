@@ -246,24 +246,27 @@ export class ProvisionedConcurrencyStack extends Stack {
     // PC, memory is baked into each published Version, so changing it needs
     // UpdateFunctionConfiguration/PublishVersion against the bare (unqualified)
     // function - these actions don't accept an alias qualifier the way the PC
-    // calls above do - plus UpdateAlias against the `live` alias itself to
-    // move it onto the newly-published version.
+    // calls above do. UpdateAlias (moving `live` onto the newly-published
+    // version) is granted against the same bare function ARN, not the alias-
+    // qualified one - confirmed live: AWS authorizes alias CRUD actions
+    // (UpdateAlias/CreateAlias/DeleteAlias) against the function's own ARN,
+    // not `function:name:live` (unlike PC's Put/DeleteProvisionedConcurrencyConfig
+    // above, which do resolve against the alias-qualified ARN) - granting the
+    // alias ARN here caused a real AccessDeniedException the moment a
+    // schedule's memoryMb diverged from a target's actual live memory (first
+    // hit for supergraph-graphql and the zero-trust-lab targets, whose CDK
+    // memorySize was never changed in this rollout).
     warmScheduleFn.addToRolePolicy(
       new iam.PolicyStatement({
         actions: [
           "lambda:GetFunctionConfiguration",
           "lambda:UpdateFunctionConfiguration",
           "lambda:PublishVersion",
+          "lambda:UpdateAlias",
         ],
         resources: targetFnNames.map(
           (name) => `arn:aws:lambda:${this.region}:${this.account}:function:${name}`
         ),
-      })
-    );
-    warmScheduleFn.addToRolePolicy(
-      new iam.PolicyStatement({
-        actions: ["lambda:UpdateAlias"],
-        resources: targetFnNames.map((name) => liveAliasArn(this.region, this.account, name)),
       })
     );
 
