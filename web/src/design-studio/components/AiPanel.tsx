@@ -1,4 +1,5 @@
 import type { AiSettings, AiSettingsInput } from "../api";
+import { AI_STYLE_PRESETS } from "../lib/ai-styles";
 
 export interface AiMessage {
   id: string;
@@ -20,6 +21,8 @@ interface AiPanelProps {
   // placeholder for a setting that isn't per-design anyway.
   aiSettings: AiSettings | null;
   onAiSettingsChange: (input: AiSettingsInput) => void;
+  style: string;
+  onStyleChange: (style: string) => void;
 }
 
 // A persistent chat-style panel, not a one-shot form - it stays open across
@@ -38,6 +41,8 @@ export default function AiPanel({
   onDiscard,
   aiSettings,
   onAiSettingsChange,
+  style,
+  onStyleChange,
 }: AiPanelProps) {
   return (
     <div className="design-studio-ai-panel">
@@ -107,6 +112,23 @@ export default function AiPanel({
         ))}
       </div>
       {error && <p className="status-line">// {error}</p>}
+      <div className="design-studio-ai-panel-styles" role="radiogroup" aria-label="AI style preset">
+        {AI_STYLE_PRESETS.map((preset) => (
+          <button
+            key={preset.key}
+            type="button"
+            role="radio"
+            aria-checked={style === preset.key}
+            className={
+              "design-studio-ai-style-chip" +
+              (style === preset.key ? " design-studio-ai-style-chip-active" : "")
+            }
+            onClick={() => onStyleChange(preset.key)}
+          >
+            {preset.label}
+          </button>
+        ))}
+      </div>
       <div className="design-studio-ai-panel-input">
         <textarea
           rows={3}

@@ -9,6 +9,7 @@ import type { HistoryEvent } from "../lib/history/reducer";
 import { createElementByType, type DesignElement, type ElementType } from "../lib/elements";
 import { toElementInput, fromWireElement } from "../lib/serialization";
 import { TOOLS, EXPORT_SHORTCUT_KEY } from "../lib/tools";
+import { AI_STYLE_PRESETS } from "../lib/ai-styles";
 import {
   saveDesign,
   saveAsTemplate,
@@ -59,6 +60,12 @@ export default function EditorWorkspace({
   const [showAiPanel, setShowAiPanel] = useState(false);
   const [aiMessages, setAiMessages] = useState<AiMessage[]>([]);
   const [aiPrompt, setAiPrompt] = useState("");
+  // The style chip selected in the panel ("none" by default) - its
+  // descriptor is appended to the prompt at send time (see handleGenerate)
+  // rather than edited into the textarea itself, so switching styles
+  // between refinements doesn't require the user to hunt for and replace
+  // a phrase they didn't type.
+  const [aiStyle, setAiStyle] = useState("none");
   const [generating, setGenerating] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   // Operator-configurable, not per-design - loaded lazily the first time the
@@ -204,8 +211,14 @@ export default function EditorWorkspace({
       // top of existing content. See the backend's isRefinement branch
       // in generate-elements.ts.
       const baseElements = draftElements ?? (elements.length > 0 ? elements : undefined);
+      // The style descriptor is appended to what's actually sent, not
+      // stored in aiPrompt/shown in the log - so switching styles between
+      // refinements doesn't clutter the visible prompt history with a
+      // repeated style phrase the user never typed.
+      const styleDescriptor = AI_STYLE_PRESETS.find((preset) => preset.key === aiStyle)?.descriptor;
+      const finalPrompt = styleDescriptor ? `${trimmed} (style: ${styleDescriptor})` : trimmed;
       const generated = await generateDesignElements({
-        prompt: trimmed,
+        prompt: finalPrompt,
         width,
         height,
         currentElements: baseElements?.map(toElementInput),
@@ -219,7 +232,7 @@ export default function EditorWorkspace({
     } finally {
       setGenerating(false);
     }
-  }, [aiPrompt, width, height, draftElements, elements]);
+  }, [aiPrompt, width, height, draftElements, elements, aiStyle]);
 
   const handleAcceptDraft = useCallback(() => {
     if (!draftElements) return;
@@ -378,6 +391,8 @@ export default function EditorWorkspace({
           onDiscard={handleDiscardDraft}
           aiSettings={aiSettings}
           onAiSettingsChange={handleAiSettingsChange}
+          style={aiStyle}
+          onStyleChange={setAiStyle}
         />
       )}
       <div className="design-studio-workspace">
