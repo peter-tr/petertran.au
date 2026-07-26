@@ -1,4 +1,5 @@
 import { ApolloServer } from "@apollo/server";
+import { ApolloServerPluginInlineTrace } from "@apollo/server/plugin/inlineTrace";
 import { startServerAndCreateLambdaHandler, handlers } from "@as-integrations/aws-lambda";
 import { buildSubgraphSchema } from "@apollo/subgraph";
 import { parse } from "graphql";
@@ -13,7 +14,12 @@ import type { Context } from "./context";
 const server = new ApolloServer<Context>({
   schema: buildSubgraphSchema([{ typeDefs: parse(typeDefs), resolvers }]),
   introspection: true,
-  plugins: [operationStatsPlugin],
+  // Responds to the supergraph Router's federated-tracing header with
+  // per-field timing data (extensions.ftv1) - without this, Router still
+  // reports the operation ran (name, count, latency) to GraphOS Studio,
+  // but Studio's field-level Insights stay empty since it never receives
+  // the field-by-field breakdown from this subgraph.
+  plugins: [operationStatsPlugin, ApolloServerPluginInlineTrace()],
 });
 
 const apolloHandler = startServerAndCreateLambdaHandler(
