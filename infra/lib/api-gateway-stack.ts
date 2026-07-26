@@ -43,6 +43,13 @@ export interface ApiGatewayStackProps extends StackProps {
   // muting alert emails isn't something the test env needs to validate, and
   // it has no MonitoringStack counterpart to point at anyway.
   alertsSettingsFnName?: string;
+  // Cost/on-off switch for the WAF rate-based rule below - a WebACL has its
+  // own flat monthly charge regardless of how it's configured, so the only
+  // way to actually stop paying for it is to not provision it at all (a
+  // COUNT-vs-BLOCK toggle on the rule wouldn't do that). Required, not
+  // optional-with-a-default, so every call site has to say explicitly
+  // whether it wants this - see infra/bin/app.ts's ENABLE_WAF_RATE_LIMIT.
+  enableWafRateLimit: boolean;
 }
 
 /**
@@ -215,61 +222,69 @@ export class ApiGatewayStack extends Stack {
     // those happen, but can't see GraphQL operation names to differentiate
     // cost - hence "in addition to", not "replacing".
     //
-    // No explicit `name` here (same as RestApi above) - this stack deploys
-    // twice (prod and the on-demand test env, see infra/bin/app.ts), and a
-    // hardcoded literal name would collide between the two in the same
-    // account/region. CloudFormation's auto-generated physical name already
-    // incorporates the stack name, so the two stay distinct without one.
-    //
-    // Starts in COUNT (not BLOCK) - deliberately observational for now.
-    // Flip the rule's `action` to `{ block: {} }` in a follow-up change once
-    // the CountedRequests CloudWatch metric (dimensioned by this WebACL's
-    // Rule name below) shows what real traffic actually looks like, so the
-    // 100/min threshold can be validated (or adjusted) before it can ever
-    // reject a real visitor.
-    const rateLimitWebAcl = new wafv2.CfnWebACL(this, "ApiRateLimitWebAcl", {
-      scope: "REGIONAL",
-      defaultAction: { allow: {} },
-      visibilityConfig: {
-        sampledRequestsEnabled: true,
-        cloudWatchMetricsEnabled: true,
-        metricName: "ApiRateLimitWebAcl",
-      },
-      rules: [
-        {
-          name: "RateLimitByIp",
-          priority: 0,
-          action: { count: {} },
-          statement: {
-            rateBasedStatement: {
-              // Requests per IP per evaluationWindowSec before this rule
-              // counts (not yet blocks) a client - starting point for COUNT
-              // mode's observation window, not a validated number yet. All
-              // routes behind this one shared RestApi share this ceiling
-              // (portfolio/pantry/imposter/supergraph/design-studio), so
-              // it's sized well above what a single legitimate visitor
-              // bouncing between them in a minute would ever hit.
-              limit: 100,
-              aggregateKeyType: "IP",
-              // Shortest window WAF supports (60/120/300/600 are the only
-              // valid values) - closest match to the app-level limiters'
-              // own 1-minute buckets (see api/src/shared/rate-limit.ts).
-              evaluationWindowSec: 60,
+    // Gated on enableWafRateLimit (see its doc comment above) - a WebACL
+    // bills a flat monthly charge just for existing, so this is an `if`
+    // around the whole resource, not a per-rule toggle.
+    if (props.enableWafRateLimit) {
+      // No explicit `name` here (same as RestApi above) - this stack
+      // deploys twice (prod and the on-demand test env, see
+      // infra/bin/app.ts), and a hardcoded literal name would collide
+      // between the two in the same account/region. CloudFormation's
+      // auto-generated physical name already incorporates the stack name,
+      // so the two stay distinct without one.
+      //
+      // Starts in COUNT (not BLOCK) - deliberately observational for now.
+      // Flip the rule's `action` to `{ block: {} }` in a follow-up change
+      // once the CountedRequests CloudWatch metric (dimensioned by this
+      // WebACL's Rule name below) shows what real traffic actually looks
+      // like, so the 100/min threshold can be validated (or adjusted)
+      // before it can ever reject a real visitor.
+      const rateLimitWebAcl = new wafv2.CfnWebACL(this, "ApiRateLimitWebAcl", {
+        scope: "REGIONAL",
+        defaultAction: { allow: {} },
+        visibilityConfig: {
+          sampledRequestsEnabled: true,
+          cloudWatchMetricsEnabled: true,
+          metricName: "ApiRateLimitWebAcl",
+        },
+        rules: [
+          {
+            name: "RateLimitByIp",
+            priority: 0,
+            action: { count: {} },
+            statement: {
+              rateBasedStatement: {
+                // Requests per IP per evaluationWindowSec before this rule
+                // counts (not yet blocks) a client - starting point for
+                // COUNT mode's observation window, not a validated number
+                // yet. All routes behind this one shared RestApi share this
+                // ceiling (portfolio/pantry/imposter/supergraph/
+                // design-studio), so it's sized well above what a single
+                // legitimate visitor bouncing between them in a minute
+                // would ever hit.
+                limit: 100,
+                aggregateKeyType: "IP",
+                // Shortest window WAF supports (60/120/300/600 are the
+                // only valid values) - closest match to the app-level
+                // limiters' own 1-minute buckets (see
+                // api/src/shared/rate-limit.ts).
+                evaluationWindowSec: 60,
+              },
+            },
+            visibilityConfig: {
+              sampledRequestsEnabled: true,
+              cloudWatchMetricsEnabled: true,
+              metricName: "RateLimitByIp",
             },
           },
-          visibilityConfig: {
-            sampledRequestsEnabled: true,
-            cloudWatchMetricsEnabled: true,
-            metricName: "RateLimitByIp",
-          },
-        },
-      ],
-    });
+        ],
+      });
 
-    new wafv2.CfnWebACLAssociation(this, "ApiRateLimitWebAclAssociation", {
-      resourceArn: restApi.deploymentStage.stageArn,
-      webAclArn: rateLimitWebAcl.attrArn,
-    });
+      new wafv2.CfnWebACLAssociation(this, "ApiRateLimitWebAclAssociation", {
+        resourceArn: restApi.deploymentStage.stageArn,
+        webAclArn: rateLimitWebAcl.attrArn,
+      });
+    }
 
     const aliasTarget = route53.RecordTarget.fromAlias(
       new route53Targets.ApiGatewayDomain(restApi.domainName!)

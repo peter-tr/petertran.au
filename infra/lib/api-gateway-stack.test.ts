@@ -18,6 +18,7 @@ describe("ApiGatewayStack", () => {
       supergraphFnName: "supergraph-graphql",
       designStudioFnName: "design-studio-graphql",
       alertsSettingsFnName: "alerts-settings",
+      enableWafRateLimit: true,
       env: { account: "123456789012", region: "ap-southeast-2" },
     });
 
@@ -97,6 +98,9 @@ describe("ApiGatewayStack", () => {
       supergraphFnName: "supergraph-graphql-test",
       // warmScheduleFnName omitted - not part of what the test env exists to
       // validate.
+      // Matches infra/bin/app.ts's real wiring - the on-demand test env
+      // doesn't get its own WebACL charge on top of prod's.
+      enableWafRateLimit: false,
       env: { account: "123456789012", region: "ap-southeast-2" },
     });
 
@@ -109,5 +113,7 @@ describe("ApiGatewayStack", () => {
     template.hasResourceProperties("AWS::ApiGateway::DomainName", {
       DomainName: "api.test.example.com",
     });
+    template.resourceCountIs("AWS::WAFv2::WebACL", 0);
+    template.resourceCountIs("AWS::WAFv2::WebACLAssociation", 0);
   });
 });
