@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it, vi, beforeAll, afterAll, type MockInstance } from "vitest";
 import { App } from "aws-cdk-lib";
-import { Template } from "aws-cdk-lib/assertions";
+import { Template, Match } from "aws-cdk-lib/assertions";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import { SupergraphStack } from "./supergraph-stack";
 
@@ -51,6 +51,12 @@ describe("SupergraphStack", () => {
         Variables: {
           API_BASE_URL: "https://api.test.petertran.au",
           AWS_LWA_PORT: "8080",
+          // A CloudFormation dynamic reference resolved at deploy time, not
+          // a runtime-fetched ARN - Match.anyValue() only confirms the key
+          // is present, same convention as design-studio-stack.test.ts's
+          // MONGO_URI assertion.
+          APOLLO_KEY: Match.anyValue(),
+          APOLLO_GRAPH_REF: "petertran-au@current",
         },
       },
       Layers: [

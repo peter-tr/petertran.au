@@ -139,6 +139,22 @@ export function buildRouterYaml(subgraphNames: string[]): string {
     "        resource:\n" +
     '          service.name: "supergraph"\n' +
     "\n" +
+    // Same freeze-before-flush problem as the OTLP batch_processor above,
+    // for a completely separate exporter: Apollo Studio usage reporting
+    // (activated by the APOLLO_KEY/APOLLO_GRAPH_REF env vars in
+    // supergraph-stack.ts) batches through its own
+    // telemetry.apollo.metrics.usage_reports.batch_processor, defaulting to
+    // the same 5s scheduled_delay - without tightening it here, reports
+    // would sit unflushed when Lambda freezes the execution environment
+    // right after the response returns, same failure mode this file already
+    // hit once for X-Ray traces.
+    "  apollo:\n" +
+    "    metrics:\n" +
+    "      usage_reports:\n" +
+    "        batch_processor:\n" +
+    "          scheduled_delay: 1ms\n" +
+    "          max_export_timeout: 3s\n" +
+    "\n" +
     "supergraph:\n" +
     "  listen: 127.0.0.1:8080\n" +
     // ApiGatewayStack routes the exact path /graphql to this Lambda (see
