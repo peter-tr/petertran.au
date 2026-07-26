@@ -69,7 +69,9 @@ export class DesignStudioStack extends Stack {
     );
     // Same secret every other Anthropic-calling Lambda in this repo already
     // reads (see pantry-stack.ts's anthropicSecret) - reused here for the
-    // AI design-generation mutation, not a project-specific key.
+    // AI design-generation mutation, not a project-specific key. Resolved
+    // into a plain ANTHROPIC_API_KEY env var at deploy time below, same as
+    // mongoSecret above and for the same reason (see its comment).
     const anthropicSecret = secretsmanager.Secret.fromSecretNameV2(
       this,
       "AnthropicApiKey",
@@ -98,12 +100,11 @@ export class DesignStudioStack extends Stack {
       environment: {
         MONGO_URI: mongoSecret.secretValue.unsafeUnwrap(),
         MONGO_DB_NAME: props.isTestEnv ? "design-studio-test" : "design-studio",
-        ANTHROPIC_SECRET_ARN: anthropicSecret.secretArn,
+        ANTHROPIC_API_KEY: anthropicSecret.secretValue.unsafeUnwrap(),
       },
       // No lambda.Tracing.ACTIVE here - see applyApplicationSignals()'s doc
       // comment for why.
     });
-    anthropicSecret.grantRead(designStudioFn);
 
     // Lets AiSettings.provider === "BEDROCK" actually invoke Claude via
     // Bedrock (see api-shared/anthropic-bedrock-client.ts) - scoped to just
