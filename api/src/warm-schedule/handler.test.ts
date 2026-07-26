@@ -21,6 +21,7 @@ import { SchedulerClient, GetScheduleCommand, UpdateScheduleCommand } from "@aws
 // instead to guarantee the env vars are set first.
 process.env.LIVE_ALIAS_NAME = "live";
 process.env.WARM_SCHEDULE_PARAM_NAME = "/warm-schedule/schedules";
+process.env.WARM_SCHEDULE_PROFILES_PARAM_NAME = "/warm-schedule/profiles";
 process.env.PORTFOLIO_FN_NAME = "portfolio-fn";
 process.env.PANTRY_FN_NAME = "pantry-fn";
 process.env.IMPOSTER_FN_NAME = "imposter-fn";
@@ -289,6 +290,120 @@ describe("warm-schedule handler - config GET/POST", () => {
     const deleteCalls = lambdaMock.commandCalls(DeleteProvisionedConcurrencyConfigCommand);
     expect(deleteCalls).toHaveLength(1);
     expect(deleteCalls[0].args[0].input.FunctionName).toBe("pantry-fn");
+  });
+});
+
+describe("warm-schedule handler - profiles", () => {
+  function mockConfigAndProfiles(config: unknown, profiles: unknown): void {
+    ssmMock
+      .on(GetParameterCommand, { Name: "/warm-schedule/schedules" })
+      .resolves({ Parameter: { Value: JSON.stringify(config) } });
+    ssmMock
+      .on(GetParameterCommand, { Name: "/warm-schedule/profiles" })
+      .resolves({ Parameter: { Value: JSON.stringify(profiles) } });
+  }
+
+  it("GET returns an empty profiles map by default", async () => {
+    ssmMock.on(GetParameterCommand).resolves({});
+
+    const result = await handler(httpEvent("GET"));
+    expect(JSON.parse(result.body as string).profiles).toEqual({});
+  });
+
+  it("POST {profileAction: save} snapshots the current live config under the given name", async () => {
+    mockConfigAndProfiles(DEFAULT_CONFIG, {});
+
+    const result = await handler(httpEvent("POST", { profileAction: "save", name: "baseline" }));
+    expect(result.statusCode).toBe(200);
+    expect(JSON.parse(result.body as string).profiles).toEqual({ baseline: DEFAULT_CONFIG });
+
+    const putCalls = ssmMock.commandCalls(PutParameterCommand);
+    const profilesPut = putCalls.find((c) => c.args[0].input.Name === "/warm-schedule/profiles")!;
+    expect(JSON.parse(profilesPut.args[0].input.Value as string)).toEqual({ baseline: DEFAULT_CONFIG });
+    // Saving never touches the live schedule config itself.
+    expect(putCalls.find((c) => c.args[0].input.Name === "/warm-schedule/schedules")).toBeUndefined();
+  });
+
+  it("POST {profileAction: save} overwrites an existing profile of the same name", async () => {
+    mockConfigAndProfiles(DEFAULT_CONFIG, { baseline: { some: "stale-config" } });
+
+    await handler(httpEvent("POST", { profileAction: "save", name: "baseline" }));
+
+    const putCalls = ssmMock.commandCalls(PutParameterCommand);
+    const profilesPut = putCalls.find((c) => c.args[0].input.Name === "/warm-schedule/profiles")!;
+    expect(JSON.parse(profilesPut.args[0].input.Value as string)).toEqual({ baseline: DEFAULT_CONFIG });
+  });
+
+  it("POST {profileAction: apply} loads the named profile as the live config and reconciles every project", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(WITHIN_WINDOW);
+
+    const coldConfig = Object.fromEntries(
+      Object.keys(DEFAULT_CONFIG).map((key) => [key, { ...DEFAULT_SCHEDULE, enabled: false }])
+    );
+    mockConfigAndProfiles(DEFAULT_CONFIG, { "all-cold": coldConfig });
+
+    const result = await handler(httpEvent("POST", { profileAction: "apply", name: "all-cold" }));
+    expect(result.statusCode).toBe(200);
+    expect(JSON.parse(result.body as string).schedules).toEqual(coldConfig);
+
+    const schedulePut = ssmMock
+      .commandCalls(PutParameterCommand)
+      .find((c) => c.args[0].input.Name === "/warm-schedule/schedules")!;
+    expect(JSON.parse(schedulePut.args[0].input.Value as string)).toEqual(coldConfig);
+
+    // Every project's pair of on/off EventBridge Schedules gets updated, not
+    // just one - this is what distinguishes "apply a profile" from an
+    // individual project Save.
+    const updateCalls = schedulerMock.commandCalls(UpdateScheduleCommand);
+    expect(updateCalls).toHaveLength(12);
+    expect(updateCalls.every((c) => c.args[0].input.State === "DISABLED")).toBe(true);
+
+    // Reconciled immediately against every target, not just deferred to the
+    // next backstop tick.
+    const deleteCalls = lambdaMock.commandCalls(DeleteProvisionedConcurrencyConfigCommand);
+    expect(deleteCalls).toHaveLength(ALL_TARGETS.length);
+  });
+
+  it("POST {profileAction: apply} with an unknown name 400s without touching any stored state", async () => {
+    mockConfigAndProfiles(DEFAULT_CONFIG, {});
+
+    const result = await handler(httpEvent("POST", { profileAction: "apply", name: "nope" }));
+    expect(result.statusCode).toBe(400);
+    expect(JSON.parse(result.body as string).error).toContain("nope");
+    expect(ssmMock.commandCalls(PutParameterCommand)).toHaveLength(0);
+    expect(schedulerMock.commandCalls(UpdateScheduleCommand)).toHaveLength(0);
+  });
+
+  it("POST {profileAction: delete} removes just the named profile", async () => {
+    mockConfigAndProfiles(DEFAULT_CONFIG, { a: DEFAULT_CONFIG, b: DEFAULT_CONFIG });
+
+    const result = await handler(httpEvent("POST", { profileAction: "delete", name: "a" }));
+    expect(result.statusCode).toBe(200);
+    expect(JSON.parse(result.body as string).profiles).toEqual({ b: DEFAULT_CONFIG });
+
+    const profilesPut = ssmMock
+      .commandCalls(PutParameterCommand)
+      .find((c) => c.args[0].input.Name === "/warm-schedule/profiles")!;
+    expect(JSON.parse(profilesPut.args[0].input.Value as string)).toEqual({ b: DEFAULT_CONFIG });
+  });
+
+  it.each([
+    ["missing", undefined],
+    ["empty", ""],
+    ["blank", "   "],
+    ["too long", "x".repeat(61)],
+  ])("POST {profileAction: save} with a %s name returns 400", async (_label, name) => {
+    mockConfigAndProfiles(DEFAULT_CONFIG, {});
+
+    const result = await handler(httpEvent("POST", { profileAction: "save", name }));
+    expect(result.statusCode).toBe(400);
+    expect(ssmMock.commandCalls(PutParameterCommand)).toHaveLength(0);
+  });
+
+  it("POST with an unrecognized profileAction returns 400", async () => {
+    const result = await handler(httpEvent("POST", { profileAction: "rename", name: "baseline" }));
+    expect(result.statusCode).toBe(400);
   });
 });
 

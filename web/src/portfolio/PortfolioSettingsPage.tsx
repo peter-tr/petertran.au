@@ -12,6 +12,7 @@ import {
 } from "./hooks/useWarmSchedule";
 import { useAlertsEnabled } from "./hooks/useAlertsEnabled";
 import WarmScheduleProject from "./components/WarmScheduleProject";
+import WarmScheduleProfiles from "./components/WarmScheduleProfiles";
 import "./portfolio.css";
 
 const WARM_SCHEDULE_LABELS: Record<WarmScheduleKey, string> = {
@@ -31,9 +32,14 @@ export default function PortfolioSettingsPage() {
   const {
     config: warmScheduleConfig,
     costs: warmScheduleCosts,
+    profiles: warmScheduleProfiles,
     saving: warmScheduleSaving,
+    profilePending: warmScheduleProfilePending,
     error: warmScheduleError,
     saveAll: saveAllWarmSchedules,
+    saveProfile: saveWarmScheduleProfile,
+    applyProfile: applyWarmScheduleProfile,
+    deleteProfile: deleteWarmScheduleProfile,
     available: warmScheduleAvailable,
   } = useWarmSchedule();
   // Every project's draft lives here (not inside each WarmScheduleProject
@@ -138,6 +144,15 @@ export default function PortfolioSettingsPage() {
             window you set below. Prices below are live, from each project's real Lambda memory size and
             currently-allocated provisioned concurrency.
           </p>
+          <WarmScheduleProfiles
+            profiles={warmScheduleProfiles}
+            pending={warmScheduleProfilePending}
+            hasUnsavedEdits={hasDirtyWarmSchedules}
+            onSave={saveWarmScheduleProfile}
+            onApply={applyWarmScheduleProfile}
+            onDelete={deleteWarmScheduleProfile}
+          />
+
           {warmScheduleDrafts &&
             WARM_SCHEDULE_KEYS.map((fn) => (
               <WarmScheduleProject

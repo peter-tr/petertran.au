@@ -27,6 +27,7 @@ const DEFAULT_COSTS = {
   supergraph: NO_COST,
   zeroTrustLab: NO_COST,
 };
+const NO_PROFILES = {};
 
 describe("useWarmSchedule", () => {
   beforeEach(() => {
@@ -51,7 +52,7 @@ describe("useWarmSchedule", () => {
     vi.stubEnv("VITE_WARM_SCHEDULE_ENDPOINT", "https://api.test/warm-schedule");
 
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-      json: async () => ({ schedules: DEFAULT_CONFIG, costs: DEFAULT_COSTS }),
+      json: async () => ({ schedules: DEFAULT_CONFIG, costs: DEFAULT_COSTS, profiles: NO_PROFILES }),
     });
 
     const { useWarmSchedule } = await import("./useWarmSchedule");
@@ -88,12 +89,22 @@ describe("useWarmSchedule", () => {
     };
     const newImposter: WarmSchedule = { ...DEFAULT_SCHEDULE, enabled: false };
     (fetch as ReturnType<typeof vi.fn>)
-      .mockResolvedValueOnce({ json: async () => ({ schedules: DEFAULT_CONFIG, costs: DEFAULT_COSTS }) })
       .mockResolvedValueOnce({
-        json: async () => ({ schedules: { ...DEFAULT_CONFIG, pantry: newPantry }, costs: DEFAULT_COSTS }),
+        json: async () => ({ schedules: DEFAULT_CONFIG, costs: DEFAULT_COSTS, profiles: NO_PROFILES }),
       })
       .mockResolvedValueOnce({
-        json: async () => ({ schedules: { ...DEFAULT_CONFIG, imposter: newImposter }, costs: DEFAULT_COSTS }),
+        json: async () => ({
+          schedules: { ...DEFAULT_CONFIG, pantry: newPantry },
+          costs: DEFAULT_COSTS,
+          profiles: NO_PROFILES,
+        }),
+      })
+      .mockResolvedValueOnce({
+        json: async () => ({
+          schedules: { ...DEFAULT_CONFIG, imposter: newImposter },
+          costs: DEFAULT_COSTS,
+          profiles: NO_PROFILES,
+        }),
       });
 
     const { useWarmSchedule } = await import("./useWarmSchedule");
@@ -136,8 +147,12 @@ describe("useWarmSchedule", () => {
     // nothing changed for.
     const fullResponseConfig = JSON.parse(JSON.stringify({ ...DEFAULT_CONFIG, pantry: newSchedule }));
     (fetch as ReturnType<typeof vi.fn>)
-      .mockResolvedValueOnce({ json: async () => ({ schedules: DEFAULT_CONFIG, costs: DEFAULT_COSTS }) })
-      .mockResolvedValueOnce({ json: async () => ({ schedules: fullResponseConfig, costs: DEFAULT_COSTS }) });
+      .mockResolvedValueOnce({
+        json: async () => ({ schedules: DEFAULT_CONFIG, costs: DEFAULT_COSTS, profiles: NO_PROFILES }),
+      })
+      .mockResolvedValueOnce({
+        json: async () => ({ schedules: fullResponseConfig, costs: DEFAULT_COSTS, profiles: NO_PROFILES }),
+      });
 
     const { useWarmSchedule } = await import("./useWarmSchedule");
 
@@ -157,7 +172,9 @@ describe("useWarmSchedule", () => {
     vi.stubEnv("VITE_WARM_SCHEDULE_ENDPOINT", "https://api.test/warm-schedule");
 
     (fetch as ReturnType<typeof vi.fn>)
-      .mockResolvedValueOnce({ json: async () => ({ schedules: DEFAULT_CONFIG, costs: DEFAULT_COSTS }) })
+      .mockResolvedValueOnce({
+        json: async () => ({ schedules: DEFAULT_CONFIG, costs: DEFAULT_COSTS, profiles: NO_PROFILES }),
+      })
       .mockRejectedValueOnce(new Error("network down"));
 
     const { useWarmSchedule } = await import("./useWarmSchedule");
@@ -181,6 +198,108 @@ describe("useWarmSchedule", () => {
 
     expect(fetch).not.toHaveBeenCalled();
     expect(result.current.saving).toBe(false);
+  });
+
+  it("saveProfile POSTs {profileAction: save, name} and updates profiles from the response", async () => {
+    vi.stubEnv("VITE_WARM_SCHEDULE_ENDPOINT", "https://api.test/warm-schedule");
+
+    (fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({
+        json: async () => ({ schedules: DEFAULT_CONFIG, costs: DEFAULT_COSTS, profiles: NO_PROFILES }),
+      })
+      .mockResolvedValueOnce({
+        json: async () => ({
+          schedules: DEFAULT_CONFIG,
+          costs: DEFAULT_COSTS,
+          profiles: { baseline: DEFAULT_CONFIG },
+        }),
+      });
+
+    const { useWarmSchedule } = await import("./useWarmSchedule");
+
+    const { result } = renderHook(() => useWarmSchedule());
+    await waitFor(() => expect(result.current.config).toEqual(DEFAULT_CONFIG));
+
+    act(() => {
+      result.current.saveProfile("baseline");
+    });
+
+    expect(result.current.profilePending).toBe("baseline");
+    await waitFor(() => expect(result.current.profiles).toEqual({ baseline: DEFAULT_CONFIG }));
+    expect(result.current.profilePending).toBeNull();
+
+    const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[1];
+    expect(JSON.parse(init.body)).toEqual({ profileAction: "save", name: "baseline" });
+  });
+
+  it("applyProfile replaces the whole config, not just one project", async () => {
+    vi.stubEnv("VITE_WARM_SCHEDULE_ENDPOINT", "https://api.test/warm-schedule");
+
+    const coldSchedule = { ...DEFAULT_SCHEDULE, enabled: false };
+    const coldConfig = Object.fromEntries(Object.keys(DEFAULT_CONFIG).map((key) => [key, coldSchedule]));
+    (fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({
+        json: async () => ({
+          schedules: DEFAULT_CONFIG,
+          costs: DEFAULT_COSTS,
+          profiles: { "all-cold": coldConfig },
+        }),
+      })
+      .mockResolvedValueOnce({
+        json: async () => ({
+          schedules: coldConfig,
+          costs: DEFAULT_COSTS,
+          profiles: { "all-cold": coldConfig },
+        }),
+      });
+
+    const { useWarmSchedule } = await import("./useWarmSchedule");
+
+    const { result } = renderHook(() => useWarmSchedule());
+    await waitFor(() => expect(result.current.config).toEqual(DEFAULT_CONFIG));
+
+    act(() => {
+      result.current.applyProfile("all-cold");
+    });
+
+    await waitFor(() => expect(result.current.config).toEqual(coldConfig));
+
+    const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[1];
+    expect(JSON.parse(init.body)).toEqual({ profileAction: "apply", name: "all-cold" });
+  });
+
+  it("deleteProfile POSTs {profileAction: delete, name} and removes it from profiles", async () => {
+    vi.stubEnv("VITE_WARM_SCHEDULE_ENDPOINT", "https://api.test/warm-schedule");
+
+    (fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({
+        json: async () => ({
+          schedules: DEFAULT_CONFIG,
+          costs: DEFAULT_COSTS,
+          profiles: { a: DEFAULT_CONFIG, b: DEFAULT_CONFIG },
+        }),
+      })
+      .mockResolvedValueOnce({
+        json: async () => ({
+          schedules: DEFAULT_CONFIG,
+          costs: DEFAULT_COSTS,
+          profiles: { b: DEFAULT_CONFIG },
+        }),
+      });
+
+    const { useWarmSchedule } = await import("./useWarmSchedule");
+
+    const { result } = renderHook(() => useWarmSchedule());
+    await waitFor(() => expect(result.current.profiles).toEqual({ a: DEFAULT_CONFIG, b: DEFAULT_CONFIG }));
+
+    act(() => {
+      result.current.deleteProfile("a");
+    });
+
+    await waitFor(() => expect(result.current.profiles).toEqual({ b: DEFAULT_CONFIG }));
+
+    const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[1];
+    expect(JSON.parse(init.body)).toEqual({ profileAction: "delete", name: "a" });
   });
 });
 
