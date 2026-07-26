@@ -37,12 +37,17 @@ export default function OperationRow({ op }: { op: OperationStat }) {
   const pollAttempt = useRef(0);
   const unmounted = useRef(false);
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    // Must reset on mount, not just set true on cleanup: React 18 StrictMode's
+    // dev-only mount->cleanup->remount cycle would otherwise run the cleanup
+    // once (setting this true) and never flip it back, so a fetch started
+    // after that point silently discards its result on every real mount.
+    unmounted.current = false;
+
+    return () => {
       unmounted.current = true;
-    },
-    []
-  );
+    };
+  }, []);
 
   function fetchTrace(traceId: string) {
     runQuery<TraceBreakdownResult>(TRACE_BREAKDOWN_QUERY, { traceId })

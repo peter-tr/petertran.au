@@ -1,3 +1,4 @@
+import { StrictMode } from "react";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import OperationRow from "./OperationRow";
@@ -105,8 +106,22 @@ describe("OperationRow", () => {
     runQuery.mockResolvedValue({
       meta: {
         traceBreakdown: [
-          { name: "Lambda: handler", startOffsetMs: 0, durationMs: 50, isPlatform: true },
-          { name: "DynamoDB: GetItem", startOffsetMs: 10, durationMs: 20, isPlatform: false },
+          {
+            id: "1",
+            parentId: null,
+            name: "Lambda: handler",
+            startOffsetMs: 0,
+            durationMs: 50,
+            isPlatform: true,
+          },
+          {
+            id: "2",
+            parentId: "1",
+            name: "DynamoDB: GetItem",
+            startOffsetMs: 10,
+            durationMs: 20,
+            isPlatform: false,
+          },
         ],
       },
     });
@@ -142,6 +157,52 @@ describe("OperationRow", () => {
     fireEvent.click(screen.getByText(/Resume/));
 
     await waitFor(() => expect(screen.getByText(/trace fetch failed/)).toBeInTheDocument());
+  });
+
+  // Regression test for a bug where the `unmounted` ref was only ever set
+  // true (in the effect cleanup) and never reset back to false on remount -
+  // harmless for a real unmount, but under React 18 StrictMode's dev-only
+  // mount->cleanup->remount cycle it meant every fetch after the first
+  // render silently discarded its result, permanently stuck on "loading
+  // trace" (see OperationRow.tsx's useEffect for the fix).
+  it("still renders the trace after a StrictMode-style mount/unmount/remount cycle", async () => {
+    runQuery.mockResolvedValue({
+      meta: {
+        traceBreakdown: [
+          {
+            id: "1",
+            parentId: null,
+            name: "Lambda: handler",
+            startOffsetMs: 0,
+            durationMs: 50,
+            isPlatform: true,
+          },
+          {
+            id: "2",
+            parentId: "1",
+            name: "DynamoDB: GetItem",
+            startOffsetMs: 10,
+            durationMs: 20,
+            isPlatform: false,
+          },
+        ],
+      },
+    });
+
+    render(
+      <StrictMode>
+        <table>
+          <tbody>
+            <OperationRow op={baseOp({ lastTraceId: "trace-123" })} />
+          </tbody>
+        </table>
+      </StrictMode>
+    );
+
+    fireEvent.click(screen.getByText(/Resume/));
+
+    await waitFor(() => expect(screen.getByText("Lambda: handler")).toBeInTheDocument());
+    expect(screen.queryByText(/loading trace/)).not.toBeInTheDocument();
   });
 
   it("does not show a Trace section when there's no lastTraceId", () => {

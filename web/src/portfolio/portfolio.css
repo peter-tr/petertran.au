@@ -978,10 +978,52 @@
 }
 
 .trace-label {
+  display: flex;
+  align-items: center;
   color: var(--muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.trace-label-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trace-toggle {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 0.9rem;
+  margin-right: 0.3rem;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--muted-dim);
+  font-size: 0.6rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.trace-toggle:hover {
+  color: var(--muted);
+}
+
+.trace-toggle-spacer {
+  flex: none;
+  display: inline-block;
+  width: 0.9rem;
+  margin-right: 0.3rem;
+}
+
+.trace-child-count {
+  flex: none;
+  margin-left: 0.4rem;
+  color: var(--muted-dim);
+  font-size: 0.68rem;
 }
 
 .trace-track {
