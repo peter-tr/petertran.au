@@ -32,10 +32,31 @@ function mockRequestsByDay() {
 // is what a GenerateQuery invocation's trace looks like in production: most
 // of the time is the Anthropic call, with DynamoDB in single-digit ms.
 const MOCK_TRACE_BREAKDOWN = [
-  { name: "Lambda", startOffsetMs: 0, durationMs: 940, isPlatform: true },
-  { name: "DynamoDB (rate limit)", startOffsetMs: 4, durationMs: 11, isPlatform: false },
-  { name: "Anthropic API", startOffsetMs: 18, durationMs: 902, isPlatform: false },
-  { name: "DynamoDB (usage counter)", startOffsetMs: 922, durationMs: 9, isPlatform: false },
+  { id: "seg-lambda", parentId: null, name: "Lambda", startOffsetMs: 0, durationMs: 940, isPlatform: true },
+  {
+    id: "seg-rate-limit",
+    parentId: "seg-lambda",
+    name: "DynamoDB (rate limit)",
+    startOffsetMs: 4,
+    durationMs: 11,
+    isPlatform: false,
+  },
+  {
+    id: "seg-anthropic",
+    parentId: "seg-lambda",
+    name: "Anthropic API",
+    startOffsetMs: 18,
+    durationMs: 902,
+    isPlatform: false,
+  },
+  {
+    id: "seg-usage-counter",
+    parentId: "seg-lambda",
+    name: "DynamoDB (usage counter)",
+    startOffsetMs: 922,
+    durationMs: 9,
+    isPlatform: false,
+  },
 ];
 
 // Mock resolvers used only by dev/server.ts -- static data, no DynamoDB,

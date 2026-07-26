@@ -70,12 +70,26 @@ describe("getTraceBreakdown", () => {
           Segments: [
             {
               Document: segmentDoc({
+                id: "seg-handler",
                 name: "handler",
                 start_time: 100,
                 end_time: 100.5,
                 subsegments: [
-                  { name: "DynamoDB", start_time: 100.1, end_time: 100.2 },
-                  { name: "InferredThing", start_time: 100.1, end_time: 100.15, inferred: true },
+                  {
+                    id: "seg-dynamo",
+                    parent_id: "seg-handler",
+                    name: "DynamoDB",
+                    start_time: 100.1,
+                    end_time: 100.2,
+                  },
+                  {
+                    id: "seg-inferred",
+                    parent_id: "seg-handler",
+                    name: "InferredThing",
+                    start_time: 100.1,
+                    end_time: 100.15,
+                    inferred: true,
+                  },
                 ],
               }),
             },
@@ -89,8 +103,22 @@ describe("getTraceBreakdown", () => {
     const result = await runAndFlush("trace-1");
 
     expect(result).toEqual([
-      { name: "handler", startOffsetMs: 0, durationMs: 500, isPlatform: false },
-      { name: "DynamoDB", startOffsetMs: 100, durationMs: 100, isPlatform: false },
+      {
+        id: "seg-handler",
+        parentId: null,
+        name: "handler",
+        startOffsetMs: 0,
+        durationMs: 500,
+        isPlatform: false,
+      },
+      {
+        id: "seg-dynamo",
+        parentId: "seg-handler",
+        name: "DynamoDB",
+        startOffsetMs: 100,
+        durationMs: 100,
+        isPlatform: false,
+      },
     ]);
   });
 
@@ -102,6 +130,7 @@ describe("getTraceBreakdown", () => {
           Segments: [
             {
               Document: segmentDoc({
+                id: "seg-platform-lambda",
                 name: "AWS::Lambda",
                 origin: "AWS::Lambda",
                 start_time: 100,
@@ -110,11 +139,20 @@ describe("getTraceBreakdown", () => {
             },
             {
               Document: segmentDoc({
+                id: "seg-handler-lambda",
                 name: "our-handler-segment",
                 origin: "AWS::Lambda::Function",
                 start_time: 100.05,
                 end_time: 109.9,
-                subsegments: [{ name: "Anthropic API", start_time: 101, end_time: 102 }],
+                subsegments: [
+                  {
+                    id: "seg-anthropic",
+                    parent_id: "seg-handler-lambda",
+                    name: "Anthropic API",
+                    start_time: 101,
+                    end_time: 102,
+                  },
+                ],
               }),
             },
           ],
@@ -128,12 +166,24 @@ describe("getTraceBreakdown", () => {
     expect(lambdaEntries).toHaveLength(1);
     // Earliest Lambda-ish segment (start_time 100) wins.
     expect(lambdaEntries[0]).toEqual({
+      id: "seg-platform-lambda",
+      parentId: null,
       name: "Lambda",
       startOffsetMs: 0,
       durationMs: 10000,
       isPlatform: true,
     });
-    expect(result.some((s) => s.name === "Anthropic API")).toBe(true);
+    // Anthropic API's real parent ("our-handler-segment") got dropped as the
+    // duplicate Lambda entry, so it should be remapped onto the surviving one
+    // rather than becoming an orphaned root.
+    expect(result.find((s) => s.name === "Anthropic API")).toEqual({
+      id: "seg-anthropic",
+      parentId: "seg-platform-lambda",
+      name: "Anthropic API",
+      startOffsetMs: 1000,
+      durationMs: 1000,
+      isPlatform: false,
+    });
   });
 
   it("retries up to twice (700ms then 1500ms) when only a single segment is found, then returns what it gets", async () => {

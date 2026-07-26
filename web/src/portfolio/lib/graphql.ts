@@ -152,6 +152,8 @@ export const TRACE_BREAKDOWN_QUERY = /* GraphQL */ `
   query TraceBreakdown($traceId: String!) {
     meta {
       traceBreakdown(traceId: $traceId) {
+        id
+        parentId
         name
         startOffsetMs
         durationMs
