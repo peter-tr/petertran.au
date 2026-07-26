@@ -5,11 +5,13 @@ import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as ses from "aws-cdk-lib/aws-ses";
 import * as cognito from "aws-cdk-lib/aws-cognito";
+import * as iam from "aws-cdk-lib/aws-iam";
 import { Schedule, ScheduleExpression } from "aws-cdk-lib/aws-scheduler";
 import { LambdaInvoke } from "aws-cdk-lib/aws-scheduler-targets";
 import * as path from "path";
 import { FUNCTION_NAMES, LIVE_ALIAS_NAME } from "./shared/function-names";
 import { applyApplicationSignals } from "./shared/application-signals";
+import { bedrockInvokeResources } from "./shared/bedrock-models";
 
 export interface PantryStackProps extends StackProps {
   // Optional, defaults to prod's current values - only the on-demand test
@@ -153,6 +155,19 @@ export class PantryStack extends Stack {
       // comment for why.
     });
     table.grantReadWriteData(apiFn);
+
+    // Lets PantrySettings.aiProvider === "BEDROCK" actually invoke Claude via
+    // Bedrock (see api-shared/anthropic-bedrock-client.ts) for the command
+    // bar - price checking never uses Bedrock (see check-prices.ts), but
+    // this Lambda serves both, so the grant is scoped by model, not by
+    // resolver.
+    apiFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
+        resources: bedrockInvokeResources(this.region, this.account),
+      })
+    );
+
     applyApplicationSignals(apiFn);
     this.apiFn = apiFn;
 

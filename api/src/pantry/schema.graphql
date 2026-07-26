@@ -318,6 +318,30 @@ input UpdateShoppingListEntryInput {
 }
 
 """
+Which backend serves the AI command bar's parseCommand calls. Price
+checking (checkPriceNow / the daily sync) always uses ANTHROPIC regardless
+of this setting - Bedrock doesn't support the web_search/web_fetch tools
+that feature depends on.
+"""
+enum AiProvider {
+  ANTHROPIC
+  BEDROCK
+}
+
+"""
+Capability tier, decoupled from the raw model ID - Bedrock and the direct
+Anthropic API use differently-shaped model ID strings for the same model
+family, so the resolver maps (provider, modelTier) to the right ID rather
+than the caller needing to know either format. BEDROCK + HAIKU is not a
+valid combination (Bedrock rejects structured JSON output for Haiku 4.5) -
+the client should disable that pairing rather than let the user pick it.
+"""
+enum AiModelTier {
+  HAIKU
+  SONNET
+}
+
+"""
 Display/view preferences for the pantry page - scoped per-account for a
 signed-in user, or shared by everyone using the default pantry if not
 signed in, so a change made on one device shows up on every other device
@@ -440,6 +464,15 @@ type PantrySettings {
   """
   nerdModeCommandBar: Boolean!
   """
+  Which backend serves the AI command bar - see AiProvider. Price checking
+  is unaffected by this setting.
+  """
+  aiProvider: AiProvider!
+  """
+  Which capability tier the AI command bar runs at - see AiModelTier.
+  """
+  aiModelTier: AiModelTier!
+  """
   Whether the web client is allowed to paint the pantry page instantly from
   its last cached PantryHome response before this query resolves (see
   web/src/pantry/lib/homeCache.ts). Always refetches in the background
@@ -477,6 +510,8 @@ input PantrySettingsInput {
   nerdModeInventory: Boolean
   nerdModeShoppingList: Boolean
   nerdModeCommandBar: Boolean
+  aiProvider: AiProvider
+  aiModelTier: AiModelTier
   instantLoadCache: Boolean
 }
 

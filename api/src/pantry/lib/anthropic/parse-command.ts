@@ -1,4 +1,10 @@
-import { getAnthropicClient } from "api-shared/anthropic-client";
+import {
+  getAiClient,
+  resolveAiModel,
+  assertValidAiSettings,
+  type AiProvider,
+  type AiModelTier,
+} from "api-shared/ai-provider";
 import { assertAiNotRateLimited } from "../util/ai-rate-limit";
 import type { InventoryItem } from "../../services/inventory";
 import type { ShoppingListEntry } from "../../services/shopping-list";
@@ -540,24 +546,27 @@ export async function parseCommand(
   inventory: InventoryItem[],
   shoppingList: ShoppingListEntry[],
   categories: string[],
-  sourceIp: string | undefined
+  sourceIp: string | undefined,
+  aiProvider: AiProvider,
+  aiModelTier: AiModelTier
 ): Promise<ParsedCommandResult> {
   const trimmed = input.trim();
   if (!trimmed) throw new Error("input is required.");
   if (trimmed.length > MAX_INPUT_LENGTH) {
     throw new Error(`Keep the command under ${MAX_INPUT_LENGTH} characters.`);
   }
+  assertValidAiSettings(aiProvider, aiModelTier);
 
   await assertAiNotRateLimited(sourceIp);
 
-  const client = await getAnthropicClient();
+  const client = await getAiClient(aiProvider);
   const priorMessages = history.slice(-MAX_HISTORY_MESSAGES).map((m) => ({
     role: (m.role === "assistant" ? "assistant" : "user") as "assistant" | "user",
     content: m.content,
   }));
   const startedAt = Date.now();
   const response = await client.messages.parse({
-    model: "claude-haiku-4-5",
+    model: resolveAiModel(aiProvider, aiModelTier),
     // Recipes mode can return up to 3 recipes, each with a full ingredient
     // list plus nutrition/pricing fields per ingredient - 1536 was cutting
     // that off mid-JSON on richer answers (SyntaxError: Unterminated
@@ -569,7 +578,7 @@ export async function parseCommand(
   });
   // searchesUsed/fetchesUsed are always 0 here - command parsing doesn't use
   // web_search/web_fetch, unlike check-prices.ts's call.
-  const debugInfo = buildDebugInfo(response.usage, Date.now() - startedAt);
+  const debugInfo = buildDebugInfo(response.usage, Date.now() - startedAt, aiModelTier);
 
   const parsed = response.parsed_output as RawParseResult | null;
   if (!parsed) throw new Error("Claude didn't return a valid response - try rephrasing.");

@@ -130,6 +130,8 @@ describe("putSettings", () => {
       nerdModeInventory: false,
       nerdModeShoppingList: false,
       nerdModeCommandBar: false,
+      aiProvider: "ANTHROPIC",
+      aiModelTier: "HAIKU",
       instantLoadCache: true,
     };
 

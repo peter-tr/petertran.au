@@ -3,7 +3,7 @@ import { fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import PantrySettingsPage from "./PantrySettingsPage";
-import { runPantryQuery } from "./api";
+import { runPantryQuery, AiProvider, AiModelTier } from "./api";
 import { clearPantryHomeCache } from "./lib/homeCache";
 import type { PantrySettings, PriceSyncStatus } from "./api";
 
@@ -53,6 +53,8 @@ function makeSettings(overrides: Partial<PantrySettings> = {}): PantrySettings {
     nerdModeInventory: false,
     nerdModeShoppingList: false,
     nerdModeCommandBar: false,
+    aiProvider: AiProvider.Anthropic,
+    aiModelTier: AiModelTier.Haiku,
     instantLoadCache: true,
     ...overrides,
   };

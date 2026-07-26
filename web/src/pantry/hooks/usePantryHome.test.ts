@@ -1,15 +1,20 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { usePantryHome } from "./usePantryHome";
-import { runPantryQuery } from "../api";
+import { runPantryQuery, AiProvider, AiModelTier } from "../api";
 import { clearPantryHomeCache, readPantryHomeCache, writePantryHomeCache } from "../lib/homeCache";
 import type { InventoryItem, PantryHomeQueryResult, PantrySettings, ShoppingListEntry } from "../api";
 
-vi.mock("../api", () => ({
-  runPantryQuery: vi.fn(),
-  PANTRY_HOME_QUERY: "PANTRY_HOME_QUERY",
-  UPDATE_SETTINGS_MUTATION: "UPDATE_SETTINGS_MUTATION",
-}));
+vi.mock("../api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../api")>();
+
+  return {
+    ...actual,
+    runPantryQuery: vi.fn(),
+    PANTRY_HOME_QUERY: "PANTRY_HOME_QUERY",
+    UPDATE_SETTINGS_MUTATION: "UPDATE_SETTINGS_MUTATION",
+  };
+});
 
 vi.mock("../lib/homeCache", () => ({
   readPantryHomeCache: vi.fn(),
@@ -48,6 +53,8 @@ function makeSettings(overrides: Partial<PantrySettings> = {}): PantrySettings {
     nerdModeInventory: false,
     nerdModeShoppingList: false,
     nerdModeCommandBar: false,
+    aiProvider: AiProvider.Anthropic,
+    aiModelTier: AiModelTier.Haiku,
     instantLoadCache: true,
     ...overrides,
   };
