@@ -195,6 +195,39 @@ jobs:
           aws lambda invoke --function-name warm-schedule \
             --payload '{"reconcile": true}' --cli-binary-format raw-in-base64-out /dev/null
 
+      # Keeps the GraphOS (petertran-au@current) registry in sync with what
+      # actually deployed - Router itself never reads this back (it composes
+      # from the build-time supergraph.generated.graphql, see
+      # compose-supergraph.ts), so this only feeds Studio's schema
+      # history/Explorer and the rover subgraph check step in verify.yml.
+      # Skipped for the test env - there's only one variant ("current"),
+      # meant to track prod's routing URLs, and test-env deploys are
+      # ephemeral/frequent enough that publishing its api.test.petertran.au
+      # routing URLs over prod's would just be noise. Idempotent: rover
+      # no-ops (no new launch) when a subgraph's schema hasn't changed, so
+      # this runs unconditionally on every deploy rather than needing its own
+      # per-subgraph change detection. Pinned to the same Rover version
+      # verified locally when GraphOS was first connected (2026-07-26), not
+      # @latest - see ROUTER_VERSION's identical reasoning in
+      # api/src/supergraph/scripts/build-router-package.ts.
+      - name: Publish subgraph schemas to GraphOS
+        if: ${{ !inputs.deploy-test-env }}
+        env:
+          APOLLO_KEY: ${{ secrets.APOLLO_KEY }}
+        run: |
+          for entry in \
+            "portfolio:api/src/portfolio/schema.graphql" \
+            "pantry:api/src/pantry/schema.graphql" \
+            "imposter:api/src/games/imposter/schema.graphql" \
+            "design-studio:api/src/design-studio/schema.graphql"; do
+            name="${entry%%:*}"
+            schema="${entry#*:}"
+            npx -y @apollo/rover@0.41.0 subgraph publish petertran-au@current \
+              --schema "$schema" \
+              --name "$name" \
+              --routing-url "https://api.petertran.au/$name"
+          done
+
       # Must run after "Deploy infrastructure", not chained into the build
       # step above - it fetches live data from VITE_GRAPHQL_ENDPOINT, and
       # whenever that endpoint's route is new (e.g. api.petertran.au/graphql

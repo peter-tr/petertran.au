@@ -46,6 +46,54 @@ jobs:
       - name: Lint, format:check, typecheck, test (same as .husky/pre-push)
         run: npx turbo run lint format:check typecheck test
 
+  # Catches a subgraph change that would break GraphOS composition or an
+  # actively-used field before merge - checks against petertran-au@current's
+  # registry (see build-and-deploy.yml's "Publish subgraph schemas to
+  # GraphOS" step, which keeps that registry in sync with what's actually
+  # deployed). Only checks subgraphs whose own schema.graphql changed in this
+  # PR - `gh pr diff --name-only` rather than a marketplace path-filter
+  # action, consistent with using plain `rover` shell steps instead of the
+  # apollographql-gh-actions marketplace actions elsewhere in this repo.
+  graphos-schema-check:
+    if: github.head_ref != 'changeset-release/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check changed subgraph schemas against GraphOS
+        env:
+          APOLLO_KEY: ${{ secrets.APOLLO_KEY }}
+          GH_TOKEN: ${{ github.token }}
+          # Rover auto-detects commit/branch from the checked-out .git dir,
+          # but on a pull_request trigger actions/checkout@v4 defaults to
+          # GitHub's synthetic merge commit (refs/pull/N/merge) - a SHA that
+          # never appears in the PR's own history. Overriding both explicitly
+          # to the PR's real HEAD is what lets GraphOS's GitHub App (once
+          # installed - see Studio Settings > Integrations) match this check
+          # back to the PR and post a native status on it, instead of the
+          # check existing in Studio with no visible link to the PR at all.
+          APOLLO_VCS_COMMIT: ${{ github.event.pull_request.head.sha }}
+          APOLLO_VCS_BRANCH: ${{ github.head_ref }}
+        run: |
+          changed=$(gh pr diff ${{ github.event.pull_request.number }} --name-only)
+          for entry in \
+            "portfolio:api/src/portfolio/schema.graphql" \
+            "pantry:api/src/pantry/schema.graphql" \
+            "imposter:api/src/games/imposter/schema.graphql" \
+            "design-studio:api/src/design-studio/schema.graphql"; do
+            name="${entry%%:*}"
+            schema="${entry#*:}"
+            if echo "$changed" | grep -qxF "$schema"; then
+              echo "::notice::$name's schema changed, running rover subgraph check"
+              npx -y @apollo/rover@0.41.0 subgraph check petertran-au@current \
+                --name "$name" \
+                --schema "$schema"
+            fi
+          done
+
   visual-e2e:
     if: github.head_ref != 'changeset-release/main'
     runs-on: ubuntu-latest
