@@ -142,18 +142,29 @@ export function buildRouterYaml(subgraphNames: string[]): string {
     // Same freeze-before-flush problem as the OTLP batch_processor above,
     // for a completely separate exporter: Apollo Studio usage reporting
     // (activated by the APOLLO_KEY/APOLLO_GRAPH_REF env vars in
-    // supergraph-stack.ts) batches through its own
-    // telemetry.apollo.metrics.usage_reports.batch_processor, defaulting to
-    // the same 5s scheduled_delay - without tightening it here, reports
-    // would sit unflushed when Lambda freezes the execution environment
-    // right after the response returns, same failure mode this file already
-    // hit once for X-Ray traces.
+    // supergraph-stack.ts) batches through its own telemetry.apollo -
+    // defaulting to the same 5s scheduled_delay - without tightening it
+    // here, reports would sit unflushed when Lambda freezes the execution
+    // environment right after the response returns, same failure mode this
+    // file already hit once for X-Ray traces.
+    //
+    // Flat telemetry.apollo.batch_processor, NOT nested under a
+    // metrics.usage_reports key - confirmed directly against
+    // apollo-router's own source at the exact ROUTER_VERSION tag pinned
+    // above (apollo-router/src/plugins/telemetry/apollo.rs's Config struct
+    // has batch_processor as a top-level field). A later Router release
+    // (PR apollographql/router#8258, merged 2025-09-15, well after this
+    // pinned version) splits this into telemetry.apollo.metrics.
+    // usage_reports.batch_processor / .tracing.batch_processor instead -
+    // using that newer nested shape against this older Router crashed it
+    // outright ("Additional properties are not allowed ('metrics' was
+    // unexpected)"), which took prod down for several minutes before being
+    // caught and reverted. Re-verify this shape directly against
+    // apollo.rs at the new tag before ever bumping ROUTER_VERSION.
     "  apollo:\n" +
-    "    metrics:\n" +
-    "      usage_reports:\n" +
-    "        batch_processor:\n" +
-    "          scheduled_delay: 1ms\n" +
-    "          max_export_timeout: 3s\n" +
+    "    batch_processor:\n" +
+    "      scheduled_delay: 1ms\n" +
+    "      max_export_timeout: 3s\n" +
     "\n" +
     "supergraph:\n" +
     "  listen: 127.0.0.1:8080\n" +
