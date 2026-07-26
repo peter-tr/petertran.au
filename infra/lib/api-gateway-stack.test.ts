@@ -18,6 +18,7 @@ describe("ApiGatewayStack", () => {
       supergraphFnName: "supergraph-graphql",
       designStudioFnName: "design-studio-graphql",
       alertsSettingsFnName: "alerts-settings",
+      enableWafRateLimit: true,
       env: { account: "123456789012", region: "ap-southeast-2" },
     });
 
@@ -60,6 +61,27 @@ describe("ApiGatewayStack", () => {
     // on-demand test-env twin, same account/region) never has a chance to
     // reappear - see the stack's cloudWatchRole comment.
     template.resourceCountIs("AWS::ApiGateway::Account", 0);
+    // Coarse per-IP outer defense layer, starting in COUNT (not BLOCK) -
+    // see the stack's doc comment above the WebACL for why.
+    template.resourceCountIs("AWS::WAFv2::WebACL", 1);
+    template.hasResourceProperties("AWS::WAFv2::WebACL", {
+      Scope: "REGIONAL",
+      DefaultAction: { Allow: {} },
+      Rules: [
+        {
+          Name: "RateLimitByIp",
+          Action: { Count: {} },
+          Statement: {
+            RateBasedStatement: {
+              Limit: 100,
+              AggregateKeyType: "IP",
+              EvaluationWindowSec: 60,
+            },
+          },
+        },
+      ],
+    });
+    template.resourceCountIs("AWS::WAFv2::WebACLAssociation", 1);
   });
 
   it("isTestEnv: routes portfolio/pantry/imposter/supergraph (no warm-schedule), under the given apiSubdomain", () => {
@@ -76,6 +98,9 @@ describe("ApiGatewayStack", () => {
       supergraphFnName: "supergraph-graphql-test",
       // warmScheduleFnName omitted - not part of what the test env exists to
       // validate.
+      // Matches infra/bin/app.ts's real wiring - the on-demand test env
+      // doesn't get its own WebACL charge on top of prod's.
+      enableWafRateLimit: false,
       env: { account: "123456789012", region: "ap-southeast-2" },
     });
 
@@ -88,5 +113,7 @@ describe("ApiGatewayStack", () => {
     template.hasResourceProperties("AWS::ApiGateway::DomainName", {
       DomainName: "api.test.example.com",
     });
+    template.resourceCountIs("AWS::WAFv2::WebACL", 0);
+    template.resourceCountIs("AWS::WAFv2::WebACLAssociation", 0);
   });
 });
