@@ -107,7 +107,9 @@ beforeEach(() => {
   // test also exercises reconcileMemory's update/publish/move-alias path as
   // a side effect, same as it would against a freshly-deployed real Lambda
   // still sitting at its old memory.
-  lambdaMock.on(GetFunctionConfigurationCommand).resolves({ MemorySize: 256, LastUpdateStatus: "Successful" });
+  lambdaMock
+    .on(GetFunctionConfigurationCommand)
+    .resolves({ MemorySize: 256, LastUpdateStatus: "Successful" });
   lambdaMock.on(UpdateFunctionConfigurationCommand).resolves({});
   lambdaMock.on(PublishVersionCommand).resolves({ Version: "5" });
   lambdaMock.on(UpdateAliasCommand).resolves({});
