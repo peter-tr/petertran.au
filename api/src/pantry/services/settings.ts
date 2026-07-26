@@ -1,4 +1,5 @@
 import { GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
+import type { AiProvider, AiModelTier } from "api-shared/ai-provider";
 import { ddb, TABLE_NAME } from "../lib/aws/ddb";
 
 const SETTINGS_SK = "SETTINGS";
@@ -33,6 +34,11 @@ export interface PantrySettings {
   nerdModeInventory: boolean;
   nerdModeShoppingList: boolean;
   nerdModeCommandBar: boolean;
+  // Which backend/tier the command bar's parseCommand calls run on - price
+  // checking always uses ANTHROPIC regardless (see check-prices.ts), since
+  // Bedrock doesn't support the web_search/web_fetch tools it needs.
+  aiProvider: AiProvider;
+  aiModelTier: AiModelTier;
 }
 
 export interface PantrySettingsInput {
@@ -60,6 +66,8 @@ export interface PantrySettingsInput {
   nerdModeInventory?: boolean;
   nerdModeShoppingList?: boolean;
   nerdModeCommandBar?: boolean;
+  aiProvider?: AiProvider;
+  aiModelTier?: AiModelTier;
 }
 
 // Same starting list as the client used to seed localStorage with, so the
@@ -91,6 +99,8 @@ const DEFAULT_SETTINGS: PantrySettings = {
   nerdModeInventory: false,
   nerdModeShoppingList: false,
   nerdModeCommandBar: false,
+  aiProvider: "ANTHROPIC",
+  aiModelTier: "HAIKU",
   commonItems: [
     "Milk",
     "Eggs",

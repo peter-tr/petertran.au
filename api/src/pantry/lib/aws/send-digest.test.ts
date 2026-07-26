@@ -53,6 +53,8 @@ function baseSettings(overrides: Partial<PantrySettings> = {}): PantrySettings {
     nerdModeInventory: false,
     nerdModeShoppingList: false,
     nerdModeCommandBar: false,
+    aiProvider: "ANTHROPIC",
+    aiModelTier: "HAIKU",
     ...overrides,
   };
 }

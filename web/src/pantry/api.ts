@@ -1,6 +1,6 @@
 import { createGraphQLClient } from "../shared/graphqlClient";
 import { getAuthHeader } from "./lib/auth";
-import { StorageLocation, PantryActionType } from "./api-schema-types.generated";
+import { StorageLocation, PantryActionType, AiProvider, AiModelTier } from "./api-schema-types.generated";
 import type {
   AddInventoryItemInput as SchemaAddInventoryItemInput,
   UpdateInventoryItemInput as SchemaUpdateInventoryItemInput,
@@ -50,7 +50,7 @@ export const runPantryQuery = createGraphQLClient(
   getAuthHeader
 );
 
-export { StorageLocation };
+export { StorageLocation, AiProvider, AiModelTier };
 
 export type AiCallDebugInfo = AiCallDebugInfoFieldsFragment;
 
@@ -280,6 +280,8 @@ const SETTINGS_FIELDS = /* GraphQL */ `
     nerdModeInventory
     nerdModeShoppingList
     nerdModeCommandBar
+    aiProvider
+    aiModelTier
   }
 `;
 

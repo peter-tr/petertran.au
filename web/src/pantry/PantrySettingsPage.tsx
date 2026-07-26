@@ -6,6 +6,8 @@ import {
   runPantryQuery,
   SYNC_PRICES_NOW_MUTATION,
   PRICE_SYNC_STATUS_QUERY,
+  AiProvider,
+  AiModelTier,
   type SyncPricesNowResult,
   type PriceSyncStatus,
   type PriceSyncStatusResult,
@@ -205,6 +207,60 @@ export default function PantrySettingsPage() {
           </div>
         )}
       </section>
+
+      {settings && (
+        <section className="pantry-panel">
+          <div className="pantry-panel-header">
+            <h2 className="pantry-panel-title">AI provider</h2>
+          </div>
+          <p className="project-desc">
+            Which backend and model the command bar runs on. This only affects the command bar - price
+            checking always uses the direct Anthropic API, since Bedrock doesn&apos;t support the web
+            search/fetch tools it depends on.
+          </p>
+          <div className="form-row pantry-settings-row">
+            <label className="form-label" htmlFor="pantry-ai-provider">
+              Provider
+            </label>
+            <select
+              id="pantry-ai-provider"
+              className="form-input"
+              value={settings.aiProvider}
+              onChange={(e) => {
+                const aiProvider = e.target.value as AiProvider;
+                // BEDROCK + HAIKU isn't a valid combination (Bedrock rejects
+                // structured JSON output for Haiku 4.5) - see the option
+                // below, which disables Haiku under Bedrock the same way.
+                if (aiProvider === AiProvider.Bedrock && settings.aiModelTier === AiModelTier.Haiku) {
+                  updateSettings({ aiProvider, aiModelTier: AiModelTier.Sonnet });
+                } else {
+                  updateSettings({ aiProvider });
+                }
+              }}
+            >
+              <option value={AiProvider.Anthropic}>Direct Anthropic API</option>
+              <option value={AiProvider.Bedrock}>AWS Bedrock</option>
+            </select>
+          </div>
+          <div className="form-row pantry-settings-row">
+            <label className="form-label" htmlFor="pantry-ai-model-tier">
+              Model
+            </label>
+            <select
+              id="pantry-ai-model-tier"
+              className="form-input"
+              value={settings.aiModelTier}
+              onChange={(e) => updateSettings({ aiModelTier: e.target.value as AiModelTier })}
+            >
+              <option value={AiModelTier.Haiku} disabled={settings.aiProvider === AiProvider.Bedrock}>
+                Haiku 4.5 (fast)
+                {settings.aiProvider === AiProvider.Bedrock ? " - not available on Bedrock" : ""}
+              </option>
+              <option value={AiModelTier.Sonnet}>Sonnet 4.6 (better quality)</option>
+            </select>
+          </div>
+        </section>
+      )}
 
       {settings && (
         <section className="pantry-panel">

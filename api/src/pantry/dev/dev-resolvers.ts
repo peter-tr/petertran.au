@@ -32,6 +32,8 @@ let settings: PantrySettings = {
   nerdModeInventory: false,
   nerdModeShoppingList: false,
   nerdModeCommandBar: false,
+  aiProvider: "ANTHROPIC",
+  aiModelTier: "HAIKU",
   commonItems: [
     "Milk",
     "Eggs",
