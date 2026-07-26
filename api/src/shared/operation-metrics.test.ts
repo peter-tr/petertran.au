@@ -2,7 +2,11 @@ import type { BaseContext, GraphQLRequestContext } from "@apollo/server";
 import { DynamoDBDocumentClient, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { mockClient } from "aws-sdk-client-mock";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createOperationMetricsPlugin, emitOperationCountMetric } from "./operation-metrics";
+import {
+  createOperationMetricsPlugin,
+  emitOperationCountMetric,
+  stripFederationSuffix,
+} from "./operation-metrics";
 
 const ddbMock = mockClient(DynamoDBDocumentClient);
 
@@ -35,6 +39,20 @@ describe("emitOperationCountMetric", () => {
     expect(logged.OperationCount).toBe(1);
 
     logSpy.mockRestore();
+  });
+});
+
+describe("stripFederationSuffix", () => {
+  it("strips the Apollo Router's '__<subgraph>__<index>' suffix", () => {
+    expect(stripFederationSuffix("GetInventory__pantry__0")).toBe("GetInventory");
+    expect(stripFederationSuffix("JoinGame__imposter__12")).toBe("JoinGame");
+    // toValidGraphQLName turns hyphens in the subgraph name into underscores.
+    expect(stripFederationSuffix("SaveDesign__design_studio__0")).toBe("SaveDesign");
+  });
+
+  it("leaves a name with no federation suffix untouched", () => {
+    expect(stripFederationSuffix("GetInventory")).toBe("GetInventory");
+    expect(stripFederationSuffix("Anonymous")).toBe("Anonymous");
   });
 });
 
@@ -82,6 +100,28 @@ describe("createOperationMetricsPlugin", () => {
     expect(input.Key).toEqual({ pk: "STATS", sk: "OP#GetInventory#2026-07-20" });
     expect(input.UpdateExpression).toBe("ADD #count :incr");
     expect(input.ExpressionAttributeValues).toEqual({ ":incr": 1 });
+  });
+
+  it("strips the federation-renamed operation name before recording/emitting", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-20T12:34:56.000Z"));
+
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    const plugin = createOperationMetricsPlugin({
+      project: "pantry",
+      ddb: ddbMock as unknown as DynamoDBDocumentClient,
+      tableName: "my-table",
+      pk: "STATS",
+    });
+
+    await fireWillSendResponse(plugin, makeRequestContext({ operationName: "GetInventory__pantry__0" }));
+
+    const logged = JSON.parse(logSpy.mock.calls[0][0] as string);
+    expect(logged.operationName).toBe("GetInventory");
+
+    const input = ddbMock.commandCalls(UpdateCommand)[0].args[0].input;
+    expect(input.Key).toEqual({ pk: "STATS", sk: "OP#GetInventory#2026-07-20" });
   });
 
   it("honors a custom skPrefix", async () => {

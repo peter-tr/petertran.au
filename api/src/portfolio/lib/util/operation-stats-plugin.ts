@@ -1,7 +1,7 @@
 import type { ApolloServerPlugin } from "@apollo/server";
 import { UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { trace } from "@opentelemetry/api";
-import { emitOperationCountMetric } from "api-shared/operation-metrics";
+import { emitOperationCountMetric, stripFederationSuffix } from "api-shared/operation-metrics";
 import { ddb, TABLE_NAME } from "../aws/ddb";
 import type { Context } from "../../context";
 
@@ -122,7 +122,7 @@ export const operationStatsPlugin: ApolloServerPlugin<Context> = {
         }
         tasks.push(recordTotalRequests().catch(() => {}));
 
-        const name = requestContext.operationName ?? "Anonymous";
+        const name = stripFederationSuffix(requestContext.operationName ?? "Anonymous");
         if (!IGNORED_OPERATIONS.has(name)) {
           emitOperationCountMetric("portfolio", name, requestContext.operation?.operation ?? "unknown");
 
