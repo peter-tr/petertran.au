@@ -129,7 +129,7 @@ export default function OperationRow({ op }: { op: OperationStat }) {
                   {traceIndexing && (
                     <p className="status-line">// still finishing up the trace - refreshing…</p>
                   )}
-                  {trace && trace.length === 0 && !traceIndexing && (
+                  {trace?.length === 0 && !traceIndexing && (
                     <p className="op-no-sample">// trace has expired or wasn&apos;t found.</p>
                   )}
                   {trace && trace.length > 0 && !traceIndexing && trace.every((s) => s.isPlatform) && (

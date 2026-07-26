@@ -12,7 +12,7 @@ import {
   HttpJwtAuthorizer,
 } from "aws-cdk-lib/aws-apigatewayv2-authorizers";
 import { HttpLambdaIntegration } from "aws-cdk-lib/aws-apigatewayv2-integrations";
-import * as path from "path";
+import * as path from "node:path";
 import { FUNCTION_NAMES, LIVE_ALIAS_NAME } from "./shared/function-names";
 
 export interface ZeroTrustLabStackProps extends StackProps {

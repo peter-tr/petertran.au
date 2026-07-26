@@ -15,7 +15,7 @@ import * as cognito from "aws-cdk-lib/aws-cognito";
 import * as rum from "aws-cdk-lib/aws-rum";
 import { Schedule, ScheduleExpression } from "aws-cdk-lib/aws-scheduler";
 import { LambdaInvoke } from "aws-cdk-lib/aws-scheduler-targets";
-import * as path from "path";
+import * as path from "node:path";
 import { FUNCTION_NAMES, LIVE_ALIAS_NAME } from "./shared/function-names";
 import { applyApplicationSignals } from "./shared/application-signals";
 
@@ -293,6 +293,8 @@ export class SiteStack extends Stack {
       autoDeleteObjects: true,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       encryption: s3.BucketEncryption.S3_MANAGED,
+      versioned: true,
+      enforceSSL: true,
     });
 
     const distribution = new cloudfront.Distribution(this, "SiteDistribution", {

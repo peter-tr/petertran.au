@@ -38,7 +38,7 @@ export function createRateLimiter({
         );
       } catch (err) {
         if (err instanceof ConditionalCheckFailedException) {
-          throw new Error("Too many requests - please wait a moment and try again.", { cause: err });
+          throw new TypeError("Too many requests - please wait a moment and try again.", { cause: err });
         }
         throw err;
       }

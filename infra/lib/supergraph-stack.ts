@@ -2,7 +2,7 @@ import { Stack, StackProps, Duration } from "aws-cdk-lib";
 import { Construct } from "constructs";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
-import * as path from "path";
+import * as path from "node:path";
 import { LIVE_ALIAS_NAME } from "./shared/function-names";
 
 // Same graph across prod and the on-demand test env - GraphOS has no notion

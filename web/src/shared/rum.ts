@@ -45,7 +45,9 @@ export function initRum(): void {
             // and send it as an `X-Amzn-Trace-Id` header instead of the
             // Lambda minting an unrelated one on arrival. Scoped to our own
             // API only, not any future third-party fetch this page might make.
-            addXRayTraceIdHeader: [new RegExp(`^${apiOrigin.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/`)],
+            addXRayTraceIdHeader: [
+              new RegExp(`^${apiOrigin.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)}/`),
+            ],
           },
         ],
       ],

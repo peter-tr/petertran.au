@@ -56,7 +56,7 @@ export default function Gallery() {
 
       {error && <p className="status-line">// {error}</p>}
 
-      {designs && designs.length === 0 && <p className="design-studio-empty">No designs yet - create one.</p>}
+      {designs?.length === 0 && <p className="design-studio-empty">No designs yet - create one.</p>}
 
       <ul className="design-studio-gallery-grid">
         {designs?.map((design) => (

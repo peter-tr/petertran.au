@@ -4,7 +4,6 @@
 // query surface with the portfolio.
 
 import { createGraphQLClient } from "../../../shared/graphqlClient";
-import { ImposterDifficulty, ImposterPhase, ImposterWordSource } from "./api-schema-types.generated";
 import type {
   CreateImposterGameMutation,
   CreateImposterGameMutationVariables,
@@ -26,7 +25,7 @@ export const IMPOSTER_ENDPOINT = import.meta.env?.VITE_IMPOSTER_GRAPHQL_ENDPOINT
 
 export const runImposterQuery = createGraphQLClient(IMPOSTER_ENDPOINT, "VITE_IMPOSTER_GRAPHQL_ENDPOINT");
 
-export { ImposterPhase, ImposterWordSource, ImposterDifficulty };
+export { ImposterPhase, ImposterWordSource, ImposterDifficulty } from "./api-schema-types.generated";
 
 export type ImposterCategory = ImposterCategoriesQuery["imposterCategories"][number];
 
