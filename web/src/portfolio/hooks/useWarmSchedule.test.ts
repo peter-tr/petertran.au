@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
-import type { ProjectCost, WarmSchedule } from "./useWarmSchedule";
+import { schedulesEqual, isScheduleValid, type ProjectCost, type WarmSchedule } from "./useWarmSchedule";
 
 const DEFAULT_SCHEDULE: WarmSchedule = {
   enabled: true,
@@ -75,10 +75,10 @@ describe("useWarmSchedule", () => {
     await waitFor(() => expect(result.current.error).toBe("Couldn't load provisioned concurrency status"));
   });
 
-  it("setSchedule POSTs the project/schedule and updates config from the response", async () => {
+  it("saveAll POSTs every dirty project and updates config from each response", async () => {
     vi.stubEnv("VITE_WARM_SCHEDULE_ENDPOINT", "https://api.test/warm-schedule");
 
-    const newSchedule: WarmSchedule = {
+    const newPantry: WarmSchedule = {
       enabled: true,
       days: ["MON", "TUE", "WED", "THU", "FRI"],
       start: "07:30",
@@ -86,30 +86,41 @@ describe("useWarmSchedule", () => {
       concurrency: 3,
       memoryMb: 1024,
     };
-    const updatedConfig = { ...DEFAULT_CONFIG, pantry: newSchedule };
+    const newImposter: WarmSchedule = { ...DEFAULT_SCHEDULE, enabled: false };
     (fetch as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce({ json: async () => ({ schedules: DEFAULT_CONFIG, costs: DEFAULT_COSTS }) })
-      .mockResolvedValueOnce({ json: async () => ({ schedules: updatedConfig, costs: DEFAULT_COSTS }) });
+      .mockResolvedValueOnce({
+        json: async () => ({ schedules: { ...DEFAULT_CONFIG, pantry: newPantry }, costs: DEFAULT_COSTS }),
+      })
+      .mockResolvedValueOnce({
+        json: async () => ({ schedules: { ...DEFAULT_CONFIG, imposter: newImposter }, costs: DEFAULT_COSTS }),
+      });
 
     const { useWarmSchedule } = await import("./useWarmSchedule");
 
     const { result } = renderHook(() => useWarmSchedule());
     await waitFor(() => expect(result.current.config).toEqual(DEFAULT_CONFIG));
 
+    let savePromise!: Promise<void>;
     act(() => {
-      result.current.setSchedule("pantry", newSchedule);
+      savePromise = result.current.saveAll({ pantry: newPantry, imposter: newImposter });
     });
 
-    expect(result.current.pendingFn).toBe("pantry");
-    await waitFor(() => expect(result.current.config).toEqual(updatedConfig));
-    expect(result.current.pendingFn).toBeNull();
+    expect(result.current.saving).toBe(true);
+    await act(() => savePromise);
+    expect(result.current.saving).toBe(false);
 
-    const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[1];
-    expect(init).toMatchObject({ method: "POST", headers: { "content-type": "application/json" } });
-    expect(JSON.parse(init.body)).toEqual({ project: "pantry", schedule: newSchedule });
+    expect(result.current.config).toEqual({ ...DEFAULT_CONFIG, pantry: newPantry, imposter: newImposter });
+
+    const postCalls = (fetch as ReturnType<typeof vi.fn>).mock.calls.slice(1);
+    expect(postCalls).toHaveLength(2);
+
+    const bodies = postCalls.map(([, init]) => JSON.parse(init.body));
+    expect(bodies).toContainEqual({ project: "pantry", schedule: newPantry });
+    expect(bodies).toContainEqual({ project: "imposter", schedule: newImposter });
   });
 
-  it("setSchedule only replaces the saved project's entry, preserving other projects' object identity", async () => {
+  it("saveAll only replaces saved projects' entries, preserving untouched projects' object identity", async () => {
     vi.stubEnv("VITE_WARM_SCHEDULE_ENDPOINT", "https://api.test/warm-schedule");
 
     const newSchedule: WarmSchedule = {
@@ -135,18 +146,14 @@ describe("useWarmSchedule", () => {
 
     const imposterBeforeSave = result.current.config!.imposter;
 
-    act(() => {
-      result.current.setSchedule("pantry", newSchedule);
-    });
-    await waitFor(() => expect(result.current.config!.pantry).toEqual(newSchedule));
+    await act(() => result.current.saveAll({ pantry: newSchedule }));
 
-    // Untouched project keeps the exact same object reference - a sibling
-    // row's local draft (reset via reference-equality against this prop)
-    // must not get discarded just because a different project was saved.
+    expect(result.current.config!.pantry).toEqual(newSchedule);
+    // Untouched project keeps the exact same object reference.
     expect(result.current.config!.imposter).toBe(imposterBeforeSave);
   });
 
-  it("setSchedule surfaces an error and clears pendingFn on failure", async () => {
+  it("saveAll surfaces an error and clears saving on failure", async () => {
     vi.stubEnv("VITE_WARM_SCHEDULE_ENDPOINT", "https://api.test/warm-schedule");
 
     (fetch as ReturnType<typeof vi.fn>)
@@ -158,23 +165,53 @@ describe("useWarmSchedule", () => {
     const { result } = renderHook(() => useWarmSchedule());
     await waitFor(() => expect(result.current.config).toEqual(DEFAULT_CONFIG));
 
-    act(() => {
-      result.current.setSchedule("pantry", DEFAULT_SCHEDULE);
-    });
+    await act(() => result.current.saveAll({ pantry: DEFAULT_SCHEDULE }));
 
-    await waitFor(() => expect(result.current.error).toBe("Couldn't update provisioned concurrency status"));
-    expect(result.current.pendingFn).toBeNull();
+    expect(result.current.error).toBe("Couldn't update provisioned concurrency status");
+    expect(result.current.saving).toBe(false);
   });
 
-  it("setSchedule is a no-op when unavailable", async () => {
+  it("saveAll is a no-op when unavailable or given no dirty projects", async () => {
     vi.stubEnv("VITE_WARM_SCHEDULE_ENDPOINT", "");
 
     const { useWarmSchedule } = await import("./useWarmSchedule");
 
     const { result } = renderHook(() => useWarmSchedule());
-    act(() => result.current.setSchedule("pantry", DEFAULT_SCHEDULE));
+    await act(() => result.current.saveAll({ pantry: DEFAULT_SCHEDULE }));
 
     expect(fetch).not.toHaveBeenCalled();
-    expect(result.current.pendingFn).toBeNull();
+    expect(result.current.saving).toBe(false);
+  });
+});
+
+describe("schedulesEqual", () => {
+  it("treats schedules with the same fields (days in any order) as equal", () => {
+    const a: WarmSchedule = { ...DEFAULT_SCHEDULE, days: ["MON", "TUE"] };
+    const b: WarmSchedule = { ...DEFAULT_SCHEDULE, days: ["TUE", "MON"] };
+
+    expect(schedulesEqual(a, b)).toBe(true);
+  });
+
+  it("treats schedules that differ in any field as not equal", () => {
+    expect(schedulesEqual(DEFAULT_SCHEDULE, { ...DEFAULT_SCHEDULE, concurrency: 2 })).toBe(false);
+    expect(schedulesEqual(DEFAULT_SCHEDULE, { ...DEFAULT_SCHEDULE, memoryMb: 1024 })).toBe(false);
+  });
+});
+
+describe("isScheduleValid", () => {
+  it("skips validation entirely when disabled", () => {
+    expect(isScheduleValid({ ...DEFAULT_SCHEDULE, enabled: false, days: [] })).toBe(true);
+  });
+
+  it("rejects an enabled schedule with no days, a bad time range, or an out-of-range concurrency/memory", () => {
+    expect(isScheduleValid({ ...DEFAULT_SCHEDULE, days: [] })).toBe(false);
+    expect(isScheduleValid({ ...DEFAULT_SCHEDULE, start: "19:00", end: "08:00" })).toBe(false);
+    expect(isScheduleValid({ ...DEFAULT_SCHEDULE, concurrency: 0 })).toBe(false);
+    expect(isScheduleValid({ ...DEFAULT_SCHEDULE, concurrency: 6 })).toBe(false);
+    expect(isScheduleValid({ ...DEFAULT_SCHEDULE, memoryMb: 256 })).toBe(false);
+  });
+
+  it("accepts a valid enabled schedule", () => {
+    expect(isScheduleValid(DEFAULT_SCHEDULE)).toBe(true);
   });
 });

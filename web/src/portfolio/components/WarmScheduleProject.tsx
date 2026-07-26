@@ -1,7 +1,7 @@
-import { useState } from "react";
 import {
   MAX_CONCURRENCY,
   MEMORY_OPTIONS_MB,
+  isScheduleValid,
   type WarmScheduleKey,
   type WarmSchedule,
   type Weekday,
@@ -19,65 +19,37 @@ const DAY_LABELS: Record<Weekday, string> = {
   SUN: "Sun",
 };
 
-function schedulesEqual(a: WarmSchedule, b: WarmSchedule): boolean {
-  return (
-    a.enabled === b.enabled &&
-    a.start === b.start &&
-    a.end === b.end &&
-    a.concurrency === b.concurrency &&
-    a.memoryMb === b.memoryMb &&
-    a.days.length === b.days.length &&
-    a.days.every((d) => b.days.includes(d))
-  );
-}
-
 interface WarmScheduleProjectProps {
   fn: WarmScheduleKey;
   label: string;
-  schedule: WarmSchedule;
+  draft: WarmSchedule;
+  onChange: (schedule: WarmSchedule) => void;
   cost: ProjectCost | undefined;
-  pending: boolean;
-  onSave: (schedule: WarmSchedule) => void;
+  disabled: boolean;
 }
 
-// One project's day/time editor - edits stay in local `draft` state until
-// "Save" is clicked, so toggling a day or nudging a time input doesn't fire
-// a request (and an UpdateScheduleCommand pair) per keystroke.
+// One project's day/time editor - a controlled component whose `draft`
+// state lives in PortfolioSettingsPage, so a single "Save all" button
+// there can POST every dirty project's schedule at once instead of each
+// row round-tripping its own save.
 export default function WarmScheduleProject({
   fn,
   label,
-  schedule,
+  draft,
+  onChange,
   cost,
-  pending,
-  onSave,
+  disabled,
 }: WarmScheduleProjectProps) {
-  const [draft, setDraft] = useState(schedule);
-  // Tracks the last `schedule` prop seen, so a change to it (e.g. after a
-  // fetch/reload) resets the local draft - adjusted during render rather
-  // than in an effect, per React's guidance against setState-in-effect
-  // cascading an extra render.
-  const [prevSchedule, setPrevSchedule] = useState(schedule);
-  if (schedule !== prevSchedule) {
-    setPrevSchedule(schedule);
-    setDraft(schedule);
-  }
-
   function toggleDay(day: Weekday): void {
-    setDraft((d) => ({
-      ...d,
-      days: d.days.includes(day) ? d.days.filter((existing) => existing !== day) : [...d.days, day],
-    }));
+    onChange({
+      ...draft,
+      days: draft.days.includes(day)
+        ? draft.days.filter((existing) => existing !== day)
+        : [...draft.days, day],
+    });
   }
 
-  const dirty = !schedulesEqual(draft, schedule);
-  const invalid =
-    draft.enabled &&
-    (draft.days.length === 0 ||
-      draft.start >= draft.end ||
-      !Number.isInteger(draft.concurrency) ||
-      draft.concurrency < 1 ||
-      draft.concurrency > MAX_CONCURRENCY ||
-      !(MEMORY_OPTIONS_MB as readonly number[]).includes(draft.memoryMb));
+  const invalid = !isScheduleValid(draft);
 
   return (
     <div className="warm-schedule">
@@ -86,7 +58,8 @@ export default function WarmScheduleProject({
           id={`warm-schedule-${fn}-enabled`}
           type="checkbox"
           checked={draft.enabled}
-          onChange={(e) => setDraft((d) => ({ ...d, enabled: e.target.checked }))}
+          disabled={disabled}
+          onChange={(e) => onChange({ ...draft, enabled: e.target.checked })}
         />{" "}
         {label}
       </label>
@@ -98,6 +71,7 @@ export default function WarmScheduleProject({
             type="button"
             className={`warm-schedule-day-btn${draft.days.includes(day) ? " active" : ""}`}
             aria-pressed={draft.days.includes(day)}
+            disabled={disabled}
             onClick={() => toggleDay(day)}
           >
             {DAY_LABELS[day]}
@@ -111,7 +85,8 @@ export default function WarmScheduleProject({
           type="time"
           aria-label={`${label} start time`}
           value={draft.start}
-          onChange={(e) => setDraft((d) => ({ ...d, start: e.target.value }))}
+          disabled={disabled}
+          onChange={(e) => onChange({ ...draft, start: e.target.value })}
         />
         <span className="warm-schedule-times-sep">to</span>
         <input
@@ -119,7 +94,8 @@ export default function WarmScheduleProject({
           type="time"
           aria-label={`${label} end time`}
           value={draft.end}
-          onChange={(e) => setDraft((d) => ({ ...d, end: e.target.value }))}
+          disabled={disabled}
+          onChange={(e) => onChange({ ...draft, end: e.target.value })}
         />
         <span className="warm-schedule-times-sep">×</span>
         <input
@@ -129,14 +105,16 @@ export default function WarmScheduleProject({
           max={MAX_CONCURRENCY}
           aria-label={`${label} provisioned concurrency`}
           value={draft.concurrency}
-          onChange={(e) => setDraft((d) => ({ ...d, concurrency: Number(e.target.value) }))}
+          disabled={disabled}
+          onChange={(e) => onChange({ ...draft, concurrency: Number(e.target.value) })}
         />
         <span className="warm-schedule-times-sep">@</span>
         <select
           className="form-input"
           aria-label={`${label} memory size`}
           value={draft.memoryMb}
-          onChange={(e) => setDraft((d) => ({ ...d, memoryMb: Number(e.target.value) }))}
+          disabled={disabled}
+          onChange={(e) => onChange({ ...draft, memoryMb: Number(e.target.value) })}
         >
           {MEMORY_OPTIONS_MB.map((mb) => (
             <option key={mb} value={mb}>
@@ -144,14 +122,6 @@ export default function WarmScheduleProject({
             </option>
           ))}
         </select>
-        <button
-          className="run-btn"
-          type="button"
-          disabled={!dirty || invalid || pending}
-          onClick={() => onSave(draft)}
-        >
-          Save
-        </button>
       </div>
       {cost && (
         <p className="section-hint">
