@@ -161,10 +161,33 @@ export function buildRouterYaml(subgraphNames: string[]): string {
     // unexpected)"), which took prod down for several minutes before being
     // caught and reverted. Re-verify this shape directly against
     // apollo.rs at the new tag before ever bumping ROUTER_VERSION.
+    // max_export_timeout is 10s here, not the 3s used above for OTLP -
+    // that 3s was tuned against a genuinely local destination (the ADOT
+    // collector on localhost, effectively zero network latency). This
+    // exporter's actual destination is a real cross-region HTTPS call to
+    // usage-reporting.api.apollographql.com, not localhost - reusing
+    // OTLP's local-latency timeout here made every export attempt fail
+    // with "operation timed out" (confirmed live: consistent timeouts
+    // across multiple warm, non-cold-start invocations, even though the
+    // endpoint itself answers in ~280ms from a normal network - the
+    // slowness is specific to this Lambda's post-response execution
+    // window, not the endpoint). scheduled_delay stays at 1ms so a flush
+    // still starts immediately rather than waiting out the 5s default.
+    // Defaults to sampling only 1% of operations for field-level
+    // instrumentation (TraceIdRatioBased(0.01) - confirmed in apollo.rs)
+    // - separate from, and additive to, whether a subgraph can produce
+    // ftv1 data at all (see each subgraph handler.ts's
+    // ApolloServerPluginInlineTrace()). On this project's real traffic
+    // volume, 1% sampling could mean waiting a very long time to see any
+    // field-level data in Studio's Insights at all. always_on trades a
+    // small amount of per-request overhead (ftv1 data riding in-band in
+    // every subgraph response) for actually being able to see field-level
+    // metrics work.
     "  apollo:\n" +
+    "    field_level_instrumentation_sampler: always_on\n" +
     "    batch_processor:\n" +
     "      scheduled_delay: 1ms\n" +
-    "      max_export_timeout: 3s\n" +
+    "      max_export_timeout: 10s\n" +
     "\n" +
     "supergraph:\n" +
     "  listen: 127.0.0.1:8080\n" +

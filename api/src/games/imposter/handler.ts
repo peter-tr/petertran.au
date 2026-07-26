@@ -1,4 +1,5 @@
 import { ApolloServer } from "@apollo/server";
+import { ApolloServerPluginInlineTrace } from "@apollo/server/plugin/inlineTrace";
 import { startServerAndCreateLambdaHandler, handlers } from "@as-integrations/aws-lambda";
 import { buildSubgraphSchema } from "@apollo/subgraph";
 import { parse } from "graphql";
@@ -20,6 +21,11 @@ const server = new ApolloServer<Context>({
   // "STATS" pk matches lib/aws/stats.ts's existing game-stats convention.
   plugins: [
     createOperationMetricsPlugin<Context>({ project: "imposter", ddb, tableName: TABLE_NAME, pk: "STATS" }),
+    // Responds to the supergraph Router's federated-tracing header with
+    // per-field timing data (extensions.ftv1) - see portfolio/handler.ts's
+    // identical comment for why this is needed for GraphOS field-level
+    // Insights specifically (separate from Router's own operation metrics).
+    ApolloServerPluginInlineTrace(),
   ],
 });
 
