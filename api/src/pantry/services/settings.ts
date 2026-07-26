@@ -39,6 +39,10 @@ export interface PantrySettings {
   // Bedrock doesn't support the web_search/web_fetch tools it needs.
   aiProvider: AiProvider;
   aiModelTier: AiModelTier;
+  // Gates web/src/pantry/lib/homeCache.ts's stale-while-revalidate cache -
+  // see the schema.graphql doc comment on this field for what it actually
+  // controls.
+  instantLoadCache: boolean;
 }
 
 export interface PantrySettingsInput {
@@ -68,6 +72,7 @@ export interface PantrySettingsInput {
   nerdModeCommandBar?: boolean;
   aiProvider?: AiProvider;
   aiModelTier?: AiModelTier;
+  instantLoadCache?: boolean;
 }
 
 // Same starting list as the client used to seed localStorage with, so the
@@ -101,6 +106,7 @@ const DEFAULT_SETTINGS: PantrySettings = {
   nerdModeCommandBar: false,
   aiProvider: "ANTHROPIC",
   aiModelTier: "HAIKU",
+  instantLoadCache: true,
   commonItems: [
     "Milk",
     "Eggs",

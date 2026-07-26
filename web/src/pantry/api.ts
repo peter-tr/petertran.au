@@ -282,6 +282,7 @@ const SETTINGS_FIELDS = /* GraphQL */ `
     nerdModeCommandBar
     aiProvider
     aiModelTier
+    instantLoadCache
   }
 `;
 

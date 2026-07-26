@@ -55,6 +55,7 @@ function baseSettings(overrides: Partial<PantrySettings> = {}): PantrySettings {
     nerdModeCommandBar: false,
     aiProvider: "ANTHROPIC",
     aiModelTier: "HAIKU",
+    instantLoadCache: true,
     ...overrides,
   };
 }

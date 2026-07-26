@@ -45,6 +45,7 @@ function makeSettings(overrides: Partial<PantrySettings> = {}): PantrySettings {
     nerdModeCommandBar: false,
     aiProvider: AiProvider.Anthropic,
     aiModelTier: AiModelTier.Haiku,
+    instantLoadCache: true,
     ...overrides,
   };
 }

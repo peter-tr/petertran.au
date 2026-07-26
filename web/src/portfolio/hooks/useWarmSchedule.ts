@@ -81,19 +81,29 @@ export interface ProjectCost {
 }
 export type WarmScheduleCosts = Record<WarmScheduleKey, ProjectCost>;
 
+// Named full-config snapshots (all 6 projects at once), keyed by
+// user-chosen name - lets "Save current as profile" / "Apply" switch every
+// project's schedule in one action instead of editing each row by hand.
+export type WarmScheduleProfiles = Record<string, WarmScheduleConfig>;
+
 interface WarmScheduleResponse {
   schedules: WarmScheduleConfig;
   costs: WarmScheduleCosts;
+  profiles: WarmScheduleProfiles;
 }
 
 export function useWarmSchedule() {
   const [config, setConfigState] = useState<WarmScheduleConfig | null>(null);
   const [costs, setCosts] = useState<WarmScheduleCosts | null>(null);
+  const [profiles, setProfiles] = useState<WarmScheduleProfiles | null>(null);
   // One flag for the whole batch, not per-project - saveAll POSTs every
   // dirty project at once, so there's no meaningful "just this one row is
   // saving" state to track anymore (see PortfolioSettingsPage's single
   // "Save all" button).
   const [saving, setSaving] = useState(false);
+  // Same per-item reasoning as elsewhere in this codebase, for whichever
+  // profile name a save/apply/delete is currently in flight for.
+  const [profilePending, setProfilePending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -103,6 +113,7 @@ export function useWarmSchedule() {
       .then((data: WarmScheduleResponse) => {
         setConfigState(data.schedules);
         setCosts(data.costs);
+        setProfiles(data.profiles);
       })
       .catch(() => setError("Couldn't load provisioned concurrency status"));
   }, []);
@@ -127,12 +138,13 @@ export function useWarmSchedule() {
               // config - a fresh object reference for every project (even
               // ones nothing changed for) would otherwise reset every other
               // row's in-progress draft too once the parent re-syncs drafts
-              // from config. Costs are pure display, not tied to any draft
-              // state, so the whole map is replaced.
+              // from config. Costs/profiles are pure display, not tied to
+              // any draft state, so they're always replaced wholesale.
               setConfigState((current) =>
                 current ? { ...current, [fn]: data.schedules[fn] } : data.schedules
               );
               setCosts(data.costs);
+              setProfiles(data.profiles);
             })
         )
       );
@@ -143,5 +155,47 @@ export function useWarmSchedule() {
     }
   }, []);
 
-  return { config, costs, saving, error, saveAll, available: Boolean(ENDPOINT) };
+  const runProfileAction = useCallback(
+    (name: string, profileAction: "save" | "apply" | "delete"): Promise<void> => {
+      if (!ENDPOINT) return Promise.resolve();
+      setProfilePending(name);
+      setError(null);
+
+      return fetch(ENDPOINT, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ profileAction, name }),
+      })
+        .then((res) => res.json())
+        .then((data: WarmScheduleResponse) => {
+          // Unlike saveAll, "apply" can change every project's schedule at
+          // once, so the whole config is replaced wholesale rather than
+          // merged one key at a time.
+          setConfigState(data.schedules);
+          setCosts(data.costs);
+          setProfiles(data.profiles);
+        })
+        .catch(() => setError(`Couldn't ${profileAction} profile "${name}"`))
+        .finally(() => setProfilePending(null));
+    },
+    []
+  );
+
+  const saveProfile = useCallback((name: string) => runProfileAction(name, "save"), [runProfileAction]);
+  const applyProfile = useCallback((name: string) => runProfileAction(name, "apply"), [runProfileAction]);
+  const deleteProfile = useCallback((name: string) => runProfileAction(name, "delete"), [runProfileAction]);
+
+  return {
+    config,
+    costs,
+    profiles,
+    saving,
+    profilePending,
+    error,
+    saveAll,
+    saveProfile,
+    applyProfile,
+    deleteProfile,
+    available: Boolean(ENDPOINT),
+  };
 }

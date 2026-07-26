@@ -66,6 +66,7 @@ describe("getSettings", () => {
     expect(settings.nerdModeInventory).toBe(false);
     expect(settings.nerdModeShoppingList).toBe(false);
     expect(settings.nerdModeCommandBar).toBe(false);
+    expect(settings.instantLoadCache).toBe(true);
     expect(settings.categories.length).toBeGreaterThan(0);
     expect(settings.categoryFilter).toBeNull();
     expect(settings.shoppingSort).toBe("recent");
@@ -131,6 +132,7 @@ describe("putSettings", () => {
       nerdModeCommandBar: false,
       aiProvider: "ANTHROPIC",
       aiModelTier: "HAIKU",
+      instantLoadCache: true,
     };
 
     await putSettings(TEST_PK, settings);

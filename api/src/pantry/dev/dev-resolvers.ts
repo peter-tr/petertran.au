@@ -34,6 +34,7 @@ let settings: PantrySettings = {
   nerdModeCommandBar: false,
   aiProvider: "ANTHROPIC",
   aiModelTier: "HAIKU",
+  instantLoadCache: true,
   commonItems: [
     "Milk",
     "Eggs",

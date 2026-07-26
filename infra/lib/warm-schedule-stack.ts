@@ -30,6 +30,12 @@ export interface ProvisionedConcurrencyStackProps extends StackProps {
 }
 
 const WARM_SCHEDULE_PARAM_NAME = "/petertran-au/warm-schedule";
+// Named full-config snapshots (all 6 projects at once) the settings page can
+// save/apply - see handler.ts's getProfiles()/setProfiles(). Seeded once as
+// "{}" and never touched again by this literal, so (unlike WARM_SCHEDULE_PARAM_NAME
+// above) it never hits the CloudFormation-clobbers-runtime-writes trap: there's
+// nothing about it that a later project/field addition would change.
+const WARM_SCHEDULE_PROFILES_PARAM_NAME = "/petertran-au/warm-schedule-profiles";
 
 type WarmScheduleKey = "portfolio" | "pantry" | "imposter" | "supergraph" | "designStudio" | "zeroTrustLab";
 type Weekday = "MON" | "TUE" | "WED" | "THU" | "FRI" | "SAT" | "SUN";
@@ -172,6 +178,11 @@ export class ProvisionedConcurrencyStack extends Stack {
       }),
     });
 
+    const profilesParam = new ssm.StringParameter(this, "WarmScheduleProfilesParam", {
+      parameterName: WARM_SCHEDULE_PROFILES_PARAM_NAME,
+      stringValue: "{}",
+    });
+
     const ztl = props.zeroTrustLabFnNames;
     const targetFnNames = [
       props.portfolioFnName,
@@ -226,10 +237,13 @@ export class ProvisionedConcurrencyStack extends Stack {
         ZTL_EDGE_PROXY_FN_NAME: ztl.edgeProxy,
         ZTL_DOMAIN_A_FN_NAME: ztl.domainA,
         WARM_SCHEDULE_NAMES: JSON.stringify(scheduleNames),
+        WARM_SCHEDULE_PROFILES_PARAM_NAME: profilesParam.parameterName,
       },
     });
     scheduleParam.grantRead(warmScheduleFn);
     scheduleParam.grantWrite(warmScheduleFn);
+    profilesParam.grantRead(warmScheduleFn);
+    profilesParam.grantWrite(warmScheduleFn);
 
     warmScheduleFn.addToRolePolicy(
       new iam.PolicyStatement({
