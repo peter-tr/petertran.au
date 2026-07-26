@@ -10,9 +10,16 @@ interface LayersPanelProps {
 }
 
 function elementLabel(element: DesignElement): string {
-  if (element.type === "text") return element.text.slice(0, 20) || "Text";
-
-  return element.type === "rectangle" ? "Rectangle" : "Ellipse";
+  switch (element.type) {
+    case "text":
+      return element.text.slice(0, 20) || "Text";
+    case "rectangle":
+      return "Rectangle";
+    case "ellipse":
+      return "Ellipse";
+    case "arrow":
+      return "Arrow";
+  }
 }
 
 export default function LayersPanel({

@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
-import { Stage, Layer, Rect, Ellipse, Text, Transformer } from "react-konva";
+import { Stage, Layer, Rect, Ellipse, Arrow, Text, Transformer } from "react-konva";
 import type Konva from "konva";
 import type { KonvaEventObject } from "konva/lib/Node";
 import type { DesignElement } from "../lib/elements";
@@ -61,6 +61,50 @@ const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
   const draftTransformerRef = useRef<Konva.Transformer>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingValue, setEditingValue] = useState("");
+  const outerRef = useRef<HTMLDivElement>(null);
+  // Shrinks the whole canvas (Stage + text-edit overlay) to fit narrow
+  // viewports via a CSS transform rather than resizing the Stage itself, so
+  // the element coordinate system (and PNG export resolution) stays at the
+  // design's native width/height regardless of screen size. Safe to do
+  // because Konva derives pointer positions from the ratio of the content
+  // div's rendered (getBoundingClientRect) size to its layout (clientWidth)
+  // size - see _getContentPosition in konva/lib/Stage.js - so it already
+  // compensates for a CSS-transformed container; clicks/drags still land
+  // correctly at any scale.
+  const [scale, setScale] = useState(1);
+
+  useEffect(() => {
+    const outer = outerRef.current;
+    if (!outer) return;
+
+    // Fitting to available width alone is enough on a portrait phone, but
+    // on a short/wide mobile-landscape viewport a width-only fit can still
+    // leave the canvas tall enough to fill nearly the whole screen height,
+    // pushing the toolbar/panels below it far off screen. Also cap by a
+    // fraction of window height so there's always room left for the rest
+    // of the editor.
+    function recompute(containerWidth: number) {
+      const heightBudget = window.innerHeight * 0.6;
+      setScale(Math.min(1, containerWidth / width, heightBudget / height));
+    }
+
+    const observer = new ResizeObserver((entries) => {
+      recompute(entries[0]?.contentRect.width ?? outer.clientWidth);
+    });
+    observer.observe(outer);
+
+    const handleViewportResize = () => {
+      recompute(outer.getBoundingClientRect().width);
+    };
+    window.addEventListener("resize", handleViewportResize);
+    window.addEventListener("orientationchange", handleViewportResize);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", handleViewportResize);
+      window.removeEventListener("orientationchange", handleViewportResize);
+    };
+  }, [width, height]);
 
   useImperativeHandle(ref, () => ({
     exportPNG: async () => {
@@ -169,125 +213,51 @@ const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
   const editingElement = editingId ? elements.find((el) => el.id === editingId) : undefined;
 
   return (
-    <div className="design-studio-stage-wrapper">
-      <Stage
-        ref={stageRef}
-        width={width}
-        height={height}
-        className="design-studio-stage"
-        onMouseDown={(e) => {
-          if (e.target === e.target.getStage()) {
-            onSelect(null);
-            onSelectDraft?.(null);
-          }
-        }}
-      >
-        {/* Dimmed while a draft overlay is showing (see the second Layer
-            below) - the draft is a preview of the complete post-accept
-            state, not an addition to this one, so at full strength the two
-            fully-opaque layers just visually duplicate every element the
-            draft echoed back unchanged. Full opacity again once there's no
-            draft. */}
-        <Layer opacity={draftElements && draftElements.length > 0 ? 0.35 : 1}>
-          <Rect x={0} y={0} width={width} height={height} fill="#ffffff" listening={false} />
-          {sorted.map((element) => {
-            const { x, y } = centerOf(element);
-            const common = {
-              key: element.id,
-              ref: (node: Konva.Node | null) => {
-                if (node) nodeRefs.current.set(element.id, node);
-                else nodeRefs.current.delete(element.id);
-              },
-              x,
-              y,
-              rotation: element.rotation,
-              fill: element.fill,
-              stroke: element.stroke || undefined,
-              strokeWidth: element.strokeWidth,
-              draggable: true,
-              onClick: () => onSelect(element.id),
-              onTap: () => onSelect(element.id),
-              onDragEnd: (e: KonvaEventObject<DragEvent>) => handleDragEnd(element, e),
-              onTransformEnd: (e: KonvaEventObject<Event>) => handleTransformEnd(element, e),
-            };
-
-            if (element.type === "rectangle") {
-              return (
-                <Rect
-                  {...common}
-                  width={element.width}
-                  height={element.height}
-                  offsetX={element.width / 2}
-                  offsetY={element.height / 2}
-                />
-              );
-            }
-
-            if (element.type === "ellipse") {
-              return <Ellipse {...common} radiusX={element.width / 2} radiusY={element.height / 2} />;
-            }
-
-            return (
-              <Text
-                {...common}
-                width={element.width}
-                height={element.height}
-                offsetX={element.width / 2}
-                offsetY={element.height / 2}
-                text={element.text}
-                fontFamily={element.fontFamily}
-                fontSize={element.fontSize}
-                fontStyle={element.fontWeight >= 600 ? "bold" : "normal"}
-                visible={element.id !== editingId}
-                onDblClick={() => startEditingText(element)}
-                onDblTap={() => startEditingText(element)}
-              />
-            );
-          })}
-          <Transformer ref={transformerRef} rotateEnabled />
-        </Layer>
-
-        {/* AI-generated draft overlay - a distinct dashed-outline layer,
-            draggable/resizable via its own Transformer, but never touching
-            useEventHistory (see EditorWorkspace's draftElements state)
-            until the user explicitly accepts it. */}
-        {draftElements && draftElements.length > 0 && (
-          <Layer>
-            {[...draftElements]
-              .sort((a, b) => a.zIndex - b.zIndex)
-              .map((element) => {
+    <div className="design-studio-canvas-outer" ref={outerRef}>
+      <div className="design-studio-scale-box" style={{ width: width * scale, height: height * scale }}>
+        <div
+          className="design-studio-stage-wrapper"
+          style={{ width, height, transform: `scale(${scale})`, transformOrigin: "top left" }}
+        >
+          <Stage
+            ref={stageRef}
+            width={width}
+            height={height}
+            className="design-studio-stage"
+            onMouseDown={(e) => {
+              if (e.target === e.target.getStage()) {
+                onSelect(null);
+                onSelectDraft?.(null);
+              }
+            }}
+          >
+            {/* Dimmed while a draft overlay is showing (see the second Layer
+                below) - the draft is a preview of the complete post-accept
+                state, not an addition to this one, so at full strength the two
+                fully-opaque layers just visually duplicate every element the
+                draft echoed back unchanged. Full opacity again once there's no
+                draft. */}
+            <Layer opacity={draftElements && draftElements.length > 0 ? 0.35 : 1}>
+              <Rect x={0} y={0} width={width} height={height} fill="#ffffff" listening={false} />
+              {sorted.map((element) => {
                 const { x, y } = centerOf(element);
                 const common = {
                   key: element.id,
                   ref: (node: Konva.Node | null) => {
-                    if (node) draftNodeRefs.current.set(element.id, node);
-                    else draftNodeRefs.current.delete(element.id);
+                    if (node) nodeRefs.current.set(element.id, node);
+                    else nodeRefs.current.delete(element.id);
                   },
                   x,
                   y,
                   rotation: element.rotation,
                   fill: element.fill,
-                  // A high-contrast color plus a glow (via
-                  // shadowColor/shadowBlur) rather than relying on stroke
-                  // color alone for visibility - a plain outline can blend
-                  // into a design that happens to share its hue, but the
-                  // glow reads regardless of the underlying palette. Konva
-                  // draws to canvas, so this can't reference the CSS custom
-                  // property directly - #63c7be is design-studio.css's
-                  // --type token, the app's own accent, not an invented
-                  // color (a plain vivid red/magenta here read as an error
-                  // state rather than a draft preview).
-                  stroke: "#63c7be",
-                  strokeWidth: Math.max(element.strokeWidth, 3),
-                  dash: [12, 8],
-                  shadowColor: "#63c7be",
-                  shadowBlur: 16,
-                  shadowOpacity: 0.6,
+                  stroke: element.stroke || undefined,
+                  strokeWidth: element.strokeWidth,
                   draggable: true,
-                  onClick: () => onSelectDraft?.(element.id),
-                  onTap: () => onSelectDraft?.(element.id),
-                  onDragEnd: (e: KonvaEventObject<DragEvent>) => handleDraftDragEnd(element, e),
-                  onTransformEnd: (e: KonvaEventObject<Event>) => handleDraftTransformEnd(element, e),
+                  onClick: () => onSelect(element.id),
+                  onTap: () => onSelect(element.id),
+                  onDragEnd: (e: KonvaEventObject<DragEvent>) => handleDragEnd(element, e),
+                  onTransformEnd: (e: KonvaEventObject<Event>) => handleTransformEnd(element, e),
                 };
 
                 if (element.type === "rectangle") {
@@ -306,6 +276,19 @@ const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
                   return <Ellipse {...common} radiusX={element.width / 2} radiusY={element.height / 2} />;
                 }
 
+                if (element.type === "arrow") {
+                  return (
+                    <Arrow
+                      {...common}
+                      points={[0, 0, element.width, element.height]}
+                      offsetX={element.width / 2}
+                      offsetY={element.height / 2}
+                      pointerLength={Math.max(8, element.strokeWidth * 2.5)}
+                      pointerWidth={Math.max(8, element.strokeWidth * 2.5)}
+                    />
+                  );
+                }
+
                 return (
                   <Text
                     {...common}
@@ -317,47 +300,143 @@ const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
                     fontFamily={element.fontFamily}
                     fontSize={element.fontSize}
                     fontStyle={element.fontWeight >= 600 ? "bold" : "normal"}
+                    visible={element.id !== editingId}
+                    onDblClick={() => startEditingText(element)}
+                    onDblTap={() => startEditingText(element)}
                   />
                 );
               })}
-            <Transformer ref={draftTransformerRef} rotateEnabled />
-          </Layer>
-        )}
-      </Stage>
+              <Transformer ref={transformerRef} rotateEnabled />
+            </Layer>
 
-      {/* Konva has no native text editing - swap in a plain HTML textarea
-          over the hidden Konva Text node while editing, matching Konva's
-          own documented "editable text" recipe. Deliberately axis-aligned
-          (ignores the element's rotation) - handling a rotated textarea
-          overlay is a well-known can of worms this MVP doesn't need to
-          open. */}
-      {editingElement && editingElement.type === "text" && (
-        <textarea
-          autoFocus
-          className="design-studio-text-editor"
-          style={{
-            top: editingElement.y,
-            left: editingElement.x,
-            width: editingElement.width,
-            height: editingElement.height,
-            fontSize: editingElement.fontSize,
-            fontFamily: editingElement.fontFamily,
-            fontWeight: editingElement.fontWeight,
-            color: editingElement.fill,
-          }}
-          value={editingValue}
-          onChange={(e) => setEditingValue(e.target.value)}
-          onBlur={commitTextEdit}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              commitTextEdit();
-            } else if (e.key === "Escape") {
-              setEditingId(null);
-            }
-          }}
-        />
-      )}
+            {/* AI-generated draft overlay - a distinct dashed-outline layer,
+                draggable/resizable via its own Transformer, but never touching
+                useEventHistory (see EditorWorkspace's draftElements state)
+                until the user explicitly accepts it. */}
+            {draftElements && draftElements.length > 0 && (
+              <Layer>
+                {[...draftElements]
+                  .sort((a, b) => a.zIndex - b.zIndex)
+                  .map((element) => {
+                    const { x, y } = centerOf(element);
+                    const common = {
+                      key: element.id,
+                      ref: (node: Konva.Node | null) => {
+                        if (node) draftNodeRefs.current.set(element.id, node);
+                        else draftNodeRefs.current.delete(element.id);
+                      },
+                      x,
+                      y,
+                      rotation: element.rotation,
+                      fill: element.fill,
+                      // A high-contrast color plus a glow (via
+                      // shadowColor/shadowBlur) rather than relying on stroke
+                      // color alone for visibility - a plain outline can blend
+                      // into a design that happens to share its hue, but the
+                      // glow reads regardless of the underlying palette. Konva
+                      // draws to canvas, so this can't reference the CSS custom
+                      // property directly - #63c7be is design-studio.css's
+                      // --type token, the app's own accent, not an invented
+                      // color (a plain vivid red/magenta here read as an error
+                      // state rather than a draft preview).
+                      stroke: "#63c7be",
+                      strokeWidth: Math.max(element.strokeWidth, 3),
+                      dash: [12, 8],
+                      shadowColor: "#63c7be",
+                      shadowBlur: 16,
+                      shadowOpacity: 0.6,
+                      draggable: true,
+                      onClick: () => onSelectDraft?.(element.id),
+                      onTap: () => onSelectDraft?.(element.id),
+                      onDragEnd: (e: KonvaEventObject<DragEvent>) => handleDraftDragEnd(element, e),
+                      onTransformEnd: (e: KonvaEventObject<Event>) => handleDraftTransformEnd(element, e),
+                    };
+
+                    if (element.type === "rectangle") {
+                      return (
+                        <Rect
+                          {...common}
+                          width={element.width}
+                          height={element.height}
+                          offsetX={element.width / 2}
+                          offsetY={element.height / 2}
+                        />
+                      );
+                    }
+
+                    if (element.type === "ellipse") {
+                      return <Ellipse {...common} radiusX={element.width / 2} radiusY={element.height / 2} />;
+                    }
+
+                    if (element.type === "arrow") {
+                      return (
+                        <Arrow
+                          {...common}
+                          points={[0, 0, element.width, element.height]}
+                          offsetX={element.width / 2}
+                          offsetY={element.height / 2}
+                          pointerLength={12}
+                          pointerWidth={12}
+                        />
+                      );
+                    }
+
+                    return (
+                      <Text
+                        {...common}
+                        width={element.width}
+                        height={element.height}
+                        offsetX={element.width / 2}
+                        offsetY={element.height / 2}
+                        text={element.text}
+                        fontFamily={element.fontFamily}
+                        fontSize={element.fontSize}
+                        fontStyle={element.fontWeight >= 600 ? "bold" : "normal"}
+                      />
+                    );
+                  })}
+                <Transformer ref={draftTransformerRef} rotateEnabled />
+              </Layer>
+            )}
+          </Stage>
+
+          {/* Konva has no native text editing - swap in a plain HTML textarea
+              over the hidden Konva Text node while editing, matching Konva's
+              own documented "editable text" recipe. Deliberately axis-aligned
+              (ignores the element's rotation) - handling a rotated textarea
+              overlay is a well-known can of worms this MVP doesn't need to
+              open. Sits inside the same scaled wrapper as the Stage, so it
+              tracks the canvas's on-screen size/position at any zoom level
+              without needing its own scale math. */}
+          {editingElement && editingElement.type === "text" && (
+            <textarea
+              autoFocus
+              className="design-studio-text-editor"
+              style={{
+                top: editingElement.y,
+                left: editingElement.x,
+                width: editingElement.width,
+                height: editingElement.height,
+                fontSize: editingElement.fontSize,
+                fontFamily: editingElement.fontFamily,
+                fontWeight: editingElement.fontWeight,
+                color: editingElement.fill,
+              }}
+              value={editingValue}
+              onChange={(e) => setEditingValue(e.target.value)}
+              onBlur={commitTextEdit}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  commitTextEdit();
+                } else if (e.key === "Escape") {
+                  setEditingId(null);
+                }
+              }}
+            />
+          )}
+        </div>
+      </div>
     </div>
   );
 });
