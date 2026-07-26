@@ -4,9 +4,10 @@ import { TOOLS, EXPORT_SHORTCUT_KEY } from "../lib/tools";
 interface ToolbarProps {
   onAdd: (type: ElementType) => void;
   onExport: () => void;
+  exporting: boolean;
 }
 
-export default function Toolbar({ onAdd, onExport }: ToolbarProps) {
+export default function Toolbar({ onAdd, onExport, exporting }: ToolbarProps) {
   return (
     <div className="design-studio-toolbar">
       {TOOLS.map((tool) => (
@@ -26,9 +27,10 @@ export default function Toolbar({ onAdd, onExport }: ToolbarProps) {
         type="button"
         className="design-studio-tool-btn"
         onClick={onExport}
+        disabled={exporting}
         title={`Export PNG (${EXPORT_SHORTCUT_KEY})`}
       >
-        Export PNG
+        {exporting ? "Exporting…" : "Export PNG"}
         <span className="design-studio-tool-shortcut">{EXPORT_SHORTCUT_KEY}</span>
       </button>
     </div>

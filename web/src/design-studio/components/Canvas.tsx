@@ -22,7 +22,7 @@ interface CanvasProps {
 }
 
 export interface CanvasHandle {
-  exportPNG: () => void;
+  exportPNG: () => Promise<void>;
 }
 
 // Every element's x/y in our own data model is its bounding box's top-left
@@ -107,14 +107,25 @@ const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
   }, [width, height]);
 
   useImperativeHandle(ref, () => ({
-    exportPNG: () => {
+    exportPNG: async () => {
       const stage = stageRef.current;
       if (!stage) return;
 
-      const link = document.createElement("a");
-      link.download = "design.png";
-      link.href = stage.toDataURL({ pixelRatio: 2 });
-      link.click();
+      // toBlob's PNG encoding runs via the browser's async canvas.toBlob
+      // rather than synchronously on the main thread like toDataURL, so a
+      // large/busy stage no longer freezes the UI while it encodes.
+      const blob = (await stage.toBlob({ pixelRatio: 2, mimeType: "image/png" })) as Blob | null;
+      if (!blob) return;
+
+      const url = URL.createObjectURL(blob);
+      try {
+        const link = document.createElement("a");
+        link.download = "design.png";
+        link.href = url;
+        link.click();
+      } finally {
+        URL.revokeObjectURL(url);
+      }
     },
   }));
 
@@ -220,7 +231,13 @@ const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
               }
             }}
           >
-            <Layer>
+            {/* Dimmed while a draft overlay is showing (see the second Layer
+                below) - the draft is a preview of the complete post-accept
+                state, not an addition to this one, so at full strength the two
+                fully-opaque layers just visually duplicate every element the
+                draft echoed back unchanged. Full opacity again once there's no
+                draft. */}
+            <Layer opacity={draftElements && draftElements.length > 0 ? 0.35 : 1}>
               <Rect x={0} y={0} width={width} height={height} fill="#ffffff" listening={false} />
               {sorted.map((element) => {
                 const { x, y } = centerOf(element);
@@ -312,17 +329,22 @@ const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
                       y,
                       rotation: element.rotation,
                       fill: element.fill,
-                      // A vivid, high-contrast color plus a glow (via
+                      // A high-contrast color plus a glow (via
                       // shadowColor/shadowBlur) rather than relying on stroke
                       // color alone for visibility - a plain outline can blend
                       // into a design that happens to share its hue, but the
-                      // glow reads regardless of the underlying palette.
-                      stroke: "#ff2d78",
+                      // glow reads regardless of the underlying palette. Konva
+                      // draws to canvas, so this can't reference the CSS custom
+                      // property directly - #63c7be is design-studio.css's
+                      // --type token, the app's own accent, not an invented
+                      // color (a plain vivid red/magenta here read as an error
+                      // state rather than a draft preview).
+                      stroke: "#63c7be",
                       strokeWidth: Math.max(element.strokeWidth, 3),
                       dash: [12, 8],
-                      shadowColor: "#ff2d78",
+                      shadowColor: "#63c7be",
                       shadowBlur: 16,
-                      shadowOpacity: 0.75,
+                      shadowOpacity: 0.6,
                       draggable: true,
                       onClick: () => onSelectDraft?.(element.id),
                       onTap: () => onSelectDraft?.(element.id),
