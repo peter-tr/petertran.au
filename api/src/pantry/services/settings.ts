@@ -1,5 +1,6 @@
 import { GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
 import type { AiProvider, AiModelTier } from "api-shared/ai-provider";
+import { traceSpan } from "api-shared/tracing";
 import { ddb, TABLE_NAME } from "../lib/aws/ddb";
 
 const SETTINGS_SK = "SETTINGS";
@@ -146,16 +147,20 @@ const DEFAULT_SETTINGS: PantrySettings = {
 // added would otherwise come back missing it, tripping the schema's
 // non-null check instead of just quietly defaulting.
 export async function getSettings(pk: string): Promise<PantrySettings> {
-  const res = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { pk, sk: SETTINGS_SK } }));
+  return traceSpan("settings.get", async () => {
+    const res = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { pk, sk: SETTINGS_SK } }));
 
-  return { ...DEFAULT_SETTINGS, ...(res.Item?.data as Partial<PantrySettings> | undefined) };
+    return { ...DEFAULT_SETTINGS, ...(res.Item?.data as Partial<PantrySettings> | undefined) };
+  });
 }
 
 export async function putSettings(pk: string, settings: PantrySettings): Promise<void> {
-  await ddb.send(
-    new PutCommand({
-      TableName: TABLE_NAME,
-      Item: { pk, sk: SETTINGS_SK, type: "SETTINGS", data: settings },
-    })
-  );
+  await traceSpan("settings.put", async () => {
+    await ddb.send(
+      new PutCommand({
+        TableName: TABLE_NAME,
+        Item: { pk, sk: SETTINGS_SK, type: "SETTINGS", data: settings },
+      })
+    );
+  });
 }
