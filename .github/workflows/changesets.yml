@@ -34,7 +34,7 @@ jobs:
           node-version: 24
           cache: npm
 
-      - run: npm ci
+      - run: npm ci --ignore-scripts
 
       # Mirrors deploy.yml's tag-release job (highest existing release-N tag
       # + 1) so the PR title always shows the release number that will

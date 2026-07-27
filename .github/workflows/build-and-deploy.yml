@@ -41,7 +41,6 @@ on:
         default: false
 
 permissions:
-  id-token: write
   contents: read
 
 jobs:
@@ -58,7 +57,7 @@ jobs:
           node-version: 24
           cache: npm
 
-      - run: npm ci
+      - run: npm ci --ignore-scripts
 
       - uses: actions/cache@v6
         with:
@@ -68,7 +67,7 @@ jobs:
             turbo-${{ github.job }}-${{ runner.os }}-
 
       - name: Validate frontend queries against each schema (graphql-codegen)
-        run: npx turbo run codegen
+        run: npm exec --no -- turbo run codegen
 
       # Must run after codegen, not before - it require()s each service's
       # real frontend module (web/src/*/api.ts etc.) to validate their query
@@ -81,7 +80,7 @@ jobs:
         run: npm run validate-schemas --workspace=api
 
       - name: Lint
-        run: npx turbo run lint
+        run: npm exec --no -- turbo run lint
 
   e2e-smoke:
     if: false
@@ -96,13 +95,16 @@ jobs:
           node-version: 24
           cache: npm
 
-      - run: npm ci
+      - run: npm ci --ignore-scripts
 
       - name: Boot each service's dev server and smoke-test it
         run: npm run test:e2e --workspace=api
 
   deploy:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - uses: actions/checkout@v7
         with:
@@ -113,7 +115,7 @@ jobs:
           node-version: 24
           cache: npm
 
-      - run: npm ci
+      - run: npm ci --ignore-scripts
 
       - uses: actions/cache@v6
         with:
@@ -134,8 +136,8 @@ jobs:
             # but excluding web from that `build` run also excludes it from
             # codegen - so codegen has to run explicitly first, or web's
             # build:test fails on missing *.generated.ts files.
-            npx turbo run codegen
-            npx turbo run build --filter=!web
+            npm exec --no -- turbo run codegen
+            npm exec --no -- turbo run build --filter=!web
             npm run build:test --workspace=web
           else
             npm run build
