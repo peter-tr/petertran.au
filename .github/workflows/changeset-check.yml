@@ -17,7 +17,7 @@ jobs:
       # anti-self-approval safeguard for required status checks), which
       # would make every auto-generated changeset need a manual "approve
       # and run" click. Pushing as a real account sidesteps that entirely.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           token: ${{ secrets.CHANGESET_PAT }}
           ref: ${{ github.event.pull_request.head.ref }}
