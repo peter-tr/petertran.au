@@ -271,6 +271,7 @@ describe("generateDesignElements", () => {
       "claude-haiku-4-5",
       "a header with my name"
     );
+
     const call = anthropicMessagesParse.mock.calls.at(-1)![0];
     expect(call.messages[0].content).toContain("a header with my name");
     expect(call.messages[0].content).toContain("Real name: Peter Tran.");
@@ -288,6 +289,7 @@ describe("generateDesignElements", () => {
     const result = await generateDesignElements("a poster", 900, 600, undefined, "1.2.3.4", settings);
 
     expect(result).toHaveLength(1);
+
     const call = anthropicMessagesParse.mock.calls.at(-1)![0];
     expect(call.messages[0].content).toBe("a poster");
   });

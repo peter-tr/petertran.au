@@ -74,10 +74,12 @@ describe("gatherSupergraphContext", () => {
   it("executes a valid tool call against the supergraph and returns the result as context", async () => {
     messagesCreate.mockImplementationOnce(async (params) => {
       recordMessages(params);
+
       return { stop_reason: "tool_use", content: [toolUseBlock("t1", "{ person { name } }")] };
     });
     messagesCreate.mockImplementationOnce(async (params) => {
       recordMessages(params);
+
       return { stop_reason: "end_turn", content: [textBlock("Use the name Peter Tran in the header.")] };
     });
     fetchMock.mockResolvedValueOnce(jsonResponse({ data: { person: { name: "Peter Tran" } } }));
@@ -103,6 +105,7 @@ describe("gatherSupergraphContext", () => {
   it("returns an is_error tool_result and lets the model retry when the query is rejected", async () => {
     messagesCreate.mockImplementationOnce(async (params) => {
       recordMessages(params);
+
       return {
         stop_reason: "tool_use",
         content: [toolUseBlock("t1", "mutation { sendMessage(input: {}) { ok } }")],
@@ -110,6 +113,7 @@ describe("gatherSupergraphContext", () => {
     });
     messagesCreate.mockImplementationOnce(async (params) => {
       recordMessages(params);
+
       return { stop_reason: "tool_use", content: [toolUseBlock("t2", "{ person { name } }")] };
     });
     fetchMock.mockResolvedValueOnce(jsonResponse({ data: { person: { name: "Peter Tran" } } }));
@@ -117,6 +121,7 @@ describe("gatherSupergraphContext", () => {
     const result = await gatherSupergraphContext(client, "claude-sonnet-4-6", "a header");
 
     expect(result).toBeNull(); // budget (2) exhausted right after the retry's tool_use turn
+
     const rejectedResult = (sentMessages[1] as { content: { is_error?: boolean; content: string }[] }[]).at(
       -1
     )!;
@@ -140,10 +145,12 @@ describe("gatherSupergraphContext", () => {
   it("surfaces a fetch failure as an is_error tool_result instead of throwing", async () => {
     messagesCreate.mockImplementationOnce(async (params) => {
       recordMessages(params);
+
       return { stop_reason: "tool_use", content: [toolUseBlock("t1", "{ person { name } }")] };
     });
     messagesCreate.mockImplementationOnce(async (params) => {
       recordMessages(params);
+
       return { stop_reason: "end_turn", content: [textBlock("done")] };
     });
     fetchMock.mockResolvedValueOnce(jsonResponse({ errors: [{ message: "boom" }] }, false));
@@ -151,6 +158,7 @@ describe("gatherSupergraphContext", () => {
     const result = await gatherSupergraphContext(client, "claude-sonnet-4-6", "a header");
 
     expect(result).toBe("done");
+
     const toolResult = (sentMessages[1] as { content: { is_error?: boolean; content: string }[] }[]).at(-1)!
       .content[0];
     expect(toolResult.is_error).toBe(true);
