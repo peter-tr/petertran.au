@@ -10,7 +10,9 @@ CloudWatch/X-Ray metrics surfaced on the page itself.
 
 Try the query explorer at [petertran.au](https://petertran.au), or point any
 GraphQL client at [api.petertran.au/graphql](https://api.petertran.au/graphql)
-directly and query it yourself.
+directly and query it yourself. There's also a hosted, no-login
+[Apollo Studio Explorer](https://studio.apollographql.com/public/petertran-au/variant/current/explorer)
+with the schema docs and some sample queries preloaded.
 
 **Live dashboards:**
 [Apollo GraphOS Studio](https://studio.apollographql.com/graph/petertran-au/variant/current/home) ·
