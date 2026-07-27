@@ -323,6 +323,23 @@ async function reconcileMemory(functionName: string, desiredMemoryMb: number): P
 // concurrency quota has no room), that's a transient infra condition, not a
 // reason to fail the request or the other targets' reconciliation in the
 // same tick.
+//
+// PC-on-alias failure mode (hit for real 2026-07-27, supergraph-graphql):
+// if a deploy publishes a version that crashes at init, AWS Lambda's own
+// alias+PC safety net keeps 100% of traffic pinned to the last version
+// that successfully warmed (via an internal weighted RoutingConfig on the
+// alias) rather than cutting over to a version PC can't warm - real
+// traffic stays safe, but the old version becomes permanently undeletable
+// (an alias still references it), which stalls every subsequent deploy's
+// CloudFormation cleanup phase ("stack ... is in
+// UPDATE_COMPLETE_CLEANUP_IN_PROGRESS state and can not be updated",
+// retrying forever without ever resolving on its own). Recovery once the
+// real code fix is ready: `aws lambda delete-provisioned-concurrency-
+// config --qualifier live` (an active PC config blocks any further
+// `update-alias` call outright), then `aws lambda update-alias --function-
+// version <last-known-good> --routing-config '{}'` to drop the stale
+// weighting, then `aws lambda delete-function --qualifier <stuck-version>`
+// to free it - only then does a fresh `cdk deploy` succeed.
 async function reconcileTarget(
   functionName: string,
   shouldBeWarm: boolean,
