@@ -1,6 +1,7 @@
 ---
 "api": patch
 "infra": patch
+"web": patch
 ---
 
 add an on-demand "Check cold start rate" action to the warm-schedule settings page
