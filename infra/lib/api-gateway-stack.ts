@@ -127,7 +127,27 @@ export class ApiGatewayStack extends Stack {
           ...(props.alternateDomainNames ?? []).map((d) => `https://${d}`),
           "http://localhost:5173",
           "http://localhost:3000",
+          // Apollo's embedded Sandbox UI (router.yaml's sandbox.enabled)
+          // and Apollo Studio's own hosted Explorer both run from this
+          // origin - missing here entirely (confirmed live 2026-07-27),
+          // this mock preflight integration falls back to echoing the
+          // *first* origin in this list instead of matching the request's
+          // real Origin, so every cross-origin request from either of
+          // those actually failed preflight this whole time. router.yaml's
+          // own cors.origins (a separate config - see its comment) already
+          // had this added back when sandbox.enabled first shipped, but
+          // that only covers Router's response to the actual POST, not
+          // this preflight, which never reached Router at all.
+          "https://studio.apollographql.com",
         ],
+        // Studio's Explorer (not the embedded Sandbox) sends requests with
+        // credentials included so its "Include cookies" toggle can work -
+        // the browser requires this on the response regardless of whether
+        // the origin already matches, confirmed live via Studio's own
+        // Explorer. See router.yaml's identical allow_credentials comment
+        // for why this doesn't change behavior for our own frontend
+        // traffic (nothing here uses cookies for auth).
+        allowCredentials: true,
         allowMethods: ["GET", "POST"],
         // x-amzn-trace-id: RUM's fetch instrumentation attaches this header
         // when enableXRay is on (see web/src/shared/rum.ts) to link a
