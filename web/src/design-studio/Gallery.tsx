@@ -87,9 +87,9 @@ export default function Gallery() {
             <kbd>Cmd/Ctrl+S</kbd> saves, and <kbd>5</kbd> exports a PNG.
           </p>
           <p>
-            "Generate with AI" opens a chat-style panel where you can describe what you want and keep
-            refining the draft before accepting it onto the canvas. "Save as template" turns the current
-            design into a reusable starting point under Templates below.
+            "Generate with AI" opens a chat-style panel where you can describe what you want and keep refining
+            the draft before accepting it onto the canvas. "Save as template" turns the current design into a
+            reusable starting point under Templates below.
           </p>
         </div>
       )}

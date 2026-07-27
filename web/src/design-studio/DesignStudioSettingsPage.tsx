@@ -98,14 +98,14 @@ export default function DesignStudioSettingsPage() {
           <h2 className="design-studio-panel-title">Architecture</h2>
         </div>
         <p className="project-desc" style={{ marginBottom: "1rem" }}>
-          Design Studio is its own Lambda, MongoDB Atlas cluster, and CDK stack, separate from the resume
-          site and from pantry (which uses DynamoDB).
+          Design Studio is its own Lambda, MongoDB Atlas cluster, and CDK stack, separate from the resume site
+          and from pantry (which uses DynamoDB).
         </p>
         <p className="project-desc" style={{ marginBottom: "1rem" }}>
           MongoDB over this repo&apos;s usual DynamoDB, deliberately: a design document is large, deeply
           nested, and gains new element types/properties as the editor grows - a document store absorbs that
-          field by field, with no migration step, unlike a pre-planned DynamoDB GSI per query shape. That
-          also happens to be the same reasoning behind Canva&apos;s own stack - their engineering team has{" "}
+          field by field, with no migration step, unlike a pre-planned DynamoDB GSI per query shape. That also
+          happens to be the same reasoning behind Canva&apos;s own stack - their engineering team has{" "}
           <a
             href="https://www.mongodb.com/blog/post/video-canvas-lessons-scaling-mongodb-atlas-billion-documents-across-nodes"
             target="_blank"

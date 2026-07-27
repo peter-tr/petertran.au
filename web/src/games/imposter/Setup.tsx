@@ -174,9 +174,9 @@ export default function ImposterSetup() {
 
       {showAbout && (
         <p className="imposter-about">
-          Built for game nights where we kept losing track of whose turn it was to think of a word and
-          quietly show it around - this hands out the secret word (and the imposter's decoy) for you, so
-          everyone can just play.
+          Built for game nights where we kept losing track of whose turn it was to think of a word and quietly
+          show it around - this hands out the secret word (and the imposter's decoy) for you, so everyone can
+          just play.
         </p>
       )}
 
