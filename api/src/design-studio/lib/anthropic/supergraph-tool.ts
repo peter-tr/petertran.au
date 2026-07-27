@@ -8,6 +8,10 @@ import { validatePortfolioQuery } from "../util/portfolio-query-allowlist";
 // back-and-forth.
 const MAX_TOOL_ITERATIONS = 2;
 const SUPERGRAPH_REQUEST_TIMEOUT_MS = 8_000;
+// Below this, don't even start another iteration - a Claude call given less
+// than this is more likely to be cut off mid-request (wasted latency, no
+// usable result) than to finish something useful in time.
+const MIN_TOOL_CALL_TIMEOUT_MS = 3_000;
 
 const QUERY_PORTFOLIO_DATA_TOOL: Anthropic.Tool = {
   name: "query_portfolio_data",
@@ -26,12 +30,16 @@ const QUERY_PORTFOLIO_DATA_TOOL: Anthropic.Tool = {
   },
 };
 
-async function executeSupergraphQuery(supergraphUrl: string, query: string): Promise<unknown> {
+async function executeSupergraphQuery(
+  supergraphUrl: string,
+  query: string,
+  timeoutMs: number
+): Promise<unknown> {
   const res = await fetch(supergraphUrl, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ query }),
-    signal: AbortSignal.timeout(SUPERGRAPH_REQUEST_TIMEOUT_MS),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   const body = (await res.json()) as { data?: unknown; errors?: unknown };
 
@@ -55,7 +63,18 @@ async function executeSupergraphQuery(supergraphUrl: string, query: string): Pro
 export async function gatherSupergraphContext(
   client: Anthropic | AnthropicBedrock,
   model: string,
-  prompt: string
+  prompt: string,
+  // Absolute deadline (Date.now()-comparable), not a duration - generate-
+  // elements.ts shares one deadline across this phase-1 loop and its own
+  // phase-2 call, so however long this loop actually takes, phase 2 gets
+  // whatever's genuinely left rather than each phase assuming it owns the
+  // full budget independently. Without this, neither the Claude tool_use
+  // calls below nor executeSupergraphQuery's fetch had any bound tighter
+  // than the Lambda's own timeout - a slow/hanging call here (observed live
+  // against Bedrock) could silently run the request out past API Gateway's
+  // 29s ceiling with zero warning, since a caught error here just degrades
+  // to "no context" rather than surfacing anything.
+  deadlineAt: number
 ): Promise<string | null> {
   const supergraphUrl = process.env.SUPERGRAPH_URL;
   if (!supergraphUrl) return null;
@@ -68,15 +87,24 @@ export async function gatherSupergraphContext(
   ];
 
   for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
-    const response = await client.messages.create({
-      model,
-      max_tokens: 1024,
-      tools: [QUERY_PORTFOLIO_DATA_TOOL],
-      // Never "any" - most prompts need no portfolio data at all, forcing a
-      // call every time would waste latency/cost on the common case.
-      tool_choice: { type: "auto" },
-      messages,
-    });
+    const remainingMs = deadlineAt - Date.now();
+    // Not enough of the budget left to reasonably expect this call to
+    // finish - degrade to no context now rather than starting (and likely
+    // wasting) another round-trip.
+    if (remainingMs < MIN_TOOL_CALL_TIMEOUT_MS) return null;
+
+    const response = await client.messages.create(
+      {
+        model,
+        max_tokens: 1024,
+        tools: [QUERY_PORTFOLIO_DATA_TOOL],
+        // Never "any" - most prompts need no portfolio data at all, forcing a
+        // call every time would waste latency/cost on the common case.
+        tool_choice: { type: "auto" },
+        messages,
+      },
+      { timeout: remainingMs }
+    );
 
     messages.push({ role: "assistant", content: response.content });
 
@@ -121,7 +149,8 @@ export async function gatherSupergraphContext(
       }
 
       try {
-        const data = await executeSupergraphQuery(supergraphUrl, input.query);
+        const fetchTimeoutMs = Math.max(0, Math.min(SUPERGRAPH_REQUEST_TIMEOUT_MS, deadlineAt - Date.now()));
+        const data = await executeSupergraphQuery(supergraphUrl, input.query, fetchTimeoutMs);
         toolResults.push({ type: "tool_result", tool_use_id: block.id, content: JSON.stringify(data) });
       } catch (err) {
         toolResults.push({

@@ -306,7 +306,8 @@ describe("generateDesignElements", () => {
     expect(gatherSupergraphContext).toHaveBeenCalledWith(
       expect.anything(),
       "claude-haiku-4-5",
-      "a header with my name"
+      "a header with my name",
+      expect.any(Number)
     );
 
     const call = anthropicMessagesParse.mock.calls.at(-1)![0];

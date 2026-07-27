@@ -27,6 +27,12 @@ function toolUseBlock(id: string, query: unknown) {
   return { type: "tool_use" as const, id, name: "query_portfolio_data", input: { query } };
 }
 
+// Generous enough that the deadline itself is never the thing under test,
+// unless a test explicitly passes its own tight deadline.
+function futureDeadline(ms = 30_000) {
+  return Date.now() + ms;
+}
+
 describe("gatherSupergraphContext", () => {
   const originalEnv = process.env.SUPERGRAPH_URL;
 
@@ -45,7 +51,7 @@ describe("gatherSupergraphContext", () => {
   it("returns null without calling Claude when SUPERGRAPH_URL is unset", async () => {
     delete process.env.SUPERGRAPH_URL;
 
-    const result = await gatherSupergraphContext(client, "claude-sonnet-4-6", "a poster");
+    const result = await gatherSupergraphContext(client, "claude-sonnet-4-6", "a poster", futureDeadline());
 
     expect(result).toBeNull();
     expect(messagesCreate).not.toHaveBeenCalled();
@@ -57,7 +63,12 @@ describe("gatherSupergraphContext", () => {
       content: [textBlock("No data needed for this prompt.")],
     });
 
-    const result = await gatherSupergraphContext(client, "claude-sonnet-4-6", "an abstract poster");
+    const result = await gatherSupergraphContext(
+      client,
+      "claude-sonnet-4-6",
+      "an abstract poster",
+      futureDeadline()
+    );
 
     expect(result).toBe("No data needed for this prompt.");
     expect(fetchMock).not.toHaveBeenCalled();
@@ -66,7 +77,7 @@ describe("gatherSupergraphContext", () => {
   it("returns null when the model's final text is empty", async () => {
     messagesCreate.mockResolvedValueOnce({ stop_reason: "end_turn", content: [textBlock("")] });
 
-    const result = await gatherSupergraphContext(client, "claude-sonnet-4-6", "a poster");
+    const result = await gatherSupergraphContext(client, "claude-sonnet-4-6", "a poster", futureDeadline());
 
     expect(result).toBeNull();
   });
@@ -84,7 +95,12 @@ describe("gatherSupergraphContext", () => {
     });
     fetchMock.mockResolvedValueOnce(jsonResponse({ data: { person: { name: "Peter Tran" } } }));
 
-    const result = await gatherSupergraphContext(client, "claude-sonnet-4-6", "a header with my name");
+    const result = await gatherSupergraphContext(
+      client,
+      "claude-sonnet-4-6",
+      "a header with my name",
+      futureDeadline()
+    );
 
     expect(result).toBe("Use the name Peter Tran in the header.");
     expect(fetchMock).toHaveBeenCalledWith(
@@ -118,7 +134,7 @@ describe("gatherSupergraphContext", () => {
     });
     fetchMock.mockResolvedValueOnce(jsonResponse({ data: { person: { name: "Peter Tran" } } }));
 
-    const result = await gatherSupergraphContext(client, "claude-sonnet-4-6", "a header");
+    const result = await gatherSupergraphContext(client, "claude-sonnet-4-6", "a header", futureDeadline());
 
     expect(result).toBeNull(); // budget (2) exhausted right after the retry's tool_use turn
 
@@ -136,10 +152,33 @@ describe("gatherSupergraphContext", () => {
     });
     fetchMock.mockResolvedValue(jsonResponse({ data: { person: { name: "Peter Tran" } } }));
 
-    const result = await gatherSupergraphContext(client, "claude-sonnet-4-6", "a header");
+    const result = await gatherSupergraphContext(client, "claude-sonnet-4-6", "a header", futureDeadline());
 
     expect(result).toBeNull();
     expect(messagesCreate).toHaveBeenCalledTimes(2);
+  });
+
+  it("passes a timeout matching whatever's left of the deadline, not a fixed duration", async () => {
+    messagesCreate.mockResolvedValueOnce({ stop_reason: "end_turn", content: [textBlock("done")] });
+
+    const deadlineAt = futureDeadline(10_000);
+    await gatherSupergraphContext(client, "claude-sonnet-4-6", "a header", deadlineAt);
+
+    const options = messagesCreate.mock.calls.at(-1)![1] as { timeout: number };
+    expect(options.timeout).toBeGreaterThan(0);
+    expect(options.timeout).toBeLessThanOrEqual(10_000);
+  });
+
+  it("degrades to no context without calling Claude when the deadline is already effectively up", async () => {
+    const result = await gatherSupergraphContext(
+      client,
+      "claude-sonnet-4-6",
+      "a header",
+      Date.now() + 100 // well under MIN_TOOL_CALL_TIMEOUT_MS
+    );
+
+    expect(result).toBeNull();
+    expect(messagesCreate).not.toHaveBeenCalled();
   });
 
   it("surfaces a fetch failure as an is_error tool_result instead of throwing", async () => {
@@ -155,7 +194,7 @@ describe("gatherSupergraphContext", () => {
     });
     fetchMock.mockResolvedValueOnce(jsonResponse({ errors: [{ message: "boom" }] }, false));
 
-    const result = await gatherSupergraphContext(client, "claude-sonnet-4-6", "a header");
+    const result = await gatherSupergraphContext(client, "claude-sonnet-4-6", "a header", futureDeadline());
 
     expect(result).toBe("done");
 
