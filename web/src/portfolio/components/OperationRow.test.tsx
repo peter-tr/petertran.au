@@ -1,6 +1,6 @@
 import { StrictMode } from "react";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import OperationRow from "./OperationRow";
 import type { OperationStat } from "../lib/graphql";
 
@@ -139,7 +139,7 @@ describe("OperationRow", () => {
     expect(screen.getByText(/loading trace/)).toBeInTheDocument();
     expect(runQuery).toHaveBeenCalledWith(expect.any(String), { traceId: "trace-123" });
 
-    await waitFor(() => expect(screen.getByText("Lambda: handler")).toBeInTheDocument());
+    await screen.findByText("Lambda: handler");
     expect(screen.queryByText(/loading trace/)).not.toBeInTheDocument();
   });
 
@@ -156,7 +156,7 @@ describe("OperationRow", () => {
 
     fireEvent.click(screen.getByText(/Resume/));
 
-    await waitFor(() => expect(screen.getByText(/trace fetch failed/)).toBeInTheDocument());
+    await screen.findByText(/trace fetch failed/);
   });
 
   // Regression test for a bug where the `unmounted` ref was only ever set
@@ -201,7 +201,7 @@ describe("OperationRow", () => {
 
     fireEvent.click(screen.getByText(/Resume/));
 
-    await waitFor(() => expect(screen.getByText("Lambda: handler")).toBeInTheDocument());
+    await screen.findByText("Lambda: handler");
     expect(screen.queryByText(/loading trace/)).not.toBeInTheDocument();
   });
 
