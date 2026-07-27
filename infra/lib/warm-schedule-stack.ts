@@ -282,7 +282,11 @@ export class ProvisionedConcurrencyStack extends Stack {
     // `ILogGroup` from the producing stack) for the same cross-stack-export
     // reason `targetFnNames` above is plain strings, not `IFunction` refs.
     for (const fnName of targetFnNames) {
-      const logGroup = logs.LogGroup.fromLogGroupName(this, `ColdStartLogGroup-${fnName}`, `/aws/lambda/${fnName}`);
+      const logGroup = logs.LogGroup.fromLogGroupName(
+        this,
+        `ColdStartLogGroup-${fnName}`,
+        `/aws/lambda/${fnName}`
+      );
       new logs.SubscriptionFilter(this, `ColdStartSubscription-${fnName}`, {
         logGroup,
         destination: new LambdaDestination(warmScheduleFn),

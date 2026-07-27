@@ -167,8 +167,8 @@ export default function PortfolioSettingsPage() {
           <p className="form-label">
             Keep warm with provisioned concurrency (Sydney time) - no cold starts for real visitors during the
             window you set below. Prices below are live, from each project's real Lambda memory size and
-            currently-allocated provisioned concurrency. Each project can also opt in to warming reactively for
-            1hr after a real cold start, on top of (or instead of) the scheduled window.
+            currently-allocated provisioned concurrency. Each project can also opt in to warming reactively
+            for 1hr after a real cold start, on top of (or instead of) the scheduled window.
           </p>
           <WarmScheduleProfiles
             profiles={warmScheduleProfiles}
@@ -178,7 +178,6 @@ export default function PortfolioSettingsPage() {
             onApply={applyWarmScheduleProfile}
             onDelete={deleteWarmScheduleProfile}
           />
-
           <div className="warm-schedule-days" role="group" aria-label="Cold start check window">
             {COLD_START_WINDOW_OPTIONS.map((option) => (
               <button
@@ -197,7 +196,6 @@ export default function PortfolioSettingsPage() {
             {checkingColdStarts && " Checking…"}
           </p>
           {coldStartError && <p className="section-hint">{coldStartError}</p>}
-
           {warmScheduleDrafts &&
             WARM_SCHEDULE_KEYS.map((fn) => (
               <WarmScheduleProject

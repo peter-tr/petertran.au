@@ -242,7 +242,11 @@ async function getReactiveState(): Promise<WarmScheduleReactiveState> {
 
 async function setReactiveState(state: WarmScheduleReactiveState): Promise<void> {
   await ssm.send(
-    new PutParameterCommand({ Name: REACTIVE_STATE_PARAM_NAME, Value: JSON.stringify(state), Overwrite: true })
+    new PutParameterCommand({
+      Name: REACTIVE_STATE_PARAM_NAME,
+      Value: JSON.stringify(state),
+      Overwrite: true,
+    })
   );
 }
 
@@ -586,7 +590,8 @@ async function reconcileProject(
   reactiveState: WarmScheduleReactiveState,
   now: Date
 ): Promise<void> {
-  const shouldBeWarm = isWithinWindow(schedule, now) || isWithinReactiveWindow(key, schedule, reactiveState, now);
+  const shouldBeWarm =
+    isWithinWindow(schedule, now) || isWithinReactiveWindow(key, schedule, reactiveState, now);
   await reconcileProjectTo(key, shouldBeWarm, schedule.concurrency, schedule.memoryMb);
 }
 
