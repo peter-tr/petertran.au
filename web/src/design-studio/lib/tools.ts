@@ -12,3 +12,13 @@ export const TOOLS: { type: ElementType; label: string; key: string }[] = [
 ];
 
 export const EXPORT_SHORTCUT_KEY = "5";
+
+// Turns a design's name into a safe download filename: strips characters
+// that are invalid (or awkward to deal with) in a downloaded file's name
+// across OSes, and falls back to "design" when the name is empty/whitespace
+// (e.g. a brand-new design the user hasn't titled yet).
+export function toExportFileName(name: string): string {
+  const sanitized = name.trim().replace(/[/\\?%*:|"<>]/g, "-");
+
+  return `${sanitized || "design"}.png`;
+}
