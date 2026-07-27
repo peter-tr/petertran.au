@@ -251,7 +251,7 @@ if (process.env.DEPLOY_TEST_ENV === "true") {
   // alarms/SNS/alerts-toggle - see MonitoringStack's isTestEnv doc comment)
   // so a test-env deploy gets its own operational visibility without
   // sharing prod's dashboard or paging anyone about disposable infra.
-  new MonitoringStack(app, "PetertranTestMonitoringStack", {
+  const testMonitoringStack = new MonitoringStack(app, "PetertranTestMonitoringStack", {
     isTestEnv: true,
     env: { account, region: "ap-southeast-2" },
   });
@@ -281,4 +281,5 @@ if (process.env.DEPLOY_TEST_ENV === "true") {
   testApiGatewayStack.addDependency(testGamesStack);
   testApiGatewayStack.addDependency(testDesignStudioStack);
   testApiGatewayStack.addDependency(testSupergraphStack);
+  testApiGatewayStack.addDependency(testMonitoringStack);
 }
