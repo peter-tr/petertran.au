@@ -99,21 +99,24 @@ export class SupergraphStack extends Stack {
           "LambdaAdapterLayer",
           `arn:aws:lambda:${this.region}:753240598075:layer:LambdaAdapterLayerX86:28`
         ),
-        // provided.al2023 gets zero automatic X-Ray instrumentation - unlike
-        // Node/Python, that's baked into each AWS-managed language runtime's
-        // own wrapper, not a platform-universal Lambda feature (tracing:
-        // ACTIVE above only grants the IAM permissions to write to X-Ray, it
-        // doesn't make anything call it). This AWS-published ADOT collector
-        // layer runs as a Lambda extension, receives the OTLP traces Router
-        // exports (see build-router-package.ts's telemetry config) over
-        // localhost, and forwards them to X-Ray - verified directly against
-        // a real Lambda: the resulting trace connected this function's own
-        // segments with the subgraph Lambda's, not just an isolated span.
-        lambda.LayerVersion.fromLayerVersionArn(
-          this,
-          "AdotCollectorLayer",
-          `arn:aws:lambda:${this.region}:901920570463:layer:aws-otel-collector-amd64-ver-0-117-0:1`
-        ),
+        // No ADOT collector layer (removed 2026-07-27, see git history for
+        // the PR that added it) - provided.al2023 gets zero automatic X-Ray
+        // instrumentation, so that layer existed purely to receive Router's
+        // own OTLP-exported spans and forward them to X-Ray. Real cold-start
+        // measurement found it cost ~170-400ms of Init Duration (isolated on
+        // a scratch Lambda ladder: Router+LWA alone vs +ADOT, both with the
+        // real composed schema) for a span that, in a real production trace,
+        // covered ~11ms of query planning - the span it exists to show costs
+        // less time than loading the extension that reports it. Confirmed
+        // directly via a real X-Ray trace that dropping this layer does NOT
+        // break trace connectivity to subgraphs (portfolio-graphql-test/
+        // imposter-graphql-test still appear under the same trace ID) -
+        // router.yaml's telemetry.exporters.tracing.propagation.aws_xray
+        // handles header propagation on its own, independent of whether
+        // anything is actually receiving/exporting Router's own spans. What's
+        // lost is only Router's own internal span (query_planning/
+        // compute_job timing) - not worth the fixed per-cold-start cost on
+        // this project's traffic volume.
       ],
     });
     this.gatewayFn = gatewayFn;

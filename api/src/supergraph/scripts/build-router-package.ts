@@ -5,11 +5,15 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 
-// Pinned, not "latest" - this exact version's GLIBC requirement (2.29) and
-// end-to-end behavior (Lambda Web Adapter + provided.al2023, cold-start Init
-// Duration ~380-436ms) were verified directly against a real Lambda before
-// this build step existed. Bump deliberately, re-verify, don't auto-track.
-const ROUTER_VERSION = "1.61.1";
+// Pinned, not "latest" - bump deliberately, re-verify GLIBC requirement and
+// end-to-end Lambda behavior (cold-start Init Duration, config compatibility)
+// against a real Lambda before trusting a new version, don't auto-track.
+// Bumped 2026-07-27 from the 1.x line to 2.16.0 (LTS) to pick up GA
+// `telemetry.apollo.subgraph_metrics` (GraphOS Insights was warning the
+// graph had never reported subgraph metrics, which requires Router >=2.7.0)
+// - see router.yaml's telemetry.apollo comment for what else changed in the
+// v1->v2 config migration.
+const ROUTER_VERSION = "2.16.0";
 const ARTIFACT = `router-v${ROUTER_VERSION}-x86_64-unknown-linux-gnu.tar.gz`;
 const RELEASE_BASE = `https://github.com/apollographql/router/releases/download/v${ROUTER_VERSION}`;
 

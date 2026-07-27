@@ -22,11 +22,17 @@ override_subgraph_url:
 # anonymous/shared-pantry behavior. Verified directly: a local echo
 # subgraph confirmed this config actually forwards a real
 # `authorization: Bearer ...` header through.
+#
+# `operations:` wrapping the propagate list is required as of the Router
+# 2.x config migration (bumped 2026-07-27) - Router 1.x accepted the list
+# directly under `request:`. Confirmed via the real v2.16.0 binary's own
+# `router config upgrade` against this exact file.
 headers:
   all:
     request:
-      - propagate:
-          named: "authorization"
+      operations:
+        - propagate:
+            named: "authorization"
 
 # infra/lib/api-gateway-stack.ts's defaultCorsPreflightOptions only answers
 # the browser's OPTIONS preflight via a mock integration that never reaches
@@ -41,20 +47,29 @@ headers:
 # one and needs updating too whenever a client sends a new custom header
 # (missed once for apollographql-client-name, broke every real browser
 # request with a generic "Failed to fetch" until fixed).
+#
+# `origins` moved under `cors.policies[0].origins` in the Router 2.x config
+# migration (bumped 2026-07-27) - Router 1.x accepted a flat `cors.origins`
+# list. `allow_credentials` stays a top-level `cors` key (not per-policy) -
+# confirmed via the real v2.16.0 binary's own `router config upgrade`
+# against this exact file, which left it there rather than moving it into
+# the policy.
 cors:
-  origins:
-    - https://www.petertran.au
-    - https://petertran.au
-    - https://test.petertran.au
-    - https://www.test.petertran.au
-    - http://localhost:5173
-    - http://localhost:3000
-    # The embedded Apollo Sandbox UI (see sandbox.enabled below) is served
-    # from studio.apollographql.com, not this project's own domain - its
-    # in-browser query editor makes requests back to this Router directly,
-    # so that origin needs to be allowed too or the Sandbox UI loads but
-    # every query it runs fails with a CORS error.
-    - https://studio.apollographql.com
+  allow_credentials: true
+  policies:
+    - origins:
+        - https://www.petertran.au
+        - https://petertran.au
+        - https://test.petertran.au
+        - https://www.test.petertran.au
+        - http://localhost:5173
+        - http://localhost:3000
+        # The embedded Apollo Sandbox UI (see sandbox.enabled below) is
+        # served from studio.apollographql.com, not this project's own
+        # domain - its in-browser query editor makes requests back to this
+        # Router directly, so that origin needs to be allowed too or the
+        # Sandbox UI loads but every query it runs fails with a CORS error.
+        - https://studio.apollographql.com
   # Apollo Studio's own hosted Explorer (studio.apollographql.com/graph/.../
   # explorer, separate from the embedded Sandbox above) sends requests with
   # credentials included (`credentials: "include"`) so its "Include
@@ -66,7 +81,6 @@ cors:
   # sends cookies cross-origin (pantry deliberately uses an Authorization
   # bearer header instead, exactly to avoid needing this), so this header
   # is simply unused/inert for every request except Explorer's.
-  allow_credentials: true
 
 # Full interactive query editor + schema explorer at the bare /graphql URL
 # in a browser, closer to what dev/dev-server.ts's startStandaloneServer
@@ -92,48 +106,24 @@ homepage:
 
 # provided.al2023 gets zero automatic X-Ray instrumentation (that's baked
 # into each AWS-managed language runtime's own wrapper, not a
-# platform-universal Lambda feature) - the ADOT collector layer
-# (infra/lib/supergraph-stack.ts) receives OTLP locally and exports to
-# X-Ray; this just needs to actually send it there. aws_xray propagation
-# makes Router read/emit the same X-Amzn-Trace-Id format API Gateway and
-# the subgraph Lambdas already use, so this shows up as one connected
-# trace, not an island - verified directly against a real Lambda: the
-# resulting trace included both this function's own segments and the
-# subgraph's. scheduled_delay: 1ms is load-bearing, not cosmetic - the
-# default 5s batch flush interval is longer than a fast invocation
-# survives before the execution environment freezes, so spans never left
-# Router's buffer at all without this (confirmed: zero traces reached
-# X-Ray with the 5s default, real traces appeared immediately once this
-# was set near-zero).
+# platform-universal Lambda feature) - no ADOT collector layer here to
+# receive/export Router's own OTLP spans (removed 2026-07-27, see
+# infra/lib/supergraph-stack.ts's comment for the cold-start-vs-value
+# tradeoff that drove this). aws_xray propagation alone is enough to keep
+# trace connectivity - it makes Router read/emit the same X-Amzn-Trace-Id
+# format API Gateway and the subgraph Lambdas already use on its own
+# outbound subgraph requests, independent of whether anything is actually
+# receiving/exporting Router's own spans. Confirmed directly against a
+# real deployed Lambda with no otlp exporter block at all: portfolio's and
+# imposter's subgraph segments still appeared under the same trace ID as
+# the platform-native supergraph-graphql-test segment. What's lost by not
+# exporting Router's own spans is only its internal query_planning/
+# compute_job timing subsegment - not connectivity.
 telemetry:
   exporters:
     tracing:
-      otlp:
-        enabled: true
-        endpoint: http://localhost:4317
-        protocol: grpc
-        batch_processor:
-          scheduled_delay: 1ms
-          max_export_timeout: 3s
       propagation:
         aws_xray: true
-      common:
-        sampler: 1.0
-        # No service_name set = OTel's generic "unknown_service:<binary
-        # name>" fallback, i.e. "unknown_service:router" - confirmed
-        # literally appearing that way in ADOT collector logs before this.
-        # Setting both this and resource.service.name since a real-Lambda
-        # spike couldn't conclusively confirm which one (if either) the
-        # awsxrayexporter actually reads - batch-get-traces never returned
-        # Router's own OTel-originated segment to check directly
-        # (referenced as a parent_id by the API Gateway segment
-        # underneath it, but absent from the returned segment list,
-        # consistently across two independent spikes). Cosmetic and
-        # low-risk either way - confirmed this doesn't break startup or
-        # break trace connectivity.
-        service_name: "supergraph"
-        resource:
-          service.name: "supergraph"
 
   # Same freeze-before-flush problem as the OTLP batch_processor above, for
   # a completely separate exporter: Apollo Studio usage reporting
@@ -144,26 +134,29 @@ telemetry:
   # environment right after the response returns, same failure mode this
   # file already hit once for X-Ray traces.
   #
-  # Flat telemetry.apollo.batch_processor, NOT nested under a
-  # metrics.usage_reports key - confirmed directly against apollo-router's
-  # own source at the exact ROUTER_VERSION tag pinned in
-  # build-router-package.ts (apollo-router/src/plugins/telemetry/apollo.rs's
-  # Config struct has batch_processor as a top-level field). A later
-  # Router release (PR apollographql/router#8258, merged 2025-09-15, well
-  # after this pinned version) splits this into
-  # telemetry.apollo.metrics.usage_reports.batch_processor /
-  # .tracing.batch_processor instead - using that newer nested shape
-  # against this older Router crashed it outright ("Additional properties
-  # are not allowed ('metrics' was unexpected)"), which took prod down for
-  # several minutes before being caught and reverted. Re-verify this shape
-  # directly against apollo.rs at the new tag before ever bumping
-  # ROUTER_VERSION.
+  # telemetry.apollo.metrics.{usage_reports,otlp}.batch_processor /
+  # .tracing.batch_processor, NOT a flat telemetry.apollo.batch_processor -
+  # this nested shape is what broke prod outright ("Additional properties
+  # are not allowed ('metrics' was unexpected)") when tried against the
+  # older Router 1.61.1 this file used to pin. Now that ROUTER_VERSION is
+  # 2.16.0 (bumped 2026-07-27), this nested shape is the *only* one Router
+  # accepts - confirmed both via the real v2.16.0 binary's own
+  # `router config upgrade` against this exact file, and via its
+  # `router config validate`. Re-verify this shape directly against
+  # apollo.rs at the new tag before ever bumping ROUTER_VERSION again.
   #
-  # max_export_timeout is 10s here, not the 3s used above for OTLP - that
-  # 3s was tuned against a genuinely local destination (the ADOT collector
-  # on localhost, effectively zero network latency). This exporter's
-  # actual destination is a real cross-region HTTPS call to
-  # usage-reporting.api.apollographql.com, not localhost - reusing OTLP's
+  # metrics.otlp.batch_processor is not unused clutter - subgraph_metrics
+  # below (description in `router config schema`: "Enable sending
+  # additional subgraph metrics to Apollo Studio via OTLP") ships over
+  # *this* exporter, not metrics.usage_reports, so it needs the same
+  # near-zero scheduled_delay or subgraph metrics would sit unflushed at
+  # the 5s default same as the other two.
+  #
+  # max_export_timeout is 10s here, not the 3s used above for the tracing
+  # OTLP exporter - that 3s was tuned against a genuinely local destination
+  # (the ADOT collector on localhost, effectively zero network latency).
+  # This exporter's actual destination is a real cross-region HTTPS call to
+  # usage-reporting.api.apollographql.com, not localhost - reusing that
   # local-latency timeout here made every export attempt fail with
   # "operation timed out" (confirmed live: consistent timeouts across
   # multiple warm, non-cold-start invocations, even though the endpoint
@@ -182,11 +175,28 @@ telemetry:
   # amount of per-request overhead (ftv1 data riding in-band in every
   # subgraph response) for actually being able to see field-level metrics
   # work.
+  #
+  # subgraph_metrics: GraphOS Insights was warning this graph had never
+  # reported subgraph-level metrics, which requires Router >=2.7.0 plus
+  # this flag (GA as of Router 2.7.0, apollographql/router#8392) - it was
+  # `preview_subgraph_metrics`/`experimental_subgraph_metrics` in older
+  # config shapes, both migrated away by `router config upgrade`.
   apollo:
     field_level_instrumentation_sampler: always_on
-    batch_processor:
-      scheduled_delay: 1ms
-      max_export_timeout: 10s
+    subgraph_metrics: true
+    metrics:
+      usage_reports:
+        batch_processor:
+          scheduled_delay: 1ms
+          max_export_timeout: 10s
+      otlp:
+        batch_processor:
+          scheduled_delay: 1ms
+          max_export_timeout: 10s
+    tracing:
+      batch_processor:
+        scheduled_delay: 1ms
+        max_export_timeout: 10s
 
 supergraph:
   listen: 127.0.0.1:8080
