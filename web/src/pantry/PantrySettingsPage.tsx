@@ -13,6 +13,7 @@ import {
   type PriceSyncStatus,
   type PriceSyncStatusResult,
 } from "./api";
+import Footer from "../shared/components/Footer";
 import "./pantry.css";
 
 const HOURS = Array.from({ length: 24 }, (_, h) => h);
@@ -354,6 +355,8 @@ export default function PantrySettingsPage() {
         </p>
         <PantryArchitectureDiagram />
       </section>
+
+      <Footer />
     </>
   );
 }

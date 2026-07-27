@@ -5,6 +5,7 @@ import { getDesign, type Design, type Template } from "./api";
 import { fromWireElement } from "./lib/serialization";
 import { DEFAULT_FORMAT } from "./lib/formats";
 import type { HistoryEvent } from "./lib/history/reducer";
+import Footer from "../shared/components/Footer";
 import "./design-studio.css";
 
 interface Seed {
@@ -131,14 +132,18 @@ export default function Editor() {
   }
 
   return (
-    <EditorWorkspace
-      key={isNew ? location.key : designId}
-      designId={isNew ? undefined : designId}
-      width={seed.width}
-      height={seed.height}
-      initialEvents={seed.events}
-      initialName={seed.name}
-      onSaved={handleSaved}
-    />
+    <>
+      <EditorWorkspace
+        key={isNew ? location.key : designId}
+        designId={isNew ? undefined : designId}
+        width={seed.width}
+        height={seed.height}
+        initialEvents={seed.events}
+        initialName={seed.name}
+        onSaved={handleSaved}
+      />
+
+      <Footer />
+    </>
   );
 }

@@ -3,7 +3,7 @@ import ProjectsSection from "./components/ProjectsSection";
 import SkillsSection from "./components/SkillsSection";
 import EducationSection from "./components/EducationSection";
 import InterestsSection from "./components/InterestsSection";
-import Footer from "./components/Footer";
+import Footer from "../shared/components/Footer";
 import { useResumeData } from "./hooks/useResumeData";
 import "./portfolio.css";
 

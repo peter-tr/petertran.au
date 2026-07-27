@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import Footer from "../portfolio/components/Footer";
+import Footer from "../shared/components/Footer";
 import ZeroTrustDiagram from "./components/ZeroTrustDiagram";
 import "./notes.css";
 

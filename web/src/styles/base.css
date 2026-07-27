@@ -360,7 +360,7 @@ a {
   opacity: 0.85;
 }
 
-/* Shared by Footer.tsx (portfolio/components/Footer.tsx) across all three
+/* Shared by Footer.tsx (shared/components/Footer.tsx) across all
    projects' pages, not just portfolio's - lives here rather than
    portfolio.css so pantry/imposter pages don't need to pull in the whole
    portfolio stylesheet just for this one component. */
