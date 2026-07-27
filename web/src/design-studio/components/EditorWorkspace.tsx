@@ -10,16 +10,7 @@ import { createElementByType, type DesignElement, type ElementType } from "../li
 import { toElementInput, fromWireElement } from "../lib/serialization";
 import { TOOLS, EXPORT_SHORTCUT_KEY, toExportFileName } from "../lib/tools";
 import { AI_STYLE_PRESETS } from "../lib/ai-styles";
-import {
-  saveDesign,
-  saveAsTemplate,
-  generateDesignElements,
-  getAiSettings,
-  updateAiSettings,
-  type AiSettings,
-  type AiSettingsInput,
-  type Design,
-} from "../api";
+import { saveDesign, saveAsTemplate, generateDesignElements, type Design } from "../api";
 
 interface EditorWorkspaceProps {
   designId: string | undefined;
@@ -68,10 +59,6 @@ export default function EditorWorkspace({
   const [aiStyle, setAiStyle] = useState("none");
   const [generating, setGenerating] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
-  // Operator-configurable, not per-design - loaded lazily the first time the
-  // panel opens rather than on mount, since most page loads never touch AI
-  // generation at all.
-  const [aiSettings, setAiSettings] = useState<AiSettings | null>(null);
   // A pending AI-generated draft - kept entirely outside useEventHistory
   // (see the reducer.ts doc comment on HistoryEvent) so nothing is
   // undoable/persisted until the user explicitly accepts it. Re-sent as
@@ -80,6 +67,16 @@ export default function EditorWorkspace({
   const [draftElements, setDraftElements] = useState<DesignElement[] | null>(null);
   const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null);
   const canvasRef = useRef<CanvasHandle>(null);
+  // Mirrors Canvas's own effective scale (auto-fit unless overridden by the
+  // zoom controls below) purely for the toolbar's % readout - Canvas remains
+  // the source of truth, this just reflects it via onScaleChange.
+  const [zoomPercent, setZoomPercent] = useState(100);
+  // A vertical rail reads better beside a tall portrait design (resume,
+  // poster) than the horizontal strip underneath it; a wide landscape
+  // design (presentation) keeps the horizontal strip. Square designs fall
+  // back to the horizontal layout too - only a genuinely taller-than-wide
+  // canvas benefits from the side rail.
+  const isPortrait = height > width;
 
   const selectedElement = elements.find((el) => el.id === selectedId);
 
@@ -167,6 +164,10 @@ export default function EditorWorkspace({
       setExporting(false);
     }
   }, [name]);
+
+  const handleZoomIn = useCallback(() => canvasRef.current?.zoomIn(), []);
+  const handleZoomOut = useCallback(() => canvasRef.current?.zoomOut(), []);
+  const handleZoomReset = useCallback(() => canvasRef.current?.zoomToFit(), []);
 
   const handleSaveAsTemplate = useCallback(async () => {
     if (!templateCategory.trim()) return;
@@ -256,33 +257,6 @@ export default function EditorWorkspace({
     setDraftElements(null);
     setSelectedDraftId(null);
     setAiMessages([]);
-  }, []);
-
-  useEffect(() => {
-    if (!showAiPanel || aiSettings) return;
-
-    getAiSettings()
-      .then(setAiSettings)
-      .catch(() => {
-        // Non-fatal - the picker just won't render until the next successful
-        // load; generation itself still works against whatever the server
-        // already has configured.
-      });
-  }, [showAiPanel, aiSettings]);
-
-  const handleAiSettingsChange = useCallback(async (input: AiSettingsInput) => {
-    // Optimistic-ish: the picker reflects the requested value immediately,
-    // then reconciles with whatever the server actually stored. The cast is
-    // safe here - this panel only ever sends a single defined field, never
-    // an explicit null to clear one (AiSettingsInput's wire type allows
-    // null since GraphQL input fields are nullable by default).
-    setAiSettings((current) => (current ? ({ ...current, ...input } as AiSettings) : current));
-    try {
-      const updated = await updateAiSettings(input);
-      setAiSettings(updated);
-    } catch {
-      setAiError("Couldn't update the AI model setting - try again.");
-    }
   }, []);
 
   const handleDraftChange = useCallback((before: DesignElement, after: DesignElement) => {
@@ -378,7 +352,7 @@ export default function EditorWorkspace({
         </div>
       )}
       {templateMessage && <p className="status-line">// {templateMessage}</p>}
-      {showAiPanel && (
+      <div className={"design-studio-ai-drawer" + (showAiPanel ? " design-studio-ai-drawer--open" : "")}>
         <AiPanel
           messages={aiMessages}
           prompt={aiPrompt}
@@ -389,14 +363,17 @@ export default function EditorWorkspace({
           hasDraft={!!draftElements}
           onAccept={handleAcceptDraft}
           onDiscard={handleDiscardDraft}
-          aiSettings={aiSettings}
-          onAiSettingsChange={handleAiSettingsChange}
           style={aiStyle}
           onStyleChange={setAiStyle}
+          onClose={() => setShowAiPanel(false)}
         />
-      )}
+      </div>
       <div className="design-studio-workspace">
-        <div className="design-studio-canvas-column">
+        <div
+          className={
+            "design-studio-canvas-column" + (isPortrait ? " design-studio-canvas-column--portrait" : "")
+          }
+        >
           <div className="design-studio-canvas-frame">
             <Canvas
               ref={canvasRef}
@@ -410,9 +387,19 @@ export default function EditorWorkspace({
               selectedDraftId={selectedDraftId}
               onSelectDraft={setSelectedDraftId}
               onDraftChange={handleDraftChange}
+              onScaleChange={(scale) => setZoomPercent(Math.round(scale * 100))}
             />
           </div>
-          <Toolbar onAdd={handleAdd} onExport={handleExport} exporting={exporting} />
+          <Toolbar
+            onAdd={handleAdd}
+            onExport={handleExport}
+            exporting={exporting}
+            zoomPercent={zoomPercent}
+            onZoomIn={handleZoomIn}
+            onZoomOut={handleZoomOut}
+            onZoomReset={handleZoomReset}
+            vertical={isPortrait}
+          />
         </div>
         <div className="design-studio-side-panels">
           <LayersPanel

@@ -5,11 +5,27 @@ interface ToolbarProps {
   onAdd: (type: ElementType) => void;
   onExport: () => void;
   exporting: boolean;
+  zoomPercent: number;
+  onZoomIn: () => void;
+  onZoomOut: () => void;
+  onZoomReset: () => void;
+  // A vertical rail beside a portrait canvas, a horizontal strip below a
+  // landscape one - see EditorWorkspace's isPortrait.
+  vertical: boolean;
 }
 
-export default function Toolbar({ onAdd, onExport, exporting }: ToolbarProps) {
+export default function Toolbar({
+  onAdd,
+  onExport,
+  exporting,
+  zoomPercent,
+  onZoomIn,
+  onZoomOut,
+  onZoomReset,
+  vertical,
+}: ToolbarProps) {
   return (
-    <div className="design-studio-toolbar">
+    <div className={"design-studio-toolbar" + (vertical ? " design-studio-toolbar--vertical" : "")}>
       {TOOLS.map((tool) => (
         <button
           key={tool.type}
@@ -33,6 +49,27 @@ export default function Toolbar({ onAdd, onExport, exporting }: ToolbarProps) {
         {exporting ? "Exporting…" : "Export PNG"}
         <span className="design-studio-tool-shortcut">{EXPORT_SHORTCUT_KEY}</span>
       </button>
+      <hr className="design-studio-toolbar-rule" />
+      <div
+        className={"design-studio-zoom-controls" + (vertical ? " design-studio-zoom-controls--vertical" : "")}
+        role="group"
+        aria-label="Canvas zoom"
+      >
+        <button type="button" className="design-studio-zoom-btn" onClick={onZoomOut} title="Zoom out">
+          −
+        </button>
+        <button
+          type="button"
+          className="design-studio-zoom-btn design-studio-zoom-readout"
+          onClick={onZoomReset}
+          title="Reset to fit"
+        >
+          {zoomPercent}%
+        </button>
+        <button type="button" className="design-studio-zoom-btn" onClick={onZoomIn} title="Zoom in">
+          +
+        </button>
+      </div>
     </div>
   );
 }

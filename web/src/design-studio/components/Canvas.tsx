@@ -19,11 +19,22 @@ interface CanvasProps {
   selectedDraftId?: string | null;
   onSelectDraft?: (id: string | null) => void;
   onDraftChange?: (before: DesignElement, after: DesignElement) => void;
+  // Fired whenever the effective on-screen scale changes (auto-fit
+  // recompute, or a manual zoomIn/zoomOut/zoomToFit call) - lets the
+  // toolbar show a live "N%" readout without owning the scale itself.
+  onScaleChange?: (scale: number) => void;
 }
 
 export interface CanvasHandle {
   exportPNG: (fileName: string) => Promise<void>;
+  zoomIn: () => void;
+  zoomOut: () => void;
+  zoomToFit: () => void;
 }
+
+const MIN_ZOOM = 0.25;
+const MAX_ZOOM = 3;
+const ZOOM_STEP = 0.25;
 
 // Every element's x/y in our own data model is its bounding box's top-left
 // corner, but Konva nodes here are positioned at their center (with
@@ -51,6 +62,7 @@ const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
     selectedDraftId,
     onSelectDraft,
     onDraftChange,
+    onScaleChange,
   },
   ref
 ) {
@@ -71,7 +83,12 @@ const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
   // size - see _getContentPosition in konva/lib/Stage.js - so it already
   // compensates for a CSS-transformed container; clicks/drags still land
   // correctly at any scale.
-  const [scale, setScale] = useState(1);
+  const [fitScale, setFitScale] = useState(1);
+  // null follows fitScale (the default, auto-fit behaviour); a number means
+  // the user has manually zoomed via the toolbar and it now overrides the
+  // auto-fit computation below, until they click the % readout to reset.
+  const [zoomOverride, setZoomOverride] = useState<number | null>(null);
+  const scale = zoomOverride ?? fitScale;
 
   useEffect(() => {
     const outer = outerRef.current;
@@ -85,7 +102,7 @@ const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
     // of the editor.
     function recompute(containerWidth: number) {
       const heightBudget = window.innerHeight * 0.6;
-      setScale(Math.min(1, containerWidth / width, heightBudget / height));
+      setFitScale(Math.min(1, containerWidth / width, heightBudget / height));
     }
 
     const observer = new ResizeObserver((entries) => {
@@ -105,6 +122,10 @@ const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
       window.removeEventListener("orientationchange", handleViewportResize);
     };
   }, [width, height]);
+
+  useEffect(() => {
+    onScaleChange?.(scale);
+  }, [scale, onScaleChange]);
 
   useImperativeHandle(ref, () => ({
     exportPNG: async (fileName: string) => {
@@ -127,6 +148,9 @@ const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
         URL.revokeObjectURL(url);
       }
     },
+    zoomIn: () => setZoomOverride((current) => Math.min(MAX_ZOOM, (current ?? scale) + ZOOM_STEP)),
+    zoomOut: () => setZoomOverride((current) => Math.max(MIN_ZOOM, (current ?? scale) - ZOOM_STEP)),
+    zoomToFit: () => setZoomOverride(null),
   }));
 
   useEffect(() => {
