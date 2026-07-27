@@ -118,36 +118,27 @@ export function useWarmSchedule() {
       .catch(() => setError("Couldn't load provisioned concurrency status"));
   }, []);
 
+  // Sends every dirty project's schedule as one batched POST rather than one
+  // request per project - the server merges and persists them in a single
+  // read-modify-write, avoiding a race where two concurrent per-project
+  // requests read the same stale config and the later one's write clobbers
+  // the earlier one's (see handler.ts's POST branch), which used to make
+  // "Save all" silently keep only the most recently edited project.
   const saveAll = useCallback(async (schedules: Partial<Record<WarmScheduleKey, WarmSchedule>>) => {
-    const entries = Object.entries(schedules) as [WarmScheduleKey, WarmSchedule][];
-    if (!ENDPOINT || entries.length === 0) return;
+    if (!ENDPOINT || Object.keys(schedules).length === 0) return;
 
     setSaving(true);
     setError(null);
     try {
-      await Promise.all(
-        entries.map(([fn, schedule]) =>
-          fetch(ENDPOINT, {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ project: fn, schedule }),
-          })
-            .then((res) => res.json())
-            .then((data: WarmScheduleResponse) => {
-              // Only replace this project's schedule entry, not the whole
-              // config - a fresh object reference for every project (even
-              // ones nothing changed for) would otherwise reset every other
-              // row's in-progress draft too once the parent re-syncs drafts
-              // from config. Costs/profiles are pure display, not tied to
-              // any draft state, so they're always replaced wholesale.
-              setConfigState((current) =>
-                current ? { ...current, [fn]: data.schedules[fn] } : data.schedules
-              );
-              setCosts(data.costs);
-              setProfiles(data.profiles);
-            })
-        )
-      );
+      const res = await fetch(ENDPOINT, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ schedules }),
+      });
+      const data: WarmScheduleResponse = await res.json();
+      setConfigState(data.schedules);
+      setCosts(data.costs);
+      setProfiles(data.profiles);
     } catch {
       setError("Couldn't update provisioned concurrency status");
     } finally {

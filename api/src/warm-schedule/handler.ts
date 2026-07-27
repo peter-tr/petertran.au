@@ -387,7 +387,7 @@ async function reconcileProjectTo(
 // Idempotent - safe to call redundantly. Called by the periodic backstop
 // {reconcile: true} tick (for every project every ~30min), by the exact
 // on/off trigger for just the project whose window opened/closed, and
-// directly by the POST handler for just the project that changed, so an
+// directly by the POST handler for just the projects that changed, so an
 // edit takes effect immediately instead of waiting for the next trigger.
 async function reconcileProject(key: WarmScheduleKey, schedule: WarmSchedule, now: Date): Promise<void> {
   await reconcileProjectTo(key, isWithinWindow(schedule, now), schedule.concurrency, schedule.memoryMb);
@@ -585,8 +585,7 @@ async function processEvent(
 
   if (event.httpMethod === "POST") {
     const body = parseJsonBody<{
-      project?: string;
-      schedule?: unknown;
+      schedules?: unknown;
       profileAction?: string;
       name?: unknown;
     }>(event);
@@ -637,27 +636,50 @@ async function processEvent(
       };
     }
 
-    if (!body.project || !(body.project in TARGETS_BY_PROJECT) || !isValidSchedule(body.schedule)) {
+    const entries =
+      body.schedules && typeof body.schedules === "object" && !Array.isArray(body.schedules)
+        ? (Object.entries(body.schedules) as [string, unknown][])
+        : null;
+    const isValidEntries =
+      entries !== null &&
+      entries.length > 0 &&
+      entries.every(([key, schedule]) => key in TARGETS_BY_PROJECT && isValidSchedule(schedule));
+
+    if (!isValidEntries) {
       return {
         statusCode: 400,
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           error:
-            "project must be one of portfolio/pantry/imposter/supergraph/designStudio/zeroTrustLab, " +
-            "schedule must be a valid { enabled, days, start, end, concurrency, memoryMb } " +
+            "schedules must be a non-empty object mapping project name " +
+            "(portfolio/pantry/imposter/supergraph/designStudio/zeroTrustLab) to a valid " +
+            "{ enabled, days, start, end, concurrency, memoryMb } " +
             `(concurrency an integer 1-${MAX_CONCURRENCY}, memoryMb one of ${MEMORY_OPTIONS_MB.join("/")})`,
         }),
       };
     }
 
-    const key = body.project as WarmScheduleKey;
-    const schedule = body.schedule;
-
+    // Every dirty project is merged into `config` and persisted in a single
+    // getConfig/setConfig round trip - saving them via separate concurrent
+    // POSTs (the previous shape of this endpoint) raced: each request's
+    // getConfig() could read the SSM parameter before a sibling request's
+    // setConfig() had written its own change, so whichever request's
+    // setConfig() landed last silently clobbered the others back out. This
+    // is what made the settings page's "Save all" button appear to save
+    // only the most recently edited project.
+    const validEntries = entries as [WarmScheduleKey, WarmSchedule][];
     const config = await getConfig();
-    config[key] = schedule;
+    for (const [key, schedule] of validEntries) {
+      config[key] = schedule;
+    }
     await setConfig(config);
-    await updateProjectSchedules(key, schedule);
-    await reconcileProject(key, schedule, new Date());
+
+    const now = new Date();
+    await Promise.all(
+      validEntries.map(([key, schedule]) =>
+        Promise.all([updateProjectSchedules(key, schedule), reconcileProject(key, schedule, now)])
+      )
+    );
 
     return {
       statusCode: 200,
