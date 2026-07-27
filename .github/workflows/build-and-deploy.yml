@@ -141,6 +141,41 @@ jobs:
             npm run build
           fi
 
+      # Boots the real Router binary (Linux x86_64 - same binary Lambda
+      # runs, since this job also runs on ubuntu-latest) against the
+      # generated router.yaml before ever touching AWS. A router.yaml
+      # config mistake crashed every cold start in production twice in one
+      # day (2026-07-26/27: first a telemetry.apollo shape that didn't
+      # exist at the pinned Router version, then sandbox/homepage both
+      # enabled at once) before being caught this way - real traffic was
+      # only protected by luck, via AWS Lambda's alias+Provisioned-
+      # Concurrency safety net silently pinning traffic to the last working
+      # version while newer, broken versions piled up undeletable and
+      # stalled every subsequent deploy's CloudFormation cleanup. This
+      # catches the same class of mistake before it ever reaches a real
+      # Lambda - API_BASE_URL is a dummy value since this only checks that
+      # Router itself starts and answers a query, not real subgraph
+      # connectivity.
+      - name: Smoke-test the supergraph Router boots with its generated config
+        working-directory: api/src/supergraph/dist
+        env:
+          API_BASE_URL: https://smoke-test.invalid
+        run: |
+          ./router --config router.yaml --supergraph supergraph.graphql --log info &
+          ROUTER_PID=$!
+          sleep 3
+          if ! kill -0 $ROUTER_PID 2>/dev/null; then
+            echo "::error::Router exited within 3s of starting - router.yaml likely has a config error. Check the job log above for 'Failed to read configuration'."
+            exit 1
+          fi
+          RESPONSE=$(curl -sf -X POST http://127.0.0.1:8080/graphql -H "Content-Type: application/json" -d '{"query":"{ __typename }"}')
+          kill $ROUTER_PID 2>/dev/null || true
+          if [ "$RESPONSE" != '{"data":{"__typename":"Query"}}' ]; then
+            echo "::error::Router started but didn't answer a basic query correctly. Got: $RESPONSE"
+            exit 1
+          fi
+          echo "Router config validated OK"
+
       # infra/cdk.json's "app" (ts-node bin/app.ts) rebuilds every stack's
       # construct tree and re-hashes/stages each Lambda's fromAsset dist dir.
       # Synth once here and point both the diff check and the deploy below
