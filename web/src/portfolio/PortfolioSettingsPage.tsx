@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useShowAlsoBuilt } from "./hooks/useShowAlsoBuilt";
+import { useShowFooterCost } from "./hooks/useShowFooterCost";
 import { usePageLoadWarmup } from "./hooks/usePageLoadWarmup";
 import { useStaggerHomeFetches } from "./hooks/useStaggerHomeFetches";
 import {
@@ -27,6 +28,7 @@ const WARM_SCHEDULE_KEYS = Object.keys(WARM_SCHEDULE_LABELS) as WarmScheduleKey[
 
 export default function PortfolioSettingsPage() {
   const { showAlsoBuilt, setShowAlsoBuilt } = useShowAlsoBuilt();
+  const { showFooterCost, setShowFooterCost } = useShowFooterCost();
   const { pageLoadWarmup, setPageLoadWarmup } = usePageLoadWarmup();
   const { staggerHomeFetches, setStaggerHomeFetches } = useStaggerHomeFetches();
   const {
@@ -93,6 +95,19 @@ export default function PortfolioSettingsPage() {
             onChange={(e) => setShowAlsoBuilt(e.target.checked)}
           />{" "}
           Show &quot;also built imposter and pantry&quot; note on home page
+        </label>
+      </div>
+
+      <div className="form-row">
+        <label className="form-label" htmlFor="show-footer-cost">
+          <input
+            id="show-footer-cost"
+            type="checkbox"
+            checked={showFooterCost}
+            onChange={(e) => setShowFooterCost(e.target.checked)}
+          />{" "}
+          Show real AWS/Anthropic cost since launch in the footer (AWS side is within the $200 AWS Free Tier
+          credit)
         </label>
       </div>
 
