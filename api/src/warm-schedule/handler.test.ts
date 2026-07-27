@@ -191,8 +191,9 @@ describe("warm-schedule handler - config GET/POST", () => {
   it("POST with an invalid schedule returns 400", async () => {
     const result = await handler(
       httpEvent("POST", {
-        project: "portfolio",
-        schedule: { enabled: true, days: [], start: "08:00", end: "19:00", concurrency: 1 },
+        schedules: {
+          portfolio: { enabled: true, days: [], start: "08:00", end: "19:00", concurrency: 1 },
+        },
       })
     );
     expect(result.statusCode).toBe(400);
@@ -202,8 +203,9 @@ describe("warm-schedule handler - config GET/POST", () => {
   it("POST with start >= end returns 400", async () => {
     const result = await handler(
       httpEvent("POST", {
-        project: "portfolio",
-        schedule: { enabled: true, days: ["MON"], start: "19:00", end: "08:00", concurrency: 1 },
+        schedules: {
+          portfolio: { enabled: true, days: ["MON"], start: "19:00", end: "08:00", concurrency: 1 },
+        },
       })
     );
     expect(result.statusCode).toBe(400);
@@ -216,8 +218,9 @@ describe("warm-schedule handler - config GET/POST", () => {
   ])("POST with concurrency %s returns 400", async (_label, concurrency) => {
     const result = await handler(
       httpEvent("POST", {
-        project: "portfolio",
-        schedule: { enabled: true, days: ["MON"], start: "08:00", end: "19:00", concurrency },
+        schedules: {
+          portfolio: { enabled: true, days: ["MON"], start: "08:00", end: "19:00", concurrency },
+        },
       })
     );
     expect(result.statusCode).toBe(400);
@@ -226,12 +229,18 @@ describe("warm-schedule handler - config GET/POST", () => {
 
   it("POST with an unrecognized project returns 400", async () => {
     const result = await handler(
-      httpEvent("POST", { project: "not-a-real-project", schedule: DEFAULT_SCHEDULE })
+      httpEvent("POST", { schedules: { "not-a-real-project": DEFAULT_SCHEDULE } })
     );
     expect(result.statusCode).toBe(400);
     expect(JSON.parse(result.body as string).error).toContain(
       "portfolio/pantry/imposter/supergraph/designStudio/zeroTrustLab"
     );
+  });
+
+  it("POST with an empty schedules object returns 400", async () => {
+    const result = await handler(httpEvent("POST", { schedules: {} }));
+    expect(result.statusCode).toBe(400);
+    expect(ssmMock.commandCalls(PutParameterCommand)).toHaveLength(0);
   });
 
   it("POST persists the updated schedule, updates its on/off EventBridge Schedules, and reconciles immediately", async () => {
@@ -247,7 +256,7 @@ describe("warm-schedule handler - config GET/POST", () => {
       concurrency: 3,
       memoryMb: 1024,
     };
-    const result = await handler(httpEvent("POST", { project: "pantry", schedule: newSchedule }));
+    const result = await handler(httpEvent("POST", { schedules: { pantry: newSchedule } }));
     expect(result.statusCode).toBe(200);
     expect(JSON.parse(result.body as string).schedules).toEqual({ ...DEFAULT_CONFIG, pantry: newSchedule });
 
@@ -282,7 +291,7 @@ describe("warm-schedule handler - config GET/POST", () => {
     ssmMock.on(GetParameterCommand).resolves({ Parameter: { Value: JSON.stringify(DEFAULT_CONFIG) } });
 
     const disabled = { ...DEFAULT_SCHEDULE, enabled: false };
-    await handler(httpEvent("POST", { project: "pantry", schedule: disabled }));
+    await handler(httpEvent("POST", { schedules: { pantry: disabled } }));
 
     const updateCalls = schedulerMock.commandCalls(UpdateScheduleCommand);
     expect(updateCalls.every((c) => c.args[0].input.State === "DISABLED")).toBe(true);
@@ -290,6 +299,43 @@ describe("warm-schedule handler - config GET/POST", () => {
     const deleteCalls = lambdaMock.commandCalls(DeleteProvisionedConcurrencyConfigCommand);
     expect(deleteCalls).toHaveLength(1);
     expect(deleteCalls[0].args[0].input.FunctionName).toBe("pantry-fn");
+  });
+
+  it("POST with multiple dirty projects in one request persists all of them, not just the last", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(WITHIN_WINDOW);
+    ssmMock.on(GetParameterCommand).resolves({ Parameter: { Value: JSON.stringify(DEFAULT_CONFIG) } });
+
+    const newPantry = { ...DEFAULT_SCHEDULE, concurrency: 3, memoryMb: 1024 };
+    const newImposter = { ...DEFAULT_SCHEDULE, enabled: false };
+
+    // Regression test for the race this endpoint used to have: previously
+    // each project was saved via its own concurrent POST, each doing its
+    // own getConfig()-then-setConfig() - two edits in the same "Save all"
+    // click could race, and whichever request's setConfig() landed last
+    // would silently overwrite the other's change. Sending both in a single
+    // POST (one getConfig/setConfig round trip) must persist both.
+    const result = await handler(
+      httpEvent("POST", { schedules: { pantry: newPantry, imposter: newImposter } })
+    );
+    expect(result.statusCode).toBe(200);
+    expect(JSON.parse(result.body as string).schedules).toEqual({
+      ...DEFAULT_CONFIG,
+      pantry: newPantry,
+      imposter: newImposter,
+    });
+
+    const putParamCalls = ssmMock.commandCalls(PutParameterCommand);
+    expect(putParamCalls).toHaveLength(1);
+
+    const persisted = JSON.parse(putParamCalls[0].args[0].input.Value as string);
+    expect(persisted.pantry).toEqual(newPantry);
+    expect(persisted.imposter).toEqual(newImposter);
+
+    const updateCalls = schedulerMock.commandCalls(UpdateScheduleCommand);
+    expect(updateCalls.map((c) => c.args[0].input.Name).sort()).toEqual(
+      ["warm-off-pantry", "warm-on-pantry", "warm-off-imposter", "warm-on-imposter"].sort()
+    );
   });
 });
 

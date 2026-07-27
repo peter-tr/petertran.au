@@ -174,9 +174,6 @@ export type TraceBreakdownResult = TraceBreakdownQuery;
 // they're kept as their own top-level Meta fields, not members of SystemStats.
 export const FOOTER_QUERY = /* GraphQL */ `
   query Footer {
-    person {
-      email
-    }
     meta {
       awsCostUsd
       anthropicCostUsd
