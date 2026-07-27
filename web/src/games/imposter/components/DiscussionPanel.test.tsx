@@ -102,7 +102,7 @@ describe("DiscussionPanel", () => {
 
     fireEvent.click(screen.getByText("Reveal the imposter"));
 
-    await waitFor(() => expect(screen.getByText(/server exploded/)).toBeInTheDocument());
+    await screen.findByText(/server exploded/);
     expect(screen.getByRole("button", { name: "Reveal the imposter" })).not.toBeDisabled();
   });
 });

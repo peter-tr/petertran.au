@@ -45,7 +45,7 @@ describe("DesignStudioSettingsPage", () => {
 
     renderPage();
 
-    await waitFor(() => expect(screen.getByText("AI provider")).toBeInTheDocument());
+    await screen.findByText("AI provider");
     expect(screen.getByText("Portfolio data access")).toBeInTheDocument();
     expect(screen.getByLabelText("Provider")).toHaveValue("ANTHROPIC");
     expect(screen.getByLabelText("Model")).toHaveValue("HAIKU");
@@ -89,6 +89,6 @@ describe("DesignStudioSettingsPage", () => {
 
     renderPage();
 
-    await waitFor(() => expect(screen.getByText(/network down/)).toBeInTheDocument());
+    await screen.findByText(/network down/);
   });
 });
