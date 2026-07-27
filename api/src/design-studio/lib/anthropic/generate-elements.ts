@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { getAiClient, resolveAiModel, assertValidAiSettings } from "api-shared/ai-provider";
 import { assertAiNotRateLimited } from "../util/ai-rate-limit";
+import { gatherSupergraphContext } from "./supergraph-tool";
 import type { AiSettingsRecord, DesignElementRecord, DesignElementType } from "../design";
 
 const MAX_PROMPT_LENGTH = 300;
@@ -241,6 +242,22 @@ export async function generateDesignElements(
   const model = resolveAiModel(aiSettings.provider, aiSettings.modelTier);
   const client = await getAiClient(aiSettings.provider);
 
+  // Best-effort - a failure here should never break the actual design
+  // generation, so any thrown error just degrades to no extra context, same
+  // as the toggle being off.
+  let supergraphContext: string | null = null;
+  if (aiSettings.allowSupergraphQuery) {
+    try {
+      supergraphContext = await gatherSupergraphContext(client, model, trimmed);
+    } catch {
+      supergraphContext = null;
+    }
+  }
+
+  const finalUserContent = supergraphContext
+    ? `${userContent}\n\nReal portfolio context that may be relevant:\n${supergraphContext}`
+    : userContent;
+
   // Haiku doesn't support adaptive thinking or the effort parameter (errors
   // if sent) - only the Sonnet tier gets a deliberation pass before it picks
   // coordinates/colors, which is where layout quality actually comes from.
@@ -252,7 +269,7 @@ export async function generateDesignElements(
     // the Sonnet path gets more headroom than Haiku's fixed, small output.
     max_tokens: supportsThinking ? 8192 : 2048,
     system: buildSystemPrompt(width, height, isRefinement),
-    messages: [{ role: "user", content: userContent }],
+    messages: [{ role: "user", content: finalUserContent }],
     ...(supportsThinking ? { thinking: { type: "adaptive" } } : {}),
     output_config: {
       format: { type: "json_schema", schema: GENERATE_ELEMENTS_SCHEMA },

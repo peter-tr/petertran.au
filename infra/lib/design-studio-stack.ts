@@ -17,6 +17,13 @@ export interface DesignStudioStackProps extends StackProps {
   // within the same Atlas cluster/secret rather than needing a second
   // manually-provisioned cluster. See lib/db/client.ts's MONGO_DB_NAME.
   isTestEnv?: boolean;
+  // The public composed supergraph origin (e.g. https://api.petertran.au)
+  // this Lambda calls, read-only and portfolio-scoped, when
+  // AiSettings.allowSupergraphQuery is on - mirrors how apiBaseUrl flows
+  // into SupergraphStack itself. Required so both callers in
+  // infra/bin/app.ts always pass their own env's value, same reasoning as
+  // SupergraphStackProps.apiBaseUrl.
+  supergraphUrl: string;
 }
 
 /**
@@ -34,7 +41,7 @@ export class DesignStudioStack extends Stack {
   // without this stack needing to know anything about either.
   public readonly designStudioFn: lambda.Function;
 
-  constructor(scope: Construct, id: string, props: DesignStudioStackProps = {}) {
+  constructor(scope: Construct, id: string, props: DesignStudioStackProps) {
     super(scope, id, props);
 
     // Created manually in Secrets Manager ahead of first deploy (Atlas
@@ -82,15 +89,25 @@ export class DesignStudioStack extends Stack {
       // up under isolation testing, and halving memory + doubling PC count
       // is cost-neutral while fixing PC's actual capacity shortfall.
       memorySize: 512,
-      // 30s, up from 20s (2026-07-25) - generateDesignElements on the
-      // SONNET tier runs adaptive thinking (see generate-elements.ts),
-      // which measured 10-11s end-to-end even at the lowest effort level;
-      // 20s left too little margin over that plus cold-start MongoDB setup.
-      timeout: Duration.seconds(30),
+      // 40s, up from 30s (2026-07-27) - generateDesignElements can now run
+      // an optional "phase 1" tool_use loop (see
+      // lib/anthropic/supergraph-tool.ts) before its existing SONNET
+      // structured-output call (10-11s end-to-end on its own). That loop is
+      // capped at 2 iterations, each up to ~8s (SUPERGRAPH_REQUEST_TIMEOUT_MS)
+      // plus Claude call latency, only when AiSettings.allowSupergraphQuery
+      // is on and the model actually chooses to call the tool - 40s covers
+      // that worst case with headroom without needing a bigger jump.
+      timeout: Duration.seconds(40),
       environment: {
         MONGO_URI: mongoSecret.secretValue.unsafeUnwrap(),
         MONGO_DB_NAME: props.isTestEnv ? "design-studio-test" : "design-studio",
         ANTHROPIC_API_KEY: anthropicSecret.secretValue.unsafeUnwrap(),
+        // Read-only, portfolio-scoped queries only (see
+        // portfolio-query-allowlist.ts) - plain outbound HTTPS to a public
+        // endpoint, no IAM grant needed, same reasoning supergraph-stack.ts
+        // already documents for why the Router itself needs none to reach
+        // subgraphs.
+        SUPERGRAPH_URL: `${props.supergraphUrl}/graphql`,
       },
       // No lambda.Tracing.ACTIVE here - see applyApplicationSignals()'s doc
       // comment for why.

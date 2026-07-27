@@ -68,6 +68,7 @@ const pantryStack = new PantryStack(app, "PetertranPantryStack", {
 // test-env counterpart below (isolated by Mongo database name, not a
 // separate Atlas cluster).
 const designStudioStack = new DesignStudioStack(app, "PetertranDesignStudioStack", {
+  supergraphUrl: `https://api.${hostedZoneName}`,
   env: { account, region: "ap-southeast-2" },
 });
 
@@ -234,6 +235,7 @@ if (process.env.DEPLOY_TEST_ENV === "true") {
   const testDesignStudioStack = new DesignStudioStack(app, "PetertranTestDesignStudioStack", {
     functionName: TEST_FUNCTION_NAMES.designStudio,
     isTestEnv: true,
+    supergraphUrl: `https://api.test.${hostedZoneName}`,
     env: { account, region: "ap-southeast-2" },
   });
 

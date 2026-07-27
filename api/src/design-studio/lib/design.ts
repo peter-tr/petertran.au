@@ -89,11 +89,13 @@ import type { AiProvider, AiModelTier } from "api-shared/ai-provider";
 export interface AiSettingsRecord {
   provider: AiProvider;
   modelTier: AiModelTier;
+  allowSupergraphQuery: boolean;
 }
 
 export interface AiSettingsInput {
   provider?: AiProvider;
   modelTier?: AiModelTier;
+  allowSupergraphQuery?: boolean;
 }
 
 const MAX_DERIVED_COLORS = 4;

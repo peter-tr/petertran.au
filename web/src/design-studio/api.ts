@@ -35,6 +35,8 @@ export const runDesignStudioQuery = createGraphQLClient(
   "design-studio"
 );
 
+export { AiProvider, AiModelTier } from "./api-schema-types.generated";
+
 export type Design = DesignFieldsFragment;
 export type DesignElementInput = SchemaDesignElementInput;
 export type AiSettingsInput = SchemaAiSettingsInput;
@@ -282,6 +284,7 @@ const AI_SETTINGS_FIELDS = /* GraphQL */ `
   fragment AiSettingsFields on AiSettings {
     provider
     modelTier
+    allowSupergraphQuery
   }
 `;
 

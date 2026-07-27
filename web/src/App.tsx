@@ -14,6 +14,7 @@ const PantrySettingsPage = lazy(() => import("./pantry/PantrySettingsPage"));
 const ImposterSetup = lazy(() => import("./games/imposter/Setup"));
 const ImposterGame = lazy(() => import("./games/imposter/Game"));
 const DesignStudioGallery = lazy(() => import("./design-studio/Gallery"));
+const DesignStudioSettingsPage = lazy(() => import("./design-studio/DesignStudioSettingsPage"));
 const DesignStudioEditor = lazy(() => import("./design-studio/Editor"));
 const Notes = lazy(() => import("./notes/Notes"));
 
@@ -105,6 +106,7 @@ export default function App() {
             <Route path="/imposter" element={<ImposterSetup />} />
             <Route path="/imposter/:gameId" element={<ImposterGame />} />
             <Route path="/design-studio" element={<DesignStudioGallery />} />
+            <Route path="/design-studio/settings" element={<DesignStudioSettingsPage />} />
             <Route path="/design-studio/:designId" element={<DesignStudioEditor />} />
             <Route path="/notes" element={<Notes />} />
           </Routes>
