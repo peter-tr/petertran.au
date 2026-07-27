@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { FaGear } from "react-icons/fa6";
 import type { AiSettings, AiSettingsInput } from "../api";
 import { AI_STYLE_PRESETS } from "../lib/ai-styles";
 
@@ -44,22 +46,28 @@ export default function AiPanel({
   style,
   onStyleChange,
 }: AiPanelProps) {
+  const [showSettings, setShowSettings] = useState(false);
+
   return (
     <div className="design-studio-ai-panel">
       <div className="design-studio-ai-panel-header">
         <h2>Generate with AI</h2>
-        {hasDraft && (
-          <div className="design-studio-ai-panel-actions">
-            <button type="button" onClick={onDiscard}>
-              Discard
-            </button>
-            <button type="button" onClick={onAccept}>
-              Accept
-            </button>
-          </div>
+        {aiSettings && (
+          <button
+            type="button"
+            className={
+              "design-studio-ai-settings-toggle" +
+              (showSettings ? " design-studio-ai-settings-toggle-active" : "")
+            }
+            aria-label="AI model settings"
+            aria-expanded={showSettings}
+            onClick={() => setShowSettings((v) => !v)}
+          >
+            <FaGear />
+          </button>
         )}
       </div>
-      {aiSettings && (
+      {aiSettings && showSettings && (
         <div className="design-studio-ai-panel-settings">
           <label>
             Provider{" "}
@@ -150,6 +158,16 @@ export default function AiPanel({
           {generating ? "Generating…" : "Send"}
         </button>
       </div>
+      {hasDraft && (
+        <div className="design-studio-ai-panel-actions">
+          <button type="button" className="design-studio-ai-discard" onClick={onDiscard}>
+            Discard
+          </button>
+          <button type="button" className="design-studio-ai-accept" onClick={onAccept}>
+            Accept
+          </button>
+        </div>
+      )}
     </div>
   );
 }

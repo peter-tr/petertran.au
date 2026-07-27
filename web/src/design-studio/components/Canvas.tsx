@@ -22,7 +22,7 @@ interface CanvasProps {
 }
 
 export interface CanvasHandle {
-  exportPNG: () => Promise<void>;
+  exportPNG: (fileName: string) => Promise<void>;
 }
 
 // Every element's x/y in our own data model is its bounding box's top-left
@@ -107,7 +107,7 @@ const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
   }, [width, height]);
 
   useImperativeHandle(ref, () => ({
-    exportPNG: async () => {
+    exportPNG: async (fileName: string) => {
       const stage = stageRef.current;
       if (!stage) return;
 
@@ -120,7 +120,7 @@ const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
       const url = URL.createObjectURL(blob);
       try {
         const link = document.createElement("a");
-        link.download = "design.png";
+        link.download = fileName;
         link.href = url;
         link.click();
       } finally {

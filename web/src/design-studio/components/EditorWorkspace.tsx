@@ -8,7 +8,7 @@ import { useEventHistory } from "../lib/history/useEventHistory";
 import type { HistoryEvent } from "../lib/history/reducer";
 import { createElementByType, type DesignElement, type ElementType } from "../lib/elements";
 import { toElementInput, fromWireElement } from "../lib/serialization";
-import { TOOLS, EXPORT_SHORTCUT_KEY } from "../lib/tools";
+import { TOOLS, EXPORT_SHORTCUT_KEY, toExportFileName } from "../lib/tools";
 import { AI_STYLE_PRESETS } from "../lib/ai-styles";
 import {
   saveDesign,
@@ -162,11 +162,11 @@ export default function EditorWorkspace({
   const handleExport = useCallback(async () => {
     setExporting(true);
     try {
-      await canvasRef.current?.exportPNG();
+      await canvasRef.current?.exportPNG(toExportFileName(name));
     } finally {
       setExporting(false);
     }
-  }, []);
+  }, [name]);
 
   const handleSaveAsTemplate = useCallback(async () => {
     if (!templateCategory.trim()) return;
@@ -306,7 +306,7 @@ export default function EditorWorkspace({
         handleDelete(selectedId);
       } else if (e.key === EXPORT_SHORTCUT_KEY) {
         e.preventDefault();
-        canvasRef.current?.exportPNG();
+        canvasRef.current?.exportPNG(toExportFileName(name));
       } else {
         const tool = TOOLS.find((t) => t.key === e.key);
         if (tool) {
@@ -319,7 +319,7 @@ export default function EditorWorkspace({
     window.addEventListener("keydown", handleKeyDown);
 
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [undo, redo, selectedId, handleDelete, handleSave, handleAdd]);
+  }, [undo, redo, selectedId, handleDelete, handleSave, handleAdd, name]);
 
   return (
     <div className="design-studio-editor">
@@ -396,21 +396,23 @@ export default function EditorWorkspace({
         />
       )}
       <div className="design-studio-workspace">
-        <Toolbar onAdd={handleAdd} onExport={handleExport} exporting={exporting} />
-        <div className="design-studio-canvas-frame">
-          <Canvas
-            ref={canvasRef}
-            width={width}
-            height={height}
-            elements={elements}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-            onChange={handleChange}
-            draftElements={draftElements ?? undefined}
-            selectedDraftId={selectedDraftId}
-            onSelectDraft={setSelectedDraftId}
-            onDraftChange={handleDraftChange}
-          />
+        <div className="design-studio-canvas-column">
+          <div className="design-studio-canvas-frame">
+            <Canvas
+              ref={canvasRef}
+              width={width}
+              height={height}
+              elements={elements}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              onChange={handleChange}
+              draftElements={draftElements ?? undefined}
+              selectedDraftId={selectedDraftId}
+              onSelectDraft={setSelectedDraftId}
+              onDraftChange={handleDraftChange}
+            />
+          </div>
+          <Toolbar onAdd={handleAdd} onExport={handleExport} exporting={exporting} />
         </div>
         <div className="design-studio-side-panels">
           <LayersPanel
