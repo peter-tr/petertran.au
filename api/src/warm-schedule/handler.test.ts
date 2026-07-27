@@ -4,6 +4,7 @@ import {
   LambdaClient,
   PutProvisionedConcurrencyConfigCommand,
   DeleteProvisionedConcurrencyConfigCommand,
+  GetAliasCommand,
   GetFunctionConfigurationCommand,
   GetProvisionedConcurrencyConfigCommand,
   UpdateFunctionConfigurationCommand,
@@ -114,6 +115,9 @@ beforeEach(() => {
   lambdaMock.on(UpdateFunctionConfigurationCommand).resolves({});
   lambdaMock.on(PublishVersionCommand).resolves({ Version: "5" });
   lambdaMock.on(UpdateAliasCommand).resolves({});
+  // No weighted RoutingConfig unless a test overrides it - see the
+  // "weighted-alias self-heal" describe block below for the stuck-alias case.
+  lambdaMock.on(GetAliasCommand).resolves({ FunctionVersion: "1" });
   // Real AWS behavior when a target currently has no PC config (e.g.
   // outside the warm window): GetProvisionedConcurrencyConfig rejects with
   // ProvisionedConcurrencyConfigNotFoundException, not ResourceNotFoundException.
@@ -526,6 +530,49 @@ describe("warm-schedule handler - memory reconciliation", () => {
 
     expect(result).toEqual({ statusCode: 200, headers: {}, body: "reconciled" });
     expect(lambdaMock.commandCalls(PublishVersionCommand)).toHaveLength(1);
+  });
+});
+
+describe("warm-schedule handler - weighted-alias self-heal", () => {
+  // Reproduces the incident hit for real on 2026-07-27: AWS Lambda's own
+  // PC-safety-net pins 100% of traffic to the last version that warmed via a
+  // weighted RoutingConfig, and a weighted alias can never have PC attached.
+  it("clears a weighted alias before granting PC, pinning to the version that was already serving all traffic", async () => {
+    ssmMock.on(GetParameterCommand).resolves({});
+    lambdaMock.on(GetAliasCommand).resolves({
+      FunctionVersion: "12",
+      RoutingConfig: { AdditionalVersionWeights: { "10": 1.0 } },
+    });
+
+    const result = await handler({ project: "pantry", action: "on" });
+    expect(result).toEqual({ statusCode: 200, headers: {}, body: "reconciled" });
+
+    // First UpdateAlias call clears the weighting; the second is
+    // reconcileMemory's own move-alias call (beforeEach's 256MB live vs
+    // 512MB desired still applies for this target).
+    const aliasCalls = lambdaMock.commandCalls(UpdateAliasCommand);
+    expect(aliasCalls[0].args[0].input).toMatchObject({
+      FunctionName: "pantry-fn",
+      Name: "live",
+      FunctionVersion: "10",
+      RoutingConfig: {},
+    });
+
+    // Self-healing doesn't block the rest of reconciliation - PC still gets granted.
+    expect(lambdaMock.commandCalls(PutProvisionedConcurrencyConfigCommand).length).toBeGreaterThan(0);
+  });
+
+  it("does nothing when the alias has no weights", async () => {
+    ssmMock.on(GetParameterCommand).resolves({});
+    // Live memory already matches desired, so the only possible UpdateAlias
+    // calls left are from the self-heal path itself.
+    lambdaMock
+      .on(GetFunctionConfigurationCommand)
+      .resolves({ MemorySize: 512, LastUpdateStatus: "Successful" });
+
+    await handler({ project: "pantry", action: "on" });
+
+    expect(lambdaMock.commandCalls(UpdateAliasCommand)).toHaveLength(0);
   });
 });
 

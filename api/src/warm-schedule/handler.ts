@@ -3,6 +3,7 @@ import {
   LambdaClient,
   PutProvisionedConcurrencyConfigCommand,
   DeleteProvisionedConcurrencyConfigCommand,
+  GetAliasCommand,
   GetFunctionConfigurationCommand,
   GetProvisionedConcurrencyConfigCommand,
   UpdateFunctionConfigurationCommand,
@@ -423,29 +424,55 @@ async function reconcileMemory(functionName: string, desiredMemoryMb: number): P
   );
 }
 
+// PC-on-alias failure mode (hit for real 2026-07-27, on portfolio-graphql,
+// supergraph-graphql, and pantry-graphql simultaneously): if a deploy
+// publishes a version that PC fails to warm, AWS Lambda's own alias+PC
+// safety net keeps 100% of traffic pinned to the last version that
+// successfully warmed (via an internal weighted RoutingConfig on the alias)
+// rather than cutting over to the version PC can't warm - real traffic stays
+// safe, but a weighted alias can never have PC attached at all (Lambda
+// rejects PutProvisionedConcurrencyConfig outright with
+// InvalidParameterValueException), so once this triggers, every subsequent
+// reconcile tick fails forever and the target runs permanently cold. The
+// stuck version this leaves referenced also stalls the next `cdk deploy`'s
+// CloudFormation cleanup phase. Confirmed live: both the pinned-to version
+// and the nominal alias version were `State: Active, LastUpdateStatus:
+// Successful` - Lambda's safety net can trigger on a transient PC-provisioning
+// failure, not just a genuinely broken version.
+async function healWeightedAlias(functionName: string): Promise<void> {
+  const { RoutingConfig } = await lambdaClient.send(
+    new GetAliasCommand({ FunctionName: functionName, Name: ALIAS_NAME })
+  );
+  const weights = Object.entries(RoutingConfig?.AdditionalVersionWeights ?? {});
+  if (weights.length === 0) return;
+
+  // Re-point the alias at whichever version is already carrying traffic
+  // (the highest-weighted one) and drop the RoutingConfig entirely - this
+  // matches what's actually live already, so it's a zero-traffic-impact
+  // change, not a cutover. The manual recovery for this same incident
+  // (2026-07-27) did exactly this: `aws lambda update-alias --function-
+  // version <already-serving-version> --routing-config '{}'`.
+  const [stuckVersion] = weights.reduce((a, b) => (b[1] > a[1] ? b : a));
+  console.warn(
+    `healWeightedAlias(${functionName}): alias had a weighted RoutingConfig ` +
+      `blocking PC - clearing it and pinning to version ${stuckVersion}, which was already serving all traffic`
+  );
+  await lambdaClient.send(
+    new UpdateAliasCommand({
+      FunctionName: functionName,
+      Name: ALIAS_NAME,
+      FunctionVersion: stuckVersion,
+      RoutingConfig: {},
+    })
+  );
+}
+
 // Never throws - applying memory/PC is best-effort. The flag itself (what
 // the user asked for) is already durably saved in SSM by the time this
 // runs; if AWS can't actually apply it right now (e.g. the account's
 // concurrency quota has no room), that's a transient infra condition, not a
 // reason to fail the request or the other targets' reconciliation in the
 // same tick.
-//
-// PC-on-alias failure mode (hit for real 2026-07-27, supergraph-graphql):
-// if a deploy publishes a version that crashes at init, AWS Lambda's own
-// alias+PC safety net keeps 100% of traffic pinned to the last version
-// that successfully warmed (via an internal weighted RoutingConfig on the
-// alias) rather than cutting over to a version PC can't warm - real
-// traffic stays safe, but the old version becomes permanently undeletable
-// (an alias still references it), which stalls every subsequent deploy's
-// CloudFormation cleanup phase ("stack ... is in
-// UPDATE_COMPLETE_CLEANUP_IN_PROGRESS state and can not be updated",
-// retrying forever without ever resolving on its own). Recovery once the
-// real code fix is ready: `aws lambda delete-provisioned-concurrency-
-// config --qualifier live` (an active PC config blocks any further
-// `update-alias` call outright), then `aws lambda update-alias --function-
-// version <last-known-good> --routing-config '{}'` to drop the stale
-// weighting, then `aws lambda delete-function --qualifier <stuck-version>`
-// to free it - only then does a fresh `cdk deploy` succeed.
 async function reconcileTarget(
   functionName: string,
   shouldBeWarm: boolean,
@@ -453,6 +480,7 @@ async function reconcileTarget(
   memoryMb: number
 ): Promise<void> {
   try {
+    await healWeightedAlias(functionName);
     await reconcileMemory(functionName, memoryMb);
 
     if (shouldBeWarm) {
