@@ -40,6 +40,7 @@ export default function PortfolioSettingsPage() {
     checkingColdStarts,
     coldStartWindowMinutes,
     setColdStartWindowMinutes,
+    coldStartError,
     saving: warmScheduleSaving,
     profilePending: warmScheduleProfilePending,
     error: warmScheduleError,
@@ -192,6 +193,7 @@ export default function PortfolioSettingsPage() {
             Cold start rate below is checked automatically, over the window selected above.
             {checkingColdStarts && " Checking…"}
           </p>
+          {coldStartError && <p className="section-hint">{coldStartError}</p>}
 
           {warmScheduleDrafts &&
             WARM_SCHEDULE_KEYS.map((fn) => (

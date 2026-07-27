@@ -28,6 +28,16 @@ const DEFAULT_COSTS = {
   zeroTrustLab: NO_COST,
 };
 const NO_PROFILES = {};
+const NO_COLD_STARTS = {};
+
+// Every renderHook mount also fires the cold-start check effect (a second,
+// independent fetch alongside the initial config GET), so any test that
+// queues `mockResolvedValueOnce` responses positionally needs one for this
+// too - inserted right after the config GET, before whatever the test is
+// actually asserting on.
+function mockColdStartCheckResponse() {
+  return { json: async () => ({ coldStarts: NO_COLD_STARTS }) };
+}
 
 describe("useWarmSchedule", () => {
   beforeEach(() => {
@@ -76,6 +86,69 @@ describe("useWarmSchedule", () => {
     await waitFor(() => expect(result.current.error).toBe("Couldn't load provisioned concurrency status"));
   });
 
+  it("checks cold starts automatically on mount with the default 24h window", async () => {
+    vi.stubEnv("VITE_WARM_SCHEDULE_ENDPOINT", "https://api.test/warm-schedule");
+
+    const coldStarts = { portfolio: { coldStartCount: 2, totalInvocations: 10, coldStartPercent: 20 } };
+    (fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({
+        json: async () => ({ schedules: DEFAULT_CONFIG, costs: DEFAULT_COSTS, profiles: NO_PROFILES }),
+      })
+      .mockResolvedValueOnce({ json: async () => ({ coldStarts }) });
+
+    const { useWarmSchedule } = await import("./useWarmSchedule");
+
+    const { result } = renderHook(() => useWarmSchedule());
+
+    expect(result.current.checkingColdStarts).toBe(true);
+    expect(result.current.coldStartWindowMinutes).toBe(1440);
+    await waitFor(() => expect(result.current.coldStarts).toEqual(coldStarts));
+    expect(result.current.checkingColdStarts).toBe(false);
+
+    const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[1];
+    expect(JSON.parse(init.body)).toEqual({ action: "checkColdStarts", windowMinutes: 1440 });
+  });
+
+  it("re-checks cold starts when the window selection changes", async () => {
+    vi.stubEnv("VITE_WARM_SCHEDULE_ENDPOINT", "https://api.test/warm-schedule");
+
+    (fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({
+        json: async () => ({ schedules: DEFAULT_CONFIG, costs: DEFAULT_COSTS, profiles: NO_PROFILES }),
+      })
+      .mockResolvedValue(mockColdStartCheckResponse());
+
+    const { useWarmSchedule } = await import("./useWarmSchedule");
+
+    const { result } = renderHook(() => useWarmSchedule());
+    await waitFor(() => expect(result.current.checkingColdStarts).toBe(false));
+
+    act(() => result.current.setColdStartWindowMinutes(10));
+
+    expect(result.current.checkingColdStarts).toBe(true);
+    await waitFor(() => expect(result.current.checkingColdStarts).toBe(false));
+
+    const lastCall = (fetch as ReturnType<typeof vi.fn>).mock.calls.at(-1)!;
+    expect(JSON.parse(lastCall[1].body)).toEqual({ action: "checkColdStarts", windowMinutes: 10 });
+  });
+
+  it("surfaces a cold start check failure independently of the general error", async () => {
+    vi.stubEnv("VITE_WARM_SCHEDULE_ENDPOINT", "https://api.test/warm-schedule");
+
+    (fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({
+        json: async () => ({ schedules: DEFAULT_CONFIG, costs: DEFAULT_COSTS, profiles: NO_PROFILES }),
+      })
+      .mockRejectedValueOnce(new Error("logs insights query failed"));
+
+    const { useWarmSchedule } = await import("./useWarmSchedule");
+
+    const { result } = renderHook(() => useWarmSchedule());
+
+    await waitFor(() => expect(result.current.coldStartError).toBe("Couldn't check cold start rate"));
+    expect(result.current.error).toBeNull();
+  });
+
   it("saveAll POSTs one batched request with every dirty project's schedule and replaces config from the response", async () => {
     vi.stubEnv("VITE_WARM_SCHEDULE_ENDPOINT", "https://api.test/warm-schedule");
 
@@ -92,6 +165,7 @@ describe("useWarmSchedule", () => {
       .mockResolvedValueOnce({
         json: async () => ({ schedules: DEFAULT_CONFIG, costs: DEFAULT_COSTS, profiles: NO_PROFILES }),
       })
+      .mockResolvedValueOnce(mockColdStartCheckResponse())
       .mockResolvedValueOnce({
         json: async () => ({
           schedules: { ...DEFAULT_CONFIG, pantry: newPantry, imposter: newImposter },
@@ -119,7 +193,7 @@ describe("useWarmSchedule", () => {
     // A single POST carrying both dirty projects, not one request per
     // project - avoids the race where two concurrent per-project requests
     // could clobber each other's write server-side.
-    const postCalls = (fetch as ReturnType<typeof vi.fn>).mock.calls.slice(1);
+    const postCalls = (fetch as ReturnType<typeof vi.fn>).mock.calls.slice(2);
     expect(postCalls).toHaveLength(1);
     expect(JSON.parse(postCalls[0][1].body)).toEqual({
       schedules: { pantry: newPantry, imposter: newImposter },
@@ -133,6 +207,7 @@ describe("useWarmSchedule", () => {
       .mockResolvedValueOnce({
         json: async () => ({ schedules: DEFAULT_CONFIG, costs: DEFAULT_COSTS, profiles: NO_PROFILES }),
       })
+      .mockResolvedValueOnce(mockColdStartCheckResponse())
       .mockRejectedValueOnce(new Error("network down"));
 
     const { useWarmSchedule } = await import("./useWarmSchedule");
@@ -165,6 +240,7 @@ describe("useWarmSchedule", () => {
       .mockResolvedValueOnce({
         json: async () => ({ schedules: DEFAULT_CONFIG, costs: DEFAULT_COSTS, profiles: NO_PROFILES }),
       })
+      .mockResolvedValueOnce(mockColdStartCheckResponse())
       .mockResolvedValueOnce({
         json: async () => ({
           schedules: DEFAULT_CONFIG,
@@ -186,7 +262,7 @@ describe("useWarmSchedule", () => {
     await waitFor(() => expect(result.current.profiles).toEqual({ baseline: DEFAULT_CONFIG }));
     expect(result.current.profilePending).toBeNull();
 
-    const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[1];
+    const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[2];
     expect(JSON.parse(init.body)).toEqual({ profileAction: "save", name: "baseline" });
   });
 
@@ -203,6 +279,7 @@ describe("useWarmSchedule", () => {
           profiles: { "all-cold": coldConfig },
         }),
       })
+      .mockResolvedValueOnce(mockColdStartCheckResponse())
       .mockResolvedValueOnce({
         json: async () => ({
           schedules: coldConfig,
@@ -222,7 +299,7 @@ describe("useWarmSchedule", () => {
 
     await waitFor(() => expect(result.current.config).toEqual(coldConfig));
 
-    const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[1];
+    const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[2];
     expect(JSON.parse(init.body)).toEqual({ profileAction: "apply", name: "all-cold" });
   });
 
@@ -237,6 +314,7 @@ describe("useWarmSchedule", () => {
           profiles: { a: DEFAULT_CONFIG, b: DEFAULT_CONFIG },
         }),
       })
+      .mockResolvedValueOnce(mockColdStartCheckResponse())
       .mockResolvedValueOnce({
         json: async () => ({
           schedules: DEFAULT_CONFIG,
@@ -256,7 +334,7 @@ describe("useWarmSchedule", () => {
 
     await waitFor(() => expect(result.current.profiles).toEqual({ b: DEFAULT_CONFIG }));
 
-    const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[1];
+    const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[2];
     expect(JSON.parse(init.body)).toEqual({ profileAction: "delete", name: "a" });
   });
 });
