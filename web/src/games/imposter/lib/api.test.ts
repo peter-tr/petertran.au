@@ -45,7 +45,10 @@ describe("api.ts", () => {
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe(`${IMPOSTER_ENDPOINT}?opname=ImposterCategories`);
     expect(init.method).toBe("POST");
-    expect(init.headers).toEqual({ "content-type": "application/json" });
+    expect(init.headers).toEqual({
+      "content-type": "application/json",
+      "apollographql-client-name": "web",
+    });
     expect(JSON.parse(init.body)).toEqual({ query: IMPOSTER_CATEGORIES_QUERY, variables: undefined });
     expect(result).toEqual({ imposterCategories: [{ id: "animals", label: "Animals" }] });
   });
