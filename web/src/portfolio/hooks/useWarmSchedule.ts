@@ -146,6 +146,11 @@ export function useWarmSchedule() {
   // profile name a save/apply/delete is currently in flight for.
   const [profilePending, setProfilePending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Separate from `error` - the cold-start check now runs automatically in
+  // its own effect, independent of the initial config load, so sharing one
+  // error string between them would let whichever settles last silently
+  // overwrite the other's message.
+  const [coldStartError, setColdStartError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!ENDPOINT) return;
@@ -237,9 +242,9 @@ export function useWarmSchedule() {
       .then((res) => res.json())
       .then((data: { coldStarts: WarmScheduleColdStarts }) => {
         setColdStarts(data.coldStarts);
-        setError(null);
+        setColdStartError(null);
       })
-      .catch(() => setError("Couldn't check cold start rate"));
+      .catch(() => setColdStartError("Couldn't check cold start rate"));
   }, [coldStartWindowMinutes]);
 
   useEffect(() => {
@@ -254,6 +259,7 @@ export function useWarmSchedule() {
     checkingColdStarts,
     coldStartWindowMinutes,
     setColdStartWindowMinutes,
+    coldStartError,
     saving,
     profilePending,
     error,
