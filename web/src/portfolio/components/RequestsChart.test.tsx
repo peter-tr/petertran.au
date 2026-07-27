@@ -29,18 +29,30 @@ describe("RequestsChart", () => {
     const { container } = render(<RequestsChart data={data} />);
 
     expect(screen.getByRole("tab", { name: "last 7 days" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("tab", { name: "last 30 days" })).toHaveAttribute("aria-selected", "false");
+    expect(screen.getByRole("tab", { name: "last 1 day" })).toHaveAttribute("aria-selected", "false");
+    expect(screen.getByRole("tab", { name: "all time" })).toHaveAttribute("aria-selected", "false");
     expect(container.querySelectorAll("rect.chart-bar")).toHaveLength(7);
   });
 
-  it("switches to 30 days when that tab is clicked", async () => {
+  it("switches to last 1 day when that tab is clicked", async () => {
     const user = userEvent.setup();
     const data = Array.from({ length: 30 }, (_, i) => day(-(29 - i), i + 1));
     const { container } = render(<RequestsChart data={data} />);
 
-    await user.click(screen.getByRole("tab", { name: "last 30 days" }));
+    await user.click(screen.getByRole("tab", { name: "last 1 day" }));
 
-    expect(screen.getByRole("tab", { name: "last 30 days" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "last 1 day" })).toHaveAttribute("aria-selected", "true");
+    expect(container.querySelectorAll("rect.chart-bar")).toHaveLength(1);
+  });
+
+  it("switches to all time when that tab is clicked", async () => {
+    const user = userEvent.setup();
+    const data = Array.from({ length: 30 }, (_, i) => day(-(29 - i), i + 1));
+    const { container } = render(<RequestsChart data={data} />);
+
+    await user.click(screen.getByRole("tab", { name: "all time" }));
+
+    expect(screen.getByRole("tab", { name: "all time" })).toHaveAttribute("aria-selected", "true");
     expect(container.querySelectorAll("rect.chart-bar")).toHaveLength(30);
   });
 
