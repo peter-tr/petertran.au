@@ -12,6 +12,19 @@
   padding: 1.4rem 1.5rem 2rem;
 }
 
+.design-studio-breadcrumb {
+  display: inline-block;
+  margin-bottom: 0.6rem;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.design-studio-breadcrumb:hover {
+  color: var(--paper);
+}
+
 .design-studio-head {
   display: flex;
   align-items: center;
@@ -77,6 +90,51 @@
   gap: 0.5rem;
   max-width: 46rem;
   margin: 0 auto 1.2rem;
+}
+
+.design-studio-custom-size-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.6rem;
+  max-width: 46rem;
+  margin: -0.6rem auto 1.2rem;
+}
+
+.design-studio-custom-size-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
+.design-studio-custom-size-form input {
+  width: 5rem;
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  color: var(--paper);
+  background: var(--panel-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 0.4rem 0.6rem;
+}
+
+.design-studio-custom-size-form button {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--paper);
+  background: var(--panel-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 0.4rem 0.7rem;
+  cursor: pointer;
+}
+
+.design-studio-custom-size-form button:hover {
+  color: var(--type);
+  border-color: var(--type);
 }
 
 .design-studio-gallery-grid {
@@ -977,7 +1035,10 @@
 }
 
 .design-studio-about {
-  margin: -0.3rem 0 0.9rem;
+  /* .design-studio-gallery is full-bleed (100vw) - a plain 0 side margin
+     here hugged the left edge of the whole viewport instead of lining up
+     under the 46rem-wide, margin: 0 auto header/grid above it. */
+  margin: -0.3rem auto 0.9rem;
   font-family: var(--font-sans);
   font-size: 0.84rem;
   font-style: italic;
@@ -986,7 +1047,7 @@
 }
 
 .design-studio-help {
-  margin: -0.3rem 0 0.9rem;
+  margin: -0.3rem auto 0.9rem;
   padding: 0.7rem 0.9rem;
   max-width: 46rem;
   font-family: var(--font-sans);

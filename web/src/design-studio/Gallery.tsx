@@ -1,18 +1,22 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { getGalleryData, listDesigns, deleteDesign, type Design, type Template } from "./api";
 import TemplatesSection from "./components/TemplatesSection";
-import { CANVAS_FORMATS } from "./lib/formats";
+import { CANVAS_FORMATS, CUSTOM_SIZE_MIN, CUSTOM_SIZE_MAX } from "./lib/formats";
 import { formatEditedAgo } from "./lib/timeAgo";
 import type { NewDesignLocationState } from "./Editor";
 import "./design-studio.css";
 
 export default function Gallery() {
+  const navigate = useNavigate();
   const [designs, setDesigns] = useState<Design[] | null>(null);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [showAbout, setShowAbout] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [showCustomForm, setShowCustomForm] = useState(false);
+  const [customWidth, setCustomWidth] = useState(900);
+  const [customHeight, setCustomHeight] = useState(600);
 
   // One combined request for both designs and templates - Gallery's own list
   // and TemplatesSection's initial unfiltered list used to be 2 (really 3,
@@ -34,6 +38,15 @@ export default function Gallery() {
     listDesigns()
       .then(setDesigns)
       .catch(() => setError("Couldn't load your designs right now."));
+  }
+
+  function handleCreateCustom() {
+    const state: NewDesignLocationState = {
+      seedName: "Untitled design",
+      seedWidth: customWidth,
+      seedHeight: customHeight,
+    };
+    navigate("/design-studio/new", { state });
   }
 
   return (
@@ -108,7 +121,45 @@ export default function Gallery() {
             </Link>
           );
         })}
+        <button
+          type="button"
+          className="design-studio-tool-btn"
+          onClick={() => setShowCustomForm((v) => !v)}
+          aria-expanded={showCustomForm}
+        >
+          New Custom…
+        </button>
       </div>
+
+      {showCustomForm && (
+        <div className="design-studio-custom-size-form">
+          <label>
+            Width
+            <input
+              type="number"
+              min={CUSTOM_SIZE_MIN}
+              max={CUSTOM_SIZE_MAX}
+              value={customWidth}
+              onChange={(e) => setCustomWidth(Number(e.target.value))}
+              aria-label="Custom width"
+            />
+          </label>
+          <label>
+            Height
+            <input
+              type="number"
+              min={CUSTOM_SIZE_MIN}
+              max={CUSTOM_SIZE_MAX}
+              value={customHeight}
+              onChange={(e) => setCustomHeight(Number(e.target.value))}
+              aria-label="Custom height"
+            />
+          </label>
+          <button type="button" onClick={handleCreateCustom}>
+            Create
+          </button>
+        </div>
+      )}
 
       {error && <p className="status-line">// {error}</p>}
 
