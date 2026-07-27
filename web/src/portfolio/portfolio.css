@@ -180,7 +180,7 @@
 /* ---------- sections ---------- */
 
 .section {
-  padding: 3.2rem 0;
+  padding: 2rem 0;
   border-top: 1px solid var(--rule);
   opacity: 0;
   transform: translateY(10px);
@@ -217,7 +217,7 @@
   background: none;
   border: none;
   padding: 0;
-  margin: 0 0 1.8rem;
+  margin: 0 0 1.1rem;
   font-family: var(--font-mono);
   font-size: 0.95rem;
   color: var(--muted);
@@ -243,13 +243,13 @@
 .section-foot {
   font-family: var(--font-mono);
   color: var(--muted-dim);
-  margin-top: 1.6rem;
+  margin-top: 0.9rem;
 }
 
 /* ---------- experience ---------- */
 
 .role {
-  margin-bottom: 1.8rem;
+  margin-bottom: 1.2rem;
   padding-left: 1.1rem;
   border-left: 2px solid var(--rule);
 }
@@ -363,7 +363,7 @@
 /* ---------- projects ---------- */
 
 .project {
-  margin-bottom: 1.8rem;
+  margin-bottom: 1.2rem;
 }
 
 .project-heading {
@@ -458,7 +458,7 @@
 /* ---------- education / programs ---------- */
 
 .fact {
-  margin-bottom: 1.2rem;
+  margin-bottom: 0.9rem;
 }
 
 .fact-title {
