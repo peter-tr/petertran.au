@@ -13,7 +13,6 @@ export default function Resume() {
   return (
     <>
       <header className="page-head">
-        <p className="eyebrow">full work history &amp; skills{data && <> · {data.person.clearance}</>}</p>
         <h1>Resume</h1>
         <div className="hero-links">
           <a href="/peter-tran-resume.pdf" target="_blank" rel="noreferrer">
