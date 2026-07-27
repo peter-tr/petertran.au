@@ -30,7 +30,9 @@ export const DESIGN_STUDIO_ENDPOINT = import.meta.env?.VITE_DESIGN_STUDIO_GRAPHQ
 
 export const runDesignStudioQuery = createGraphQLClient(
   DESIGN_STUDIO_ENDPOINT,
-  "VITE_DESIGN_STUDIO_GRAPHQL_ENDPOINT"
+  "VITE_DESIGN_STUDIO_GRAPHQL_ENDPOINT",
+  undefined,
+  "design-studio"
 );
 
 export type Design = DesignFieldsFragment;

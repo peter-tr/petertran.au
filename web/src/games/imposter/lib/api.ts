@@ -23,7 +23,12 @@ import type {
 // load - see web/src/portfolio/Home.tsx.
 export const IMPOSTER_ENDPOINT = import.meta.env?.VITE_IMPOSTER_GRAPHQL_ENDPOINT as string | undefined;
 
-export const runImposterQuery = createGraphQLClient(IMPOSTER_ENDPOINT, "VITE_IMPOSTER_GRAPHQL_ENDPOINT");
+export const runImposterQuery = createGraphQLClient(
+  IMPOSTER_ENDPOINT,
+  "VITE_IMPOSTER_GRAPHQL_ENDPOINT",
+  undefined,
+  "imposter"
+);
 
 export { ImposterPhase, ImposterWordSource, ImposterDifficulty } from "./api-schema-types.generated";
 

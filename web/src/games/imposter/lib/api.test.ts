@@ -47,7 +47,7 @@ describe("api.ts", () => {
     expect(init.method).toBe("POST");
     expect(init.headers).toEqual({
       "content-type": "application/json",
-      "apollographql-client-name": "web",
+      "apollographql-client-name": "imposter",
     });
     expect(JSON.parse(init.body)).toEqual({ query: IMPOSTER_CATEGORIES_QUERY, variables: undefined });
     expect(result).toEqual({ imposterCategories: [{ id: "animals", label: "Animals" }] });
