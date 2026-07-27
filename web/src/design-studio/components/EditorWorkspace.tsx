@@ -10,6 +10,7 @@ import { createElementByType, type DesignElement, type ElementType } from "../li
 import { toElementInput, fromWireElement } from "../lib/serialization";
 import { TOOLS, EXPORT_SHORTCUT_KEY, toExportFileName } from "../lib/tools";
 import { AI_STYLE_PRESETS } from "../lib/ai-styles";
+import { TEMPLATE_CATEGORIES } from "../lib/formats";
 import { saveDesign, saveAsTemplate, generateDesignElements, type Design } from "../api";
 
 interface EditorWorkspaceProps {
@@ -325,13 +326,18 @@ export default function EditorWorkspace({
       {saveError && <p className="status-line">// {saveError}</p>}
       {showTemplateForm && (
         <div className="design-studio-template-form">
-          <input
-            type="text"
-            placeholder="Category (e.g. Poster)"
+          <select
             value={templateCategory}
             onChange={(e) => setTemplateCategory(e.target.value)}
             aria-label="Template category"
-          />
+          >
+            <option value="">Category…</option>
+            {TEMPLATE_CATEGORIES.map((category) => (
+              <option key={category} value={category}>
+                {category}
+              </option>
+            ))}
+          </select>
           <input
             type="text"
             placeholder="Tags, comma separated"
@@ -386,33 +392,36 @@ export default function EditorWorkspace({
           />
         </div>
         <div className="design-studio-side-panels">
-          <LayersPanel
-            elements={elements}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-            onReorder={handleReorder}
-            onDuplicate={handleDuplicate}
-            onDelete={handleDelete}
-          />
-          <PropertyPanel element={selectedElement} onChange={handlePropertyChange} />
+          {showAiPanel ? (
+            <AiPanel
+              messages={aiMessages}
+              prompt={aiPrompt}
+              onPromptChange={setAiPrompt}
+              onSend={handleGenerate}
+              generating={generating}
+              error={aiError}
+              hasDraft={!!draftElements}
+              onAccept={handleAcceptDraft}
+              onDiscard={handleDiscardDraft}
+              style={aiStyle}
+              onStyleChange={setAiStyle}
+              onClose={() => setShowAiPanel(false)}
+            />
+          ) : (
+            <>
+              <LayersPanel
+                elements={elements}
+                selectedId={selectedId}
+                onSelect={setSelectedId}
+                onReorder={handleReorder}
+                onDuplicate={handleDuplicate}
+                onDelete={handleDelete}
+              />
+              <PropertyPanel element={selectedElement} onChange={handlePropertyChange} />
+            </>
+          )}
         </div>
       </div>
-      {showAiPanel && (
-        <AiPanel
-          messages={aiMessages}
-          prompt={aiPrompt}
-          onPromptChange={setAiPrompt}
-          onSend={handleGenerate}
-          generating={generating}
-          error={aiError}
-          hasDraft={!!draftElements}
-          onAccept={handleAcceptDraft}
-          onDiscard={handleDiscardDraft}
-          style={aiStyle}
-          onStyleChange={setAiStyle}
-          onClose={() => setShowAiPanel(false)}
-        />
-      )}
     </div>
   );
 }

@@ -49,6 +49,9 @@ interface TemplateDocument {
   width: number;
   height: number;
   elements: DesignElementRecord[];
+  // Optional - absent on every document written before this field existed
+  // (every seed template, and any template saved before this shipped).
+  isCustom?: boolean;
 }
 
 function toTemplateRecord(doc: TemplateDocument): TemplateRecord {
@@ -62,6 +65,9 @@ function toTemplateRecord(doc: TemplateDocument): TemplateRecord {
     width: doc.width,
     height: doc.height,
     elements: doc.elements ?? [],
+    // Backfills to false (not deletable) for a pre-existing document with no
+    // isCustom recorded - same discipline as withDesignDefaults/getSettings.
+    isCustom: doc.isCustom ?? false,
   };
 }
 
@@ -203,6 +209,19 @@ export class MongoDesignStore implements DesignStore {
     await collection.insertOne(doc);
 
     return toTemplateRecord(doc);
+  }
+
+  async deleteTemplate(id: string): Promise<boolean> {
+    if (!ObjectId.isValid(id)) return false;
+
+    const collection = await getTemplatesCollection();
+    // isCustom: true in the filter itself, not a separate check after
+    // fetching - a built-in starter template (or a legacy document
+    // predating this field) simply matches no document and deletes
+    // nothing, same "no error, just false" contract as an unknown id.
+    const result = await collection.deleteOne({ _id: new ObjectId(id), isCustom: true });
+
+    return result.deletedCount === 1;
   }
 
   async getAiSettings(): Promise<AiSettingsRecord> {

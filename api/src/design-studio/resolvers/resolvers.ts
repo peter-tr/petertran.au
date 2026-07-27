@@ -20,6 +20,7 @@ export interface DesignStore {
   deleteDesign(id: string): Promise<boolean>;
   listTemplates(filter: TemplateFilter): Promise<TemplateRecord[]>;
   saveTemplate(args: Omit<TemplateRecord, "id">): Promise<TemplateRecord>;
+  deleteTemplate(id: string): Promise<boolean>;
   getAiSettings(): Promise<AiSettingsRecord>;
   updateAiSettings(input: AiSettingsInput): Promise<AiSettingsRecord>;
 }
@@ -72,7 +73,9 @@ export function createDesignStudioResolvers(
           ...args.input,
           colors: deriveColors(args.input.elements),
           popularity: 0,
+          isCustom: true,
         }),
+      deleteTemplate: async (_: unknown, args: { id: string }) => store.deleteTemplate(args.id),
       generateDesignElements: async (
         _: unknown,
         args: {

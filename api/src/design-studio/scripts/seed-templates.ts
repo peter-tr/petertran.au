@@ -3,8 +3,12 @@
 //
 //   MONGO_URI="mongodb+srv://..." npx tsx src/design-studio/scripts/seed-templates.ts
 //
-// Clears and re-inserts every template rather than diffing - there are only
-// a handful of these and they're read-mostly seed data, not user content.
+// Clears and re-inserts every *seed* template rather than diffing - there
+// are only a handful of these and they're read-mostly seed data, not user
+// content. Scoped to isCustom-not-true so a real user's own "Save as
+// template" documents (isCustom: true) are never touched by a re-run -
+// { $ne: true } rather than { $eq: false } also catches any pre-existing
+// seed document written before isCustom existed at all.
 import { getDb } from "../lib/db/client";
 import { STARTER_TEMPLATES } from "../lib/templates";
 
@@ -12,8 +16,10 @@ async function main() {
   const db = await getDb();
   const collection = db.collection("templates");
 
-  const { deletedCount } = await collection.deleteMany({});
-  const { insertedCount } = await collection.insertMany(STARTER_TEMPLATES);
+  const { deletedCount } = await collection.deleteMany({ isCustom: { $ne: true } });
+  const { insertedCount } = await collection.insertMany(
+    STARTER_TEMPLATES.map((template) => ({ ...template, isCustom: false }))
+  );
 
   console.log(`[seed-templates] removed ${deletedCount} existing, inserted ${insertedCount} templates`);
   process.exit(0);

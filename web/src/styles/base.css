@@ -232,6 +232,26 @@ a {
   border-color: var(--type);
 }
 
+/* Modifier on .form-label for the "checkbox + long description" pattern
+   (settings toggles) - a bare checkbox followed by inline text otherwise
+   wraps flush against the left edge on its second line, orphaning the
+   checkbox above it instead of reading as one aligned block. Flex row +
+   the checkbox as a fixed-width item makes the text (an anonymous flex
+   item, per the flexbox spec, since it's a bare text run rather than
+   wrapped in its own element) wrap in its own column to the checkbox's
+   right instead. */
+.form-checkbox-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  cursor: pointer;
+}
+
+.form-checkbox-label input[type="checkbox"] {
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+}
+
 @media (max-width: 640px) {
   /* iOS Safari auto-zooms the page on focus for any input under 16px -
      bumping just the mobile font-size avoids that without changing how

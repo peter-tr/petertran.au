@@ -103,6 +103,7 @@ class InMemoryDesignStore implements DesignStore {
   private readonly templates: TemplateRecord[] = STARTER_TEMPLATES.map((template) => ({
     ...template,
     id: randomUUID(),
+    isCustom: false,
   }));
   private aiSettings: AiSettingsRecord = { ...DEFAULT_AI_SETTINGS };
 
@@ -147,6 +148,15 @@ class InMemoryDesignStore implements DesignStore {
     this.templates.push(template);
 
     return template;
+  }
+
+  async deleteTemplate(id: string): Promise<boolean> {
+    const index = this.templates.findIndex((template) => template.id === id && template.isCustom);
+    if (index === -1) return false;
+
+    this.templates.splice(index, 1);
+
+    return true;
   }
 
   async getAiSettings(): Promise<AiSettingsRecord> {

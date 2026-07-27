@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { getGalleryData, listDesigns, deleteDesign, type Design, type Template } from "./api";
 import TemplatesSection from "./components/TemplatesSection";
 import { CANVAS_FORMATS } from "./lib/formats";
+import { formatEditedAgo } from "./lib/timeAgo";
 import type { NewDesignLocationState } from "./Editor";
 import "./design-studio.css";
 
@@ -10,6 +11,8 @@ export default function Gallery() {
   const [designs, setDesigns] = useState<Design[] | null>(null);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [showAbout, setShowAbout] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
 
   // One combined request for both designs and templates - Gallery's own list
   // and TemplatesSection's initial unfiltered list used to be 2 (really 3,
@@ -36,42 +39,92 @@ export default function Gallery() {
   return (
     <div className="design-studio-gallery">
       <header className="design-studio-gallery-head">
-        <h1>Design Studio</h1>
-        <div className="design-studio-gallery-head-actions">
-          <div className="design-studio-new-formats">
-            {CANVAS_FORMATS.map((format) => {
-              const state: NewDesignLocationState = {
-                seedName: `Untitled ${format.label.toLowerCase()}`,
-                seedWidth: format.width,
-                seedHeight: format.height,
-              };
-
-              return (
-                <Link
-                  key={format.id}
-                  to="/design-studio/new"
-                  state={state}
-                  className="design-studio-tool-btn"
-                >
-                  New {format.label}
-                </Link>
-              );
-            })}
-          </div>
-          <Link to="/design-studio/settings" className="design-studio-settings-link">
-            Settings
-          </Link>
-        </div>
+        <h1>
+          Design Studio
+          <button
+            type="button"
+            className="design-studio-info-btn"
+            onClick={() => setShowAbout((v) => !v)}
+            aria-label="What is this page?"
+            aria-expanded={showAbout}
+          >
+            i
+          </button>
+          <button
+            type="button"
+            className="design-studio-info-btn"
+            onClick={() => setShowHelp((v) => !v)}
+            aria-label="How do I use this?"
+            aria-expanded={showHelp}
+          >
+            h
+          </button>
+        </h1>
+        <Link
+          to="/design-studio/settings"
+          className="design-studio-settings-link"
+          aria-label="Design Studio settings"
+          title="Settings"
+        >
+          ⚙
+        </Link>
       </header>
 
+      {showAbout && (
+        <p className="design-studio-about">
+          A lightweight Canva clone - built to try AI-assisted design generation and to use MongoDB (rather
+          than this site's usual DynamoDB) as a real datastore for something that's naturally a large, deeply
+          nested document.
+        </p>
+      )}
+
+      {showHelp && (
+        <div className="design-studio-help">
+          <p>
+            Pick a shape/text tool from the toolbar under the canvas, or press its number key (1 rectangle, 2
+            ellipse, 3 arrow, 4 text). Drag to move, use the handles to resize. <kbd>Delete</kbd> removes the
+            selected element, <kbd>Cmd/Ctrl+Z</kbd> undoes, <kbd>Cmd/Ctrl+Shift+Z</kbd> redoes,{" "}
+            <kbd>Cmd/Ctrl+S</kbd> saves, and <kbd>5</kbd> exports a PNG.
+          </p>
+          <p>
+            "Generate with AI" opens a chat-style panel where you can describe what you want and keep refining
+            the draft before accepting it onto the canvas. "Save as template" turns the current design into a
+            reusable starting point under Templates below.
+          </p>
+        </div>
+      )}
+
+      <div className="design-studio-new-formats">
+        {CANVAS_FORMATS.map((format) => {
+          const state: NewDesignLocationState = {
+            seedName: `Untitled ${format.label.toLowerCase()}`,
+            seedWidth: format.width,
+            seedHeight: format.height,
+          };
+
+          return (
+            <Link key={format.id} to="/design-studio/new" state={state} className="design-studio-tool-btn">
+              New {format.label}
+            </Link>
+          );
+        })}
+      </div>
+
       {error && <p className="status-line">// {error}</p>}
+
+      <h2 className="design-studio-section-heading">Your designs</h2>
 
       {designs?.length === 0 && <p className="design-studio-empty">No designs yet - create one.</p>}
 
       <ul className="design-studio-gallery-grid">
         {designs?.map((design) => (
           <li key={design.id} className="design-studio-gallery-card">
-            <Link to={`/design-studio/${design.id}`}>{design.name}</Link>
+            <div className="design-studio-gallery-card-info">
+              <Link to={`/design-studio/${design.id}`}>{design.name}</Link>
+              <span className="design-studio-gallery-card-meta">
+                edited {formatEditedAgo(design.updatedAt)}
+              </span>
+            </div>
             <button
               type="button"
               onClick={() => handleDelete(design.id)}

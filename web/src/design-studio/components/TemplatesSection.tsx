@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { listTemplates, type Template } from "../api";
+import { listTemplates, deleteTemplate, type Template } from "../api";
 import type { NewDesignLocationState } from "../Editor";
 
 interface TemplatesSectionProps {
@@ -17,6 +17,12 @@ export default function TemplatesSection({ initialTemplates }: TemplatesSectionP
   const [category, setCategory] = useState("");
   const [results, setResults] = useState<Template[]>(initialTemplates);
   const [error, setError] = useState<string | null>(null);
+  // Deleting a custom template can't just splice `results`/`initialTemplates`
+  // - initialTemplates is Gallery's own prop (immutable here) and the
+  // unfiltered view renders it directly (see displayedResults below), so a
+  // deleted id is instead filtered out of whichever list is showing, no
+  // matter which one that is. Avoids an extra network round-trip too.
+  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
 
   const categories = useMemo(
     () =>
@@ -30,7 +36,9 @@ export default function TemplatesSection({ initialTemplates }: TemplatesSectionP
   // `results` via an effect - Gallery's combined GALLERY_QUERY already
   // fetched the unfiltered list (see api.ts), so this component only ever
   // touches the network for an actual search/filter.
-  const displayedResults = isFiltered ? results : initialTemplates;
+  const displayedResults = (isFiltered ? results : initialTemplates).filter(
+    (template) => !deletedIds.has(template.id)
+  );
   const displayedError = isFiltered ? error : null;
 
   // Debounced so typing a search term doesn't fire a request per keystroke.
@@ -61,6 +69,11 @@ export default function TemplatesSection({ initialTemplates }: TemplatesSectionP
       seedHeight: template.height,
     };
     navigate("/design-studio/new", { state });
+  }
+
+  async function handleDelete(template: Template) {
+    const deleted = await deleteTemplate(template.id).catch(() => false);
+    if (deleted) setDeletedIds((current) => new Set(current).add(template.id));
   }
 
   return (
@@ -103,9 +116,21 @@ export default function TemplatesSection({ initialTemplates }: TemplatesSectionP
             </div>
             <span className="design-studio-template-name">{template.name}</span>
             <span className="design-studio-template-category">{template.category}</span>
-            <button type="button" onClick={() => handleOpen(template)}>
-              Use template
-            </button>
+            <div className="design-studio-template-actions">
+              <button type="button" onClick={() => handleOpen(template)}>
+                Use template
+              </button>
+              {template.isCustom && (
+                <button
+                  type="button"
+                  className="design-studio-template-delete"
+                  onClick={() => handleDelete(template)}
+                  aria-label={`Delete ${template.name}`}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
           </li>
         ))}
       </ul>

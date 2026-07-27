@@ -58,7 +58,7 @@ export default function WarmScheduleProject({
 
   return (
     <div className="warm-schedule">
-      <label className="form-label" htmlFor={`warm-schedule-${fn}-enabled`}>
+      <label className="form-label form-checkbox-label" htmlFor={`warm-schedule-${fn}-enabled`}>
         <input
           id={`warm-schedule-${fn}-enabled`}
           type="checkbox"

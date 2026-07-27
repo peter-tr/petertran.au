@@ -48,6 +48,7 @@ export default function ImposterSetup() {
   const [hideCategory, setHideCategory] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showAbout, setShowAbout] = useState(false);
 
   useEffect(() => {
     runImposterQuery<ImposterCategoriesResult>(IMPOSTER_CATEGORIES_QUERY)
@@ -156,14 +157,33 @@ export default function ImposterSetup() {
 
   return (
     <>
-      <header className="page-head">
-        <p className="eyebrow">one shared device, one word each</p>
-        <h1>Imposter</h1>
-        <p className="tagline">
-          Everyone gets the same secret word - except the imposter(s), who get something close but different.
-          Pass the device around, discuss out loud, and vote out whoever seems off.
-        </p>
+      <header className="imposter-head imposter-head-row">
+        <h1>
+          Imposter
+          <button
+            type="button"
+            className="imposter-info-btn"
+            onClick={() => setShowAbout((v) => !v)}
+            aria-label="What is this page?"
+            aria-expanded={showAbout}
+          >
+            i
+          </button>
+        </h1>
       </header>
+
+      {showAbout && (
+        <p className="imposter-about">
+          Built for game nights where we kept losing track of whose turn it was to think of a word and quietly
+          show it around - this hands out the secret word (and the imposter's decoy) for you, so everyone can
+          just play.
+        </p>
+      )}
+
+      <p className="tagline">
+        Everyone gets the same secret word - except the imposter(s), who get something close but different.
+        Pass the device around, discuss out loud, and vote out whoever seems off.
+      </p>
 
       <RecentGames />
       <LiveGames />

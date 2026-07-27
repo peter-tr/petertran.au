@@ -135,7 +135,7 @@ export default function PantrySettingsPage() {
           </p>
 
           <div className="form-row pantry-settings-row">
-            <label className="form-label" htmlFor="pantry-digest-enabled">
+            <label className="form-label form-checkbox-label" htmlFor="pantry-digest-enabled">
               <input
                 id="pantry-digest-enabled"
                 type="checkbox"
@@ -180,7 +180,7 @@ export default function PantrySettingsPage() {
           </p>
 
           <div className="form-row pantry-settings-row">
-            <label className="form-label" htmlFor="pantry-instant-load-cache">
+            <label className="form-label form-checkbox-label" htmlFor="pantry-instant-load-cache">
               <input
                 id="pantry-instant-load-cache"
                 type="checkbox"
@@ -309,7 +309,7 @@ export default function PantrySettingsPage() {
             are usually checked separately.
           </p>
           <div className="form-row pantry-settings-row">
-            <label className="form-label" htmlFor="pantry-nerd-mode-inventory">
+            <label className="form-label form-checkbox-label" htmlFor="pantry-nerd-mode-inventory">
               <input
                 id="pantry-nerd-mode-inventory"
                 type="checkbox"
@@ -320,7 +320,7 @@ export default function PantrySettingsPage() {
             </label>
           </div>
           <div className="form-row pantry-settings-row">
-            <label className="form-label" htmlFor="pantry-nerd-mode-shopping-list">
+            <label className="form-label form-checkbox-label" htmlFor="pantry-nerd-mode-shopping-list">
               <input
                 id="pantry-nerd-mode-shopping-list"
                 type="checkbox"
@@ -331,7 +331,7 @@ export default function PantrySettingsPage() {
             </label>
           </div>
           <div className="form-row pantry-settings-row">
-            <label className="form-label" htmlFor="pantry-nerd-mode-command-bar">
+            <label className="form-label form-checkbox-label" htmlFor="pantry-nerd-mode-command-bar">
               <input
                 id="pantry-nerd-mode-command-bar"
                 type="checkbox"

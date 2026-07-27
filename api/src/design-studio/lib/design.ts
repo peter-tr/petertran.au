@@ -53,12 +53,19 @@ export interface TemplateRecord {
   width: number;
   height: number;
   elements: DesignElementRecord[];
+  // True only for a template saved via the editor's "Save as template" -
+  // false for one of the hand-built STARTER_TEMPLATES (see lib/templates.ts).
+  // Only a custom template can be deleted (see deleteTemplate in
+  // resolvers.ts/store.ts) - a hardcoded seed template isn't user content,
+  // and re-running scripts/seed-templates.ts would just recreate it anyway.
+  isCustom: boolean;
 }
 
-// A template's seed data, before it has a store-assigned id - what
-// scripts/seed-templates.ts inserts and the in-memory dev store seeds
-// itself with, so both share one definition instead of two.
-export type TemplateSeed = Omit<TemplateRecord, "id">;
+// A template's seed data, before it has a store-assigned id or isCustom
+// (always false for a seed) - what scripts/seed-templates.ts inserts and the
+// in-memory dev store seeds itself with, so both share one definition
+// instead of two.
+export type TemplateSeed = Omit<TemplateRecord, "id" | "isCustom">;
 
 export interface TemplateFilter {
   search?: string | null;

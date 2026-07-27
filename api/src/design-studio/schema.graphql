@@ -104,6 +104,12 @@ type Template {
   width: Float!
   height: Float!
   elements: [DesignElement!]!
+  """
+  True only for a template saved via "Save as template" in the editor -
+  false for one of the built-in starter templates. Only a custom template
+  can be deleted (see deleteTemplate).
+  """
+  isCustom: Boolean!
 }
 
 """
@@ -197,6 +203,12 @@ type Mutation {
   automatically from the elements' fills, not part of the input.
   """
   saveAsTemplate(input: SaveAsTemplateInput!): Template!
+  """
+  Deletes a template. Only templates with isCustom: true can be deleted -
+  returns false (without error) for a built-in starter template or an id
+  that doesn't exist.
+  """
+  deleteTemplate(id: ID!): Boolean!
   """
   Generates a set of design elements from a natural-language prompt, sized
   to fit within width/height. Pure generation - nothing is persisted here;
