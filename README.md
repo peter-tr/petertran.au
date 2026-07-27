@@ -102,3 +102,83 @@ npm run deploy
 
 This builds every workspace (via turbo, in parallel and cached), then runs
 `cdk deploy` from `infra`.
+
+## CI/CD
+
+Every PR runs three required checks in parallel - a Conventional Commit title
+lint, a changeset-coverage check (auto-generates one from the PR title if
+missing, then fails naming any package still uncovered), and `verify`
+(lint/format/typecheck). A squash-merge to `main` triggers two independent
+workflows: **Deploy** (build every workspace, `cdk deploy`, sync `web/dist` to
+S3 + invalidate CloudFront) and **Changelog** (Changesets opens/updates a
+"Version Packages" PR; once that merges, it tags each bumped package and cuts
+a GitHub Release). A successful deploy of that release-PR merge also tags the
+commit `release-N` - a pinned, already-verified-deployable snapshot that two
+manual rollback workflows (whole-site or single-package) can redeploy from on
+demand.
+
+```mermaid
+flowchart LR
+    pr["PR opened"] --> checks["title lint + changeset\ncoverage + verify"]
+    checks -->|"required checks pass"| merge["squash-merge to main"]
+    merge --> deploy["Deploy:\nbuild -> cdk deploy -> sync web"]
+    merge --> changelog["Changelog:\nversion PR -> tag + GitHub Release"]
+    changelog -.->|"version PR merges"| deploy
+    deploy -.->|"was a version-PR merge"| tag["tag release-N"]
+    tag -.-> rollback["Deploy Release / Deploy Package\n(manual rollback, by tag)"]
+    rollback -.-> deploy
+```
+
+Full breakdown, including OIDC auth, the on-demand test environment, and why
+rollbacks specifically guard against destructive CDK replacements:
+[`.github/workflows/README.md`](./.github/workflows/README.md).
+
+## Observability
+
+Six signals answer six different questions about the same running system:
+RUM and Microsoft Clarity for real-user page performance and session replay,
+Apollo GraphOS for which GraphQL operations/fields run and how fast,
+CloudWatch alarms + a dashboard for "is something unhealthy right now,
+page me," OTEL/ADOT + X-Ray for per-request distributed tracing, and
+CloudWatch Logs for raw invocation output. One identifier ties most of them
+together: the browser generates its own X-Ray trace ID and carries it all
+the way from RUM through API Gateway, into whichever Lambda(s) handle the
+request, and out to DynamoDB/Anthropic calls as subsegments.
+
+```mermaid
+flowchart LR
+    browser["Browser"] -->|"aws-rum-web"| rum["RUM"]
+    browser -->|"@microsoft/clarity"| clarity["Clarity"]
+    browser -->|"X-Amzn-Trace-Id\n(self-generated)"| apigw["API Gateway\n(REST, tracingEnabled)"]
+    apigw --> lambdas["Lambda subgraphs /\nsupergraph Router"]
+    lambdas -->|"ADOT layer / collector"| xray["X-Ray trace"]
+    lambdas -->|"ftv1 field timing"| graphos["Apollo GraphOS Studio"]
+    lambdas --> data["DynamoDB / Mongo / Anthropic"]
+    lambdas -->|"EMF metrics"| dashboard["CloudWatch dashboard\n+ alarms -> SNS -> email"]
+```
+
+Full breakdown of each signal and how it's wired: [`docs/observability.md`](./docs/observability.md).
+
+## Identity & access control
+
+Three unrelated mechanisms happen to all involve "Cognito," which is worth
+being precise about: **pantry** and **zero-trust-lab** authenticate real
+people (Cognito User Pools); **RUM** vends anonymous AWS credentials to every
+browser via a Cognito _Identity_ Pool with no user identity at all; and
+**portfolio**, **design-studio**, and **games/imposter** have no auth
+whatsoever. zero-trust-lab specifically implements the "phantom token"
+pattern - an opaque token at the edge exchanged for a short-lived, KMS-signed
+JWT before it reaches an internal service - as a hands-on exercise in an
+enterprise gateway pattern.
+
+```mermaid
+flowchart LR
+    ztlUser["Person"] -->|"Cognito Hosted UI"| ztl["zero-trust-lab:\nopaque token -> edge introspect\n-> KMS-signed JWT -> domain gateway"]
+    pantryUser["Person"] -->|"direct InitiateAuth"| pantry["pantry:\nID token -> per-user\nDynamoDB partition (USER#sub)"]
+    anyone["Any visitor"] -->|"no login"| rumId["RUM:\nCognito Identity Pool,\nanonymous AWS creds only"]
+    public["Any visitor"] -->|"no auth"| noauth["portfolio / design-studio /\ngames/imposter: public"]
+```
+
+Full breakdown: [`docs/identity.md`](./docs/identity.md) (and
+[`docs/zero-trust-lab.md`](./docs/zero-trust-lab.md) for zero-trust-lab's
+own deep technical writeup).
