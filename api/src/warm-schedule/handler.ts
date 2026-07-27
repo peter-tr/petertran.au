@@ -510,7 +510,7 @@ async function healWeightedAlias(functionName: string): Promise<void> {
   // change, not a cutover. The manual recovery for this same incident
   // (2026-07-27) did exactly this: `aws lambda update-alias --function-
   // version <already-serving-version> --routing-config '{}'`.
-  const [stuckVersion] = weights.reduce((a, b) => (b[1] > a[1] ? b : a));
+  const [stuckVersion] = weights.reduce((a, b) => (b[1] > a[1] ? b : a), weights[0]);
   console.warn(
     `healWeightedAlias(${functionName}): alias had a weighted RoutingConfig ` +
       `blocking PC - clearing it and pinning to version ${stuckVersion}, which was already serving all traffic`
