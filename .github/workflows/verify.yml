@@ -27,16 +27,16 @@ jobs:
     if: github.head_ref != 'changeset-release/main'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - run: npm ci
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: .turbo/cache
           key: turbo-${{ github.job }}-${{ runner.os }}-${{ github.sha }}
@@ -61,14 +61,14 @@ jobs:
       contents: read
       pull-requests: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Check changed subgraph schemas against GraphOS
         env:
           APOLLO_KEY: ${{ secrets.APOLLO_KEY }}
           GH_TOKEN: ${{ github.token }}
           # Rover auto-detects commit/branch from the checked-out .git dir,
-          # but on a pull_request trigger actions/checkout@v4 defaults to
+          # but on a pull_request trigger actions/checkout@v7 defaults to
           # GitHub's synthetic merge commit (refs/pull/N/merge) - a SHA that
           # never appears in the PR's own history. Overriding both explicitly
           # to the PR's real HEAD is what lets GraphOS's GitHub App (once
@@ -98,11 +98,11 @@ jobs:
     if: github.head_ref != 'changeset-release/main'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - run: npm ci
@@ -116,7 +116,7 @@ jobs:
 
       - name: Cache Playwright browsers
         id: playwright-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-chromium-${{ runner.os }}-${{ hashFiles('web/package-lock.json', 'package-lock.json') }}
