@@ -1,4 +1,4 @@
-import { describe, it, vi, beforeAll, afterAll, type MockInstance } from "vitest";
+import { describe, it, expect, vi, beforeAll, afterAll, type MockInstance } from "vitest";
 import { App } from "aws-cdk-lib";
 import { Template } from "aws-cdk-lib/assertions";
 import * as lambda from "aws-cdk-lib/aws-lambda";
@@ -81,5 +81,43 @@ describe("ProvisionedConcurrencyStack", () => {
     template.hasResourceProperties("AWS::Logs::SubscriptionFilter", {
       FilterPattern: '"Init Duration"',
     });
+  });
+
+  // Regression test for a real incident (#232 shipped healWeightedAlias,
+  // which calls GetAlias on every reconcileTarget tick, without ever
+  // granting lambda:GetAlias) - every reconcile for every project silently
+  // failed with AccessDeniedException before ever reaching the actual PC
+  // grant/delete call, confirmed live via warm-schedule's own CloudWatch
+  // Logs. GetAlias is the read counterpart of UpdateAlias/CreateAlias/
+  // DeleteAlias and resolves against the bare function ARN, same as those.
+  it("grants lambda:GetAlias against the bare function ARN, alongside the other alias CRUD actions", () => {
+    const app = new App();
+    const stack = new ProvisionedConcurrencyStack(app, "TestProvisionedConcurrencyStack", {
+      portfolioFnName: "portfolio-graphql",
+      pantryFnName: "pantry-graphql",
+      imposterFnName: "imposter-graphql",
+      supergraphFnName: "supergraph-graphql",
+      designStudioFnName: "design-studio-graphql",
+      zeroTrustLabFnNames: {
+        idpBridge: "ztl-idp-bridge",
+        internalSts: "ztl-internal-sts",
+        edgeAuthorizer: "ztl-edge-authorizer",
+        edgeProxy: "ztl-edge-proxy",
+        domainA: "ztl-domain-a",
+      },
+      env: { account: "123456789012", region: "ap-southeast-2" },
+    });
+
+    const template = Template.fromStack(stack);
+
+    const policies = Object.values(template.findResources("AWS::IAM::Policy")) as Array<{
+      Properties: { PolicyDocument: { Statement: Array<{ Action: string | string[] }> } };
+    }>;
+    const statements = policies.flatMap((p) => p.Properties.PolicyDocument.Statement);
+    const aliasStatement = statements.find(
+      (s) => Array.isArray(s.Action) && s.Action.includes("lambda:UpdateAlias")
+    );
+
+    expect(aliasStatement?.Action).toContain("lambda:GetAlias");
   });
 });
