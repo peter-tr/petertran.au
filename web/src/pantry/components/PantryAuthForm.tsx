@@ -23,22 +23,28 @@ export default function PantryAuthForm({ pending, error, onSubmit, onClose }: Pa
 
   return (
     <div className="pantry-auth-form">
+      <p className="pantry-auth-blurb">
+        Want your own saved pantry, prices, and settings? Sign in or create an account.
+      </p>
       <form onSubmit={handleSubmit}>
+        {/* type="text" (not "email") and no required/minLength - Cognito's
+            own SignUp/InitiateAuth response already carries a real error
+            message (see auth.ts's friendlyMessage) for a bad/missing
+            email or a too-short password, so the browser's native
+            validation popups here would just be a second, redundant
+            (and worse-worded) copy of the same feedback. */}
         <input
-          type="email"
+          type="text"
           placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           autoFocus
-          required
         />
         <input
           type="password"
           placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          minLength={6}
-          required
         />
         {error && <p className="pantry-auth-error">{error}</p>}
         <div className="pantry-auth-actions">
