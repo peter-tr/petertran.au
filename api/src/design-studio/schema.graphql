@@ -6,6 +6,7 @@ enum DesignElementType {
   RECTANGLE
   ELLIPSE
   TEXT
+  ARROW
 }
 
 """

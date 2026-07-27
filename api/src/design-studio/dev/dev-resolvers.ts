@@ -95,8 +95,8 @@ function matchesFilter(template: TemplateRecord, filter: TemplateFilter): boolea
 }
 
 class InMemoryDesignStore implements DesignStore {
-  private designs = new Map<string, DesignRecord>();
-  private templates: TemplateRecord[] = STARTER_TEMPLATES.map((template) => ({
+  private readonly designs = new Map<string, DesignRecord>();
+  private readonly templates: TemplateRecord[] = STARTER_TEMPLATES.map((template) => ({
     ...template,
     id: randomUUID(),
   }));

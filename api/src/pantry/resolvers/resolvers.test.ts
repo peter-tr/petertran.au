@@ -235,7 +235,11 @@ describe("Query.parseCommand", () => {
   it("gathers inventory/shoppingList/settings and forwards categories and sourceIp", async () => {
     const inventory = [inventoryItem()];
     const shoppingList = [shoppingListEntry()];
-    const settings = { categories: ["Dairy", "Produce"] } as PantrySettings;
+    const settings = {
+      categories: ["Dairy", "Produce"],
+      aiProvider: "ANTHROPIC",
+      aiModelTier: "HAIKU",
+    } as PantrySettings;
     getAllItems.mockResolvedValue(inventory);
     getShoppingList.mockResolvedValue(shoppingList);
     getSettings.mockResolvedValue(settings);
@@ -250,7 +254,9 @@ describe("Query.parseCommand", () => {
       inventory,
       shoppingList,
       ["Dairy", "Produce"],
-      "9.9.9.9"
+      "9.9.9.9",
+      "ANTHROPIC",
+      "HAIKU"
     );
   });
 

@@ -5,6 +5,7 @@ import {
   DeleteCommand,
   type DynamoDBDocumentClient,
 } from "@aws-sdk/lib-dynamodb";
+import { traceSpan } from "api-shared/tracing";
 
 export interface DynamoRepositoryConfig {
   ddb: DynamoDBDocumentClient;
@@ -34,44 +35,52 @@ export abstract class DynamoRepository<T extends { id: string }> {
   }
 
   async get(pk: string, id: string): Promise<T | null> {
-    const res = await this.config.ddb.send(
-      new GetCommand({ TableName: this.config.tableName, Key: this.key(pk, id) })
-    );
-    const item = res.Item?.data as T | undefined;
+    return traceSpan(`${this.config.itemType}.get`, async () => {
+      const res = await this.config.ddb.send(
+        new GetCommand({ TableName: this.config.tableName, Key: this.key(pk, id) })
+      );
+      const item = res.Item?.data as T | undefined;
 
-    return item ? this.applyDefaults(item) : null;
+      return item ? this.applyDefaults(item) : null;
+    });
   }
 
   async getAll(pk: string): Promise<T[]> {
-    const res = await this.config.ddb.send(
-      new QueryCommand({
-        TableName: this.config.tableName,
-        KeyConditionExpression: "pk = :pk AND begins_with(sk, :prefix)",
-        ExpressionAttributeValues: { ":pk": pk, ":prefix": this.config.skPrefix },
-      })
-    );
+    return traceSpan(`${this.config.itemType}.getAll`, async () => {
+      const res = await this.config.ddb.send(
+        new QueryCommand({
+          TableName: this.config.tableName,
+          KeyConditionExpression: "pk = :pk AND begins_with(sk, :prefix)",
+          ExpressionAttributeValues: { ":pk": pk, ":prefix": this.config.skPrefix },
+        })
+      );
 
-    return (res.Items ?? []).map((i) => this.applyDefaults(i.data as T));
+      return (res.Items ?? []).map((i) => this.applyDefaults(i.data as T));
+    });
   }
 
   async put(pk: string, item: T): Promise<void> {
-    await this.config.ddb.send(
-      new PutCommand({
-        TableName: this.config.tableName,
-        Item: { ...this.key(pk, item.id), type: this.config.itemType, data: item },
-      })
-    );
+    await traceSpan(`${this.config.itemType}.put`, async () => {
+      await this.config.ddb.send(
+        new PutCommand({
+          TableName: this.config.tableName,
+          Item: { ...this.key(pk, item.id), type: this.config.itemType, data: item },
+        })
+      );
+    });
   }
 
   async delete(pk: string, id: string): Promise<boolean> {
-    const res = await this.config.ddb.send(
-      new DeleteCommand({
-        TableName: this.config.tableName,
-        Key: this.key(pk, id),
-        ReturnValues: "ALL_OLD",
-      })
-    );
+    return traceSpan(`${this.config.itemType}.delete`, async () => {
+      const res = await this.config.ddb.send(
+        new DeleteCommand({
+          TableName: this.config.tableName,
+          Key: this.key(pk, id),
+          ReturnValues: "ALL_OLD",
+        })
+      );
 
-    return res.Attributes !== undefined;
+      return res.Attributes !== undefined;
+    });
   }
 }

@@ -6,14 +6,10 @@ import PropertyPanel from "./PropertyPanel";
 import AiPanel, { type AiMessage } from "./AiPanel";
 import { useEventHistory } from "../lib/history/useEventHistory";
 import type { HistoryEvent } from "../lib/history/reducer";
-import {
-  createRectangle,
-  createEllipse,
-  createText,
-  type DesignElement,
-  type ElementType,
-} from "../lib/elements";
+import { createElementByType, type DesignElement, type ElementType } from "../lib/elements";
 import { toElementInput, fromWireElement } from "../lib/serialization";
+import { TOOLS, EXPORT_SHORTCUT_KEY } from "../lib/tools";
+import { AI_STYLE_PRESETS } from "../lib/ai-styles";
 import {
   saveDesign,
   saveAsTemplate,
@@ -64,6 +60,12 @@ export default function EditorWorkspace({
   const [showAiPanel, setShowAiPanel] = useState(false);
   const [aiMessages, setAiMessages] = useState<AiMessage[]>([]);
   const [aiPrompt, setAiPrompt] = useState("");
+  // The style chip selected in the panel ("none" by default) - its
+  // descriptor is appended to the prompt at send time (see handleGenerate)
+  // rather than edited into the textarea itself, so switching styles
+  // between refinements doesn't require the user to hunt for and replace
+  // a phrase they didn't type.
+  const [aiStyle, setAiStyle] = useState("none");
   const [generating, setGenerating] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   // Operator-configurable, not per-design - loaded lazily the first time the
@@ -83,14 +85,7 @@ export default function EditorWorkspace({
 
   const handleAdd = useCallback(
     (type: ElementType) => {
-      const centerX = width / 2;
-      const centerY = height / 2;
-      const created =
-        type === "rectangle"
-          ? createRectangle(elements, centerX, centerY)
-          : type === "ellipse"
-            ? createEllipse(elements, centerX, centerY)
-            : createText(elements, centerX, centerY);
+      const created = createElementByType(type, elements, width / 2, height / 2);
 
       dispatch({ type: "add", element: created });
       setSelectedId(created.id);
@@ -216,8 +211,14 @@ export default function EditorWorkspace({
       // top of existing content. See the backend's isRefinement branch
       // in generate-elements.ts.
       const baseElements = draftElements ?? (elements.length > 0 ? elements : undefined);
+      // The style descriptor is appended to what's actually sent, not
+      // stored in aiPrompt/shown in the log - so switching styles between
+      // refinements doesn't clutter the visible prompt history with a
+      // repeated style phrase the user never typed.
+      const styleDescriptor = AI_STYLE_PRESETS.find((preset) => preset.key === aiStyle)?.descriptor;
+      const finalPrompt = styleDescriptor ? `${trimmed} (style: ${styleDescriptor})` : trimmed;
       const generated = await generateDesignElements({
-        prompt: trimmed,
+        prompt: finalPrompt,
         width,
         height,
         currentElements: baseElements?.map(toElementInput),
@@ -231,7 +232,7 @@ export default function EditorWorkspace({
     } finally {
       setGenerating(false);
     }
-  }, [aiPrompt, width, height, draftElements, elements]);
+  }, [aiPrompt, width, height, draftElements, elements, aiStyle]);
 
   const handleAcceptDraft = useCallback(() => {
     if (!draftElements) return;
@@ -303,13 +304,22 @@ export default function EditorWorkspace({
       } else if ((e.key === "Delete" || e.key === "Backspace") && selectedId) {
         e.preventDefault();
         handleDelete(selectedId);
+      } else if (e.key === EXPORT_SHORTCUT_KEY) {
+        e.preventDefault();
+        canvasRef.current?.exportPNG();
+      } else {
+        const tool = TOOLS.find((t) => t.key === e.key);
+        if (tool) {
+          e.preventDefault();
+          handleAdd(tool.type);
+        }
       }
     }
 
     window.addEventListener("keydown", handleKeyDown);
 
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [undo, redo, selectedId, handleDelete, handleSave]);
+  }, [undo, redo, selectedId, handleDelete, handleSave, handleAdd]);
 
   return (
     <div className="design-studio-editor">
@@ -368,6 +378,23 @@ export default function EditorWorkspace({
         </div>
       )}
       {templateMessage && <p className="status-line">// {templateMessage}</p>}
+      {showAiPanel && (
+        <AiPanel
+          messages={aiMessages}
+          prompt={aiPrompt}
+          onPromptChange={setAiPrompt}
+          onSend={handleGenerate}
+          generating={generating}
+          error={aiError}
+          hasDraft={!!draftElements}
+          onAccept={handleAcceptDraft}
+          onDiscard={handleDiscardDraft}
+          aiSettings={aiSettings}
+          onAiSettingsChange={handleAiSettingsChange}
+          style={aiStyle}
+          onStyleChange={setAiStyle}
+        />
+      )}
       <div className="design-studio-workspace">
         <Toolbar onAdd={handleAdd} onExport={handleExport} exporting={exporting} />
         <div className="design-studio-canvas-frame">
@@ -386,21 +413,6 @@ export default function EditorWorkspace({
           />
         </div>
         <div className="design-studio-side-panels">
-          {showAiPanel && (
-            <AiPanel
-              messages={aiMessages}
-              prompt={aiPrompt}
-              onPromptChange={setAiPrompt}
-              onSend={handleGenerate}
-              generating={generating}
-              error={aiError}
-              hasDraft={!!draftElements}
-              onAccept={handleAcceptDraft}
-              onDiscard={handleDiscardDraft}
-              aiSettings={aiSettings}
-              onAiSettingsChange={handleAiSettingsChange}
-            />
-          )}
           <LayersPanel
             elements={elements}
             selectedId={selectedId}

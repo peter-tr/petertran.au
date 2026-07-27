@@ -1,16 +1,31 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { usePantryHome } from "./usePantryHome";
-import { runPantryQuery } from "../api";
+import { runPantryQuery, AiProvider, AiModelTier } from "../api";
+import { clearPantryHomeCache, readPantryHomeCache, writePantryHomeCache } from "../lib/homeCache";
 import type { InventoryItem, PantryHomeQueryResult, PantrySettings, ShoppingListEntry } from "../api";
 
-vi.mock("../api", () => ({
-  runPantryQuery: vi.fn(),
-  PANTRY_HOME_QUERY: "PANTRY_HOME_QUERY",
-  UPDATE_SETTINGS_MUTATION: "UPDATE_SETTINGS_MUTATION",
+vi.mock("../api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../api")>();
+
+  return {
+    ...actual,
+    runPantryQuery: vi.fn(),
+    PANTRY_HOME_QUERY: "PANTRY_HOME_QUERY",
+    UPDATE_SETTINGS_MUTATION: "UPDATE_SETTINGS_MUTATION",
+  };
+});
+
+vi.mock("../lib/homeCache", () => ({
+  readPantryHomeCache: vi.fn(),
+  writePantryHomeCache: vi.fn(),
+  clearPantryHomeCache: vi.fn(),
 }));
 
 const mockRunPantryQuery = vi.mocked(runPantryQuery);
+const mockReadPantryHomeCache = vi.mocked(readPantryHomeCache);
+const mockWritePantryHomeCache = vi.mocked(writePantryHomeCache);
+const mockClearPantryHomeCache = vi.mocked(clearPantryHomeCache);
 
 function makeSettings(overrides: Partial<PantrySettings> = {}): PantrySettings {
   return {
@@ -38,6 +53,9 @@ function makeSettings(overrides: Partial<PantrySettings> = {}): PantrySettings {
     nerdModeInventory: false,
     nerdModeShoppingList: false,
     nerdModeCommandBar: false,
+    aiProvider: AiProvider.Anthropic,
+    aiModelTier: AiModelTier.Haiku,
+    instantLoadCache: true,
     ...overrides,
   };
 }
@@ -141,5 +159,80 @@ describe("usePantryHome", () => {
 
     await waitFor(() => expect(result.current.error).toBe("save failed"));
     expect(result.current.settings?.view).toBe("grid");
+  });
+
+  it("paints the cached response synchronously on mount, before the background refetch resolves", () => {
+    const cached = makeHomeResult({ inventory: [{ id: "cached-1" } as InventoryItem] });
+    mockReadPantryHomeCache.mockReturnValue(cached);
+    mockRunPantryQuery.mockReturnValue(new Promise(() => {}));
+
+    const { result } = renderHook(() => usePantryHome());
+
+    expect(result.current.items).toEqual(cached.inventory);
+    expect(result.current.shoppingList).toEqual(cached.shoppingList);
+    expect(result.current.settings).toEqual(cached.settings);
+  });
+
+  it("keeps showing cached data (with an error) when the background revalidation fails", async () => {
+    const cached = makeHomeResult({ inventory: [{ id: "cached-1" } as InventoryItem] });
+    mockReadPantryHomeCache.mockReturnValue(cached);
+    mockRunPantryQuery.mockRejectedValueOnce(new Error("offline"));
+
+    const { result } = renderHook(() => usePantryHome());
+
+    await waitFor(() => expect(result.current.error).toBe("offline"));
+    expect(result.current.items).toEqual(cached.inventory);
+  });
+
+  it("writes the fresh response to the cache once the background refetch succeeds", async () => {
+    mockReadPantryHomeCache.mockReturnValue(null);
+
+    const data = makeHomeResult({ inventory: [{ id: "fresh-1" } as InventoryItem] });
+    mockRunPantryQuery.mockResolvedValueOnce(data);
+
+    const { result } = renderHook(() => usePantryHome());
+
+    await waitFor(() => expect(result.current.items).toEqual(data.inventory));
+    expect(mockWritePantryHomeCache).toHaveBeenCalledWith(data);
+  });
+
+  it("skips the cached response on mount when the cached settings have instantLoadCache off", () => {
+    const cached = makeHomeResult({
+      inventory: [{ id: "cached-1" } as InventoryItem],
+      settings: makeSettings({ instantLoadCache: false }),
+    });
+    mockReadPantryHomeCache.mockReturnValue(cached);
+    mockRunPantryQuery.mockReturnValue(new Promise(() => {}));
+
+    const { result } = renderHook(() => usePantryHome());
+
+    expect(result.current.items).toBeNull();
+    expect(result.current.shoppingList).toBeNull();
+    expect(result.current.settings).toBeNull();
+  });
+
+  it("hydrates from a cache entry with no instantLoadCache flag at all, defaulting to on", () => {
+    const cached = makeHomeResult({ inventory: [{ id: "cached-1" } as InventoryItem] });
+    // Simulates a cache entry written before this field existed.
+    delete (cached.settings as Partial<PantrySettings>).instantLoadCache;
+    mockReadPantryHomeCache.mockReturnValue(cached);
+    mockRunPantryQuery.mockReturnValue(new Promise(() => {}));
+
+    const { result } = renderHook(() => usePantryHome());
+
+    expect(result.current.items).toEqual(cached.inventory);
+  });
+
+  it("clears the cache instead of writing it when a background refetch returns instantLoadCache off", async () => {
+    mockReadPantryHomeCache.mockReturnValue(null);
+
+    const data = makeHomeResult({ settings: makeSettings({ instantLoadCache: false }) });
+    mockRunPantryQuery.mockResolvedValueOnce(data);
+
+    const { result } = renderHook(() => usePantryHome());
+
+    await waitFor(() => expect(result.current.settings).toEqual(data.settings));
+    expect(mockWritePantryHomeCache).not.toHaveBeenCalled();
+    expect(mockClearPantryHomeCache).toHaveBeenCalledTimes(1);
   });
 });

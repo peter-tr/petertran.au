@@ -32,6 +32,13 @@ jobs:
     permissions:
       id-token: write
       contents: read
+    # workflow_call jobs get none of the caller's secrets by default -
+    # build-and-deploy.yml's "Publish subgraph schemas to GraphOS" step reads
+    # secrets.APOLLO_KEY, which silently resolved to an empty string without
+    # this (rover then failed with a misleading "Could not find graph"
+    # error, not an auth error - confirmed directly against a real deploy
+    # run, 2026-07-26).
+    secrets: inherit
 
   # Only a Version Packages PR merge (branch `changeset-release/main`, see
   # changesets.yml) mints a release - and only once the deploy above has

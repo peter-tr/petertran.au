@@ -1,0 +1,199 @@
+# Copied as-is into dist/ by scripts/build-router-package.ts - not generated,
+# edit this file directly. The subgraph names below must stay in sync by
+# hand with SERVICES in scripts/compose-supergraph.ts (same "duplicated,
+# kept in sync by hand" tolerance this codebase already accepts for
+# WARM_SCHEDULE_PROJECTS in infra/lib/warm-schedule-stack.ts) - add a
+# subgraph in both places, never just one.
+#
+# `${env.API_BASE_URL}` below is Router's own runtime env-var templating,
+# resolved by Router itself from the Lambda's API_BASE_URL env var (see
+# infra/lib/supergraph-stack.ts) - not something this file's build step
+# resolves, so one static file is correct for both prod and the on-demand
+# test env without any per-environment variant.
+override_subgraph_url:
+  portfolio: ${env.API_BASE_URL}/portfolio
+  pantry: ${env.API_BASE_URL}/pantry
+  imposter: ${env.API_BASE_URL}/imposter
+  design-studio: ${env.API_BASE_URL}/design-studio
+
+# pantry is the only subgraph that reads this today (see cognito-auth.ts) -
+# without it, Router doesn't forward client headers to subgraphs on its
+# own, so a signed-in pantry request would silently fall back to
+# anonymous/shared-pantry behavior. Verified directly: a local echo
+# subgraph confirmed this config actually forwards a real
+# `authorization: Bearer ...` header through.
+headers:
+  all:
+    request:
+      - propagate:
+          named: "authorization"
+
+# infra/lib/api-gateway-stack.ts's defaultCorsPreflightOptions only answers
+# the browser's OPTIONS preflight via a mock integration that never reaches
+# this Lambda - it does NOT add CORS headers to the actual GET/POST
+# response coming back through the proxy integration. Router needs the
+# equivalent here or browsers silently discard every real response (the
+# request itself still succeeds - curl won't show anything wrong, only a
+# real browser enforcing CORS will). Keep this origin list in sync with
+# both corsHeaders()'s ALLOWED_ORIGINS and api-gateway-stack.ts's
+# allowOrigins - and note API Gateway's own preflight allowlist
+# (allowHeaders in api-gateway-stack.ts) is a *separate* config from this
+# one and needs updating too whenever a client sends a new custom header
+# (missed once for apollographql-client-name, broke every real browser
+# request with a generic "Failed to fetch" until fixed).
+cors:
+  origins:
+    - https://www.petertran.au
+    - https://petertran.au
+    - https://test.petertran.au
+    - https://www.test.petertran.au
+    - http://localhost:5173
+    - http://localhost:3000
+    # The embedded Apollo Sandbox UI (see sandbox.enabled below) is served
+    # from studio.apollographql.com, not this project's own domain - its
+    # in-browser query editor makes requests back to this Router directly,
+    # so that origin needs to be allowed too or the Sandbox UI loads but
+    # every query it runs fails with a CORS error.
+    - https://studio.apollographql.com
+  # Apollo Studio's own hosted Explorer (studio.apollographql.com/graph/.../
+  # explorer, separate from the embedded Sandbox above) sends requests with
+  # credentials included (`credentials: "include"`) so its "Include
+  # cookies" toggle can work - the browser then requires this header on
+  # the response regardless of whether Access-Control-Allow-Origin already
+  # matches, or it silently rejects the response with a generic "Failed to
+  # fetch" (confirmed live via Studio's own Explorer, 2026-07-27). Doesn't
+  # change behavior for our own frontend traffic - nothing in this project
+  # sends cookies cross-origin (pantry deliberately uses an Authorization
+  # bearer header instead, exactly to avoid needing this), so this header
+  # is simply unused/inert for every request except Explorer's.
+  allow_credentials: true
+
+# Full interactive query editor + schema explorer at the bare /graphql URL
+# in a browser, closer to what dev/dev-server.ts's startStandaloneServer
+# already gives locally - Router's own default (sandbox.enabled: false)
+# instead shows a minimal built-in page with just a curl example. Safe to
+# leave on in prod: this only changes what a browser GET renders, doesn't
+# affect introspection/auth on the actual POST /graphql operations.
+#
+# homepage.enabled must be explicitly false alongside this - Router
+# refuses to start at all if both are true ("sandbox and homepage cannot
+# be enabled at the same time"), since homepage defaults to true. Missing
+# this crashed every cold start in production (confirmed live: "Failed to
+# read configuration: could not deserialize configuration" on every
+# INIT_REPORT) - real traffic was only saved because AWS Lambda's own
+# alias+Provisioned-Concurrency safety mechanism detected PC couldn't warm
+# the new (broken) version and kept 100% of traffic pinned to the last
+# good one, which also left that old version undeletable and stuck
+# CloudFormation's cleanup phase on the next deploy.
+sandbox:
+  enabled: true
+homepage:
+  enabled: false
+
+# provided.al2023 gets zero automatic X-Ray instrumentation (that's baked
+# into each AWS-managed language runtime's own wrapper, not a
+# platform-universal Lambda feature) - the ADOT collector layer
+# (infra/lib/supergraph-stack.ts) receives OTLP locally and exports to
+# X-Ray; this just needs to actually send it there. aws_xray propagation
+# makes Router read/emit the same X-Amzn-Trace-Id format API Gateway and
+# the subgraph Lambdas already use, so this shows up as one connected
+# trace, not an island - verified directly against a real Lambda: the
+# resulting trace included both this function's own segments and the
+# subgraph's. scheduled_delay: 1ms is load-bearing, not cosmetic - the
+# default 5s batch flush interval is longer than a fast invocation
+# survives before the execution environment freezes, so spans never left
+# Router's buffer at all without this (confirmed: zero traces reached
+# X-Ray with the 5s default, real traces appeared immediately once this
+# was set near-zero).
+telemetry:
+  exporters:
+    tracing:
+      otlp:
+        enabled: true
+        endpoint: http://localhost:4317
+        protocol: grpc
+        batch_processor:
+          scheduled_delay: 1ms
+          max_export_timeout: 3s
+      propagation:
+        aws_xray: true
+      common:
+        sampler: 1.0
+        # No service_name set = OTel's generic "unknown_service:<binary
+        # name>" fallback, i.e. "unknown_service:router" - confirmed
+        # literally appearing that way in ADOT collector logs before this.
+        # Setting both this and resource.service.name since a real-Lambda
+        # spike couldn't conclusively confirm which one (if either) the
+        # awsxrayexporter actually reads - batch-get-traces never returned
+        # Router's own OTel-originated segment to check directly
+        # (referenced as a parent_id by the API Gateway segment
+        # underneath it, but absent from the returned segment list,
+        # consistently across two independent spikes). Cosmetic and
+        # low-risk either way - confirmed this doesn't break startup or
+        # break trace connectivity.
+        service_name: "supergraph"
+        resource:
+          service.name: "supergraph"
+
+  # Same freeze-before-flush problem as the OTLP batch_processor above, for
+  # a completely separate exporter: Apollo Studio usage reporting
+  # (activated by the APOLLO_KEY/APOLLO_GRAPH_REF env vars in
+  # supergraph-stack.ts) batches through its own telemetry.apollo -
+  # defaulting to the same 5s scheduled_delay - without tightening it
+  # here, reports would sit unflushed when Lambda freezes the execution
+  # environment right after the response returns, same failure mode this
+  # file already hit once for X-Ray traces.
+  #
+  # Flat telemetry.apollo.batch_processor, NOT nested under a
+  # metrics.usage_reports key - confirmed directly against apollo-router's
+  # own source at the exact ROUTER_VERSION tag pinned in
+  # build-router-package.ts (apollo-router/src/plugins/telemetry/apollo.rs's
+  # Config struct has batch_processor as a top-level field). A later
+  # Router release (PR apollographql/router#8258, merged 2025-09-15, well
+  # after this pinned version) splits this into
+  # telemetry.apollo.metrics.usage_reports.batch_processor /
+  # .tracing.batch_processor instead - using that newer nested shape
+  # against this older Router crashed it outright ("Additional properties
+  # are not allowed ('metrics' was unexpected)"), which took prod down for
+  # several minutes before being caught and reverted. Re-verify this shape
+  # directly against apollo.rs at the new tag before ever bumping
+  # ROUTER_VERSION.
+  #
+  # max_export_timeout is 10s here, not the 3s used above for OTLP - that
+  # 3s was tuned against a genuinely local destination (the ADOT collector
+  # on localhost, effectively zero network latency). This exporter's
+  # actual destination is a real cross-region HTTPS call to
+  # usage-reporting.api.apollographql.com, not localhost - reusing OTLP's
+  # local-latency timeout here made every export attempt fail with
+  # "operation timed out" (confirmed live: consistent timeouts across
+  # multiple warm, non-cold-start invocations, even though the endpoint
+  # itself answers in ~280ms from a normal network - the slowness is
+  # specific to this Lambda's post-response execution window, not the
+  # endpoint). scheduled_delay stays at 1ms so a flush still starts
+  # immediately rather than waiting out the 5s default.
+  #
+  # field_level_instrumentation_sampler defaults to sampling only 1% of
+  # operations (TraceIdRatioBased(0.01) - confirmed in apollo.rs) -
+  # separate from, and additive to, whether a subgraph can produce ftv1
+  # data at all (see each subgraph handler.ts's
+  # ApolloServerPluginInlineTrace()). On this project's real traffic
+  # volume, 1% sampling could mean waiting a very long time to see any
+  # field-level data in Studio's Insights at all. always_on trades a small
+  # amount of per-request overhead (ftv1 data riding in-band in every
+  # subgraph response) for actually being able to see field-level metrics
+  # work.
+  apollo:
+    field_level_instrumentation_sampler: always_on
+    batch_processor:
+      scheduled_delay: 1ms
+      max_export_timeout: 10s
+
+supergraph:
+  listen: 127.0.0.1:8080
+  # ApiGatewayStack routes the exact path /graphql to this Lambda (see
+  # infra/lib/api-gateway-stack.ts's routes array) - Router's own default
+  # is "/", which 404s under that routing. introspection:true matches the
+  # old Node handler's `new ApolloServer({ introspection: true })`, which
+  # the dashboard's GraphiQL/schema tooling relies on.
+  path: /graphql
+  introspection: true

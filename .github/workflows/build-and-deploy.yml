@@ -122,7 +122,7 @@ jobs:
           restore-keys: |
             turbo-${{ github.job }}-${{ runner.os }}-
 
-      - uses: aws-actions/configure-aws-credentials@v4
+      - uses: aws-actions/configure-aws-credentials@ff717079ee2060e4bcee96c4779b553acc87447c # v4
         with:
           role-to-assume: arn:aws:iam::275695104296:role/petertran-au-github-actions-deploy
           aws-region: ap-southeast-2
@@ -140,6 +140,41 @@ jobs:
           else
             npm run build
           fi
+
+      # Boots the real Router binary (Linux x86_64 - same binary Lambda
+      # runs, since this job also runs on ubuntu-latest) against the
+      # generated router.yaml before ever touching AWS. A router.yaml
+      # config mistake crashed every cold start in production twice in one
+      # day (2026-07-26/27: first a telemetry.apollo shape that didn't
+      # exist at the pinned Router version, then sandbox/homepage both
+      # enabled at once) before being caught this way - real traffic was
+      # only protected by luck, via AWS Lambda's alias+Provisioned-
+      # Concurrency safety net silently pinning traffic to the last working
+      # version while newer, broken versions piled up undeletable and
+      # stalled every subsequent deploy's CloudFormation cleanup. This
+      # catches the same class of mistake before it ever reaches a real
+      # Lambda - API_BASE_URL is a dummy value since this only checks that
+      # Router itself starts and answers a query, not real subgraph
+      # connectivity.
+      - name: Smoke-test the supergraph Router boots with its generated config
+        working-directory: api/src/supergraph/dist
+        env:
+          API_BASE_URL: https://smoke-test.invalid
+        run: |
+          ./router --config router.yaml --supergraph supergraph.graphql --log info &
+          ROUTER_PID=$!
+          sleep 3
+          if ! kill -0 $ROUTER_PID 2>/dev/null; then
+            echo "::error::Router exited within 3s of starting - router.yaml likely has a config error. Check the job log above for 'Failed to read configuration'."
+            exit 1
+          fi
+          RESPONSE=$(curl -sf -X POST http://127.0.0.1:8080/graphql -H "Content-Type: application/json" -d '{"query":"{ __typename }"}')
+          kill $ROUTER_PID 2>/dev/null || true
+          if [ "$RESPONSE" != '{"data":{"__typename":"Query"}}' ]; then
+            echo "::error::Router started but didn't answer a basic query correctly. Got: $RESPONSE"
+            exit 1
+          fi
+          echo "Router config validated OK"
 
       # infra/cdk.json's "app" (ts-node bin/app.ts) rebuilds every stack's
       # construct tree and re-hashes/stages each Lambda's fromAsset dist dir.
@@ -194,6 +229,39 @@ jobs:
         run: |
           aws lambda invoke --function-name warm-schedule \
             --payload '{"reconcile": true}' --cli-binary-format raw-in-base64-out /dev/null
+
+      # Keeps the GraphOS (petertran-au@current) registry in sync with what
+      # actually deployed - Router itself never reads this back (it composes
+      # from the build-time supergraph.generated.graphql, see
+      # compose-supergraph.ts), so this only feeds Studio's schema
+      # history/Explorer and the rover subgraph check step in verify.yml.
+      # Skipped for the test env - there's only one variant ("current"),
+      # meant to track prod's routing URLs, and test-env deploys are
+      # ephemeral/frequent enough that publishing its api.test.petertran.au
+      # routing URLs over prod's would just be noise. Idempotent: rover
+      # no-ops (no new launch) when a subgraph's schema hasn't changed, so
+      # this runs unconditionally on every deploy rather than needing its own
+      # per-subgraph change detection. Pinned to the same Rover version
+      # verified locally when GraphOS was first connected (2026-07-26), not
+      # @latest - see ROUTER_VERSION's identical reasoning in
+      # api/src/supergraph/scripts/build-router-package.ts.
+      - name: Publish subgraph schemas to GraphOS
+        if: ${{ !inputs.deploy-test-env }}
+        env:
+          APOLLO_KEY: ${{ secrets.APOLLO_KEY }}
+        run: |
+          for entry in \
+            "portfolio:api/src/portfolio/schema.graphql" \
+            "pantry:api/src/pantry/schema.graphql" \
+            "imposter:api/src/games/imposter/schema.graphql" \
+            "design-studio:api/src/design-studio/schema.graphql"; do
+            name="${entry%%:*}"
+            schema="${entry#*:}"
+            npx -y @apollo/rover@0.41.0 subgraph publish petertran-au@current \
+              --schema "$schema" \
+              --name "$name" \
+              --routing-url "https://api.petertran.au/$name"
+          done
 
       # Must run after "Deploy infrastructure", not chained into the build
       # step above - it fetches live data from VITE_GRAPHQL_ENDPOINT, and

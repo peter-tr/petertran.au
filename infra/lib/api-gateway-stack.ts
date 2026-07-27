@@ -5,6 +5,7 @@ import * as acm from "aws-cdk-lib/aws-certificatemanager";
 import * as route53 from "aws-cdk-lib/aws-route53";
 import * as route53Targets from "aws-cdk-lib/aws-route53-targets";
 import * as apigateway from "aws-cdk-lib/aws-apigateway";
+import * as wafv2 from "aws-cdk-lib/aws-wafv2";
 import { LIVE_ALIAS_NAME, liveAliasArn } from "./shared/function-names";
 
 export interface ApiGatewayStackProps extends StackProps {
@@ -42,6 +43,13 @@ export interface ApiGatewayStackProps extends StackProps {
   // muting alert emails isn't something the test env needs to validate, and
   // it has no MonitoringStack counterpart to point at anyway.
   alertsSettingsFnName?: string;
+  // Cost/on-off switch for the WAF rate-based rule below - a WebACL has its
+  // own flat monthly charge regardless of how it's configured, so the only
+  // way to actually stop paying for it is to not provision it at all (a
+  // COUNT-vs-BLOCK toggle on the rule wouldn't do that). Required, not
+  // optional-with-a-default, so every call site has to say explicitly
+  // whether it wants this - see infra/bin/app.ts's ENABLE_WAF_RATE_LIMIT.
+  enableWafRateLimit: boolean;
 }
 
 /**
@@ -119,7 +127,27 @@ export class ApiGatewayStack extends Stack {
           ...(props.alternateDomainNames ?? []).map((d) => `https://${d}`),
           "http://localhost:5173",
           "http://localhost:3000",
+          // Apollo's embedded Sandbox UI (router.yaml's sandbox.enabled)
+          // and Apollo Studio's own hosted Explorer both run from this
+          // origin - missing here entirely (confirmed live 2026-07-27),
+          // this mock preflight integration falls back to echoing the
+          // *first* origin in this list instead of matching the request's
+          // real Origin, so every cross-origin request from either of
+          // those actually failed preflight this whole time. router.yaml's
+          // own cors.origins (a separate config - see its comment) already
+          // had this added back when sandbox.enabled first shipped, but
+          // that only covers Router's response to the actual POST, not
+          // this preflight, which never reached Router at all.
+          "https://studio.apollographql.com",
         ],
+        // Studio's Explorer (not the embedded Sandbox) sends requests with
+        // credentials included so its "Include cookies" toggle can work -
+        // the browser requires this on the response regardless of whether
+        // the origin already matches, confirmed live via Studio's own
+        // Explorer. See router.yaml's identical allow_credentials comment
+        // for why this doesn't change behavior for our own frontend
+        // traffic (nothing here uses cookies for auth).
+        allowCredentials: true,
         allowMethods: ["GET", "POST"],
         // x-amzn-trace-id: RUM's fetch instrumentation attaches this header
         // when enableXRay is on (see web/src/shared/rum.ts) to link a
@@ -128,8 +156,21 @@ export class ApiGatewayStack extends Stack {
         // GraphQL call outright. authorization: pantry's signed-in requests
         // carry a Cognito ID token here (see web/src/pantry/lib/auth.ts) -
         // same reasoning, the preflight blocks it client-side before it ever
-        // reaches a Lambda without this.
-        allowHeaders: ["content-type", "apollo-require-preflight", "x-amzn-trace-id", "authorization"],
+        // reaches a Lambda without this. apollographql-client-name:
+        // graphqlClient.ts sends this on every request (see PR #205) so
+        // GraphOS Studio can attribute traffic to a named client - missed
+        // updating this allowlist when that shipped, which silently broke
+        // every real browser request with a generic "Failed to fetch"
+        // (confirmed live 2026-07-27: curl without this header succeeded
+        // fine since it never triggers a preflight, masking the bug from
+        // every manual verification during that PR).
+        allowHeaders: [
+          "content-type",
+          "apollo-require-preflight",
+          "x-amzn-trace-id",
+          "authorization",
+          "apollographql-client-name",
+        ],
         maxAge: Duration.hours(1),
       },
     });
@@ -203,6 +244,79 @@ export class ApiGatewayStack extends Stack {
       // blocking every real request with a CORS error.
       resource.addMethod("GET", integration);
       resource.addMethod("POST", integration);
+    }
+
+    // Coarse, per-IP outer defense layer, on top of (not instead of) each
+    // project's own app-level DynamoDB rate limiter (see
+    // api/src/shared/rate-limit.ts) - that limiter is fine-grained
+    // (different limits per operation cost) but only rejects a request
+    // after it's already paid for a full Lambda invocation and a DynamoDB
+    // write. A WAF rate-based rule rejects at the edge, before either of
+    // those happen, but can't see GraphQL operation names to differentiate
+    // cost - hence "in addition to", not "replacing".
+    //
+    // Gated on enableWafRateLimit (see its doc comment above) - a WebACL
+    // bills a flat monthly charge just for existing, so this is an `if`
+    // around the whole resource, not a per-rule toggle.
+    if (props.enableWafRateLimit) {
+      // No explicit `name` here (same as RestApi above) - this stack
+      // deploys twice (prod and the on-demand test env, see
+      // infra/bin/app.ts), and a hardcoded literal name would collide
+      // between the two in the same account/region. CloudFormation's
+      // auto-generated physical name already incorporates the stack name,
+      // so the two stay distinct without one.
+      //
+      // Starts in COUNT (not BLOCK) - deliberately observational for now.
+      // Flip the rule's `action` to `{ block: {} }` in a follow-up change
+      // once the CountedRequests CloudWatch metric (dimensioned by this
+      // WebACL's Rule name below) shows what real traffic actually looks
+      // like, so the 100/min threshold can be validated (or adjusted)
+      // before it can ever reject a real visitor.
+      const rateLimitWebAcl = new wafv2.CfnWebACL(this, "ApiRateLimitWebAcl", {
+        scope: "REGIONAL",
+        defaultAction: { allow: {} },
+        visibilityConfig: {
+          sampledRequestsEnabled: true,
+          cloudWatchMetricsEnabled: true,
+          metricName: "ApiRateLimitWebAcl",
+        },
+        rules: [
+          {
+            name: "RateLimitByIp",
+            priority: 0,
+            action: { count: {} },
+            statement: {
+              rateBasedStatement: {
+                // Requests per IP per evaluationWindowSec before this rule
+                // counts (not yet blocks) a client - starting point for
+                // COUNT mode's observation window, not a validated number
+                // yet. All routes behind this one shared RestApi share this
+                // ceiling (portfolio/pantry/imposter/supergraph/
+                // design-studio), so it's sized well above what a single
+                // legitimate visitor bouncing between them in a minute
+                // would ever hit.
+                limit: 100,
+                aggregateKeyType: "IP",
+                // Shortest window WAF supports (60/120/300/600 are the
+                // only valid values) - closest match to the app-level
+                // limiters' own 1-minute buckets (see
+                // api/src/shared/rate-limit.ts).
+                evaluationWindowSec: 60,
+              },
+            },
+            visibilityConfig: {
+              sampledRequestsEnabled: true,
+              cloudWatchMetricsEnabled: true,
+              metricName: "RateLimitByIp",
+            },
+          },
+        ],
+      });
+
+      new wafv2.CfnWebACLAssociation(this, "ApiRateLimitWebAclAssociation", {
+        resourceArn: restApi.deploymentStage.stageArn,
+        webAclArn: rateLimitWebAcl.attrArn,
+      });
     }
 
     const aliasTarget = route53.RecordTarget.fromAlias(

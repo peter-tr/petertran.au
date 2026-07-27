@@ -2,7 +2,8 @@ import { DynamoDBDocumentClient, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { mockClient } from "aws-sdk-client-mock";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("api-shared/operation-metrics", () => ({
+vi.mock("api-shared/operation-metrics", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("api-shared/operation-metrics")>()),
   emitOperationCountMetric: vi.fn(),
 }));
 
@@ -103,6 +104,35 @@ describe("operationStatsPlugin", () => {
       expect(opCall).toBeUndefined();
     }
   );
+
+  it.each(["IntrospectionQuery__portfolio__0", "TraceBreakdown__portfolio__0", "SystemStats__portfolio__0"])(
+    "also ignores the federation-renamed form %s (Apollo Router suffixes every subgraph operation)",
+    async (operationName) => {
+      await fireWillSendResponse({ operationName, operationType: "query" });
+
+      expect(emitOperationCountMetric).not.toHaveBeenCalled();
+
+      const opCall = ddbMock
+        .commandCalls(UpdateCommand)
+        .find((c) => (c.args[0].input.Key as { sk: string }).sk.startsWith("OP#"));
+      expect(opCall).toBeUndefined();
+    }
+  );
+
+  it("strips the Apollo Router's '__<subgraph>__<index>' suffix before emitting the metric and DynamoDB key", async () => {
+    await fireWillSendResponse({
+      operationName: "Resume__portfolio__0",
+      operationType: "query",
+      query: "query Resume__portfolio__0 { person { name } }",
+    });
+
+    expect(emitOperationCountMetric).toHaveBeenCalledWith("portfolio", "Resume", "query");
+
+    const opCall = ddbMock
+      .commandCalls(UpdateCommand)
+      .find((c) => (c.args[0].input.Key as { sk: string }).sk.startsWith("OP#Resume#"));
+    expect(opCall).toBeDefined();
+  });
 
   it("emits a metric and records a query sample (query + variables)", async () => {
     await fireWillSendResponse({

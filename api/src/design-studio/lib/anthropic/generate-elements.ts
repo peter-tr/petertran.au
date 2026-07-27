@@ -1,42 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { getAnthropicClient } from "api-shared/anthropic-client";
-import { getAnthropicBedrockClient } from "api-shared/anthropic-bedrock-client";
+import { getAiClient, resolveAiModel, assertValidAiSettings } from "api-shared/ai-provider";
 import { assertAiNotRateLimited } from "../util/ai-rate-limit";
 import type { AiSettingsRecord, DesignElementRecord, DesignElementType } from "../design";
 
 const MAX_PROMPT_LENGTH = 300;
 const MAX_ELEMENTS = 12;
-
-// Bedrock's inference-profile IDs don't match the direct API's bare model
-// IDs for the same model, so callers pick a capability tier (AiSettings)
-// rather than a raw ID, and this resolves the actual string per provider.
-// The BEDROCK IDs use the "au." cross-region inference profile prefix,
-// not "us." - this Lambda deploys to ap-southeast-2 (see
-// infra/bin/*.ts's DesignStudioStack instantiation), and on-demand
-// invocation of the bare model id fails there ("with on-demand throughput
-// isn't supported") the same way it does everywhere else; verified
-// invokable via `aws bedrock-runtime converse --region ap-southeast-2`.
-// Sonnet 5 isn't on this table yet - it's not been granted Bedrock model
-// access on this account, so SONNET currently means Sonnet 4.6 on both
-// providers. Bump both rows once that access lands.
-//
-// BEDROCK + HAIKU is deliberately not offered in the UI (see
-// AiPanel.tsx) - confirmed via a minimal repro that Bedrock rejects
-// structured JSON output (output_config.format) for Haiku 4.5 with
-// "Extra inputs are not permitted", while the identical shape against
-// Sonnet 4.6 on Bedrock succeeds. Re-test before re-enabling it; the
-// guard below exists so a stale client or a direct API call still fails
-// with a clear message instead of that raw 400.
-const MODEL_IDS: Record<AiSettingsRecord["provider"], Record<AiSettingsRecord["modelTier"], string>> = {
-  ANTHROPIC: {
-    HAIKU: "claude-haiku-4-5",
-    SONNET: "claude-sonnet-4-6",
-  },
-  BEDROCK: {
-    HAIKU: "au.anthropic.claude-haiku-4-5-20251001-v1:0",
-    SONNET: "au.anthropic.claude-sonnet-4-6",
-  },
-};
 
 interface RawElement {
   type: DesignElementType;
@@ -261,11 +229,7 @@ export async function generateDesignElements(
     throw new Error(`Keep the prompt under ${MAX_PROMPT_LENGTH} characters.`);
   }
   if (width <= 0 || height <= 0) throw new Error("width/height must be positive.");
-  if (aiSettings.provider === "BEDROCK" && aiSettings.modelTier === "HAIKU") {
-    throw new Error(
-      "Bedrock doesn't currently support this feature's structured output for Haiku 4.5 - pick Sonnet, or switch to the direct Anthropic API."
-    );
-  }
+  assertValidAiSettings(aiSettings.provider, aiSettings.modelTier);
 
   await assertAiNotRateLimited(sourceIp);
 
@@ -274,8 +238,8 @@ export async function generateDesignElements(
     ? `Current draft (JSON): ${JSON.stringify(currentElements)}\n\nInstruction: ${trimmed}`
     : trimmed;
 
-  const model = MODEL_IDS[aiSettings.provider][aiSettings.modelTier];
-  const client = aiSettings.provider === "BEDROCK" ? getAnthropicBedrockClient() : await getAnthropicClient();
+  const model = resolveAiModel(aiSettings.provider, aiSettings.modelTier);
+  const client = await getAiClient(aiSettings.provider);
 
   // Haiku doesn't support adaptive thinking or the effort parameter (errors
   // if sent) - only the Sonnet tier gets a deliberation pass before it picks
@@ -302,7 +266,7 @@ export async function generateDesignElements(
   });
 
   const parsed = response.parsed_output as RawGenerateResult | null;
-  if (!parsed || !parsed.elements.length) {
+  if (!parsed?.elements.length) {
     throw new Error("Claude didn't return a usable design - try rephrasing the prompt.");
   }
 

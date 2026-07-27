@@ -1,32 +1,49 @@
 # petertran.au
 
 My personal site - a resume that's also a live, publicly-queryable GraphQL API.
-The site itself is served by the exact system its architecture diagram describes:
-a Lambda-backed Apollo Server, deployed with AWS CDK, backed by a single
-DynamoDB table, with real CloudWatch/X-Ray metrics surfaced on the page itself.
+The site itself is served by the exact system its architecture diagram
+describes: a federated GraphQL API (Apollo Router in front of several
+independent Lambda subgraphs), deployed with AWS CDK, with real
+CloudWatch/X-Ray metrics surfaced on the page itself.
 
 Try the query explorer at [petertran.au](https://petertran.au), or point any
-GraphQL client at the API directly and query it yourself.
+GraphQL client at [api.petertran.au/graphql](https://api.petertran.au/graphql)
+directly and query it yourself.
+
+**Live dashboards:**
+[Apollo GraphOS Studio](https://studio.apollographql.com/graph/petertran-au/variant/current/home) ·
+[SonarCloud](https://sonarcloud.io/project/overview?id=peter-tr_petertran.au)
 
 ## Stack
 
 ```
 petertran.au/
-├── web/      React + Vite frontend - GraphiQL explorer, "Ask Claude" (NL → GraphQL), Pantry, Imposter
-├── api/      Apollo Server GraphQL API, on Lambda behind a Function URL
+├── web/      React + Vite frontend - one app per backend below, plus a
+│             notes/writeup page and an "Ask Claude" (NL → GraphQL) explorer
+├── api/      Each src/ subdirectory is an independent GraphQL backend
 │   └── src/
 │       ├── portfolio/       this resume/API site
 │       ├── pantry/          AI-assisted grocery inventory + shopping list
 │       ├── games/imposter/  a Werewolf/Mafia-style party game
-│       ├── zero-trust-lab/  edge/domain gateway + token-exchange learning exercise (docs/zero-trust-lab.md)
-│       └── warmup/          keeps every project's Lambda warm on a schedule, toggleable from /settings
-├── infra/    AWS CDK (TypeScript) - Lambda, DynamoDB, S3 + CloudFront, Route 53, ACM, SES, Secrets Manager
-└── .github/  CI/CD via GitHub Actions, authenticating to AWS via OIDC (no long-lived access keys)
+│       ├── design-studio/   a mock-Canva design editor
+│       ├── supergraph/      Apollo Router - composes the four above into
+│       │                    one federated endpoint (api.petertran.au/graphql)
+│       ├── shared/          code genuinely common to more than one backend
+│       ├── zero-trust-lab/  edge/domain gateway + token-exchange learning
+│       │                    exercise (see docs/zero-trust-lab.md)
+│       └── warm-schedule/   keeps every project's Lambda warm on a schedule,
+│                            toggleable from the site's /settings page
+├── infra/    AWS CDK (TypeScript) - Lambda, DynamoDB, MongoDB Atlas, S3 +
+│             CloudFront, Route 53, ACM, SES, Secrets Manager, WAF
+└── .github/  CI/CD via GitHub Actions, authenticating to AWS via OIDC
 ```
 
-Each of `portfolio`, `pantry`, and `games/imposter` is its own independent
-backend - separate Lambda, Function URL, and DynamoDB table - deployed as its
-own CDK stack so they evolve independently.
+Every project under `api/src/` other than `shared`, `zero-trust-lab`, and
+`warm-schedule` is a fully independent backend - its own Lambda, database,
+and CDK stack, versioned and released separately via
+[Changesets](https://github.com/changesets/changesets) - fronted by one
+shared API Gateway and stitched into a single federated endpoint by
+`supergraph`'s Apollo Router.
 
 ## Running it locally
 
@@ -37,26 +54,20 @@ npm install
 npm run dev
 ```
 
-This starts all four dev servers together in one terminal (labeled, colored
-output; Ctrl+C stops all of them): the resume API, the Pantry API, the
-Imposter game API, and the Vite frontend. Each API is a separate service with
-its own in-memory mock resolvers - see `api/src/{portfolio,pantry,games/imposter}`.
+This starts every backend's dev server plus the Vite frontend together in one
+terminal (labeled, colored output; Ctrl+C stops all of them). Each backend is
+a separate service with its own in-memory mock resolvers - no real AWS
+credentials needed for local dev, nothing here talks to DynamoDB/Mongo.
 
 To run just one, use its workspace script directly, e.g.
-`npm run dev:portfolio --workspace=api` or `npm run dev --workspace=web`.
-
-The frontend expects each API at a URL configured in `web/.env.development` (see
-`web/src/portfolio/lib/graphql.ts`, `web/src/pantry/api.ts`, and
-`web/src/games/imposter/lib/api.ts` for the defaults). Local dev doesn't need
-real AWS credentials - every API's dev server runs against mock data, not
-DynamoDB.
+`npm run dev:pantry --workspace=api` or `npm run dev --workspace=web`.
 
 ## Other commands
 
 ```bash
-npm run typecheck     # tsc across api + web, via turbo (cached, parallel)
-npm run build         # build api + web + infra, via turbo (cached, parallel)
-npm run verify        # lint + format:check + typecheck + build, all via turbo
+npm run typecheck     # tsc across every workspace, via turbo (cached, parallel)
+npm run build         # build every workspace, via turbo (cached, parallel)
+npm run verify        # lint + format:check + typecheck + build + test, all via turbo
 npm run lint          # eslint across the whole monorepo
 npm run format        # prettier --write
 npm run format:check  # prettier --check
@@ -67,17 +78,18 @@ npm run validate-schemas --workspace=api  # construct each service's ApolloServe
 npm run test:e2e --workspace=api          # boot each service's real dev server and smoke-test it
 ```
 
-`validate-schemas` and `test:e2e` also run as parallel CI jobs the `deploy`
-job depends on - see `.github/workflows/deploy.yml`.
+`validate-schemas` and `test:e2e` also run as CI jobs - see
+`.github/workflows/build-and-deploy.yml`, which also boots the real Apollo
+Router binary against its generated config before every deploy, for the same
+reason: catch a config mistake in CI instead of in production.
 
 `dev`, `typecheck`, and `build` are orchestrated by
 [Turborepo](https://turbo.build) (`turbo.json`) rather than plain npm-workspace
-chaining: each task is content-hashed per package (including `web`'s generated
-GraphQL types against the `api` schema files they're generated from), so an
-unchanged package replays its cached result instead of re-running, and
-independent packages build in parallel instead of sequentially. In CI, turbo's
-local cache (`.turbo/cache`) is persisted across runs via `actions/cache` (see
-`deploy.yml`) so this pays off there too, not just locally.
+chaining: each task is content-hashed per package, so an unchanged package
+replays its cached result instead of re-running, and independent packages
+build in parallel instead of sequentially. In CI, turbo's local cache is
+persisted across runs via `actions/cache` so this pays off there too, not
+just locally.
 
 ## Deploying
 
@@ -88,5 +100,5 @@ manually (requires AWS credentials for the target account):
 npm run deploy
 ```
 
-This builds `api`, `web`, and `infra` (via turbo, in parallel and cached),
-then runs `cdk deploy` from `infra`.
+This builds every workspace (via turbo, in parallel and cached), then runs
+`cdk deploy` from `infra`.

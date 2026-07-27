@@ -24,6 +24,13 @@ const hostedZoneId = "Z0088163WL3F617J73T";
 const hostedZoneName = "petertran.au";
 const account = process.env.CDK_DEFAULT_ACCOUNT;
 
+// Cost on/off switch for ApiGatewayStack's WAF rate-based rule (see its own
+// doc comment) - flip this and push to actually stop paying for the WebACL,
+// rather than just changing its rule action. Left off for the on-demand
+// test env below - it's disposable and short-lived, not something worth
+// its own WebACL charge on top of prod's.
+const ENABLE_WAF_RATE_LIMIT = true;
+
 // CloudFront certificates must live in us-east-1 regardless of where the
 // rest of the stack runs -- this is an AWS platform requirement, not a choice.
 const certStack = new CertStack(app, "PetertranCertStack", {
@@ -148,6 +155,7 @@ const apiGatewayStack = new ApiGatewayStack(app, "PetertranApiGatewayStack", {
   supergraphFnName: FUNCTION_NAMES.supergraph,
   designStudioFnName: FUNCTION_NAMES.designStudio,
   alertsSettingsFnName: FUNCTION_NAMES.alertsSettings,
+  enableWafRateLimit: ENABLE_WAF_RATE_LIMIT,
   env: { account, region: "ap-southeast-2" },
 });
 
@@ -257,6 +265,7 @@ if (process.env.DEPLOY_TEST_ENV === "true") {
     imposterFnName: TEST_FUNCTION_NAMES.imposter,
     supergraphFnName: TEST_FUNCTION_NAMES.supergraph,
     designStudioFnName: TEST_FUNCTION_NAMES.designStudio,
+    enableWafRateLimit: false,
     env: { account, region: "ap-southeast-2" },
   });
   // Same fix as prod's apiGatewayStack.addDependency calls above, and even

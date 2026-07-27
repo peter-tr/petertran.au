@@ -13,7 +13,7 @@ import type {
 // requires this module outside Vite to validate the queries below.
 export const ENDPOINT = import.meta.env?.VITE_GRAPHQL_ENDPOINT as string | undefined;
 
-export const runQuery = createGraphQLClient(ENDPOINT, "VITE_GRAPHQL_ENDPOINT");
+export const runQuery = createGraphQLClient(ENDPOINT, "VITE_GRAPHQL_ENDPOINT", undefined, "portfolio");
 
 export const RESUME_QUERY = /* GraphQL */ `
   query Resume {
@@ -152,6 +152,8 @@ export const TRACE_BREAKDOWN_QUERY = /* GraphQL */ `
   query TraceBreakdown($traceId: String!) {
     meta {
       traceBreakdown(traceId: $traceId) {
+        id
+        parentId
         name
         startOffsetMs
         durationMs

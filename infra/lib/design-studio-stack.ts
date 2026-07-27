@@ -3,20 +3,10 @@ import { Construct } from "constructs";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as iam from "aws-cdk-lib/aws-iam";
-import * as path from "path";
+import * as path from "node:path";
 import { FUNCTION_NAMES, LIVE_ALIAS_NAME } from "./shared/function-names";
 import { applyApplicationSignals } from "./shared/application-signals";
-
-// The models the AI generation feature's AiSettings can select, on the
-// Bedrock path (see api/src/design-studio/lib/anthropic/generate-elements.ts's
-// MODEL_IDS - this list must stay in sync with the BEDROCK row there).
-const BEDROCK_MODELS = ["anthropic.claude-haiku-4-5-20251001-v1:0", "anthropic.claude-sonnet-4-6"];
-// "au." cross-region inference profiles route to both of these regions
-// regardless of which region the Lambda itself runs in (confirmed via
-// `aws bedrock get-inference-profile`) - granting only the caller's own
-// region would let ListFoundationModels succeed but InvokeModel fail
-// whenever Bedrock happened to route a request to the other one.
-const BEDROCK_MODEL_REGIONS = ["ap-southeast-2", "ap-southeast-4"];
+import { bedrockInvokeResources } from "./shared/bedrock-models";
 
 export interface DesignStudioStackProps extends StackProps {
   // Optional, defaults to prod's current value - only the on-demand test
@@ -69,7 +59,9 @@ export class DesignStudioStack extends Stack {
     );
     // Same secret every other Anthropic-calling Lambda in this repo already
     // reads (see pantry-stack.ts's anthropicSecret) - reused here for the
-    // AI design-generation mutation, not a project-specific key.
+    // AI design-generation mutation, not a project-specific key. Resolved
+    // into a plain ANTHROPIC_API_KEY env var at deploy time below, same as
+    // mongoSecret above and for the same reason (see its comment).
     const anthropicSecret = secretsmanager.Secret.fromSecretNameV2(
       this,
       "AnthropicApiKey",
@@ -98,12 +90,11 @@ export class DesignStudioStack extends Stack {
       environment: {
         MONGO_URI: mongoSecret.secretValue.unsafeUnwrap(),
         MONGO_DB_NAME: props.isTestEnv ? "design-studio-test" : "design-studio",
-        ANTHROPIC_SECRET_ARN: anthropicSecret.secretArn,
+        ANTHROPIC_API_KEY: anthropicSecret.secretValue.unsafeUnwrap(),
       },
       // No lambda.Tracing.ACTIVE here - see applyApplicationSignals()'s doc
       // comment for why.
     });
-    anthropicSecret.grantRead(designStudioFn);
 
     // Lets AiSettings.provider === "BEDROCK" actually invoke Claude via
     // Bedrock (see api-shared/anthropic-bedrock-client.ts) - scoped to just
@@ -114,14 +105,7 @@ export class DesignStudioStack extends Stack {
     designStudioFn.addToRolePolicy(
       new iam.PolicyStatement({
         actions: ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
-        resources: [
-          ...BEDROCK_MODELS.map(
-            (model) => `arn:aws:bedrock:${this.region}:${this.account}:inference-profile/au.${model}`
-          ),
-          ...BEDROCK_MODEL_REGIONS.flatMap((region) =>
-            BEDROCK_MODELS.map((model) => `arn:aws:bedrock:${region}::foundation-model/${model}`)
-          ),
-        ],
+        resources: bedrockInvokeResources(this.region, this.account),
       })
     );
 

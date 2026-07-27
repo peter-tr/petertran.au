@@ -5,7 +5,7 @@ import * as iam from "aws-cdk-lib/aws-iam";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 import { Schedule, ScheduleExpression, ScheduleTargetInput } from "aws-cdk-lib/aws-scheduler";
 import { LambdaInvoke } from "aws-cdk-lib/aws-scheduler-targets";
-import * as path from "path";
+import * as path from "node:path";
 import { FUNCTION_NAMES, LIVE_ALIAS_NAME, liveAliasArn } from "./shared/function-names";
 
 export interface ZeroTrustLabFunctionNames {
@@ -30,6 +30,12 @@ export interface ProvisionedConcurrencyStackProps extends StackProps {
 }
 
 const WARM_SCHEDULE_PARAM_NAME = "/petertran-au/warm-schedule";
+// Named full-config snapshots (all 6 projects at once) the settings page can
+// save/apply - see handler.ts's getProfiles()/setProfiles(). Seeded once as
+// "{}" and never touched again by this literal, so (unlike WARM_SCHEDULE_PARAM_NAME
+// above) it never hits the CloudFormation-clobbers-runtime-writes trap: there's
+// nothing about it that a later project/field addition would change.
+const WARM_SCHEDULE_PROFILES_PARAM_NAME = "/petertran-au/warm-schedule-profiles";
 
 type WarmScheduleKey = "portfolio" | "pantry" | "imposter" | "supergraph" | "designStudio" | "zeroTrustLab";
 type Weekday = "MON" | "TUE" | "WED" | "THU" | "FRI" | "SAT" | "SUN";
@@ -172,6 +178,11 @@ export class ProvisionedConcurrencyStack extends Stack {
       }),
     });
 
+    const profilesParam = new ssm.StringParameter(this, "WarmScheduleProfilesParam", {
+      parameterName: WARM_SCHEDULE_PROFILES_PARAM_NAME,
+      stringValue: "{}",
+    });
+
     const ztl = props.zeroTrustLabFnNames;
     const targetFnNames = [
       props.portfolioFnName,
@@ -226,10 +237,13 @@ export class ProvisionedConcurrencyStack extends Stack {
         ZTL_EDGE_PROXY_FN_NAME: ztl.edgeProxy,
         ZTL_DOMAIN_A_FN_NAME: ztl.domainA,
         WARM_SCHEDULE_NAMES: JSON.stringify(scheduleNames),
+        WARM_SCHEDULE_PROFILES_PARAM_NAME: profilesParam.parameterName,
       },
     });
     scheduleParam.grantRead(warmScheduleFn);
     scheduleParam.grantWrite(warmScheduleFn);
+    profilesParam.grantRead(warmScheduleFn);
+    profilesParam.grantWrite(warmScheduleFn);
 
     warmScheduleFn.addToRolePolicy(
       new iam.PolicyStatement({
@@ -246,24 +260,27 @@ export class ProvisionedConcurrencyStack extends Stack {
     // PC, memory is baked into each published Version, so changing it needs
     // UpdateFunctionConfiguration/PublishVersion against the bare (unqualified)
     // function - these actions don't accept an alias qualifier the way the PC
-    // calls above do - plus UpdateAlias against the `live` alias itself to
-    // move it onto the newly-published version.
+    // calls above do. UpdateAlias (moving `live` onto the newly-published
+    // version) is granted against the same bare function ARN, not the alias-
+    // qualified one - confirmed live: AWS authorizes alias CRUD actions
+    // (UpdateAlias/CreateAlias/DeleteAlias) against the function's own ARN,
+    // not `function:name:live` (unlike PC's Put/DeleteProvisionedConcurrencyConfig
+    // above, which do resolve against the alias-qualified ARN) - granting the
+    // alias ARN here caused a real AccessDeniedException the moment a
+    // schedule's memoryMb diverged from a target's actual live memory (first
+    // hit for supergraph-graphql and the zero-trust-lab targets, whose CDK
+    // memorySize was never changed in this rollout).
     warmScheduleFn.addToRolePolicy(
       new iam.PolicyStatement({
         actions: [
           "lambda:GetFunctionConfiguration",
           "lambda:UpdateFunctionConfiguration",
           "lambda:PublishVersion",
+          "lambda:UpdateAlias",
         ],
         resources: targetFnNames.map(
           (name) => `arn:aws:lambda:${this.region}:${this.account}:function:${name}`
         ),
-      })
-    );
-    warmScheduleFn.addToRolePolicy(
-      new iam.PolicyStatement({
-        actions: ["lambda:UpdateAlias"],
-        resources: targetFnNames.map((name) => liveAliasArn(this.region, this.account, name)),
       })
     );
 

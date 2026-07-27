@@ -80,7 +80,9 @@ export const resolvers = {
         inventory,
         shoppingList,
         settings.categories,
-        context.sourceIp
+        context.sourceIp,
+        settings.aiProvider,
+        settings.aiModelTier
       );
     },
     // Null when unauthenticated (using the default/shared pantry) - the

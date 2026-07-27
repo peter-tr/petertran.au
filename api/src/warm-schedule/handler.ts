@@ -21,6 +21,7 @@ const scheduler = new SchedulerClient({});
 
 const ALIAS_NAME = process.env.LIVE_ALIAS_NAME!;
 const PARAM_NAME = process.env.WARM_SCHEDULE_PARAM_NAME!;
+const PROFILES_PARAM_NAME = process.env.WARM_SCHEDULE_PROFILES_PARAM_NAME!;
 // CDK-provided map of each project's on/off EventBridge Schedule names -
 // see infra/lib/warm-schedule-stack.ts.
 const SCHEDULE_NAMES: Record<WarmScheduleKey, { on: string; off: string }> = JSON.parse(
@@ -40,6 +41,12 @@ interface WarmSchedule {
 }
 
 type WarmScheduleConfig = Record<WarmScheduleKey, WarmSchedule>;
+// Named full-config snapshots (all 6 projects at once), keyed by
+// user-chosen name - lets the settings page save/apply a whole mode (e.g.
+// "all cold, 1024MB") in one action instead of editing every project's row.
+type WarmScheduleProfiles = Record<string, WarmScheduleConfig>;
+
+const MAX_PROFILE_NAME_LENGTH = 60;
 
 // Real ap-southeast-2 Provisioned Concurrency rate (AWS Pricing API,
 // effective 2026-07-01) - see the 2026-07-20 PC rollout's pricing pull.
@@ -151,6 +158,19 @@ async function getConfig(): Promise<WarmScheduleConfig> {
 async function setConfig(config: WarmScheduleConfig): Promise<void> {
   await ssm.send(
     new PutParameterCommand({ Name: PARAM_NAME, Value: JSON.stringify(config), Overwrite: true })
+  );
+}
+
+async function getProfiles(): Promise<WarmScheduleProfiles> {
+  const { Parameter } = await ssm.send(new GetParameterCommand({ Name: PROFILES_PARAM_NAME }));
+  if (!Parameter?.Value) return {};
+
+  return JSON.parse(Parameter.Value) as WarmScheduleProfiles;
+}
+
+async function setProfiles(profiles: WarmScheduleProfiles): Promise<void> {
+  await ssm.send(
+    new PutParameterCommand({ Name: PROFILES_PARAM_NAME, Value: JSON.stringify(profiles), Overwrite: true })
   );
 }
 
@@ -303,6 +323,23 @@ async function reconcileMemory(functionName: string, desiredMemoryMb: number): P
 // concurrency quota has no room), that's a transient infra condition, not a
 // reason to fail the request or the other targets' reconciliation in the
 // same tick.
+//
+// PC-on-alias failure mode (hit for real 2026-07-27, supergraph-graphql):
+// if a deploy publishes a version that crashes at init, AWS Lambda's own
+// alias+PC safety net keeps 100% of traffic pinned to the last version
+// that successfully warmed (via an internal weighted RoutingConfig on the
+// alias) rather than cutting over to a version PC can't warm - real
+// traffic stays safe, but the old version becomes permanently undeletable
+// (an alias still references it), which stalls every subsequent deploy's
+// CloudFormation cleanup phase ("stack ... is in
+// UPDATE_COMPLETE_CLEANUP_IN_PROGRESS state and can not be updated",
+// retrying forever without ever resolving on its own). Recovery once the
+// real code fix is ready: `aws lambda delete-provisioned-concurrency-
+// config --qualifier live` (an active PC config blocks any further
+// `update-alias` call outright), then `aws lambda update-alias --function-
+// version <last-known-good> --routing-config '{}'` to drop the stale
+// weighting, then `aws lambda delete-function --qualifier <stuck-version>`
+// to free it - only then does a fresh `cdk deploy` succeed.
 async function reconcileTarget(
   functionName: string,
   shouldBeWarm: boolean,
@@ -404,6 +441,70 @@ async function updateProjectSchedules(key: WarmScheduleKey, schedule: WarmSchedu
   ]);
 }
 
+// Returns the updated profiles map directly, rather than making the caller
+// re-fetch it from SSM right after this writes it - the response can build
+// off this in-memory value instead of a redundant read.
+async function saveProfile(name: string): Promise<WarmScheduleProfiles> {
+  const [config, profiles] = await Promise.all([getConfig(), getProfiles()]);
+  const updated = { ...profiles, [name]: config };
+  await setProfiles(updated);
+
+  return updated;
+}
+
+async function deleteProfile(name: string): Promise<WarmScheduleProfiles> {
+  const profiles = await getProfiles();
+  const updated = { ...profiles };
+  delete updated[name];
+  await setProfiles(updated);
+
+  return updated;
+}
+
+// Loads `name`'s saved config as the new live config and applies it exactly
+// like an individual project Save does (updateProjectSchedules +
+// reconcileProject), just for all 6 projects at once. Returns null (without
+// touching anything) if no profile by that name exists.
+async function applyProfile(name: string): Promise<WarmScheduleConfig | null> {
+  const profiles = await getProfiles();
+  const config = profiles[name];
+  if (!config) return null;
+
+  await setConfig(config);
+
+  const now = new Date();
+  await Promise.all(
+    (Object.keys(TARGETS_BY_PROJECT) as WarmScheduleKey[]).map((key) =>
+      Promise.all([updateProjectSchedules(key, config[key]), reconcileProject(key, config[key], now)])
+    )
+  );
+
+  return config;
+}
+
+// Takes `profiles` as a parameter rather than fetching it itself - every
+// call site already has the current value in hand (either just wrote it via
+// saveProfile/deleteProfile, or knows it's untouched by whatever it just
+// did), so a fresh getProfiles() here would be a redundant SSM read at best
+// and, right after a write, a stale one at worst (SSM's own read here
+// wouldn't necessarily reflect a Put this same request just issued).
+async function buildStatus(
+  config: WarmScheduleConfig,
+  profiles: WarmScheduleProfiles
+): Promise<{
+  schedules: WarmScheduleConfig;
+  costs: Record<WarmScheduleKey, ProjectCost>;
+  profiles: WarmScheduleProfiles;
+}> {
+  const costs = await computeAllProjectCosts(config);
+
+  return { schedules: config, costs, profiles };
+}
+
+function isValidProfileName(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0 && value.length <= MAX_PROFILE_NAME_LENGTH;
+}
+
 interface ReconcilePing {
   reconcile: true;
 }
@@ -483,7 +584,59 @@ async function processEvent(
   }
 
   if (event.httpMethod === "POST") {
-    const body = parseJsonBody<{ project?: string; schedule?: unknown }>(event);
+    const body = parseJsonBody<{
+      project?: string;
+      schedule?: unknown;
+      profileAction?: string;
+      name?: unknown;
+    }>(event);
+
+    if (body.profileAction !== undefined) {
+      if (
+        (body.profileAction !== "save" &&
+          body.profileAction !== "apply" &&
+          body.profileAction !== "delete") ||
+        !isValidProfileName(body.name)
+      ) {
+        return {
+          statusCode: 400,
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            error: `profileAction must be save/apply/delete, name must be a non-empty string up to ${MAX_PROFILE_NAME_LENGTH} chars`,
+          }),
+        };
+      }
+
+      const name = body.name;
+      let config: WarmScheduleConfig;
+      let profiles: WarmScheduleProfiles;
+
+      if (body.profileAction === "save") {
+        profiles = await saveProfile(name);
+        config = await getConfig();
+      } else if (body.profileAction === "delete") {
+        profiles = await deleteProfile(name);
+        config = await getConfig();
+      } else {
+        const applied = await applyProfile(name);
+        if (!applied) {
+          return {
+            statusCode: 400,
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ error: `no saved profile named "${name}"` }),
+          };
+        }
+        config = applied;
+        profiles = await getProfiles();
+      }
+
+      return {
+        statusCode: 200,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(await buildStatus(config, profiles)),
+      };
+    }
+
     if (!body.project || !(body.project in TARGETS_BY_PROJECT) || !isValidSchedule(body.schedule)) {
       return {
         statusCode: 400,
@@ -506,22 +659,19 @@ async function processEvent(
     await updateProjectSchedules(key, schedule);
     await reconcileProject(key, schedule, new Date());
 
-    const costs = await computeAllProjectCosts(config);
-
     return {
       statusCode: 200,
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ schedules: config, costs }),
+      body: JSON.stringify(await buildStatus(config, await getProfiles())),
     };
   }
 
   const config = await getConfig();
-  const costs = await computeAllProjectCosts(config);
 
   return {
     statusCode: 200,
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ schedules: config, costs }),
+    body: JSON.stringify(await buildStatus(config, await getProfiles())),
   };
 }
 

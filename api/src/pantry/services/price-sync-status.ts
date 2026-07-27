@@ -1,4 +1,5 @@
 import { GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
+import { traceSpan } from "api-shared/tracing";
 import { ddb, TABLE_NAME } from "../lib/aws/ddb";
 
 const STATUS_SK = "PRICE_SYNC_STATUS";
@@ -37,18 +38,22 @@ const DEFAULT_STATUS: PriceSyncStatus = {
 // Same backfill-merge pattern as settings.ts - a row written before a field
 // existed shouldn't trip a non-null check on read.
 export async function getPriceSyncStatus(pk: string): Promise<PriceSyncStatus> {
-  const res = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { pk, sk: STATUS_SK } }));
+  return traceSpan("price-sync-status.get", async () => {
+    const res = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { pk, sk: STATUS_SK } }));
 
-  return { ...DEFAULT_STATUS, ...(res.Item?.data as Partial<PriceSyncStatus> | undefined) };
+    return { ...DEFAULT_STATUS, ...(res.Item?.data as Partial<PriceSyncStatus> | undefined) };
+  });
 }
 
 async function putPriceSyncStatus(pk: string, status: PriceSyncStatus): Promise<void> {
-  await ddb.send(
-    new PutCommand({
-      TableName: TABLE_NAME,
-      Item: { pk, sk: STATUS_SK, type: "PRICE_SYNC_STATUS", data: status },
-    })
-  );
+  await traceSpan("price-sync-status.put", async () => {
+    await ddb.send(
+      new PutCommand({
+        TableName: TABLE_NAME,
+        Item: { pk, sk: STATUS_SK, type: "PRICE_SYNC_STATUS", data: status },
+      })
+    );
+  });
 }
 
 export async function startPriceSync(pk: string, totalItems: number): Promise<void> {

@@ -70,7 +70,7 @@ describe("validateContactInput", () => {
     // "@b.co" is 5 chars, so a 195-char local part makes exactly 200 chars.
     const localPart = "a".repeat(195);
     const email = `${localPart}@b.co`;
-    expect(email.length).toBe(200);
+    expect(email).toHaveLength(200);
 
     const message = "a".repeat(5000);
     expect(() => validateContactInput({ name, email, message })).not.toThrow();

@@ -1,6 +1,6 @@
 import { describe, it } from "vitest";
 import { App } from "aws-cdk-lib";
-import { Template } from "aws-cdk-lib/assertions";
+import { Template, Match } from "aws-cdk-lib/assertions";
 import { ApiGatewayStack } from "./api-gateway-stack";
 
 describe("ApiGatewayStack", () => {
@@ -18,6 +18,7 @@ describe("ApiGatewayStack", () => {
       supergraphFnName: "supergraph-graphql",
       designStudioFnName: "design-studio-graphql",
       alertsSettingsFnName: "alerts-settings",
+      enableWafRateLimit: true,
       env: { account: "123456789012", region: "ap-southeast-2" },
     });
 
@@ -48,10 +49,26 @@ describe("ApiGatewayStack", () => {
       Integration: {
         IntegrationResponses: [
           {
-            ResponseParameters: {
+            ResponseParameters: Match.objectLike({
               "method.response.header.Access-Control-Allow-Headers":
-                "'content-type,apollo-require-preflight,x-amzn-trace-id,authorization'",
-            },
+                "'content-type,apollo-require-preflight,x-amzn-trace-id,authorization,apollographql-client-name'",
+              // Regression test: this origin was missing from allowOrigins
+              // entirely (confirmed live 2026-07-27) - CDK's mock preflight
+              // integration falls back to echoing the *first* configured
+              // origin for any request whose Origin isn't in the list at
+              // all, so both the embedded Sandbox UI and Apollo Studio's
+              // own Explorer failed CORS preflight this whole time.
+              "method.response.header.Access-Control-Allow-Credentials": "'true'",
+            }),
+            // CDK renders per-origin matching as a Velocity Template that
+            // overrides the response's Allow-Origin header at request time
+            // if the real Origin matches one of the non-default entries -
+            // this is what actually lets studio.apollographql.com's
+            // preflight succeed, not the static header above (which is
+            // just the first-listed origin as a fallback default).
+            ResponseTemplates: Match.objectLike({
+              "application/json": Match.stringLikeRegexp("https://studio\\.apollographql\\.com"),
+            }),
           },
         ],
       },
@@ -60,6 +77,27 @@ describe("ApiGatewayStack", () => {
     // on-demand test-env twin, same account/region) never has a chance to
     // reappear - see the stack's cloudWatchRole comment.
     template.resourceCountIs("AWS::ApiGateway::Account", 0);
+    // Coarse per-IP outer defense layer, starting in COUNT (not BLOCK) -
+    // see the stack's doc comment above the WebACL for why.
+    template.resourceCountIs("AWS::WAFv2::WebACL", 1);
+    template.hasResourceProperties("AWS::WAFv2::WebACL", {
+      Scope: "REGIONAL",
+      DefaultAction: { Allow: {} },
+      Rules: [
+        {
+          Name: "RateLimitByIp",
+          Action: { Count: {} },
+          Statement: {
+            RateBasedStatement: {
+              Limit: 100,
+              AggregateKeyType: "IP",
+              EvaluationWindowSec: 60,
+            },
+          },
+        },
+      ],
+    });
+    template.resourceCountIs("AWS::WAFv2::WebACLAssociation", 1);
   });
 
   it("isTestEnv: routes portfolio/pantry/imposter/supergraph (no warm-schedule), under the given apiSubdomain", () => {
@@ -76,6 +114,9 @@ describe("ApiGatewayStack", () => {
       supergraphFnName: "supergraph-graphql-test",
       // warmScheduleFnName omitted - not part of what the test env exists to
       // validate.
+      // Matches infra/bin/app.ts's real wiring - the on-demand test env
+      // doesn't get its own WebACL charge on top of prod's.
+      enableWafRateLimit: false,
       env: { account: "123456789012", region: "ap-southeast-2" },
     });
 
@@ -88,5 +129,7 @@ describe("ApiGatewayStack", () => {
     template.hasResourceProperties("AWS::ApiGateway::DomainName", {
       DomainName: "api.test.example.com",
     });
+    template.resourceCountIs("AWS::WAFv2::WebACL", 0);
+    template.resourceCountIs("AWS::WAFv2::WebACLAssociation", 0);
   });
 });

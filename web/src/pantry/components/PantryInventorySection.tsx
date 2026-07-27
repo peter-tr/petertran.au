@@ -133,7 +133,9 @@ export default function PantryInventorySection({
     onSettingsChange({ collapsedGroups: [...next] });
   }
 
-  const categories = [...new Set(items.map((i) => i.category).filter((c): c is string => !!c))].sort();
+  const categories = [...new Set(items.map((i) => i.category).filter((c): c is string => !!c))].sort((a, b) =>
+    a.localeCompare(b)
+  );
 
   // Keyed off the total count, not how many are *currently* hidden - the
   // latter goes to 0 the moment showLowPriority flips on, which made the

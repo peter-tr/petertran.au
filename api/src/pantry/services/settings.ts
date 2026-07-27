@@ -1,4 +1,6 @@
 import { GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
+import type { AiProvider, AiModelTier } from "api-shared/ai-provider";
+import { traceSpan } from "api-shared/tracing";
 import { ddb, TABLE_NAME } from "../lib/aws/ddb";
 
 const SETTINGS_SK = "SETTINGS";
@@ -33,6 +35,15 @@ export interface PantrySettings {
   nerdModeInventory: boolean;
   nerdModeShoppingList: boolean;
   nerdModeCommandBar: boolean;
+  // Which backend/tier the command bar's parseCommand calls run on - price
+  // checking always uses ANTHROPIC regardless (see check-prices.ts), since
+  // Bedrock doesn't support the web_search/web_fetch tools it needs.
+  aiProvider: AiProvider;
+  aiModelTier: AiModelTier;
+  // Gates web/src/pantry/lib/homeCache.ts's stale-while-revalidate cache -
+  // see the schema.graphql doc comment on this field for what it actually
+  // controls.
+  instantLoadCache: boolean;
 }
 
 export interface PantrySettingsInput {
@@ -60,6 +71,9 @@ export interface PantrySettingsInput {
   nerdModeInventory?: boolean;
   nerdModeShoppingList?: boolean;
   nerdModeCommandBar?: boolean;
+  aiProvider?: AiProvider;
+  aiModelTier?: AiModelTier;
+  instantLoadCache?: boolean;
 }
 
 // Same starting list as the client used to seed localStorage with, so the
@@ -91,6 +105,9 @@ const DEFAULT_SETTINGS: PantrySettings = {
   nerdModeInventory: false,
   nerdModeShoppingList: false,
   nerdModeCommandBar: false,
+  aiProvider: "ANTHROPIC",
+  aiModelTier: "HAIKU",
+  instantLoadCache: true,
   commonItems: [
     "Milk",
     "Eggs",
@@ -130,16 +147,20 @@ const DEFAULT_SETTINGS: PantrySettings = {
 // added would otherwise come back missing it, tripping the schema's
 // non-null check instead of just quietly defaulting.
 export async function getSettings(pk: string): Promise<PantrySettings> {
-  const res = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { pk, sk: SETTINGS_SK } }));
+  return traceSpan("settings.get", async () => {
+    const res = await ddb.send(new GetCommand({ TableName: TABLE_NAME, Key: { pk, sk: SETTINGS_SK } }));
 
-  return { ...DEFAULT_SETTINGS, ...(res.Item?.data as Partial<PantrySettings> | undefined) };
+    return { ...DEFAULT_SETTINGS, ...(res.Item?.data as Partial<PantrySettings> | undefined) };
+  });
 }
 
 export async function putSettings(pk: string, settings: PantrySettings): Promise<void> {
-  await ddb.send(
-    new PutCommand({
-      TableName: TABLE_NAME,
-      Item: { pk, sk: SETTINGS_SK, type: "SETTINGS", data: settings },
-    })
-  );
+  await traceSpan("settings.put", async () => {
+    await ddb.send(
+      new PutCommand({
+        TableName: TABLE_NAME,
+        Item: { pk, sk: SETTINGS_SK, type: "SETTINGS", data: settings },
+      })
+    );
+  });
 }

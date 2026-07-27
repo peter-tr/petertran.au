@@ -146,7 +146,7 @@ function injectIntoShell(shellHtml: string, bodyHtml: string, title?: string, de
 
 async function main() {
   const endpoint = readEnvVar("VITE_GRAPHQL_ENDPOINT");
-  const runQuery = createGraphQLClient(endpoint, "VITE_GRAPHQL_ENDPOINT");
+  const runQuery = createGraphQLClient(endpoint, "VITE_GRAPHQL_ENDPOINT", undefined, "prerender");
   const data = await runQuery<ResumeData>(RESUME_QUERY);
 
   const shellPath = path.join(DIST_DIR, "index.html");

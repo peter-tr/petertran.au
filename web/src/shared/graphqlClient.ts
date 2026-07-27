@@ -31,7 +31,19 @@ export function createGraphQLClient(
   // the resume API's and imposter's own createGraphQLClient calls are
   // unaffected. Called fresh on every request, not captured once, since the
   // underlying token can be refreshed/cleared between calls.
-  getAuthHeader?: () => Promise<string | undefined>
+  getAuthHeader?: () => Promise<string | undefined>,
+  // Router reads apollographql-client-name by default (no router.yaml
+  // config needed) to attribute traffic to a named client in GraphOS
+  // Studio - without it, every request shows up as "unidentified client".
+  // Each caller passes its own name (portfolio/pantry/imposter/design-
+  // studio, matching the subgraph names elsewhere - see SUBGRAPH_NAMES in
+  // build-router-package.ts) rather than sharing one generic "web" value,
+  // since the 4 apps query almost entirely disjoint parts of the schema -
+  // Studio's per-client field usage view is only useful if it can actually
+  // tell them apart. prerender.tsx overrides this to "prerender" so CI/
+  // build-time traffic is distinguishable from real users too. "web" is
+  // only a fallback for a caller that forgets to pass one.
+  clientName = "web"
 ) {
   return async function runQuery<T = unknown>(
     query: string,
@@ -47,6 +59,7 @@ export function createGraphQLClient(
       method: "POST",
       headers: {
         "content-type": "application/json",
+        "apollographql-client-name": clientName,
         ...(authHeader ? { authorization: authHeader } : {}),
       },
       body: JSON.stringify({ query, variables }),

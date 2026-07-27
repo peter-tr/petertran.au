@@ -2,10 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import PantryArchitectureDiagram from "./components/PantryArchitectureDiagram";
 import { usePantrySettings } from "./hooks/usePantrySettings";
+import { clearPantryHomeCache } from "./lib/homeCache";
 import {
   runPantryQuery,
   SYNC_PRICES_NOW_MUTATION,
   PRICE_SYNC_STATUS_QUERY,
+  AiProvider,
+  AiModelTier,
   type SyncPricesNowResult,
   type PriceSyncStatus,
   type PriceSyncStatusResult,
@@ -164,6 +167,41 @@ export default function PantrySettingsPage() {
         </section>
       )}
 
+      {settings && (
+        <section className="pantry-panel">
+          <div className="pantry-panel-header">
+            <h2 className="pantry-panel-title">Instant load</h2>
+          </div>
+
+          <p className="project-desc">
+            Paints the pantry page instantly from the last-loaded inventory/shopping list while a fresh copy
+            loads in the background, instead of waiting on the network every time. Turning this off also
+            clears whatever's currently cached.
+          </p>
+
+          <div className="form-row pantry-settings-row">
+            <label className="form-label" htmlFor="pantry-instant-load-cache">
+              <input
+                id="pantry-instant-load-cache"
+                type="checkbox"
+                checked={settings.instantLoadCache}
+                onChange={(e) => {
+                  updateSettings({ instantLoadCache: e.target.checked });
+                  // usePantryHome (Pantry.tsx) owns the actual cache and
+                  // would clear it on its own next background refetch
+                  // anyway (see its refetch), but that only happens on the
+                  // next /pantry visit - clear it here too so switching
+                  // this off takes effect immediately rather than lagging
+                  // one visit behind.
+                  if (!e.target.checked) clearPantryHomeCache();
+                }}
+              />{" "}
+              Cache the pantry page for instant loads
+            </label>
+          </div>
+        </section>
+      )}
+
       <section className="pantry-panel">
         <div className="pantry-panel-header">
           <h2 className="pantry-panel-title">Price tracking</h2>
@@ -205,6 +243,60 @@ export default function PantrySettingsPage() {
           </div>
         )}
       </section>
+
+      {settings && (
+        <section className="pantry-panel">
+          <div className="pantry-panel-header">
+            <h2 className="pantry-panel-title">AI provider</h2>
+          </div>
+          <p className="project-desc">
+            Which backend and model the command bar runs on. This only affects the command bar - price
+            checking always uses the direct Anthropic API, since Bedrock doesn&apos;t support the web
+            search/fetch tools it depends on.
+          </p>
+          <div className="form-row pantry-settings-row">
+            <label className="form-label" htmlFor="pantry-ai-provider">
+              Provider
+            </label>
+            <select
+              id="pantry-ai-provider"
+              className="form-input"
+              value={settings.aiProvider}
+              onChange={(e) => {
+                const aiProvider = e.target.value as AiProvider;
+                // BEDROCK + HAIKU isn't a valid combination (Bedrock rejects
+                // structured JSON output for Haiku 4.5) - see the option
+                // below, which disables Haiku under Bedrock the same way.
+                if (aiProvider === AiProvider.Bedrock && settings.aiModelTier === AiModelTier.Haiku) {
+                  updateSettings({ aiProvider, aiModelTier: AiModelTier.Sonnet });
+                } else {
+                  updateSettings({ aiProvider });
+                }
+              }}
+            >
+              <option value={AiProvider.Anthropic}>Direct Anthropic API</option>
+              <option value={AiProvider.Bedrock}>AWS Bedrock</option>
+            </select>
+          </div>
+          <div className="form-row pantry-settings-row">
+            <label className="form-label" htmlFor="pantry-ai-model-tier">
+              Model
+            </label>
+            <select
+              id="pantry-ai-model-tier"
+              className="form-input"
+              value={settings.aiModelTier}
+              onChange={(e) => updateSettings({ aiModelTier: e.target.value as AiModelTier })}
+            >
+              <option value={AiModelTier.Haiku} disabled={settings.aiProvider === AiProvider.Bedrock}>
+                Haiku 4.5 (fast)
+                {settings.aiProvider === AiProvider.Bedrock ? " - not available on Bedrock" : ""}
+              </option>
+              <option value={AiModelTier.Sonnet}>Sonnet 4.6 (better quality)</option>
+            </select>
+          </div>
+        </section>
+      )}
 
       {settings && (
         <section className="pantry-panel">

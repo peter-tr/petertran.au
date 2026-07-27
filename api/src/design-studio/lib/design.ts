@@ -1,4 +1,4 @@
-export type DesignElementType = "RECTANGLE" | "ELLIPSE" | "TEXT";
+export type DesignElementType = "RECTANGLE" | "ELLIPSE" | "TEXT" | "ARROW";
 
 export interface DesignElementRecord {
   id: string;
@@ -76,15 +76,16 @@ export interface SaveAsTemplateArgs {
   elements: DesignElementRecord[];
 }
 
-export type AiProvider = "ANTHROPIC" | "BEDROCK";
-export type AiModelTier = "HAIKU" | "SONNET";
+export type { AiProvider, AiModelTier } from "api-shared/ai-provider";
+import type { AiProvider, AiModelTier } from "api-shared/ai-provider";
 
 // Operator-configurable, not per-user - there's one editor, so one shared
 // setting. Deliberately decoupled from the raw model ID string: BEDROCK's
 // inference-profile IDs (e.g. "us.anthropic.claude-sonnet-4-6") don't match
 // ANTHROPIC's bare ones (e.g. "claude-sonnet-4-6"), so storing a tier lets
 // generate-elements.ts resolve the actual per-provider ID rather than the
-// caller needing to know both formats.
+// caller needing to know both formats. AiProvider/AiModelTier themselves
+// live in api-shared/ai-provider, shared with pantry's equivalent setting.
 export interface AiSettingsRecord {
   provider: AiProvider;
   modelTier: AiModelTier;

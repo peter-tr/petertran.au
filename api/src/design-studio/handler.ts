@@ -1,4 +1,5 @@
 import { ApolloServer } from "@apollo/server";
+import { ApolloServerPluginInlineTrace } from "@apollo/server/plugin/inlineTrace";
 import { startServerAndCreateLambdaHandler, handlers } from "@as-integrations/aws-lambda";
 import { buildSubgraphSchema } from "@apollo/subgraph";
 import { parse } from "graphql";
@@ -14,6 +15,11 @@ const resolvers = createDesignStudioResolvers(new MongoDesignStore());
 const server = new ApolloServer<Context>({
   schema: buildSubgraphSchema([{ typeDefs: parse(typeDefs), resolvers }]),
   introspection: true,
+  // Responds to the supergraph Router's federated-tracing header with
+  // per-field timing data (extensions.ftv1) - see portfolio/handler.ts's
+  // identical comment for why this is needed for GraphOS field-level
+  // Insights specifically (separate from Router's own operation metrics).
+  plugins: [ApolloServerPluginInlineTrace()],
 });
 
 const apolloHandler = startServerAndCreateLambdaHandler(

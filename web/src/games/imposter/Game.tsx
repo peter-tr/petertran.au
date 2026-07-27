@@ -96,15 +96,15 @@ export default function ImposterGamePage() {
         </p>
       )}
 
-      {!loading && game && game.phase === "REVEAL" && (
+      {!loading && game?.phase === "REVEAL" && (
         <RevealBoard gameId={game.gameId} players={game.players} onAllRevealed={setGame} />
       )}
 
-      {!loading && game && game.phase === "DISCUSSION" && (
+      {!loading && game?.phase === "DISCUSSION" && (
         <DiscussionPanel gameId={game.gameId} players={game.players} onGameUpdate={setGame} />
       )}
 
-      {!loading && game && game.phase === "RESULTS" && <ResultsPanel game={game} />}
+      {!loading && game?.phase === "RESULTS" && <ResultsPanel game={game} />}
     </>
   );
 }

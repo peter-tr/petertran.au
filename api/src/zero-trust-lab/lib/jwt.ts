@@ -1,5 +1,5 @@
 import { KMSClient, SignCommand, GetPublicKeyCommand } from "@aws-sdk/client-kms";
-import { createPublicKey } from "crypto";
+import { createPublicKey } from "node:crypto";
 import { captureAwsClient } from "api-shared/xray";
 
 const kms = captureAwsClient(new KMSClient({}));

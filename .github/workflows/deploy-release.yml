@@ -28,3 +28,6 @@ jobs:
     permissions:
       id-token: write
       contents: read
+    # workflow_call jobs get none of the caller's secrets by default - see
+    # deploy.yml's identical comment on this same line.
+    secrets: inherit

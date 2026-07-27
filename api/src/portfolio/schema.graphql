@@ -278,6 +278,18 @@ One timed segment (or subsegment) within a single AWS X-Ray trace.
 """
 type TraceSegment {
   """
+  This segment's own id, from X-Ray's segment/subsegment document. Used to
+  reconstruct the real call tree client-side via `parentId` - not otherwise
+  meaningful on its own.
+  """
+  id: ID!
+  """
+  The `id` of the segment that called this one, or null if this segment is
+  a root of the trace (no parent, or its parent didn't survive filtering -
+  see the platform-Lambda dedup in `xray.ts`).
+  """
+  parentId: ID
+  """
   What this segment represents, e.g. "Lambda", "DynamoDB", or "Anthropic API".
   """
   name: String!

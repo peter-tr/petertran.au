@@ -5,11 +5,13 @@ import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as ses from "aws-cdk-lib/aws-ses";
 import * as cognito from "aws-cdk-lib/aws-cognito";
+import * as iam from "aws-cdk-lib/aws-iam";
 import { Schedule, ScheduleExpression } from "aws-cdk-lib/aws-scheduler";
 import { LambdaInvoke } from "aws-cdk-lib/aws-scheduler-targets";
-import * as path from "path";
+import * as path from "node:path";
 import { FUNCTION_NAMES, LIVE_ALIAS_NAME } from "./shared/function-names";
 import { applyApplicationSignals } from "./shared/application-signals";
+import { bedrockInvokeResources } from "./shared/bedrock-models";
 
 export interface PantryStackProps extends StackProps {
   // Optional, defaults to prod's current values - only the on-demand test
@@ -57,7 +59,9 @@ export class PantryStack extends Stack {
     // Reuses the same Anthropic key as the resume API and Imposter - it's
     // the same underlying account/budget either way. Only parseCommand
     // (the AI command bar) calls it; every other pantry mutation is plain
-    // DynamoDB CRUD.
+    // DynamoDB CRUD. Resolved into a plain ANTHROPIC_API_KEY env var at
+    // deploy time below rather than fetched via ARN at runtime - see
+    // site-stack.ts's identical comment on this same secret for why.
     const anthropicSecret = secretsmanager.Secret.fromSecretNameV2(
       this,
       "AnthropicApiKey",
@@ -138,12 +142,12 @@ export class PantryStack extends Stack {
       memorySize: 512,
       // Generous - "recipes" mode (esp. an open "what can I make?" request
       // returning several full recipes) has been observed taking 6-8s warm,
-      // and a cold start (Secrets Manager fetch + Anthropic client init) on
-      // top of that was enough to blow through the previous 15s timeout.
+      // and a cold start (Anthropic client init) on top of that was enough
+      // to blow through the previous 15s timeout.
       timeout: Duration.seconds(30),
       environment: {
         TABLE_NAME: table.tableName,
-        ANTHROPIC_SECRET_ARN: anthropicSecret.secretArn,
+        ANTHROPIC_API_KEY: anthropicSecret.secretValue.unsafeUnwrap(),
         PANTRY_COGNITO_USER_POOL_ID: userPool.userPoolId,
         PANTRY_COGNITO_CLIENT_ID: userPoolClient.userPoolClientId,
       },
@@ -151,7 +155,19 @@ export class PantryStack extends Stack {
       // comment for why.
     });
     table.grantReadWriteData(apiFn);
-    anthropicSecret.grantRead(apiFn);
+
+    // Lets PantrySettings.aiProvider === "BEDROCK" actually invoke Claude via
+    // Bedrock (see api-shared/anthropic-bedrock-client.ts) for the command
+    // bar - price checking never uses Bedrock (see check-prices.ts), but
+    // this Lambda serves both, so the grant is scoped by model, not by
+    // resolver.
+    apiFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
+        resources: bedrockInvokeResources(this.region, this.account),
+      })
+    );
+
     applyApplicationSignals(apiFn);
     this.apiFn = apiFn;
 
@@ -238,11 +254,10 @@ export class PantryStack extends Stack {
         timeout: Duration.minutes(10),
         environment: {
           TABLE_NAME: table.tableName,
-          ANTHROPIC_SECRET_ARN: anthropicSecret.secretArn,
+          ANTHROPIC_API_KEY: anthropicSecret.secretValue.unsafeUnwrap(),
         },
       });
       table.grantReadWriteData(priceCheckFn);
-      anthropicSecret.grantRead(priceCheckFn);
       applyApplicationSignals(priceCheckFn);
 
       // No automatic schedule - lets the main GraphQL Lambda's syncPricesNow

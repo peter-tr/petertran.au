@@ -110,7 +110,9 @@ async function run(
     opts.inventory ?? [],
     opts.shoppingList ?? [],
     ["Dairy"],
-    "1.2.3.4"
+    "1.2.3.4",
+    "ANTHROPIC",
+    "HAIKU"
   );
 }
 

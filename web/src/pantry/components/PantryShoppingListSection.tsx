@@ -198,8 +198,12 @@ export default function PantryShoppingListSection({
     }
   }
 
-  const categories = [...new Set(entries.map((e) => e.category).filter((c): c is string => !!c))].sort();
-  const recipeTags = [...new Set(entries.map((e) => e.recipeTag).filter((t): t is string => !!t))].sort();
+  const categories = [...new Set(entries.map((e) => e.category).filter((c): c is string => !!c))].sort(
+    (a, b) => a.localeCompare(b)
+  );
+  const recipeTags = [...new Set(entries.map((e) => e.recipeTag).filter((t): t is string => !!t))].sort(
+    (a, b) => a.localeCompare(b)
+  );
 
   const filteredEntries = sortEntries(
     entries.filter((e) => {

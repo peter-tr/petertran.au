@@ -8,6 +8,19 @@ function dayKey(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
+// The Apollo Router's query planner renames every subgraph-level operation to
+// `<clientOperationName>__<subgraphName>__<fetchIndex>` for its own internal
+// tracing (see @apollo/query-planner's buildPlan.js), even when the plan has
+// only one fetch group - so requestContext.operationName inside a subgraph
+// Lambda is never the name the client actually sent. Stripping it back down
+// is what keeps the systemStats/CloudWatch breakdown keyed by "Footer"
+// instead of "Footer__portfolio__0".
+const FEDERATION_SUFFIX_PATTERN = /__\w+__\d+$/;
+
+export function stripFederationSuffix(operationName: string): string {
+  return operationName.replace(FEDERATION_SUFFIX_PATTERN, "");
+}
+
 // CloudWatch auto-parses any stdout line shaped like this (Embedded Metric
 // Format) into a real metric -- no PutMetricData call, no extra AWS SDK
 // client, no added request latency. Two dimension sets on the same datum so
@@ -87,7 +100,7 @@ export function createOperationMetricsPlugin<TContext extends BaseContext = Base
     async requestDidStart() {
       return {
         async willSendResponse(requestContext) {
-          const operationName = requestContext.operationName ?? "Anonymous";
+          const operationName = stripFederationSuffix(requestContext.operationName ?? "Anonymous");
           if (ignoredOperations.has(operationName)) return;
 
           const operationType = requestContext.operation?.operation ?? "unknown";

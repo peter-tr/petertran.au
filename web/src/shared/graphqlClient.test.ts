@@ -107,4 +107,29 @@ describe("createGraphQLClient", () => {
     const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(init.headers).not.toHaveProperty("authorization");
   });
+
+  it("defaults the apollographql-client-name header to 'web'", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => ({ data: {} }) });
+
+    const runQuery = createGraphQLClient("https://api.test/graphql", "VITE_SOME_ENDPOINT");
+    await runQuery("{ foo }");
+
+    const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(init.headers).toMatchObject({ "apollographql-client-name": "web" });
+  });
+
+  it("sends a caller-supplied apollographql-client-name (e.g. prerender.tsx's 'prerender')", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => ({ data: {} }) });
+
+    const runQuery = createGraphQLClient(
+      "https://api.test/graphql",
+      "VITE_SOME_ENDPOINT",
+      undefined,
+      "prerender"
+    );
+    await runQuery("{ foo }");
+
+    const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(init.headers).toMatchObject({ "apollographql-client-name": "prerender" });
+  });
 });

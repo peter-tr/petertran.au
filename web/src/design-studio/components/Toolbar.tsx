@@ -1,16 +1,11 @@
 import type { ElementType } from "../lib/elements";
+import { TOOLS, EXPORT_SHORTCUT_KEY } from "../lib/tools";
 
 interface ToolbarProps {
   onAdd: (type: ElementType) => void;
   onExport: () => void;
   exporting: boolean;
 }
-
-const TOOLS: { type: ElementType; label: string }[] = [
-  { type: "rectangle", label: "Rectangle" },
-  { type: "ellipse", label: "Ellipse" },
-  { type: "text", label: "Text" },
-];
 
 export default function Toolbar({ onAdd, onExport, exporting }: ToolbarProps) {
   return (
@@ -21,13 +16,22 @@ export default function Toolbar({ onAdd, onExport, exporting }: ToolbarProps) {
           type="button"
           className="design-studio-tool-btn"
           onClick={() => onAdd(tool.type)}
+          title={`${tool.label} (${tool.key})`}
         >
           {tool.label}
+          <span className="design-studio-tool-shortcut">{tool.key}</span>
         </button>
       ))}
       <hr className="design-studio-toolbar-rule" />
-      <button type="button" className="design-studio-tool-btn" onClick={onExport} disabled={exporting}>
+      <button
+        type="button"
+        className="design-studio-tool-btn"
+        onClick={onExport}
+        disabled={exporting}
+        title={`Export PNG (${EXPORT_SHORTCUT_KEY})`}
+      >
         {exporting ? "Exporting…" : "Export PNG"}
+        <span className="design-studio-tool-shortcut">{EXPORT_SHORTCUT_KEY}</span>
       </button>
     </div>
   );

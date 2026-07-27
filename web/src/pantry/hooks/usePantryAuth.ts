@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { runPantryQuery, ME_QUERY, type MeResult } from "../api";
 import { signIn, signUp, signOut as authSignOut, PantryAuthError } from "../lib/auth";
+import { clearPantryHomeCache } from "../lib/homeCache";
 
 export type PantryAuthMode = "signin" | "signup";
 
@@ -45,6 +46,11 @@ export function usePantryAuth() {
   );
 
   const signOut = useCallback(() => {
+    // Clear the cache before authSignOut() drops the token - homeCache
+    // keys by the signed-in identity, so clearing has to happen while
+    // that identity is still readable, otherwise it'd clear the guest
+    // bucket instead of the account that's actually signing out.
+    clearPantryHomeCache();
     authSignOut();
     setEmail(null);
   }, []);

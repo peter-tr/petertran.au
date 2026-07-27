@@ -1,14 +1,19 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { mergeSettings, usePantrySettings } from "./usePantrySettings";
-import { runPantryQuery } from "../api";
+import { runPantryQuery, AiProvider, AiModelTier } from "../api";
 import type { PantrySettings, PantrySettingsInput } from "../api";
 
-vi.mock("../api", () => ({
-  runPantryQuery: vi.fn(),
-  SETTINGS_QUERY: "SETTINGS_QUERY",
-  UPDATE_SETTINGS_MUTATION: "UPDATE_SETTINGS_MUTATION",
-}));
+vi.mock("../api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../api")>();
+
+  return {
+    ...actual,
+    runPantryQuery: vi.fn(),
+    SETTINGS_QUERY: "SETTINGS_QUERY",
+    UPDATE_SETTINGS_MUTATION: "UPDATE_SETTINGS_MUTATION",
+  };
+});
 
 const mockRunPantryQuery = vi.mocked(runPantryQuery);
 
@@ -38,6 +43,9 @@ function makeSettings(overrides: Partial<PantrySettings> = {}): PantrySettings {
     nerdModeInventory: false,
     nerdModeShoppingList: false,
     nerdModeCommandBar: false,
+    aiProvider: AiProvider.Anthropic,
+    aiModelTier: AiModelTier.Haiku,
+    instantLoadCache: true,
     ...overrides,
   };
 }

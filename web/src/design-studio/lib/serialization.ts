@@ -6,12 +6,14 @@ const TYPE_TO_WIRE: Record<ElementType, DesignElementType> = {
   rectangle: DesignElementType.Rectangle,
   ellipse: DesignElementType.Ellipse,
   text: DesignElementType.Text,
+  arrow: DesignElementType.Arrow,
 };
 
 const TYPE_FROM_WIRE: Record<DesignElementType, ElementType> = {
   [DesignElementType.Rectangle]: "rectangle",
   [DesignElementType.Ellipse]: "ellipse",
   [DesignElementType.Text]: "text",
+  [DesignElementType.Arrow]: "arrow",
 };
 
 export function toElementInput(element: DesignElement): DesignElementInput {

@@ -1,6 +1,5 @@
 import { createGraphQLClient } from "../shared/graphqlClient";
 import { getAuthHeader } from "./lib/auth";
-import { StorageLocation, PantryActionType } from "./api-schema-types.generated";
 import type {
   AddInventoryItemInput as SchemaAddInventoryItemInput,
   UpdateInventoryItemInput as SchemaUpdateInventoryItemInput,
@@ -47,10 +46,11 @@ export const PANTRY_ENDPOINT = import.meta.env?.VITE_PANTRY_GRAPHQL_ENDPOINT as 
 export const runPantryQuery = createGraphQLClient(
   PANTRY_ENDPOINT,
   "VITE_PANTRY_GRAPHQL_ENDPOINT",
-  getAuthHeader
+  getAuthHeader,
+  "pantry"
 );
 
-export { StorageLocation };
+export { StorageLocation, AiProvider, AiModelTier } from "./api-schema-types.generated";
 
 export type AiCallDebugInfo = AiCallDebugInfoFieldsFragment;
 
@@ -280,6 +280,9 @@ const SETTINGS_FIELDS = /* GraphQL */ `
     nerdModeInventory
     nerdModeShoppingList
     nerdModeCommandBar
+    aiProvider
+    aiModelTier
+    instantLoadCache
   }
 `;
 
@@ -381,7 +384,7 @@ export const ME_QUERY = /* GraphQL */ `
 
 export type MeResult = MeQuery;
 
-export { PantryActionType };
+export { PantryActionType } from "./api-schema-types.generated";
 
 // No standalone GraphQL fragment - actions/recipes/ingredients below are only
 // ever selected inline as part of ParseCommand's response.

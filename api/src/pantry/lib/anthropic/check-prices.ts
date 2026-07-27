@@ -8,6 +8,11 @@ import { buildDebugInfo, type AiCallDebugInfo } from "./debug-info";
 // blowing out if the tracked list grows large, not an expected ceiling.
 const MAX_ITEMS_PER_RUN = 20;
 
+// Always the direct Anthropic API, regardless of PantrySettings.aiProvider -
+// Bedrock doesn't support the web_search/web_fetch tools this feature
+// depends on at all (not a Haiku-specific gap like generate-elements.ts's
+// structured-output one), so there's no Bedrock path to switch to here.
+
 // claude-haiku-4-5 doesn't support the newer web_search_20260209/
 // web_fetch_20260209 dynamic-filtering variants, so this uses the basic
 // ones - see the memory writeup: Haiku + basic tools was ~4-5x cheaper than
@@ -106,7 +111,9 @@ async function checkPricesBatch(
     { timeout: timeoutMs }
   );
 
-  const debugInfo = buildDebugInfo(response.usage, Date.now() - startedAt);
+  // Always HAIKU - this feature is pinned to the direct Anthropic API (see
+  // this file's header comment), never PantrySettings.aiModelTier.
+  const debugInfo = buildDebugInfo(response.usage, Date.now() - startedAt, "HAIKU");
   const parsed = response.parsed_output as { results: BatchPriceResult[] } | null;
 
   const results = new Map<string, BatchPriceResult>();
@@ -114,7 +121,7 @@ async function checkPricesBatch(
     // Same URL validation as before - never pass through a malformed/
     // hallucinated link just because a field happened to be present.
     const rawUrl = r.productUrl?.replace(/[.,;)]+$/, "") ?? null;
-    const productUrl = rawUrl && /^https:\/\/www\.coles\.com\.au\/product\//.test(rawUrl) ? rawUrl : null;
+    const productUrl = rawUrl && rawUrl.startsWith("https://www.coles.com.au/product/") ? rawUrl : null;
     results.set(r.name, { ...r, productUrl });
   }
 

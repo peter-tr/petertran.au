@@ -3,6 +3,8 @@ import { XRayClient, BatchGetTracesCommand } from "@aws-sdk/client-xray";
 const xray = new XRayClient({});
 
 export interface TraceSegment {
+  id: string;
+  parentId: string | null;
   name: string;
   startOffsetMs: number;
   durationMs: number;
@@ -10,6 +12,8 @@ export interface TraceSegment {
 }
 
 interface RawSegment {
+  id?: string;
+  parent_id?: string;
   name: string;
   origin?: string;
   start_time: number;
@@ -62,25 +66,46 @@ async function fetchBreakdown(traceId: string): Promise<TraceSegment[]> {
 
   // Keep only the earliest (outermost) "Lambda" entry -- it already spans
   // the full invocation, so any inner one is a fully-overlapping duplicate.
+  // Its subsegments (DynamoDB/Anthropic calls) are nested under that inner
+  // duplicate in the raw document though, not the surviving one, so their
+  // parent_id needs remapping onto whichever Lambda id survives or they'd
+  // point at a dropped node and render as orphaned roots.
   let sawLambda = false;
-  const out: TraceSegment[] = [];
+  let survivingLambdaId: string | null = null;
+  const idRemap = new Map<string, string>();
+  const kept: { node: RawSegment; name: string }[] = [];
   for (const node of real.sort((a, b) => a.start_time - b.start_time)) {
     const name = displayName(node);
     if (name === "Lambda") {
-      if (sawLambda) continue;
+      if (sawLambda) {
+        if (node.id && survivingLambdaId) idRemap.set(node.id, survivingLambdaId);
+        continue;
+      }
       sawLambda = true;
+      survivingLambdaId = node.id ?? null;
     }
+    kept.push({ node, name });
+  }
 
+  // Real X-Ray segment documents always carry an `id` (it's a required
+  // field of the wire format), so this fallback only ever fires for
+  // hand-written test fixtures that omit it.
+  const withIds = kept.map(({ node, name }, i) => ({ node, name, id: node.id ?? `segment-${i}` }));
+  const keptIds = new Set(withIds.map((k) => k.id));
+
+  return withIds.map(({ node, name, id }) => {
     const end = node.end_time ?? node.start_time;
-    out.push({
+    const linkedParentId = node.parent_id ? (idRemap.get(node.parent_id) ?? node.parent_id) : null;
+
+    return {
+      id,
+      parentId: linkedParentId && keptIds.has(linkedParentId) ? linkedParentId : null,
       name,
       startOffsetMs: Math.round((node.start_time - rootStart) * 1000),
       durationMs: Math.round((end - node.start_time) * 1000),
       isPlatform: isPlatformWrapper(node),
-    });
-  }
-
-  return out;
+    };
+  });
 }
 
 function sleep(ms: number): Promise<void> {
@@ -106,10 +131,11 @@ function sleep(ms: number): Promise<void> {
 const RETRY_DELAYS_MS = [700, 1500];
 
 // Fetches a specific trace by ID (captured alongside each operation's stats
-// row) and flattens its segment tree into a list ready for a waterfall chart.
-// This only reflects what actually happened inside the Lambda invocation --
-// X-Ray has no visibility into the browser or CloudFront/S3, which aren't
-// part of the same trace.
+// row) and returns its segments as a flat list annotated with id/parentId so
+// the frontend can rebuild the real call tree for a waterfall chart. This
+// only reflects what actually happened inside the Lambda invocation -- X-Ray
+// has no visibility into the browser or CloudFront/S3, which aren't part of
+// the same trace.
 //
 // BatchGetTraces returns a flat array of segment documents, not a clean
 // tree: our own SDK-created "work" segment nests its DynamoDB/Anthropic
