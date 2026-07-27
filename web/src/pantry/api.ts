@@ -46,7 +46,8 @@ export const PANTRY_ENDPOINT = import.meta.env?.VITE_PANTRY_GRAPHQL_ENDPOINT as 
 export const runPantryQuery = createGraphQLClient(
   PANTRY_ENDPOINT,
   "VITE_PANTRY_GRAPHQL_ENDPOINT",
-  getAuthHeader
+  getAuthHeader,
+  "pantry"
 );
 
 export { StorageLocation, AiProvider, AiModelTier } from "./api-schema-types.generated";

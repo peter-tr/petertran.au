@@ -35,10 +35,14 @@ export function createGraphQLClient(
   // Router reads apollographql-client-name by default (no router.yaml
   // config needed) to attribute traffic to a named client in GraphOS
   // Studio - without it, every request shows up as "unidentified client".
-  // "web" covers real browser traffic uniformly across all 4 site
-  // sections; prerender.tsx's own createGraphQLClient call overrides this
-  // to "prerender" so CI/build-time traffic is distinguishable from real
-  // users in Studio.
+  // Each caller passes its own name (portfolio/pantry/imposter/design-
+  // studio, matching the subgraph names elsewhere - see SUBGRAPH_NAMES in
+  // build-router-package.ts) rather than sharing one generic "web" value,
+  // since the 4 apps query almost entirely disjoint parts of the schema -
+  // Studio's per-client field usage view is only useful if it can actually
+  // tell them apart. prerender.tsx overrides this to "prerender" so CI/
+  // build-time traffic is distinguishable from real users too. "web" is
+  // only a fallback for a caller that forgets to pass one.
   clientName = "web"
 ) {
   return async function runQuery<T = unknown>(
