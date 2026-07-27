@@ -8,6 +8,7 @@ import {
   useWarmSchedule,
   schedulesEqual,
   isScheduleValid,
+  COLD_START_WINDOW_OPTIONS,
   type WarmScheduleKey,
   type WarmSchedule,
 } from "./hooks/useWarmSchedule";
@@ -37,6 +38,8 @@ export default function PortfolioSettingsPage() {
     profiles: warmScheduleProfiles,
     coldStarts: warmScheduleColdStarts,
     checkingColdStarts,
+    coldStartWindowMinutes,
+    setColdStartWindowMinutes,
     saving: warmScheduleSaving,
     profilePending: warmScheduleProfilePending,
     error: warmScheduleError,
@@ -44,9 +47,10 @@ export default function PortfolioSettingsPage() {
     saveProfile: saveWarmScheduleProfile,
     applyProfile: applyWarmScheduleProfile,
     deleteProfile: deleteWarmScheduleProfile,
-    checkColdStarts,
     available: warmScheduleAvailable,
   } = useWarmSchedule();
+  const coldStartWindowLabel =
+    COLD_START_WINDOW_OPTIONS.find((option) => option.minutes === coldStartWindowMinutes)?.label ?? "";
   // Every project's draft lives here (not inside each WarmScheduleProject
   // row) so a single "Save all" button can see every row's unsaved edits at
   // once. Reset from `config` whenever it gets a fresh object reference -
@@ -170,6 +174,25 @@ export default function PortfolioSettingsPage() {
             onApply={applyWarmScheduleProfile}
             onDelete={deleteWarmScheduleProfile}
           />
+
+          <div className="warm-schedule-days" role="group" aria-label="Cold start check window">
+            {COLD_START_WINDOW_OPTIONS.map((option) => (
+              <button
+                key={option.minutes}
+                type="button"
+                className={`warm-schedule-day-btn${option.minutes === coldStartWindowMinutes ? " active" : ""}`}
+                aria-pressed={option.minutes === coldStartWindowMinutes}
+                onClick={() => setColdStartWindowMinutes(option.minutes)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          <p className="section-hint">
+            Cold start rate below is checked automatically, over the window selected above.
+            {checkingColdStarts && " Checking…"}
+          </p>
+
           {warmScheduleDrafts &&
             WARM_SCHEDULE_KEYS.map((fn) => (
               <WarmScheduleProject
@@ -182,6 +205,7 @@ export default function PortfolioSettingsPage() {
                 }
                 cost={warmScheduleCosts?.[fn]}
                 coldStart={warmScheduleColdStarts?.[fn]}
+                coldStartWindowLabel={coldStartWindowLabel}
                 disabled={warmScheduleSaving}
               />
             ))}
@@ -197,20 +221,7 @@ export default function PortfolioSettingsPage() {
             onClick={() => saveAllWarmSchedules(dirtyWarmSchedules)}
           >
             Save all
-          </button>{" "}
-          <button
-            className="run-btn"
-            type="button"
-            disabled={checkingColdStarts}
-            onClick={() => checkColdStarts()}
-          >
-            {checkingColdStarts ? "Checking…" : "Check cold start rate"}
           </button>
-          {checkingColdStarts && (
-            <p className="section-hint">
-              Querying CloudWatch Logs for the last 24h across every project - this can take up to a minute.
-            </p>
-          )}
           {warmScheduleError && <p className="section-hint">{warmScheduleError}</p>}
         </div>
       )}

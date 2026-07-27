@@ -27,6 +27,7 @@ interface WarmScheduleProjectProps {
   onChange: (schedule: WarmSchedule) => void;
   cost: ProjectCost | undefined;
   coldStart: ColdStartStats | undefined;
+  coldStartWindowLabel: string;
   disabled: boolean;
 }
 
@@ -41,6 +42,7 @@ export default function WarmScheduleProject({
   onChange,
   cost,
   coldStart,
+  coldStartWindowLabel,
   disabled,
 }: WarmScheduleProjectProps) {
   function toggleDay(day: Weekday): void {
@@ -139,8 +141,8 @@ export default function WarmScheduleProject({
           <p className="section-hint">Cold start check failed: {coldStart.error}</p>
         ) : (
           <p className="section-hint">
-            Last 24h: {coldStart.coldStartPercent}% cold starts ({coldStart.coldStartCount} of{" "}
-            {coldStart.totalInvocations} invocations)
+            Last {coldStartWindowLabel}: {coldStart.coldStartPercent}% cold starts ({coldStart.coldStartCount}{" "}
+            of {coldStart.totalInvocations} invocations)
           </p>
         ))}
       {invalid && (
