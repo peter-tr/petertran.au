@@ -76,7 +76,7 @@ describe("useWarmSchedule", () => {
     await waitFor(() => expect(result.current.error).toBe("Couldn't load provisioned concurrency status"));
   });
 
-  it("saveAll POSTs every dirty project and updates config from each response", async () => {
+  it("saveAll POSTs one batched request with every dirty project's schedule and replaces config from the response", async () => {
     vi.stubEnv("VITE_WARM_SCHEDULE_ENDPOINT", "https://api.test/warm-schedule");
 
     const newPantry: WarmSchedule = {
@@ -94,14 +94,7 @@ describe("useWarmSchedule", () => {
       })
       .mockResolvedValueOnce({
         json: async () => ({
-          schedules: { ...DEFAULT_CONFIG, pantry: newPantry },
-          costs: DEFAULT_COSTS,
-          profiles: NO_PROFILES,
-        }),
-      })
-      .mockResolvedValueOnce({
-        json: async () => ({
-          schedules: { ...DEFAULT_CONFIG, imposter: newImposter },
+          schedules: { ...DEFAULT_CONFIG, pantry: newPantry, imposter: newImposter },
           costs: DEFAULT_COSTS,
           profiles: NO_PROFILES,
         }),
@@ -123,49 +116,14 @@ describe("useWarmSchedule", () => {
 
     expect(result.current.config).toEqual({ ...DEFAULT_CONFIG, pantry: newPantry, imposter: newImposter });
 
+    // A single POST carrying both dirty projects, not one request per
+    // project - avoids the race where two concurrent per-project requests
+    // could clobber each other's write server-side.
     const postCalls = (fetch as ReturnType<typeof vi.fn>).mock.calls.slice(1);
-    expect(postCalls).toHaveLength(2);
-
-    const bodies = postCalls.map(([, init]) => JSON.parse(init.body));
-    expect(bodies).toContainEqual({ project: "pantry", schedule: newPantry });
-    expect(bodies).toContainEqual({ project: "imposter", schedule: newImposter });
-  });
-
-  it("saveAll only replaces saved projects' entries, preserving untouched projects' object identity", async () => {
-    vi.stubEnv("VITE_WARM_SCHEDULE_ENDPOINT", "https://api.test/warm-schedule");
-
-    const newSchedule: WarmSchedule = {
-      enabled: true,
-      days: ["MON", "TUE", "WED", "THU", "FRI"],
-      start: "07:30",
-      end: "18:00",
-      concurrency: 3,
-      memoryMb: 1024,
-    };
-    // The server always responds with the full config, same as GET - but a
-    // fresh JSON.parse means every key is a new object reference, even ones
-    // nothing changed for.
-    const fullResponseConfig = JSON.parse(JSON.stringify({ ...DEFAULT_CONFIG, pantry: newSchedule }));
-    (fetch as ReturnType<typeof vi.fn>)
-      .mockResolvedValueOnce({
-        json: async () => ({ schedules: DEFAULT_CONFIG, costs: DEFAULT_COSTS, profiles: NO_PROFILES }),
-      })
-      .mockResolvedValueOnce({
-        json: async () => ({ schedules: fullResponseConfig, costs: DEFAULT_COSTS, profiles: NO_PROFILES }),
-      });
-
-    const { useWarmSchedule } = await import("./useWarmSchedule");
-
-    const { result } = renderHook(() => useWarmSchedule());
-    await waitFor(() => expect(result.current.config).toEqual(DEFAULT_CONFIG));
-
-    const imposterBeforeSave = result.current.config!.imposter;
-
-    await act(() => result.current.saveAll({ pantry: newSchedule }));
-
-    expect(result.current.config!.pantry).toEqual(newSchedule);
-    // Untouched project keeps the exact same object reference.
-    expect(result.current.config!.imposter).toBe(imposterBeforeSave);
+    expect(postCalls).toHaveLength(1);
+    expect(JSON.parse(postCalls[0][1].body)).toEqual({
+      schedules: { pantry: newPantry, imposter: newImposter },
+    });
   });
 
   it("saveAll surfaces an error and clears saving on failure", async () => {
