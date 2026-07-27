@@ -25,7 +25,8 @@ export interface SystemStats {
   avgDurationMs: number;
   aiQueriesTotal: number;
   operations: OperationStats[];
-  operationsLast30Days: OperationStats[];
+  operationsLastDay: OperationStats[];
+  operationsLast7Days: OperationStats[];
   requestsByDay: DailyCount[];
   uniqueVisitorsTotal: number;
 }
@@ -52,14 +53,18 @@ async function getLambdaMetrics(functionName: string): Promise<LambdaMetrics> {
   return data;
 }
 
-const CHART_WINDOW_DAYS = 30;
+// CloudWatch only retains metric data for 15 months regardless of
+// resolution, so a window this wide already covers true "all time" for any
+// realistic lifetime of this Lambda - the frontend slices the single
+// returned array down to last-1-day/last-7-days/all-time itself.
+const CHART_WINDOW_DAYS = 400;
 
 async function fetchLambdaMetrics(functionName: string): Promise<LambdaMetrics> {
   const end = new Date();
   // One shared time range for both queries below (GetMetricData applies
-  // StartTime/EndTime to the whole call, not per-query) - daily buckets over
-  // 30 days rather than hourly over 24h, since a low-traffic personal site's
-  // real hourly counts are almost all zero.
+  // StartTime/EndTime to the whole call, not per-query) - daily buckets
+  // rather than hourly, since a low-traffic personal site's real hourly
+  // counts are almost all zero.
   const start = new Date(end.getTime() - CHART_WINDOW_DAYS * 24 * 60 * 60 * 1000);
   const dimensions = [{ Name: "FunctionName", Value: functionName }];
 
@@ -139,7 +144,17 @@ async function getUniqueVisitorsTotal(): Promise<number> {
 }
 
 const MAX_OPERATIONS_SHOWN = 8;
-const RECENT_DAYS = 30;
+
+// Sets of UTC calendar-day keys ("YYYY-MM-DD") going back `days` days from
+// today (inclusive), used to bucket each window below.
+function dayKeys(days: number): Set<string> {
+  const keys = new Set<string>();
+  for (let i = 0; i < days; i++) {
+    keys.add(new Date(Date.now() - i * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
+  }
+
+  return keys;
+}
 
 interface OperationAggregate {
   count: number;
@@ -176,14 +191,19 @@ function finalizeAggregate(agg: Map<string, OperationAggregate>): OperationStats
 }
 
 // Reads day-bucketed items (sk = "OP#<name>#<YYYY-MM-DD>", kept forever - see
-// the plugin) and aggregates them two ways: across everything ever recorded
-// (true all time), and across just the last 30 days for a view of recent
-// activity. Both are capped to the top N by count, since AI-generated
-// queries can mint a new name every time and the table places no limit on
-// how many accumulate. Each bucket may also carry a sample of the last query
-// it saw (queries only -- see the plugin for why mutations are excluded); we
-// surface the single most recent sample across all of an operation's buckets.
-async function getOperationStats(): Promise<{ allTime: OperationStats[]; recent: OperationStats[] }> {
+// the plugin) and aggregates them three ways: across everything ever
+// recorded (true all time), across just the last day, and across just the
+// last 7 days. All three are capped to the top N by count, since
+// AI-generated queries can mint a new name every time and the table places
+// no limit on how many accumulate. Each bucket may also carry a sample of
+// the last query it saw (queries only -- see the plugin for why mutations
+// are excluded); we surface the single most recent sample across all of an
+// operation's buckets.
+async function getOperationStats(): Promise<{
+  allTime: OperationStats[];
+  lastDay: OperationStats[];
+  last7Days: OperationStats[];
+}> {
   const res = await ddb.send(
     new QueryCommand({
       TableName: TABLE_NAME,
@@ -192,13 +212,12 @@ async function getOperationStats(): Promise<{ allTime: OperationStats[]; recent:
     })
   );
 
-  const recentDayKeys = new Set<string>();
-  for (let i = 0; i < RECENT_DAYS; i++) {
-    recentDayKeys.add(new Date(Date.now() - i * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
-  }
+  const lastDayKeys = dayKeys(1);
+  const last7DaysKeys = dayKeys(7);
 
   const allTimeAgg = new Map<string, OperationAggregate>();
-  const recentAgg = new Map<string, OperationAggregate>();
+  const lastDayAgg = new Map<string, OperationAggregate>();
+  const last7DaysAgg = new Map<string, OperationAggregate>();
 
   const applyTo = (
     map: Map<string, OperationAggregate>,
@@ -234,12 +253,19 @@ async function getOperationStats(): Promise<{ allTime: OperationStats[]; recent:
     const lastTraceId = (item.lastTraceId as string | undefined) ?? null;
 
     applyTo(allTimeAgg, name, day, count, totalMs, lastQuery, lastVariables, lastTraceId);
-    if (recentDayKeys.has(day)) {
-      applyTo(recentAgg, name, day, count, totalMs, lastQuery, lastVariables, lastTraceId);
+    if (lastDayKeys.has(day)) {
+      applyTo(lastDayAgg, name, day, count, totalMs, lastQuery, lastVariables, lastTraceId);
+    }
+    if (last7DaysKeys.has(day)) {
+      applyTo(last7DaysAgg, name, day, count, totalMs, lastQuery, lastVariables, lastTraceId);
     }
   }
 
-  return { allTime: finalizeAggregate(allTimeAgg), recent: finalizeAggregate(recentAgg) };
+  return {
+    allTime: finalizeAggregate(allTimeAgg),
+    lastDay: finalizeAggregate(lastDayAgg),
+    last7Days: finalizeAggregate(last7DaysAgg),
+  };
 }
 
 export async function getSystemStats(functionName: string | undefined): Promise<SystemStats> {
@@ -257,7 +283,8 @@ export async function getSystemStats(functionName: string | undefined): Promise<
     aiQueriesTotal,
     uniqueVisitorsTotal,
     operations: operationStats.allTime,
-    operationsLast30Days: operationStats.recent,
+    operationsLastDay: operationStats.lastDay,
+    operationsLast7Days: operationStats.last7Days,
     requestsByDay: metrics.requestsByDay,
   };
 }

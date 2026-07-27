@@ -7,7 +7,10 @@ import { QUERY_RAN_EVENT } from "../lib/events";
 
 type Stats = SystemStatsResult["meta"]["systemStats"];
 
-type NumericStatKey = Exclude<keyof Stats, "operations" | "operationsLast30Days" | "requestsByDay">;
+type NumericStatKey = Exclude<
+  keyof Stats,
+  "operations" | "operationsLastDay" | "operationsLast7Days" | "requestsByDay"
+>;
 
 const TILES: { key: NumericStatKey; label: string; format: (value: number) => string }[] = [
   { key: "requestsTotal", label: "total requests", format: (v) => v.toLocaleString() },
@@ -16,7 +19,7 @@ const TILES: { key: NumericStatKey; label: string; format: (value: number) => st
   { key: "uniqueVisitorsTotal", label: "unique visitors", format: (v) => v.toLocaleString() },
 ];
 
-type OperationsRange = "recent" | "all";
+type OperationsRange = "1d" | "7d" | "all";
 type OpsSortKey = "count" | "avgDurationMs";
 type OpsSort = { key: OpsSortKey; direction: "asc" | "desc" } | null;
 
@@ -24,7 +27,7 @@ export default function SystemStatsSection({ staggerDelayMs = 0 }: { staggerDela
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [opsRange, setOpsRange] = useState<OperationsRange>("recent");
+  const [opsRange, setOpsRange] = useState<OperationsRange>("7d");
   const [opsSort, setOpsSort] = useState<OpsSort>(null);
 
   function toggleOpsSort(key: OpsSortKey) {
@@ -84,7 +87,10 @@ export default function SystemStatsSection({ staggerDelayMs = 0 }: { staggerDela
   const activeOperations = useMemo(() => {
     if (!stats) return [];
 
-    return opsRange === "recent" ? stats.operationsLast30Days : stats.operations;
+    if (opsRange === "1d") return stats.operationsLastDay;
+    if (opsRange === "7d") return stats.operationsLast7Days;
+
+    return stats.operations;
   }, [stats, opsRange]);
 
   const sortedOperations = useMemo(() => {
@@ -123,11 +129,20 @@ export default function SystemStatsSection({ staggerDelayMs = 0 }: { staggerDela
                 <button
                   type="button"
                   role="tab"
-                  aria-selected={opsRange === "recent"}
-                  className={opsRange === "recent" ? "active" : ""}
-                  onClick={() => setOpsRange("recent")}
+                  aria-selected={opsRange === "1d"}
+                  className={opsRange === "1d" ? "active" : ""}
+                  onClick={() => setOpsRange("1d")}
                 >
-                  last 30 days
+                  last 1 day
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={opsRange === "7d"}
+                  className={opsRange === "7d" ? "active" : ""}
+                  onClick={() => setOpsRange("7d")}
+                >
+                  last 7 days
                 </button>
                 <button
                   type="button"
