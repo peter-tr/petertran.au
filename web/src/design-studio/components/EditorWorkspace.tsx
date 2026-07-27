@@ -352,22 +352,6 @@ export default function EditorWorkspace({
         </div>
       )}
       {templateMessage && <p className="status-line">// {templateMessage}</p>}
-      <div className={"design-studio-ai-drawer" + (showAiPanel ? " design-studio-ai-drawer--open" : "")}>
-        <AiPanel
-          messages={aiMessages}
-          prompt={aiPrompt}
-          onPromptChange={setAiPrompt}
-          onSend={handleGenerate}
-          generating={generating}
-          error={aiError}
-          hasDraft={!!draftElements}
-          onAccept={handleAcceptDraft}
-          onDiscard={handleDiscardDraft}
-          style={aiStyle}
-          onStyleChange={setAiStyle}
-          onClose={() => setShowAiPanel(false)}
-        />
-      </div>
       <div className="design-studio-workspace">
         <div
           className={
@@ -413,6 +397,22 @@ export default function EditorWorkspace({
           <PropertyPanel element={selectedElement} onChange={handlePropertyChange} />
         </div>
       </div>
+      {showAiPanel && (
+        <AiPanel
+          messages={aiMessages}
+          prompt={aiPrompt}
+          onPromptChange={setAiPrompt}
+          onSend={handleGenerate}
+          generating={generating}
+          error={aiError}
+          hasDraft={!!draftElements}
+          onAccept={handleAcceptDraft}
+          onDiscard={handleDiscardDraft}
+          style={aiStyle}
+          onStyleChange={setAiStyle}
+          onClose={() => setShowAiPanel(false)}
+        />
+      )}
     </div>
   );
 }

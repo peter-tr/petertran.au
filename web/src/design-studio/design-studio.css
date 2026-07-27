@@ -314,6 +314,12 @@
 .design-studio-canvas-column--portrait {
   flex-direction: row;
   align-items: flex-start;
+  /* flex-direction: row switches the main axis from vertical to horizontal
+     - align-items (cross-axis) alone no longer centers the group
+     horizontally the way it did in the column layout above; justify-content
+     (main-axis) is what's needed now, or the canvas+toolbar row hugs the
+     left edge of the fluid grid column instead of sitting centered in it. */
+  justify-content: center;
 }
 
 /* Below this, the desktop 2-column row (900px canvas + side panels, ~1100px
@@ -615,53 +621,17 @@
   color: var(--muted);
 }
 
-/* Fills its drawer (see .design-studio-ai-drawer below) edge-to-edge,
-   rather than the centered/max-width block this used to be back when it
-   rendered inline above the canvas. */
+/* Below the canvas/toolbar/side-panels row (see EditorWorkspace - rendered
+   after .design-studio-workspace closes, not before it), so opening it
+   never pushes the canvas or toolbar down - only whatever was already below
+   the fold moves, same as any other section stacking on the page. A fixed
+   overlay was tried and dropped: on desktop it either covered the canvas or
+   had to dodge the side-panels rail with viewport-width-dependent offset
+   math, and on narrow viewports it covered the canvas outright. */
 .design-studio-ai-panel {
+  max-width: 46rem;
   width: 100%;
-  height: 100%;
-  border-radius: 0;
-  box-sizing: border-box;
-}
-
-/* Fixed-position slide-in drawer, not an inline block above the canvas -
-   opening/closing it no longer pushes the canvas/toolbar/side panels up or
-   down. Always mounted (even while closed) so the transform transition has
-   something to animate from/to; `visibility` follows with a matching delay
-   so a closed, off-screen drawer isn't still tab-focusable. Docked flush
-   against the left edge of .design-studio-side-panels (not the viewport's
-   right edge) so it doesn't cover the Layers/Properties rail that already
-   lives there - the offset is .design-studio-editor's own right padding
-   (1.5rem) + .design-studio-side-panels' width (14rem) +
-   .design-studio-workspace's grid gap (1rem). */
-.design-studio-ai-drawer {
-  position: fixed;
-  top: 0;
-  right: 16.5rem;
-  bottom: 0;
-  width: min(26rem, 100vw);
-  z-index: 50;
-  transform: translateX(100%);
-  transition:
-    transform 0.2s ease,
-    visibility 0.2s;
-  visibility: hidden;
-}
-
-.design-studio-ai-drawer--open {
-  transform: translateX(0);
-  visibility: visible;
-}
-
-/* Below the same 960px breakpoint the rest of the layout reflows at (see
-   the mobile block up near .design-studio-workspace) - the side panels
-   stack under the canvas instead of sitting beside it there, so the drawer
-   goes back to docking against the viewport's own right edge. */
-@media (max-width: 960px) {
-  .design-studio-ai-drawer {
-    right: 0;
-  }
+  margin: 1rem auto 0;
 }
 
 .design-studio-ai-panel-header {
@@ -674,10 +644,10 @@
 .design-studio-ai-panel-header h2 {
   margin: 0;
   /* Smaller than the shared .design-studio-layers/-properties/-ai-panel h2
-     rule above (0.85rem/600) - this drawer is a full-height column on its
-     own (see .design-studio-ai-drawer), not a compact side-panel rail, so
-     that same size read as oversized with nothing else around it to set
-     the scale against. */
+     rule above (0.85rem/600) - this panel is a full 46rem-wide section on
+     its own line (see .design-studio-ai-panel's comment above), not a
+     compact side-panel rail, so that same size read as oversized with
+     nothing else around it to set the scale against. */
   font-size: 0.75rem;
   font-weight: 500;
 }
