@@ -12,14 +12,14 @@ const SUPERGRAPH_REQUEST_TIMEOUT_MS = 8_000;
 const QUERY_PORTFOLIO_DATA_TOOL: Anthropic.Tool = {
   name: "query_portfolio_data",
   description:
-    "Query real portfolio/resume content (person, education, experience, projects, skills, programs, interests) from petertran.au's public GraphQL API, to ground design generation in facts - e.g. a resume header using the person's actual name/title, or a project-showcase slide using real project names. Read-only: only \"query\" operations selecting these fields are accepted, anything else is rejected. Only call this when the prompt would clearly benefit from real portfolio data; most prompts (a generic poster, an abstract theme) need nothing from here - just skip the tool and reply that no data is needed.",
+    "Query real portfolio/resume content (person, education, experience, projects, skills, programs, interests) from petertran.au's public GraphQL API, to ground design generation in facts - e.g. a resume header using the person's actual name/role, or a project-showcase slide using real project names. Read-only: only \"query\" operations selecting these fields are accepted, anything else is rejected. Only call this when the prompt would clearly benefit from real portfolio data; most prompts (a generic poster, an abstract theme) need nothing from here - just skip the tool and reply that no data is needed.",
   input_schema: {
     type: "object",
     properties: {
       query: {
         type: "string",
         description:
-          'A complete GraphQL query document selecting only from person, education, experience, projects, skills, programs, interests - e.g. "{ person { name headline } experience(currentOnly: true) { title company } }".',
+          'A complete GraphQL query document selecting only from person, education, experience, projects, skills, programs, interests - e.g. "{ person { name location } experience(currentOnly: true) { role company } }".',
       },
     },
     required: ["query"],

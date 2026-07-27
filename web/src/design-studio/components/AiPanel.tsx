@@ -1,6 +1,3 @@
-import { useState } from "react";
-import { FaGear } from "react-icons/fa6";
-import type { AiSettings, AiSettingsInput } from "../api";
 import { AI_STYLE_PRESETS } from "../lib/ai-styles";
 
 export interface AiMessage {
@@ -18,19 +15,20 @@ interface AiPanelProps {
   hasDraft: boolean;
   onAccept: () => void;
   onDiscard: () => void;
-  // null until the first load resolves (see EditorWorkspace's lazy fetch) -
-  // the picker just doesn't render until then rather than showing a
-  // placeholder for a setting that isn't per-design anyway.
-  aiSettings: AiSettings | null;
-  onAiSettingsChange: (input: AiSettingsInput) => void;
   style: string;
   onStyleChange: (style: string) => void;
+  onClose: () => void;
 }
 
 // A persistent chat-style panel, not a one-shot form - it stays open across
 // multiple generate calls so a prompt can be followed by refinements ("make
 // it bigger", "change the colors") against the same draft, rather than the
-// user having to reopen a form and start over each time.
+// user having to reopen a form and start over each time. Provider/model
+// configuration lives only on the dedicated settings page (see
+// DesignStudioSettingsPage) - it's a global, not per-design, setting and
+// doesn't need a second picker duplicated in here. Rendered inside a
+// fixed-position slide-in drawer (see EditorWorkspace) rather than inline
+// above the canvas, so opening it doesn't push the canvas/toolbar down.
 export default function AiPanel({
   messages,
   prompt,
@@ -41,71 +39,18 @@ export default function AiPanel({
   hasDraft,
   onAccept,
   onDiscard,
-  aiSettings,
-  onAiSettingsChange,
   style,
   onStyleChange,
+  onClose,
 }: AiPanelProps) {
-  const [showSettings, setShowSettings] = useState(false);
-
   return (
     <div className="design-studio-ai-panel">
       <div className="design-studio-ai-panel-header">
         <h2>Generate with AI</h2>
-        {aiSettings && (
-          <button
-            type="button"
-            className={
-              "design-studio-ai-settings-toggle" +
-              (showSettings ? " design-studio-ai-settings-toggle-active" : "")
-            }
-            aria-label="AI model settings"
-            aria-expanded={showSettings}
-            onClick={() => setShowSettings((v) => !v)}
-          >
-            <FaGear />
-          </button>
-        )}
+        <button type="button" className="design-studio-ai-panel-close" onClick={onClose} aria-label="Close">
+          ×
+        </button>
       </div>
-      {aiSettings && showSettings && (
-        <div className="design-studio-ai-panel-settings">
-          <label>
-            Provider{" "}
-            <select
-              aria-label="AI provider"
-              value={aiSettings.provider}
-              onChange={(e) => {
-                const provider = e.target.value as AiSettings["provider"];
-                // Bedrock doesn't currently support this feature's
-                // structured output for Haiku 4.5 (see generate-elements.ts)
-                // - steer off it automatically rather than letting the user
-                // land on a combination that's guaranteed to fail.
-                if (provider === "BEDROCK" && aiSettings.modelTier === "HAIKU") {
-                  onAiSettingsChange({ provider, modelTier: "SONNET" as AiSettings["modelTier"] });
-                } else {
-                  onAiSettingsChange({ provider });
-                }
-              }}
-            >
-              <option value="ANTHROPIC">Direct Anthropic API</option>
-              <option value="BEDROCK">AWS Bedrock</option>
-            </select>
-          </label>
-          <label>
-            Model{" "}
-            <select
-              aria-label="AI model"
-              value={aiSettings.modelTier}
-              onChange={(e) => onAiSettingsChange({ modelTier: e.target.value as AiSettings["modelTier"] })}
-            >
-              <option value="HAIKU" disabled={aiSettings.provider === "BEDROCK"}>
-                Haiku 4.5 (fast){aiSettings.provider === "BEDROCK" ? " - not available on Bedrock" : ""}
-              </option>
-              <option value="SONNET">Sonnet 4.6 (better quality)</option>
-            </select>
-          </label>
-        </div>
-      )}
       <div className="design-studio-ai-panel-log">
         {messages.length === 0 && (
           <p className="design-studio-empty">

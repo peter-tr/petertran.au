@@ -307,6 +307,15 @@
   min-width: 0;
 }
 
+/* A tall portrait design (resume, poster) reads better with the toolbar as
+   a vertical rail beside it than as a horizontal strip crammed under a
+   narrow canvas - see EditorWorkspace's isPortrait. Landscape designs
+   (presentation) keep the default column-with-strip-underneath layout. */
+.design-studio-canvas-column--portrait {
+  flex-direction: row;
+  align-items: flex-start;
+}
+
 /* Below this, the desktop 2-column row (900px canvas + side panels, ~1100px
    total) no longer fits - rather than let flexbox force it into an
    unscrollable, squeezed mess, stack everything vertically. The canvas
@@ -387,6 +396,21 @@
   border-radius: var(--radius);
 }
 
+/* Rail beside a portrait canvas (see .design-studio-canvas-column--portrait)
+   instead of a strip underneath it - same buttons, stacked instead of
+   wrapped, sized to their container rather than their own content so the
+   rail reads as one consistent column. */
+.design-studio-toolbar--vertical {
+  flex-direction: column;
+  align-items: stretch;
+  flex-wrap: nowrap;
+}
+
+.design-studio-toolbar--vertical .design-studio-tool-btn,
+.design-studio-toolbar--vertical .design-studio-zoom-btn {
+  width: 100%;
+}
+
 /* A vertical divider between the shape/text tools and Export PNG, now that
    the toolbar is a row - height comes from align-self: stretch matching it
    to the row's own height, rather than a fixed value that could mismatch
@@ -397,6 +421,16 @@
   align-self: stretch;
   width: 0;
   margin: 0 0.2rem;
+}
+
+/* Same divider, rotated - a horizontal rule between stacked groups instead
+   of a vertical one between side-by-side groups. */
+.design-studio-toolbar--vertical .design-studio-toolbar-rule {
+  border-left: none;
+  border-top: 1px solid var(--rule);
+  width: auto;
+  height: 0;
+  margin: 0.2rem 0;
 }
 
 .design-studio-tool-btn {
@@ -417,6 +451,85 @@
 .design-studio-tool-btn:hover {
   color: var(--type);
   border-color: var(--type);
+}
+
+/* Zoom -/%/+ trio - same look as .design-studio-tool-btn but without its
+   shortcut-badge right padding, since these three have no keyboard-shortcut
+   badge to reserve space for. */
+.design-studio-zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+/* Stacked -/%/+ to match the vertical rail around it, rather than staying a
+   3-wide row squeezed into a narrow column. */
+.design-studio-zoom-controls--vertical {
+  flex-direction: column;
+}
+
+.design-studio-zoom-btn {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--paper);
+  background: var(--panel-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.7rem;
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.design-studio-zoom-btn:hover {
+  color: var(--type);
+  border-color: var(--type);
+}
+
+.design-studio-zoom-readout {
+  min-width: 3.6rem;
+  text-align: center;
+}
+
+/* Below the same 960px breakpoint as the main mobile block further up (see
+   its comment - kept as a separate block down here, after the vertical-rail
+   rules above rather than merged into that earlier block, purely so these
+   overrides win the cascade: same-specificity rules resolve by source
+   order, and these need to come after .design-studio-toolbar--vertical
+   etc. to actually override them). Screen's too narrow for a side rail
+   regardless of the canvas's own aspect ratio, so force every design back
+   to the horizontal strip-under-canvas layout here. */
+@media (max-width: 960px) {
+  .design-studio-canvas-column--portrait {
+    flex-direction: column;
+  }
+
+  .design-studio-toolbar--vertical {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    width: auto;
+    justify-content: center;
+  }
+
+  .design-studio-toolbar--vertical .design-studio-toolbar-rule {
+    border-left: 1px solid var(--rule);
+    border-top: none;
+    align-self: stretch;
+    width: 0;
+    height: auto;
+    margin: 0 0.2rem;
+  }
+
+  .design-studio-toolbar--vertical .design-studio-tool-btn,
+  .design-studio-toolbar--vertical .design-studio-zoom-btn {
+    width: auto;
+  }
+
+  .design-studio-zoom-controls--vertical {
+    flex-direction: row;
+  }
 }
 
 /* Excalidraw-style number badge in the corner of each tool button, hinting
@@ -502,16 +615,53 @@
   color: var(--muted);
 }
 
-/* No longer one of the cramped 14rem side-panel columns (see
-   EditorWorkspace.tsx - moved out of .design-studio-side-panels into its
-   own full-width section) - sized like the page's other centered sections
-   (.design-studio-templates etc.) instead, since a chat-style prompt +
-   response log needs real width to be usable, not a rail sized for a list
-   of layer names. */
+/* Fills its drawer (see .design-studio-ai-drawer below) edge-to-edge,
+   rather than the centered/max-width block this used to be back when it
+   rendered inline above the canvas. */
 .design-studio-ai-panel {
-  max-width: 46rem;
   width: 100%;
-  margin: 0 auto 1rem;
+  height: 100%;
+  border-radius: 0;
+  box-sizing: border-box;
+}
+
+/* Fixed-position slide-in drawer, not an inline block above the canvas -
+   opening/closing it no longer pushes the canvas/toolbar/side panels up or
+   down. Always mounted (even while closed) so the transform transition has
+   something to animate from/to; `visibility` follows with a matching delay
+   so a closed, off-screen drawer isn't still tab-focusable. Docked flush
+   against the left edge of .design-studio-side-panels (not the viewport's
+   right edge) so it doesn't cover the Layers/Properties rail that already
+   lives there - the offset is .design-studio-editor's own right padding
+   (1.5rem) + .design-studio-side-panels' width (14rem) +
+   .design-studio-workspace's grid gap (1rem). */
+.design-studio-ai-drawer {
+  position: fixed;
+  top: 0;
+  right: 16.5rem;
+  bottom: 0;
+  width: min(26rem, 100vw);
+  z-index: 50;
+  transform: translateX(100%);
+  transition:
+    transform 0.2s ease,
+    visibility 0.2s;
+  visibility: hidden;
+}
+
+.design-studio-ai-drawer--open {
+  transform: translateX(0);
+  visibility: visible;
+}
+
+/* Below the same 960px breakpoint the rest of the layout reflows at (see
+   the mobile block up near .design-studio-workspace) - the side panels
+   stack under the canvas instead of sitting beside it there, so the drawer
+   goes back to docking against the viewport's own right edge. */
+@media (max-width: 960px) {
+  .design-studio-ai-drawer {
+    right: 0;
+  }
 }
 
 .design-studio-ai-panel-header {
@@ -524,12 +674,34 @@
 .design-studio-ai-panel-header h2 {
   margin: 0;
   /* Smaller than the shared .design-studio-layers/-properties/-ai-panel h2
-     rule above (0.85rem/600) - this panel is now a full 46rem-wide
-     section on its own line (see .design-studio-ai-panel's comment above),
-     not a compact side-panel rail, so that same size read as oversized
-     with nothing else around it to set the scale against. */
+     rule above (0.85rem/600) - this drawer is a full-height column on its
+     own (see .design-studio-ai-drawer), not a compact side-panel rail, so
+     that same size read as oversized with nothing else around it to set
+     the scale against. */
   font-size: 0.75rem;
   font-weight: 500;
+}
+
+.design-studio-ai-panel-close {
+  font-family: var(--font-mono);
+  font-size: 1.1rem;
+  line-height: 1;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  width: 1.6rem;
+  height: 1.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.design-studio-ai-panel-close:hover {
+  color: var(--paper);
+  border-color: var(--type);
 }
 
 /* Below the prompt input, right-aligned - Discard first (secondary/left),
@@ -562,64 +734,6 @@
 .design-studio-ai-accept {
   color: var(--type);
   border: 1px solid var(--type);
-}
-
-.design-studio-ai-settings-toggle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.6rem;
-  height: 1.6rem;
-  color: var(--muted);
-  background: transparent;
-  border: 1px solid var(--rule);
-  border-radius: var(--radius);
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.design-studio-ai-settings-toggle:hover,
-.design-studio-ai-settings-toggle-active {
-  color: var(--paper);
-  border-color: var(--type);
-}
-
-.design-studio-ai-panel-settings {
-  display: flex;
-  /* Column, not the wrapped row this started as - a select showing its
-     full current value ("Sonnet 4.6 (better quality)") doesn't fit next
-     to a label on one line. Wrapping only rescues a row once an item fits
-     on its own line; here neither item does, so the overflow just pushed
-     past the panel and off the screen instead. */
-  flex-direction: column;
-  gap: 0.4rem;
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  color: var(--muted);
-}
-
-.design-studio-ai-panel-settings label {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-}
-
-.design-studio-ai-panel-settings select {
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  color: var(--paper);
-  background: var(--panel-2);
-  border: 1px solid var(--rule);
-  border-radius: var(--radius);
-  padding: 0.3rem 0.4rem;
-  /* Without an explicit width, a <select> sizes to its longest content
-     (here, the current value's text) rather than its container - the
-     actual cause of the overflow. width: 100% + min-width: 0 makes it
-     respect the panel; the browser truncates the displayed text instead
-     of growing the box. */
-  width: 100%;
-  min-width: 0;
-  box-sizing: border-box;
 }
 
 .design-studio-ai-panel-log {
