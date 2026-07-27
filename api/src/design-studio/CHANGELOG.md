@@ -1,5 +1,21 @@
 # design-studio
 
+## 0.3.0
+
+### Minor Changes
+
+- 992ade4: Add an opt-in `AiSettings.allowSupergraphQuery` toggle that lets `generateDesignElements` call a read-only tool (`query_portfolio_data`) to look up real portfolio content (person, education, experience, projects, skills, programs, interests) from the public composed supergraph endpoint, grounding generated designs in real facts (e.g. a resume header using the actual current job title). The tool call is a short, bounded (2-iteration) `tool_use` loop that runs before the existing structured-output generation call, validated by a new hand-rolled portfolio-only field allowlist (`lib/util/portfolio-query-allowlist.ts`) that rejects mutations, subscriptions, the `meta` field, and the Federation `_service` introspection field before anything leaves this Lambda. Off by default; any failure gathering context degrades to unaugmented generation rather than breaking the request.
+- 7ff6b62: add a pantry settings toggle for the AI command bar's provider (direct Anthropic API or AWS Bedrock) and model tier (Haiku/Sonnet), matching design-studio's existing AiSettings pattern. Extracted the provider/model-ID resolution and Bedrock IAM policy into shared modules (`api-shared/ai-provider`, `infra/lib/shared/bedrock-models.ts`) so design-studio and pantry share one implementation instead of two copies. Price checking (Coles lookups) always stays on the direct Anthropic API, since Bedrock doesn't support the web_search/web_fetch tools it depends on.
+
+### Patch Changes
+
+- cfe30d6: enable federated field-level tracing for GraphOS Insights
+- 25e3615: apply mechanical SonarCloud fixes across api/web/infra
+- Updated dependencies [25e3615]
+- Updated dependencies [803209b]
+- Updated dependencies [7ff6b62]
+  - api-shared@1.3.0
+
 ## 0.2.0
 
 ### Minor Changes

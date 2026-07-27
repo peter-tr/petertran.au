@@ -1,5 +1,16 @@
 # imposter
 
+## 1.3.3
+
+### Patch Changes
+
+- cfe30d6: enable federated field-level tracing for GraphOS Insights
+- 25e3615: apply mechanical SonarCloud fixes across api/web/infra
+- Updated dependencies [25e3615]
+- Updated dependencies [803209b]
+- Updated dependencies [7ff6b62]
+  - api-shared@1.3.0
+
 ## 1.3.2
 
 ### Patch Changes

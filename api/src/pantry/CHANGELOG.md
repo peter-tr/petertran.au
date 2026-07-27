@@ -1,5 +1,25 @@
 # pantry
 
+## 1.6.0
+
+### Minor Changes
+
+- 7ff6b62: add a pantry settings toggle for the AI command bar's provider (direct Anthropic API or AWS Bedrock) and model tier (Haiku/Sonnet), matching design-studio's existing AiSettings pattern. Extracted the provider/model-ID resolution and Bedrock IAM policy into shared modules (`api-shared/ai-provider`, `infra/lib/shared/bedrock-models.ts`) so design-studio and pantry share one implementation instead of two copies. Price checking (Coles lookups) always stays on the direct Anthropic API, since Bedrock doesn't support the web_search/web_fetch tools it depends on.
+- 240ddbd: add a stale-while-revalidate cache for the pantry page: it now paints instantly from the last-loaded inventory/shopping list/settings on mount while a fresh copy loads in the background, instead of waiting on the network every visit. Controlled by a new "Instant load" toggle on the pantry settings page (`instantLoadCache` on `PantrySettings`, default on) - the cache is scoped per signed-in account (or the shared/default pantry when signed out) and clears immediately when the toggle is switched off.
+
+### Patch Changes
+
+- cfe30d6: enable federated field-level tracing for GraphOS Insights
+- 25e3615: apply mechanical SonarCloud fixes across api/web/infra
+- 803209b: add named OTel spans around the rate-limit check and pantry's DynamoDB calls
+
+  Application Signals' automatic `aws-sdk` instrumentation only produces a generic `dynamodb.<region>.amazonaws.com:443` span for every DynamoDB call, with no operation or table info surfacing in the trace - real X-Ray traces confirmed a guarded pantry mutation shows several indistinguishable DynamoDB spans, so telling the rate-limit check's `UpdateItem` apart from the resolver's own reads/writes required inferring from call order and timing rather than just reading the trace. `api-shared/tracing`'s new `traceSpan()` wraps a piece of work in a real span via `@opentelemetry/api`'s `trace.getTracer().startActiveSpan()` (safe with no exporter registered, e.g. local dev - unlike the classic X-Ray SDK's `traced()`, no environment guard is needed). The shared rate limiter (`rate-limit-check`, used by pantry/portfolio/imposter) and pantry's `DynamoRepository`/`settings`/`price-sync-status` now use it, so future traces name each call directly (e.g. `ITEM.put`, `SHOPLIST.get`, `settings.get`).
+
+- Updated dependencies [25e3615]
+- Updated dependencies [803209b]
+- Updated dependencies [7ff6b62]
+  - api-shared@1.3.0
+
 ## 1.5.0
 
 ### Minor Changes

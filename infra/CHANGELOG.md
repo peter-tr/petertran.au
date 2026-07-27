@@ -1,5 +1,48 @@
 # infra
 
+## 1.6.0
+
+### Minor Changes
+
+- 6432904: add a WAF rate-based rule (per-IP, COUNT mode) to the shared API Gateway stage
+
+  The app-level DynamoDB rate limiters (`api-shared/rate-limit`) reject a request only after it's already paid for a full Lambda invocation and a DynamoDB write - a WAF rate-based rule rejects at the edge, before either happens, but can't see GraphQL operation names to differentiate cost, so this is additive to those limiters, not a replacement. `ApiGatewayStack` now provisions a regional `AWS::WAFv2::WebACL` with one rate-based rule (100 req/IP/60s, `Count` action, not `Block`) associated with the RestApi's deployment stage, covering every route behind it (portfolio/pantry/imposter/supergraph/design-studio) in one place. Deliberately starts in COUNT rather than BLOCK - the 100/min threshold is a starting point, not validated against real traffic yet; flipping the rule's `action` to `Block` is a follow-up change once the `RateLimitByIp` CloudWatch metric shows what real usage looks like.
+
+- 992ade4: `DesignStudioStack` now takes a required `supergraphUrl` prop (mirroring `SupergraphStackProps.apiBaseUrl`) and passes it into the Lambda as `SUPERGRAPH_URL`, letting design-studio's new opt-in portfolio-data-lookup tool call the real public composed supergraph endpoint. No new IAM grant - a plain outbound HTTPS call to a public endpoint, same reasoning already documented for why the Router itself needs none to reach subgraphs. The Lambda's timeout goes from 30s to 40s to cover the new tool loop's worst-case added latency (up to 2 iterations of the supergraph call plus Claude round trip) on top of the existing generation call.
+- 7ff6b62: add a pantry settings toggle for the AI command bar's provider (direct Anthropic API or AWS Bedrock) and model tier (Haiku/Sonnet), matching design-studio's existing AiSettings pattern. Extracted the provider/model-ID resolution and Bedrock IAM policy into shared modules (`api-shared/ai-provider`, `infra/lib/shared/bedrock-models.ts`) so design-studio and pantry share one implementation instead of two copies. Price checking (Coles lookups) always stays on the direct Anthropic API, since Bedrock doesn't support the web_search/web_fetch tools it depends on.
+- b0487a5: add saveable/applyable "profiles" to the warm-schedule settings page
+
+  Snapshots the whole 6-project provisioned-concurrency config (all
+  schedules/concurrency/memory at once) under a name, stored in a new SSM
+  parameter alongside the live config. The settings page can now save the
+  current setup as a profile, apply a saved one back (flipping every
+  project's real EventBridge schedules and reconciling PC/memory
+  immediately, same as an individual project save), or delete one - so
+  switching between modes (e.g. "all cold, 1024MB" vs "PC everywhere,
+  512MB") no longer means hand-editing every row.
+
+### Patch Changes
+
+- 7ff1033: resolve the Anthropic API key(s) into Lambda env vars at deploy time instead of fetching from Secrets Manager at runtime
+
+  X-Ray traces showed a ~300ms median (p99 ~1.7s) `GetSecretValue` round trip on every cold start that touched `getAnthropicClient()`/`getAnthropicAdminApiKey()`, and cold starts turned out to be 13-25% of invocations across portfolio/pantry/imposter/design-studio over a 7-day sample - not the rare case the runtime-fetch design assumed. `ANTHROPIC_API_KEY`/`ANTHROPIC_ADMIN_API_KEY` are now resolved via `secretValue.unsafeUnwrap()` (a CloudFormation dynamic reference resolved at deploy time), the same pattern `design-studio-stack.ts` already used for `MONGO_URI`. No application code changes needed - both `anthropic-client.ts` and `anthropic-cost.ts` already preferred a direct env var over the Secrets Manager fallback. Confirmed live: zero `SecretsManager` subsegments across all four Lambdas' first (cold) invocations post-deploy.
+
+- d1fd49b: allow apollographql-client-name in API Gateway CORS preflight [URGENT - prod broken for real users]
+- 88290e3: allow apollo-federation-include-trace in API Gateway CORS preflight
+- 25e3615: apply mechanical SonarCloud fixes across api/web/infra
+- 05105be: allow studio.apollographql.com in API Gateway CORS preflight + credentials
+- 3c08a9c: connect the supergraph Router to Apollo GraphOS for Studio usage reporting
+
+  `SupergraphStack` now resolves `APOLLO_KEY`/`APOLLO_GRAPH_REF` (graph `petertran-au@current`) into the Router Lambda's env at deploy time, the same `secretValue.unsafeUnwrap()` pattern used for the Anthropic keys - Router auto-detects these and starts reporting operation metrics/errors to GraphOS Studio. This is independent of schema composition: Router still resolves the supergraph from the build-time offline-composed file (`--supergraph` in `bootstrap`), so cold-start Init Duration is unaffected.
+
+  `build-router-package.ts`'s generated `router.yaml` also tightens `telemetry.apollo.metrics.usage_reports.batch_processor.scheduled_delay` to `1ms` - Apollo's usage-reporting exporter has its own 5s-default batch flush, separate from the OTLP tracing one already tuned here, and would otherwise sit unflushed when Lambda freezes the execution environment right after the response returns (the same failure mode already hit once for X-Ray traces).
+
+  CI (`build-and-deploy.yml`, `verify.yml`) now publishes all 4 subgraphs to GraphOS on every prod deploy and runs `rover subgraph check` on PRs for any subgraph whose schema changed, via `npx @apollo/rover@0.41.0` rather than a marketplace GitHub Action.
+
+- bb5ce9b: add an on-demand "Check cold start rate" action to the warm-schedule settings page
+
+  Runs a CloudWatch Logs Insights query (`filter @type = "REPORT" | stats count(@initDuration) as coldStarts, count(*) as total`) per project over the last 24h, aggregated across all of that project's target Lambdas, and surfaces the cold-start count/percentage next to each project's existing cost line - previously there was no way to tell from the settings page whether a given PC schedule was actually working. Kept as an explicit "check now" button rather than a live/cached figure, since Logs Insights queries are async and take several seconds each; the existing scheduled+cached pattern used for cost data would be overkill for a rarely-clicked diagnostic. `warm-schedule`'s Lambda gets new `logs:StartQuery`/`logs:GetQueryResults` IAM grants scoped to each target's own log group, and its timeout is bumped 60s -> 120s to give the new action real margin.
+
 ## 1.5.0
 
 ### Minor Changes
