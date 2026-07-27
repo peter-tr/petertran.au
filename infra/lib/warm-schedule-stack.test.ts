@@ -22,7 +22,7 @@ afterAll(() => {
 });
 
 describe("ProvisionedConcurrencyStack", () => {
-  it("synthesizes with the warm-schedule Lambda, its 2 SSM parameters, and 12 on/off schedules plus the backstop reconcile", () => {
+  it("synthesizes with the warm-schedule Lambda, its 3 SSM parameters, and 12 on/off schedules plus the backstop reconcile", () => {
     const app = new App();
     const stack = new ProvisionedConcurrencyStack(app, "TestProvisionedConcurrencyStack", {
       portfolioFnName: "portfolio-graphql",
@@ -46,9 +46,40 @@ describe("ProvisionedConcurrencyStack", () => {
     template.hasResourceProperties("AWS::Lambda::Function", {
       FunctionName: "warm-schedule",
     });
-    template.resourceCountIs("AWS::SSM::Parameter", 2);
+    // Schedule config, profiles, and reactive-warm runtime state - see
+    // WARM_SCHEDULE_REACTIVE_STATE_PARAM_NAME's doc comment for why the
+    // latter is a separate parameter from the schedule config.
+    template.resourceCountIs("AWS::SSM::Parameter", 3);
     // 2 (on/off) per project (portfolio, pantry, imposter, supergraph,
     // designStudio, zeroTrustLab) plus the one backstop reconcile schedule.
     template.resourceCountIs("AWS::Scheduler::Schedule", 13);
+  });
+
+  it("subscribes every target's log group to the cold-start filter, one SubscriptionFilter per target", () => {
+    const app = new App();
+    const stack = new ProvisionedConcurrencyStack(app, "TestProvisionedConcurrencyStack", {
+      portfolioFnName: "portfolio-graphql",
+      pantryFnName: "pantry-graphql",
+      imposterFnName: "imposter-graphql",
+      supergraphFnName: "supergraph-graphql",
+      designStudioFnName: "design-studio-graphql",
+      zeroTrustLabFnNames: {
+        idpBridge: "ztl-idp-bridge",
+        internalSts: "ztl-internal-sts",
+        edgeAuthorizer: "ztl-edge-authorizer",
+        edgeProxy: "ztl-edge-proxy",
+        domainA: "ztl-domain-a",
+      },
+      env: { account: "123456789012", region: "ap-southeast-2" },
+    });
+
+    const template = Template.fromStack(stack);
+
+    // 5 (portfolio, pantry, imposter, supergraph, designStudio) + 5 (ztl's
+    // own Lambdas) = 10 targets, one subscription each.
+    template.resourceCountIs("AWS::Logs::SubscriptionFilter", 10);
+    template.hasResourceProperties("AWS::Logs::SubscriptionFilter", {
+      FilterPattern: '"Init Duration"',
+    });
   });
 });

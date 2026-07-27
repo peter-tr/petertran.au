@@ -1,6 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { schedulesEqual, isScheduleValid, type ProjectCost, type WarmSchedule } from "./useWarmSchedule";
+import {
+  schedulesEqual,
+  isScheduleValid,
+  type ProjectCost,
+  type WarmSchedule,
+  type ReactiveStatus,
+} from "./useWarmSchedule";
 
 const DEFAULT_SCHEDULE: WarmSchedule = {
   enabled: true,
@@ -9,6 +15,7 @@ const DEFAULT_SCHEDULE: WarmSchedule = {
   end: "19:00",
   concurrency: 1,
   memoryMb: 512,
+  reactiveEnabled: false,
 };
 
 const DEFAULT_CONFIG = {
@@ -29,6 +36,14 @@ const DEFAULT_COSTS = {
 };
 const NO_PROFILES = {};
 const NO_COLD_STARTS = {};
+const INACTIVE: ReactiveStatus = { active: false, until: null };
+const DEFAULT_REACTIVE = {
+  portfolio: INACTIVE,
+  pantry: INACTIVE,
+  imposter: INACTIVE,
+  supergraph: INACTIVE,
+  zeroTrustLab: INACTIVE,
+};
 
 // Every renderHook mount also fires the cold-start check effect (a second,
 // independent fetch alongside the initial config GET), so any test that
@@ -62,7 +77,12 @@ describe("useWarmSchedule", () => {
     vi.stubEnv("VITE_WARM_SCHEDULE_ENDPOINT", "https://api.test/warm-schedule");
 
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-      json: async () => ({ schedules: DEFAULT_CONFIG, costs: DEFAULT_COSTS, profiles: NO_PROFILES }),
+      json: async () => ({
+        schedules: DEFAULT_CONFIG,
+        costs: DEFAULT_COSTS,
+        profiles: NO_PROFILES,
+        reactive: DEFAULT_REACTIVE,
+      }),
     });
 
     const { useWarmSchedule } = await import("./useWarmSchedule");
@@ -73,6 +93,46 @@ describe("useWarmSchedule", () => {
     await waitFor(() => expect(result.current.config).toEqual(DEFAULT_CONFIG));
     expect(result.current.costs).toEqual(DEFAULT_COSTS);
     expect(fetch).toHaveBeenCalledWith("https://api.test/warm-schedule");
+  });
+
+  it("exposes reactive status from the endpoint and refresh() re-fetches it", async () => {
+    vi.stubEnv("VITE_WARM_SCHEDULE_ENDPOINT", "https://api.test/warm-schedule");
+
+    const activeReactive = {
+      ...DEFAULT_REACTIVE,
+      portfolio: { active: true, until: "2026-07-27T05:00:00.000Z" },
+    };
+    (fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({
+        json: async () => ({
+          schedules: DEFAULT_CONFIG,
+          costs: DEFAULT_COSTS,
+          profiles: NO_PROFILES,
+          reactive: DEFAULT_REACTIVE,
+        }),
+      })
+      .mockResolvedValueOnce(mockColdStartCheckResponse())
+      .mockResolvedValueOnce({
+        json: async () => ({
+          schedules: DEFAULT_CONFIG,
+          costs: DEFAULT_COSTS,
+          profiles: NO_PROFILES,
+          reactive: activeReactive,
+        }),
+      });
+
+    const { useWarmSchedule } = await import("./useWarmSchedule");
+
+    const { result } = renderHook(() => useWarmSchedule());
+    await waitFor(() => expect(result.current.reactive).toEqual(DEFAULT_REACTIVE));
+
+    await act(() => result.current.refresh());
+
+    expect(result.current.reactive).toEqual(activeReactive);
+
+    // refresh() re-fetches the same GET endpoint, not the cold-start POST.
+    const lastCall = (fetch as ReturnType<typeof vi.fn>).mock.calls.at(-1)!;
+    expect(lastCall).toEqual(["https://api.test/warm-schedule"]);
   });
 
   it("surfaces an error when the initial load fails", async () => {
@@ -92,7 +152,12 @@ describe("useWarmSchedule", () => {
     const coldStarts = { portfolio: { coldStartCount: 2, totalInvocations: 10, coldStartPercent: 20 } };
     (fetch as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce({
-        json: async () => ({ schedules: DEFAULT_CONFIG, costs: DEFAULT_COSTS, profiles: NO_PROFILES }),
+        json: async () => ({
+          schedules: DEFAULT_CONFIG,
+          costs: DEFAULT_COSTS,
+          profiles: NO_PROFILES,
+          reactive: DEFAULT_REACTIVE,
+        }),
       })
       .mockResolvedValueOnce({ json: async () => ({ coldStarts }) });
 
@@ -114,7 +179,12 @@ describe("useWarmSchedule", () => {
 
     (fetch as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce({
-        json: async () => ({ schedules: DEFAULT_CONFIG, costs: DEFAULT_COSTS, profiles: NO_PROFILES }),
+        json: async () => ({
+          schedules: DEFAULT_CONFIG,
+          costs: DEFAULT_COSTS,
+          profiles: NO_PROFILES,
+          reactive: DEFAULT_REACTIVE,
+        }),
       })
       .mockResolvedValue(mockColdStartCheckResponse());
 
@@ -137,7 +207,12 @@ describe("useWarmSchedule", () => {
 
     (fetch as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce({
-        json: async () => ({ schedules: DEFAULT_CONFIG, costs: DEFAULT_COSTS, profiles: NO_PROFILES }),
+        json: async () => ({
+          schedules: DEFAULT_CONFIG,
+          costs: DEFAULT_COSTS,
+          profiles: NO_PROFILES,
+          reactive: DEFAULT_REACTIVE,
+        }),
       })
       .mockRejectedValueOnce(new Error("logs insights query failed"));
 
@@ -159,11 +234,17 @@ describe("useWarmSchedule", () => {
       end: "18:00",
       concurrency: 3,
       memoryMb: 1024,
+      reactiveEnabled: false,
     };
     const newImposter: WarmSchedule = { ...DEFAULT_SCHEDULE, enabled: false };
     (fetch as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce({
-        json: async () => ({ schedules: DEFAULT_CONFIG, costs: DEFAULT_COSTS, profiles: NO_PROFILES }),
+        json: async () => ({
+          schedules: DEFAULT_CONFIG,
+          costs: DEFAULT_COSTS,
+          profiles: NO_PROFILES,
+          reactive: DEFAULT_REACTIVE,
+        }),
       })
       .mockResolvedValueOnce(mockColdStartCheckResponse())
       .mockResolvedValueOnce({
@@ -171,6 +252,7 @@ describe("useWarmSchedule", () => {
           schedules: { ...DEFAULT_CONFIG, pantry: newPantry, imposter: newImposter },
           costs: DEFAULT_COSTS,
           profiles: NO_PROFILES,
+          reactive: DEFAULT_REACTIVE,
         }),
       });
 
@@ -205,7 +287,12 @@ describe("useWarmSchedule", () => {
 
     (fetch as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce({
-        json: async () => ({ schedules: DEFAULT_CONFIG, costs: DEFAULT_COSTS, profiles: NO_PROFILES }),
+        json: async () => ({
+          schedules: DEFAULT_CONFIG,
+          costs: DEFAULT_COSTS,
+          profiles: NO_PROFILES,
+          reactive: DEFAULT_REACTIVE,
+        }),
       })
       .mockResolvedValueOnce(mockColdStartCheckResponse())
       .mockRejectedValueOnce(new Error("network down"));
@@ -238,7 +325,12 @@ describe("useWarmSchedule", () => {
 
     (fetch as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce({
-        json: async () => ({ schedules: DEFAULT_CONFIG, costs: DEFAULT_COSTS, profiles: NO_PROFILES }),
+        json: async () => ({
+          schedules: DEFAULT_CONFIG,
+          costs: DEFAULT_COSTS,
+          profiles: NO_PROFILES,
+          reactive: DEFAULT_REACTIVE,
+        }),
       })
       .mockResolvedValueOnce(mockColdStartCheckResponse())
       .mockResolvedValueOnce({
@@ -350,6 +442,7 @@ describe("schedulesEqual", () => {
   it("treats schedules that differ in any field as not equal", () => {
     expect(schedulesEqual(DEFAULT_SCHEDULE, { ...DEFAULT_SCHEDULE, concurrency: 2 })).toBe(false);
     expect(schedulesEqual(DEFAULT_SCHEDULE, { ...DEFAULT_SCHEDULE, memoryMb: 1024 })).toBe(false);
+    expect(schedulesEqual(DEFAULT_SCHEDULE, { ...DEFAULT_SCHEDULE, reactiveEnabled: true })).toBe(false);
   });
 });
 

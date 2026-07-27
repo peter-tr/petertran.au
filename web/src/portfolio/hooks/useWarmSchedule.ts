@@ -20,6 +20,10 @@ export interface WarmSchedule {
   end: string; // "HH:MM"
   concurrency: number; // ProvisionedConcurrentExecutions granted while within window
   memoryMb: number; // every target Lambda's memory
+  // Opt-in: grants PC for 1hr after a real cold hit on this project,
+  // independent of (and additive to) the scheduled window above - see
+  // api/src/warm-schedule/handler.ts's handleColdHit/isWithinReactiveWindow.
+  reactiveEnabled: boolean;
 }
 
 // Mirrors warm-schedule/handler.ts's own MAX_CONCURRENCY (the actual
@@ -43,6 +47,7 @@ export function schedulesEqual(a: WarmSchedule, b: WarmSchedule): boolean {
     a.end === b.end &&
     a.concurrency === b.concurrency &&
     a.memoryMb === b.memoryMb &&
+    a.reactiveEnabled === b.reactiveEnabled &&
     a.days.length === b.days.length &&
     a.days.every((d) => b.days.includes(d))
   );
@@ -81,6 +86,15 @@ export interface ProjectCost {
 }
 export type WarmScheduleCosts = Record<WarmScheduleKey, ProjectCost>;
 
+// Mirrors warm-schedule/handler.ts's own ReactiveStatus - whether a real
+// cold hit has granted this project PC for the next hour right now, and
+// when that grant expires (null when inactive).
+export interface ReactiveStatus {
+  active: boolean;
+  until: string | null;
+}
+export type WarmScheduleReactive = Record<WarmScheduleKey, ReactiveStatus>;
+
 // Mirrors warm-schedule/handler.ts's own ColdStartStats - real counts from a
 // CloudWatch Logs Insights query over the selected lookback window, fetched
 // automatically (on mount and whenever the window selection changes, see
@@ -115,12 +129,14 @@ interface WarmScheduleResponse {
   schedules: WarmScheduleConfig;
   costs: WarmScheduleCosts;
   profiles: WarmScheduleProfiles;
+  reactive: WarmScheduleReactive;
 }
 
 export function useWarmSchedule() {
   const [config, setConfigState] = useState<WarmScheduleConfig | null>(null);
   const [costs, setCosts] = useState<WarmScheduleCosts | null>(null);
   const [profiles, setProfiles] = useState<WarmScheduleProfiles | null>(null);
+  const [reactive, setReactive] = useState<WarmScheduleReactive | null>(null);
   const [coldStarts, setColdStarts] = useState<WarmScheduleColdStarts | null>(null);
   // Starts true - a check always begins immediately on mount.
   const [checkingColdStarts, setCheckingColdStarts] = useState(true);
@@ -152,17 +168,28 @@ export function useWarmSchedule() {
   // overwrite the other's message.
   const [coldStartError, setColdStartError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!ENDPOINT) return;
-    fetch(ENDPOINT)
+  // Shared by the mount effect and the settings page's manual "Refresh
+  // status" button - the initial config/costs/profiles/reactive load only
+  // ever happens once (or after a save), so a reactive window's countdown
+  // would otherwise go stale until the next edit.
+  const refresh = useCallback(() => {
+    if (!ENDPOINT) return Promise.resolve();
+
+    return fetch(ENDPOINT)
       .then((res) => res.json())
       .then((data: WarmScheduleResponse) => {
         setConfigState(data.schedules);
         setCosts(data.costs);
         setProfiles(data.profiles);
+        setReactive(data.reactive);
+        setError(null);
       })
       .catch(() => setError("Couldn't load provisioned concurrency status"));
   }, []);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
 
   // Sends every dirty project's schedule as one batched POST rather than one
   // request per project - the server merges and persists them in a single
@@ -185,6 +212,7 @@ export function useWarmSchedule() {
       setConfigState(data.schedules);
       setCosts(data.costs);
       setProfiles(data.profiles);
+      setReactive(data.reactive);
     } catch {
       setError("Couldn't update provisioned concurrency status");
     } finally {
@@ -211,6 +239,7 @@ export function useWarmSchedule() {
           setConfigState(data.schedules);
           setCosts(data.costs);
           setProfiles(data.profiles);
+          setReactive(data.reactive);
         })
         .catch(() => setError(`Couldn't ${profileAction} profile "${name}"`))
         .finally(() => setProfilePending(null));
@@ -255,6 +284,8 @@ export function useWarmSchedule() {
     config,
     costs,
     profiles,
+    reactive,
+    refresh,
     coldStarts,
     checkingColdStarts,
     coldStartWindowMinutes,

@@ -3,6 +3,8 @@ import { Construct } from "constructs";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as ssm from "aws-cdk-lib/aws-ssm";
+import * as logs from "aws-cdk-lib/aws-logs";
+import { LambdaDestination } from "aws-cdk-lib/aws-logs-destinations";
 import { Schedule, ScheduleExpression, ScheduleTargetInput } from "aws-cdk-lib/aws-scheduler";
 import { LambdaInvoke } from "aws-cdk-lib/aws-scheduler-targets";
 import * as path from "node:path";
@@ -36,6 +38,16 @@ const WARM_SCHEDULE_PARAM_NAME = "/petertran-au/warm-schedule";
 // above) it never hits the CloudFormation-clobbers-runtime-writes trap: there's
 // nothing about it that a later project/field addition would change.
 const WARM_SCHEDULE_PROFILES_PARAM_NAME = "/petertran-au/warm-schedule-profiles";
+// Per-project reactive-warm runtime state (epoch-ms expiry, written by the
+// cold-hit CloudWatch Logs subscription below and read by every reconcile
+// path) - see handler.ts's isWithinReactiveWindow(). Kept in its own
+// parameter, not merged into WARM_SCHEDULE_PARAM_NAME above, so a
+// settings-page save's read-modify-write on the config param can never
+// race with a cold-hit trigger's write to this one - same reasoning as
+// WARM_SCHEDULE_PROFILES_PARAM_NAME's own separation. Seeded "{}" and never
+// touched by this literal again (same "safe from the CloudFormation-clobber
+// trap" property WARM_SCHEDULE_PROFILES_PARAM_NAME already documents).
+const WARM_SCHEDULE_REACTIVE_STATE_PARAM_NAME = "/petertran-au/warm-schedule-reactive-state";
 
 type WarmScheduleKey = "portfolio" | "pantry" | "imposter" | "supergraph" | "designStudio" | "zeroTrustLab";
 type Weekday = "MON" | "TUE" | "WED" | "THU" | "FRI" | "SAT" | "SUN";
@@ -183,6 +195,11 @@ export class ProvisionedConcurrencyStack extends Stack {
       stringValue: "{}",
     });
 
+    const reactiveStateParam = new ssm.StringParameter(this, "WarmScheduleReactiveStateParam", {
+      parameterName: WARM_SCHEDULE_REACTIVE_STATE_PARAM_NAME,
+      stringValue: "{}",
+    });
+
     const ztl = props.zeroTrustLabFnNames;
     const targetFnNames = [
       props.portfolioFnName,
@@ -241,12 +258,41 @@ export class ProvisionedConcurrencyStack extends Stack {
         ZTL_DOMAIN_A_FN_NAME: ztl.domainA,
         WARM_SCHEDULE_NAMES: JSON.stringify(scheduleNames),
         WARM_SCHEDULE_PROFILES_PARAM_NAME: profilesParam.parameterName,
+        WARM_SCHEDULE_REACTIVE_STATE_PARAM_NAME: reactiveStateParam.parameterName,
       },
     });
     scheduleParam.grantRead(warmScheduleFn);
     scheduleParam.grantWrite(warmScheduleFn);
     profilesParam.grantRead(warmScheduleFn);
     profilesParam.grantWrite(warmScheduleFn);
+    reactiveStateParam.grantRead(warmScheduleFn);
+    reactiveStateParam.grantWrite(warmScheduleFn);
+
+    // Reactive PC: a subscription filter per target's log group, matching
+    // the "Init Duration" field that only appears on a REPORT log line for a
+    // genuine cold start (same detection idiom queryColdStarts's Logs
+    // Insights query above uses, just live-streamed instead of polled).
+    // Fires warmScheduleFn asynchronously on every real cold hit - see
+    // handler.ts's handleColdHit(). Zero added latency to the cold request
+    // itself (the subscription delivers after the log line is written), and
+    // zero code changes needed in any target project's own handler.
+    // LambdaDestination grants the required logs.<region>.amazonaws.com
+    // invoke permission automatically, scoped per log group ARN - no manual
+    // IAM needed here. Log groups are imported by name (not a live
+    // `ILogGroup` from the producing stack) for the same cross-stack-export
+    // reason `targetFnNames` above is plain strings, not `IFunction` refs.
+    for (const fnName of targetFnNames) {
+      const logGroup = logs.LogGroup.fromLogGroupName(
+        this,
+        `ColdStartLogGroup-${fnName}`,
+        `/aws/lambda/${fnName}`
+      );
+      new logs.SubscriptionFilter(this, `ColdStartSubscription-${fnName}`, {
+        logGroup,
+        destination: new LambdaDestination(warmScheduleFn),
+        filterPattern: logs.FilterPattern.literal('"Init Duration"'),
+      });
+    }
 
     warmScheduleFn.addToRolePolicy(
       new iam.PolicyStatement({

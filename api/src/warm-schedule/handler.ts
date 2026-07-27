@@ -1,3 +1,4 @@
+import { gunzipSync } from "node:zlib";
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import {
   LambdaClient,
@@ -29,6 +30,7 @@ const logsClient = new CloudWatchLogsClient({});
 const ALIAS_NAME = process.env.LIVE_ALIAS_NAME!;
 const PARAM_NAME = process.env.WARM_SCHEDULE_PARAM_NAME!;
 const PROFILES_PARAM_NAME = process.env.WARM_SCHEDULE_PROFILES_PARAM_NAME!;
+const REACTIVE_STATE_PARAM_NAME = process.env.WARM_SCHEDULE_REACTIVE_STATE_PARAM_NAME!;
 // CDK-provided map of each project's on/off EventBridge Schedule names -
 // see infra/lib/warm-schedule-stack.ts.
 const SCHEDULE_NAMES: Record<WarmScheduleKey, { on: string; off: string }> = JSON.parse(
@@ -45,6 +47,14 @@ interface WarmSchedule {
   end: string; // "HH:MM", must be > start - same-day windows only
   concurrency: number; // ProvisionedConcurrentExecutions granted to every target while within window
   memoryMb: number; // every target's Lambda memory, applied via reconcileMemory()
+  // Opt-in per project - if true, a genuine cold hit on any of this
+  // project's targets (see handleColdHit()) grants PC for
+  // REACTIVE_WINDOW_MINUTES regardless of the scheduled window above. Not
+  // seeded into infra/lib/warm-schedule-stack.ts's own CDK-side WarmSchedule/
+  // DEFAULT_SCHEDULE literal - see that file's "DO NOT EDIT THIS LITERAL"
+  // comment on WarmScheduleParam for why a field only needs to exist here;
+  // getConfig()'s merge below backfills it for every already-stored project.
+  reactiveEnabled: boolean;
 }
 
 type WarmScheduleConfig = Record<WarmScheduleKey, WarmSchedule>;
@@ -52,8 +62,17 @@ type WarmScheduleConfig = Record<WarmScheduleKey, WarmSchedule>;
 // user-chosen name - lets the settings page save/apply a whole mode (e.g.
 // "all cold, 1024MB") in one action instead of editing every project's row.
 type WarmScheduleProfiles = Record<string, WarmScheduleConfig>;
+// Per-project reactive-warm expiry, epoch ms - see handleColdHit() and
+// isWithinReactiveWindow(). Absent/expired key means "no active reactive
+// window right now" for that project.
+type WarmScheduleReactiveState = Partial<Record<WarmScheduleKey, number>>;
 
 const MAX_PROFILE_NAME_LENGTH = 60;
+
+// Fixed (not rolling/reset by a later hit) - a cold hit during an already-
+// active reactive window is a no-op (see handleColdHit()'s guard), so this
+// is genuinely "1hr from the first hit", not "1hr from the most recent one".
+const REACTIVE_WINDOW_MINUTES = 60;
 
 // Real ap-southeast-2 Provisioned Concurrency rate (AWS Pricing API,
 // effective 2026-07-01) - see the 2026-07-20 PC rollout's pricing pull.
@@ -147,6 +166,15 @@ const TARGETS_BY_PROJECT: Record<WarmScheduleKey, string[]> = {
   ],
 };
 
+// Inverse of TARGETS_BY_PROJECT, built once at module scope - lets
+// handleColdHit() map the function name parsed out of a cold-start log
+// event's log group back to the project that owns it.
+const FUNCTION_NAME_TO_PROJECT: Record<string, WarmScheduleKey> = Object.fromEntries(
+  (Object.entries(TARGETS_BY_PROJECT) as [WarmScheduleKey, string[]][]).flatMap(([key, fnNames]) =>
+    fnNames.map((fnName) => [fnName, key])
+  )
+);
+
 // On (business-hours PC scheduling active) by default, 8am-7pm every day,
 // 1 provisioned instance - matches how warmup's schedules used to be
 // ENABLED at creation, and this stack's original fixed window.
@@ -157,6 +185,7 @@ const DEFAULT_SCHEDULE: WarmSchedule = {
   end: "19:00",
   concurrency: 1,
   memoryMb: 512,
+  reactiveEnabled: false,
 };
 const DEFAULT_CONFIG: WarmScheduleConfig = {
   portfolio: DEFAULT_SCHEDULE,
@@ -204,6 +233,23 @@ async function setProfiles(profiles: WarmScheduleProfiles): Promise<void> {
   );
 }
 
+async function getReactiveState(): Promise<WarmScheduleReactiveState> {
+  const { Parameter } = await ssm.send(new GetParameterCommand({ Name: REACTIVE_STATE_PARAM_NAME }));
+  if (!Parameter?.Value) return {};
+
+  return JSON.parse(Parameter.Value) as WarmScheduleReactiveState;
+}
+
+async function setReactiveState(state: WarmScheduleReactiveState): Promise<void> {
+  await ssm.send(
+    new PutParameterCommand({
+      Name: REACTIVE_STATE_PARAM_NAME,
+      Value: JSON.stringify(state),
+      Overwrite: true,
+    })
+  );
+}
+
 // Sydney weekday + "HH:MM" for `now`, so an enabled schedule with `days`/
 // `start`/`end` can be checked against the current moment.
 function sydneyNow(now: Date): { weekday: Weekday; time: string } {
@@ -231,6 +277,18 @@ function isWithinWindow(schedule: WarmSchedule, now: Date): boolean {
   const { weekday, time } = sydneyNow(now);
 
   return schedule.days.includes(weekday) && schedule.start <= time && time < schedule.end;
+}
+
+// Gated on schedule.reactiveEnabled (not just the stored expiry) so
+// disabling the toggle immediately stops honoring any stale leftover state
+// left in SSM from before it was turned off - no explicit clear needed.
+function isWithinReactiveWindow(
+  key: WarmScheduleKey,
+  schedule: WarmSchedule,
+  reactiveState: WarmScheduleReactiveState,
+  now: Date
+): boolean {
+  return schedule.reactiveEnabled && (reactiveState[key] ?? 0) > now.getTime();
 }
 
 function hoursPerWeek(schedule: WarmSchedule): number {
@@ -519,12 +577,22 @@ async function reconcileProjectTo(
 }
 
 // Idempotent - safe to call redundantly. Called by the periodic backstop
-// {reconcile: true} tick (for every project every ~30min), by the exact
-// on/off trigger for just the project whose window opened/closed, and
-// directly by the POST handler for just the projects that changed, so an
-// edit takes effect immediately instead of waiting for the next trigger.
-async function reconcileProject(key: WarmScheduleKey, schedule: WarmSchedule, now: Date): Promise<void> {
-  await reconcileProjectTo(key, isWithinWindow(schedule, now), schedule.concurrency, schedule.memoryMb);
+// {reconcile: true} tick (for every project every ~30min - also the thing
+// that eventually turns PC back off once a reactive window expires with no
+// schedule covering it, since there's no dedicated one-shot expiry trigger),
+// by the exact on/off trigger for just the project whose window opened/
+// closed, and directly by the POST handler for just the projects that
+// changed, so an edit takes effect immediately instead of waiting for the
+// next trigger.
+async function reconcileProject(
+  key: WarmScheduleKey,
+  schedule: WarmSchedule,
+  reactiveState: WarmScheduleReactiveState,
+  now: Date
+): Promise<void> {
+  const shouldBeWarm =
+    isWithinWindow(schedule, now) || isWithinReactiveWindow(key, schedule, reactiveState, now);
+  await reconcileProjectTo(key, shouldBeWarm, schedule.concurrency, schedule.memoryMb);
 }
 
 // Builds the AWS cron fields for a project's on/off EventBridge Schedule
@@ -606,14 +674,23 @@ async function applyProfile(name: string): Promise<WarmScheduleConfig | null> {
 
   await setConfig(config);
 
+  const reactiveState = await getReactiveState();
   const now = new Date();
   await Promise.all(
     (Object.keys(TARGETS_BY_PROJECT) as WarmScheduleKey[]).map((key) =>
-      Promise.all([updateProjectSchedules(key, config[key]), reconcileProject(key, config[key], now)])
+      Promise.all([
+        updateProjectSchedules(key, config[key]),
+        reconcileProject(key, config[key], reactiveState, now),
+      ])
     )
   );
 
   return config;
+}
+
+interface ReactiveStatus {
+  active: boolean;
+  until: string | null;
 }
 
 // Takes `profiles` as a parameter rather than fetching it itself - every
@@ -629,10 +706,20 @@ async function buildStatus(
   schedules: WarmScheduleConfig;
   costs: Record<WarmScheduleKey, ProjectCost>;
   profiles: WarmScheduleProfiles;
+  reactive: Record<WarmScheduleKey, ReactiveStatus>;
 }> {
-  const costs = await computeAllProjectCosts(config);
+  const [costs, reactiveState] = await Promise.all([computeAllProjectCosts(config), getReactiveState()]);
+  const now = Date.now();
+  const reactive = Object.fromEntries(
+    (Object.keys(TARGETS_BY_PROJECT) as WarmScheduleKey[]).map((key) => {
+      const expiry = reactiveState[key] ?? 0;
+      const active = config[key].reactiveEnabled && expiry > now;
 
-  return { schedules: config, costs, profiles };
+      return [key, { active, until: active ? new Date(expiry).toISOString() : null }];
+    })
+  ) as Record<WarmScheduleKey, ReactiveStatus>;
+
+  return { schedules: config, costs, profiles, reactive };
 }
 
 function isValidProfileName(value: unknown): value is string {
@@ -661,6 +748,49 @@ function isWarmScheduleTrigger(event: unknown): event is WarmScheduleTrigger {
   );
 }
 
+// Envelope CloudWatch Logs sends a subscription filter's Lambda destination -
+// gzip+base64-encoded JSON, not the plain event shape used elsewhere here.
+// See infra/lib/warm-schedule-stack.ts's SubscriptionFilter, one per target
+// log group, filtering on "Init Duration" (only present on a cold start).
+interface ColdStartLogEvent {
+  awslogs: { data: string };
+}
+
+function isColdStartLogEvent(event: unknown): event is ColdStartLogEvent {
+  return typeof (event as { awslogs?: { data?: unknown } })?.awslogs?.data === "string";
+}
+
+// Never throws - a cold-hit trigger is best-effort, same reasoning as
+// reconcileTarget below. CloudWatch Logs retries a failing Lambda
+// destination with backoff and can eventually drop data on repeated
+// failures, so this must stay robust rather than let a malformed/unexpected
+// envelope take down the whole invocation.
+async function handleColdHit(event: ColdStartLogEvent): Promise<void> {
+  try {
+    const decoded = JSON.parse(gunzipSync(Buffer.from(event.awslogs.data, "base64")).toString("utf-8")) as {
+      logGroup?: string;
+    };
+    const fnName = decoded.logGroup?.replace(/^\/aws\/lambda\//, "");
+    const project = fnName ? FUNCTION_NAME_TO_PROJECT[fnName] : undefined;
+    if (!project) return;
+
+    const config = await getConfig();
+    if (!config[project].reactiveEnabled) return;
+
+    const reactiveState = await getReactiveState();
+    const now = Date.now();
+    // Fixed-from-first-hit: a hit during an already-active window is a
+    // no-op, not an extension - see REACTIVE_WINDOW_MINUTES's doc comment.
+    if ((reactiveState[project] ?? 0) > now) return;
+
+    const expiry = now + REACTIVE_WINDOW_MINUTES * 60_000;
+    await setReactiveState({ ...reactiveState, [project]: expiry });
+    await reconcileProjectTo(project, true, config[project].concurrency, config[project].memoryMb);
+  } catch (err) {
+    console.error("handleColdHit failed - left as-is, will retry on the next cold hit", err);
+  }
+}
+
 function isValidSchedule(value: unknown): value is WarmSchedule {
   if (typeof value !== "object" || value === null) return false;
 
@@ -681,19 +811,26 @@ function isValidSchedule(value: unknown): value is WarmSchedule {
     s.concurrency >= 1 &&
     s.concurrency <= MAX_CONCURRENCY &&
     typeof s.memoryMb === "number" &&
-    (MEMORY_OPTIONS_MB as readonly number[]).includes(s.memoryMb)
+    (MEMORY_OPTIONS_MB as readonly number[]).includes(s.memoryMb) &&
+    typeof s.reactiveEnabled === "boolean"
   );
 }
 
 async function processEvent(
-  event: APIGatewayProxyEvent | ReconcilePing | WarmScheduleTrigger
+  event: APIGatewayProxyEvent | ReconcilePing | WarmScheduleTrigger | ColdStartLogEvent
 ): Promise<APIGatewayProxyResult> {
+  if (isColdStartLogEvent(event)) {
+    await handleColdHit(event);
+
+    return { statusCode: 200, body: "ok" };
+  }
+
   if (isReconcilePing(event)) {
-    const config = await getConfig();
+    const [config, reactiveState] = await Promise.all([getConfig(), getReactiveState()]);
     const now = new Date();
     await Promise.all(
       (Object.keys(TARGETS_BY_PROJECT) as WarmScheduleKey[]).map((key) =>
-        reconcileProject(key, config[key], now)
+        reconcileProject(key, config[key], reactiveState, now)
       )
     );
 
@@ -705,11 +842,17 @@ async function processEvent(
     // trigger payload itself (the EventBridge Schedule's input is just
     // {project, action}, set once at CDK synth time / on a settings save) -
     // fetch the current config to know how much concurrency to grant and
-    // which memory size to reconcile toward.
-    const config = await getConfig();
+    // which memory size to reconcile toward. A reactive window still active
+    // for this project overrides an "off" trigger - the scheduled window
+    // closing shouldn't tear down PC a real cold hit just earned for the
+    // next hour.
+    const [config, reactiveState] = await Promise.all([getConfig(), getReactiveState()]);
+    const shouldBeWarm =
+      event.action === "on" ||
+      isWithinReactiveWindow(event.project, config[event.project], reactiveState, new Date());
     await reconcileProjectTo(
       event.project,
-      event.action === "on",
+      shouldBeWarm,
       config[event.project].concurrency,
       config[event.project].memoryMb
     );
@@ -807,7 +950,7 @@ async function processEvent(
           error:
             "schedules must be a non-empty object mapping project name " +
             "(portfolio/pantry/imposter/supergraph/designStudio/zeroTrustLab) to a valid " +
-            "{ enabled, days, start, end, concurrency, memoryMb } " +
+            "{ enabled, days, start, end, concurrency, memoryMb, reactiveEnabled } " +
             `(concurrency an integer 1-${MAX_CONCURRENCY}, memoryMb one of ${MEMORY_OPTIONS_MB.join("/")})`,
         }),
       };
@@ -828,10 +971,14 @@ async function processEvent(
     }
     await setConfig(config);
 
+    const reactiveState = await getReactiveState();
     const now = new Date();
     await Promise.all(
       validEntries.map(([key, schedule]) =>
-        Promise.all([updateProjectSchedules(key, schedule), reconcileProject(key, schedule, now)])
+        Promise.all([
+          updateProjectSchedules(key, schedule),
+          reconcileProject(key, schedule, reactiveState, now),
+        ])
       )
     );
 
@@ -852,10 +999,13 @@ async function processEvent(
 }
 
 export async function handler(
-  event: APIGatewayProxyEvent | ReconcilePing | WarmScheduleTrigger
+  event: APIGatewayProxyEvent | ReconcilePing | WarmScheduleTrigger | ColdStartLogEvent
 ): Promise<APIGatewayProxyResult> {
   const result = await processEvent(event);
-  const origin = isReconcilePing(event) || isWarmScheduleTrigger(event) ? undefined : event.headers?.origin;
+  const origin =
+    isReconcilePing(event) || isWarmScheduleTrigger(event) || isColdStartLogEvent(event)
+      ? undefined
+      : event.headers?.origin;
 
   return { ...result, headers: { ...result.headers, ...corsHeaders(origin) } };
 }

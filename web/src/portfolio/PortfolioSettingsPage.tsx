@@ -32,6 +32,8 @@ export default function PortfolioSettingsPage() {
     config: warmScheduleConfig,
     costs: warmScheduleCosts,
     profiles: warmScheduleProfiles,
+    reactive: warmScheduleReactive,
+    refresh: refreshWarmSchedule,
     coldStarts: warmScheduleColdStarts,
     checkingColdStarts,
     coldStartWindowMinutes,
@@ -136,7 +138,8 @@ export default function PortfolioSettingsPage() {
           <p className="form-label">
             Keep warm with provisioned concurrency (Sydney time) - no cold starts for real visitors during the
             window you set below. Prices below are live, from each project's real Lambda memory size and
-            currently-allocated provisioned concurrency.
+            currently-allocated provisioned concurrency. Each project can also opt in to warming reactively
+            for 1hr after a real cold start, on top of (or instead of) the scheduled window.
           </p>
           <WarmScheduleProfiles
             profiles={warmScheduleProfiles}
@@ -146,7 +149,6 @@ export default function PortfolioSettingsPage() {
             onApply={applyWarmScheduleProfile}
             onDelete={deleteWarmScheduleProfile}
           />
-
           <div className="warm-schedule-days" role="group" aria-label="Cold start check window">
             {COLD_START_WINDOW_OPTIONS.map((option) => (
               <button
@@ -165,7 +167,6 @@ export default function PortfolioSettingsPage() {
             {checkingColdStarts && " Checking…"}
           </p>
           {coldStartError && <p className="section-hint">{coldStartError}</p>}
-
           {warmScheduleDrafts &&
             WARM_SCHEDULE_KEYS.map((fn) => (
               <WarmScheduleProject
@@ -177,6 +178,7 @@ export default function PortfolioSettingsPage() {
                   setWarmScheduleDrafts((current) => (current ? { ...current, [fn]: schedule } : current))
                 }
                 cost={warmScheduleCosts?.[fn]}
+                reactiveStatus={warmScheduleReactive?.[fn]}
                 coldStart={warmScheduleColdStarts?.[fn]}
                 coldStartWindowLabel={coldStartWindowLabel}
                 disabled={warmScheduleSaving}
@@ -194,6 +196,9 @@ export default function PortfolioSettingsPage() {
             onClick={() => saveAllWarmSchedules(dirtyWarmSchedules)}
           >
             Save all
+          </button>{" "}
+          <button className="run-btn" type="button" onClick={() => refreshWarmSchedule()}>
+            Refresh status
           </button>
           {warmScheduleError && <p className="section-hint">{warmScheduleError}</p>}
         </div>

@@ -23,6 +23,7 @@ import { SchedulerClient, GetScheduleCommand, UpdateScheduleCommand } from "@aws
 process.env.LIVE_ALIAS_NAME = "live";
 process.env.WARM_SCHEDULE_PARAM_NAME = "/warm-schedule/schedules";
 process.env.WARM_SCHEDULE_PROFILES_PARAM_NAME = "/warm-schedule/profiles";
+process.env.WARM_SCHEDULE_REACTIVE_STATE_PARAM_NAME = "/warm-schedule/reactive-state";
 process.env.PORTFOLIO_FN_NAME = "portfolio-fn";
 process.env.PANTRY_FN_NAME = "pantry-fn";
 process.env.IMPOSTER_FN_NAME = "imposter-fn";
@@ -44,6 +45,7 @@ process.env.WARM_SCHEDULE_NAMES = JSON.stringify({
 
 const { handler } = await import("./handler");
 import type { APIGatewayProxyEvent } from "aws-lambda";
+import { gzipSync } from "node:zlib";
 
 const lambdaMock = mockClient(LambdaClient);
 const ssmMock = mockClient(SSMClient);
@@ -72,6 +74,7 @@ const DEFAULT_SCHEDULE = {
   end: "19:00",
   concurrency: 1,
   memoryMb: 512,
+  reactiveEnabled: false,
 };
 const DEFAULT_CONFIG = {
   portfolio: DEFAULT_SCHEDULE,
@@ -94,6 +97,15 @@ function httpEvent(method: string, body?: unknown): APIGatewayProxyEvent {
     body: body !== undefined ? JSON.stringify(body) : undefined,
     isBase64Encoded: false,
   } as unknown as APIGatewayProxyEvent;
+}
+
+// Mirrors the real envelope CloudWatch Logs sends a subscription filter's
+// Lambda destination (gzip+base64 JSON) - see infra/lib/warm-schedule-stack.ts's
+// SubscriptionFilter and handler.ts's isColdStartLogEvent/handleColdHit.
+function coldStartLogEvent(functionName: string): { awslogs: { data: string } } {
+  const payload = JSON.stringify({ logGroup: `/aws/lambda/${functionName}` });
+
+  return { awslogs: { data: gzipSync(Buffer.from(payload, "utf-8")).toString("base64") } };
 }
 
 beforeEach(() => {
@@ -259,6 +271,7 @@ describe("warm-schedule handler - config GET/POST", () => {
       end: "18:00",
       concurrency: 3,
       memoryMb: 1024,
+      reactiveEnabled: false,
     };
     const result = await handler(httpEvent("POST", { schedules: { pantry: newSchedule } }));
     expect(result.statusCode).toBe(200);
@@ -351,6 +364,9 @@ describe("warm-schedule handler - profiles", () => {
     ssmMock
       .on(GetParameterCommand, { Name: "/warm-schedule/profiles" })
       .resolves({ Parameter: { Value: JSON.stringify(profiles) } });
+    // No active reactive window by default - every code path here (via
+    // buildStatus/applyProfile) also reads this param now.
+    ssmMock.on(GetParameterCommand, { Name: "/warm-schedule/reactive-state" }).resolves({});
   }
 
   it("GET returns an empty profiles map by default", async () => {
@@ -608,6 +624,145 @@ describe("warm-schedule handler - on/off trigger", () => {
 
     const deleteCalls = lambdaMock.commandCalls(DeleteProvisionedConcurrencyConfigCommand);
     expect(deleteCalls.map((c) => c.args[0].input.FunctionName).sort()).toEqual([...ALL_ZTL_TARGETS].sort());
+  });
+});
+
+describe("warm-schedule handler - reactive (cold-hit-triggered) PC", () => {
+  const REACTIVE_STATE_NAME = "/warm-schedule/reactive-state";
+
+  it("ignores a cold hit for a project with reactiveEnabled: false", async () => {
+    ssmMock.on(GetParameterCommand).resolves({});
+
+    const result = await handler(coldStartLogEvent("portfolio-fn"));
+    expect(result.statusCode).toBe(200);
+
+    expect(ssmMock.commandCalls(PutParameterCommand)).toHaveLength(0);
+    expect(lambdaMock.commandCalls(PutProvisionedConcurrencyConfigCommand)).toHaveLength(0);
+  });
+
+  it("ignores a cold hit on a log group that doesn't map to any known target", async () => {
+    ssmMock.on(GetParameterCommand).resolves({});
+
+    const result = await handler(coldStartLogEvent("some-unrelated-function"));
+    expect(result.statusCode).toBe(200);
+    expect(ssmMock.commandCalls(PutParameterCommand)).toHaveLength(0);
+  });
+
+  it("grants PC and records a 1hr expiry on a cold hit when reactiveEnabled is true and no window is active", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(WITHIN_WINDOW);
+    ssmMock.on(GetParameterCommand, { Name: "/warm-schedule/schedules" }).resolves({
+      Parameter: { Value: JSON.stringify({ portfolio: { ...DEFAULT_SCHEDULE, reactiveEnabled: true } }) },
+    });
+    ssmMock.on(GetParameterCommand, { Name: REACTIVE_STATE_NAME }).resolves({});
+
+    const result = await handler(coldStartLogEvent("portfolio-fn"));
+    expect(result.statusCode).toBe(200);
+
+    const stateWrites = ssmMock
+      .commandCalls(PutParameterCommand)
+      .filter((c) => c.args[0].input.Name === REACTIVE_STATE_NAME);
+    expect(stateWrites).toHaveLength(1);
+
+    const written = JSON.parse(stateWrites[0].args[0].input.Value as string);
+    expect(written.portfolio).toBe(WITHIN_WINDOW.getTime() + 60 * 60_000);
+
+    const putCalls = lambdaMock.commandCalls(PutProvisionedConcurrencyConfigCommand);
+    expect(putCalls).toHaveLength(1);
+    expect(putCalls[0].args[0].input.FunctionName).toBe("portfolio-fn");
+  });
+
+  it("does not extend an already-active reactive window on a second cold hit (fixed, not rolling)", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(WITHIN_WINDOW);
+    ssmMock.on(GetParameterCommand, { Name: "/warm-schedule/schedules" }).resolves({
+      Parameter: { Value: JSON.stringify({ portfolio: { ...DEFAULT_SCHEDULE, reactiveEnabled: true } }) },
+    });
+    // Already active, 30 min still remaining.
+    ssmMock.on(GetParameterCommand, { Name: REACTIVE_STATE_NAME }).resolves({
+      Parameter: { Value: JSON.stringify({ portfolio: WITHIN_WINDOW.getTime() + 30 * 60_000 }) },
+    });
+
+    await handler(coldStartLogEvent("portfolio-fn"));
+
+    expect(ssmMock.commandCalls(PutParameterCommand)).toHaveLength(0);
+    expect(lambdaMock.commandCalls(PutProvisionedConcurrencyConfigCommand)).toHaveLength(0);
+  });
+
+  it("backstop reconcile keeps PC on for a project with an active reactive window even outside its schedule", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(OUTSIDE_WINDOW);
+    ssmMock.on(GetParameterCommand, { Name: "/warm-schedule/schedules" }).resolves({
+      Parameter: { Value: JSON.stringify({ portfolio: { ...DEFAULT_SCHEDULE, reactiveEnabled: true } }) },
+    });
+    ssmMock.on(GetParameterCommand, { Name: REACTIVE_STATE_NAME }).resolves({
+      Parameter: { Value: JSON.stringify({ portfolio: OUTSIDE_WINDOW.getTime() + 10 * 60_000 }) },
+    });
+
+    await handler({ reconcile: true });
+
+    const putCalls = lambdaMock.commandCalls(PutProvisionedConcurrencyConfigCommand);
+    expect(putCalls.map((c) => c.args[0].input.FunctionName)).toContain("portfolio-fn");
+
+    // Every other target has no active window and is outside its schedule -
+    // still torn down as normal.
+    const deleteCalls = lambdaMock.commandCalls(DeleteProvisionedConcurrencyConfigCommand);
+    expect(deleteCalls.map((c) => c.args[0].input.FunctionName)).not.toContain("portfolio-fn");
+    expect(deleteCalls.map((c) => c.args[0].input.FunctionName)).toContain("pantry-fn");
+  });
+
+  it("backstop reconcile tears PC down once a reactive window has expired outside the schedule", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(OUTSIDE_WINDOW);
+    ssmMock.on(GetParameterCommand, { Name: "/warm-schedule/schedules" }).resolves({
+      Parameter: { Value: JSON.stringify({ portfolio: { ...DEFAULT_SCHEDULE, reactiveEnabled: true } }) },
+    });
+    // Expired 1 minute ago.
+    ssmMock.on(GetParameterCommand, { Name: REACTIVE_STATE_NAME }).resolves({
+      Parameter: { Value: JSON.stringify({ portfolio: OUTSIDE_WINDOW.getTime() - 60_000 }) },
+    });
+
+    await handler({ reconcile: true });
+
+    const deleteCalls = lambdaMock.commandCalls(DeleteProvisionedConcurrencyConfigCommand);
+    expect(deleteCalls.map((c) => c.args[0].input.FunctionName)).toContain("portfolio-fn");
+  });
+
+  it("an 'off' schedule trigger does not tear down PC while a reactive window is still active for that project", async () => {
+    ssmMock.on(GetParameterCommand, { Name: "/warm-schedule/schedules" }).resolves({
+      Parameter: { Value: JSON.stringify({ portfolio: { ...DEFAULT_SCHEDULE, reactiveEnabled: true } }) },
+    });
+    ssmMock.on(GetParameterCommand, { Name: REACTIVE_STATE_NAME }).resolves({
+      Parameter: { Value: JSON.stringify({ portfolio: Date.now() + 10 * 60_000 }) },
+    });
+
+    const result = await handler({ project: "portfolio", action: "off" });
+    expect(result).toEqual({ statusCode: 200, headers: {}, body: "reconciled" });
+
+    expect(lambdaMock.commandCalls(DeleteProvisionedConcurrencyConfigCommand)).toHaveLength(0);
+
+    const putCalls = lambdaMock.commandCalls(PutProvisionedConcurrencyConfigCommand);
+    expect(putCalls.map((c) => c.args[0].input.FunctionName)).toContain("portfolio-fn");
+  });
+
+  it("reports reactive status (active/until) alongside schedules and costs in the GET response", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(WITHIN_WINDOW);
+
+    const until = WITHIN_WINDOW.getTime() + 10 * 60_000;
+    ssmMock.on(GetParameterCommand, { Name: "/warm-schedule/schedules" }).resolves({
+      Parameter: { Value: JSON.stringify({ portfolio: { ...DEFAULT_SCHEDULE, reactiveEnabled: true } }) },
+    });
+    ssmMock.on(GetParameterCommand, { Name: "/warm-schedule/profiles" }).resolves({});
+    ssmMock
+      .on(GetParameterCommand, { Name: REACTIVE_STATE_NAME })
+      .resolves({ Parameter: { Value: JSON.stringify({ portfolio: until }) } });
+
+    const result = await handler(httpEvent("GET"));
+    const { reactive } = JSON.parse(result.body as string);
+
+    expect(reactive.portfolio).toEqual({ active: true, until: new Date(until).toISOString() });
+    expect(reactive.pantry).toEqual({ active: false, until: null });
   });
 });
 

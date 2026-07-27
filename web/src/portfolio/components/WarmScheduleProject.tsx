@@ -7,6 +7,7 @@ import {
   type Weekday,
   type ProjectCost,
   type ColdStartStats,
+  type ReactiveStatus,
 } from "../hooks/useWarmSchedule";
 
 const ALL_DAYS: Weekday[] = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
@@ -26,6 +27,7 @@ interface WarmScheduleProjectProps {
   draft: WarmSchedule;
   onChange: (schedule: WarmSchedule) => void;
   cost: ProjectCost | undefined;
+  reactiveStatus: ReactiveStatus | undefined;
   coldStart: ColdStartStats | undefined;
   coldStartWindowLabel: string;
   disabled: boolean;
@@ -41,6 +43,7 @@ export default function WarmScheduleProject({
   draft,
   onChange,
   cost,
+  reactiveStatus,
   coldStart,
   coldStartWindowLabel,
   disabled,
@@ -67,6 +70,17 @@ export default function WarmScheduleProject({
           onChange={(e) => onChange({ ...draft, enabled: e.target.checked })}
         />{" "}
         {label}
+      </label>
+
+      <label className="form-label" htmlFor={`warm-schedule-${fn}-reactive`}>
+        <input
+          id={`warm-schedule-${fn}-reactive`}
+          type="checkbox"
+          checked={draft.reactiveEnabled}
+          disabled={disabled}
+          onChange={(e) => onChange({ ...draft, reactiveEnabled: e.target.checked })}
+        />{" "}
+        Also warm for 1hr after a real cold start
       </label>
 
       <div className="warm-schedule-days">
@@ -134,6 +148,9 @@ export default function WarmScheduleProject({
             ? `Currently ${cost.liveConcurrency} warm instance${cost.liveConcurrency === 1 ? "" : "s"} ($${cost.liveHourlyCostUsd.toFixed(4)}/hr)`
             : "Currently cold (no PC active)"}{" "}
           · ~${cost.scheduledMonthlyCostUsd.toFixed(2)}/mo if this schedule runs as set
+          {reactiveStatus?.active &&
+            reactiveStatus.until &&
+            ` · reactively warm until ${new Date(reactiveStatus.until).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`}
         </p>
       )}
       {coldStart &&
