@@ -84,6 +84,13 @@
   box-shadow: 0 0.4rem 1rem rgba(0, 0, 0, 0.15);
 }
 
+.pantry-auth-blurb {
+  margin: 0 0 0.6rem;
+  font-family: var(--font-sans);
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
 .pantry-auth-form form {
   display: flex;
   flex-direction: column;

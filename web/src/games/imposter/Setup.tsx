@@ -180,7 +180,7 @@ export default function ImposterSetup() {
         </p>
       )}
 
-      <p className="tagline">
+      <p className="project-desc" style={{ marginBottom: "1rem" }}>
         Everyone gets the same secret word - except the imposter(s), who get something close but different.
         Pass the device around, discuss out loud, and vote out whoever seems off.
       </p>
