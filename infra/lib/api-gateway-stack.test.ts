@@ -51,7 +51,7 @@ describe("ApiGatewayStack", () => {
           {
             ResponseParameters: {
               "method.response.header.Access-Control-Allow-Headers":
-                "'content-type,apollo-require-preflight,x-amzn-trace-id,authorization'",
+                "'content-type,apollo-require-preflight,x-amzn-trace-id,authorization,apollographql-client-name'",
             },
           },
         ],
