@@ -235,7 +235,12 @@ export async function generateDesignElements(
   sourceIp: string | undefined,
   aiSettings: AiSettingsRecord
 ): Promise<DesignElementRecord[]> {
-  const startedAt = Date.now();
+  // Absolute deadline, not a duration - shared between the phase-1
+  // supergraph tool loop below and this function's own phase-2 call, so
+  // however long phase 1 actually takes (previously unbounded - see
+  // supergraph-tool.ts's gatherSupergraphContext doc comment), phase 2 gets
+  // whatever's genuinely left rather than each phase assuming a fresh 27s.
+  const deadlineAt = Date.now() + TOTAL_TIME_BUDGET_MS;
   const trimmed = prompt.trim();
   if (!trimmed) throw new Error("A prompt is required.");
   if (trimmed.length > MAX_PROMPT_LENGTH) {
@@ -260,7 +265,7 @@ export async function generateDesignElements(
   let supergraphContext: string | null = null;
   if (aiSettings.allowSupergraphQuery) {
     try {
-      supergraphContext = await gatherSupergraphContext(client, model, trimmed);
+      supergraphContext = await gatherSupergraphContext(client, model, trimmed, deadlineAt);
     } catch {
       supergraphContext = null;
     }
@@ -283,13 +288,10 @@ export async function generateDesignElements(
   // smaller and comfortably clear it, so only isRefinement forces this off.
   const supportsThinking = aiSettings.modelTier === "SONNET" && !isRefinement;
 
-  // Whatever's left of the 27s budget after the (optional) phase-1
+  // Whatever's left of the shared deadline after the (optional) phase-1
   // supergraph tool loop above - so the timeout adapts to however much of
   // it that loop actually used, rather than assuming it used none.
-  const remainingBudgetMs = Math.max(
-    MIN_GENERATE_TIMEOUT_MS,
-    TOTAL_TIME_BUDGET_MS - (Date.now() - startedAt)
-  );
+  const remainingBudgetMs = Math.max(MIN_GENERATE_TIMEOUT_MS, deadlineAt - Date.now());
 
   const response = await client.messages.parse(
     {
