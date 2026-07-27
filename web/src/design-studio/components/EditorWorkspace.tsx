@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import Canvas, { type CanvasHandle } from "./Canvas";
 import Toolbar from "./Toolbar";
 import LayersPanel from "./LayersPanel";
@@ -298,6 +299,9 @@ export default function EditorWorkspace({
 
   return (
     <div className="design-studio-editor">
+      <Link to="/design-studio" className="design-studio-breadcrumb">
+        ← Design Studio
+      </Link>
       <header className="design-studio-head">
         <input
           className="design-studio-name-input"

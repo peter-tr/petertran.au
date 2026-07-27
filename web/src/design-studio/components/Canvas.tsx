@@ -99,9 +99,15 @@ const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
     // leave the canvas tall enough to fill nearly the whole screen height,
     // pushing the toolbar/panels below it far off screen. Also cap by a
     // fraction of window height so there's always room left for the rest
-    // of the editor.
+    // of the editor - a smaller fraction on mobile (less vertical room to
+    // spare once the toolbar/panels stack below the canvas there) than on
+    // desktop, where 0.6 was leaving the default fit noticeably smaller
+    // than the available space actually allowed (960px matches the
+    // toolbar/side-panels desktop-vs-stacked breakpoint used elsewhere in
+    // design-studio.css).
     function recompute(containerWidth: number) {
-      const heightBudget = window.innerHeight * 0.6;
+      const heightBudgetFraction = window.innerWidth > 960 ? 0.75 : 0.6;
+      const heightBudget = window.innerHeight * heightBudgetFraction;
       setFitScale(Math.min(1, containerWidth / width, heightBudget / height));
     }
 
