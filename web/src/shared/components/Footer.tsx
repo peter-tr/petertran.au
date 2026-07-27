@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { runQuery, FOOTER_QUERY, type FooterQueryResult } from "../lib/graphql";
+// Footer lives here (not portfolio/components) since pantry/notes/imposter
+// all render it too, but the cost query still goes through portfolio's
+// GraphQL client/schema - the "total cost since launch" is a genuine
+// site-wide figure that portfolio's `meta` resolver owns, not per-project data.
+import { runQuery, FOOTER_QUERY, type FooterQueryResult } from "../../portfolio/lib/graphql";
 import { useShowFooterCost } from "../hooks/useShowFooterCost";
 
 type Cost = FooterQueryResult["meta"];

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useShowAlsoBuilt } from "./hooks/useShowAlsoBuilt";
-import { useShowFooterCost } from "./hooks/useShowFooterCost";
+import { useShowFooterCost } from "../shared/hooks/useShowFooterCost";
 import {
   useWarmSchedule,
   schedulesEqual,
@@ -13,6 +13,7 @@ import {
 import { useAlertsEnabled } from "./hooks/useAlertsEnabled";
 import WarmScheduleProject from "./components/WarmScheduleProject";
 import WarmScheduleProfiles from "./components/WarmScheduleProfiles";
+import Footer from "../shared/components/Footer";
 import "./portfolio.css";
 
 const WARM_SCHEDULE_LABELS: Record<WarmScheduleKey, string> = {
@@ -207,6 +208,8 @@ export default function PortfolioSettingsPage() {
       <p className="section-hint">
         <Link to="/">← back home</Link>
       </p>
+
+      <Footer />
     </>
   );
 }

@@ -3,7 +3,7 @@ import Hero from "./components/Hero";
 import ArchitectureSection from "./components/ArchitectureSection";
 import SystemStatsSection from "./components/SystemStatsSection";
 import ContactSection from "./components/ContactSection";
-import Footer from "./components/Footer";
+import Footer from "../shared/components/Footer";
 import "./portfolio.css";
 
 // Lazy-loaded on its own, separate from the rest of Home - GraphiQL pulls in

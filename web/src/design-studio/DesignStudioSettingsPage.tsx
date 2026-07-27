@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { useDesignStudioAiSettings } from "./hooks/useDesignStudioAiSettings";
 import { AiProvider, AiModelTier } from "./api";
 import DesignStudioArchitectureDiagram from "./components/DesignStudioArchitectureDiagram";
+import Footer from "../shared/components/Footer";
 import "./design-studio.css";
 
 export default function DesignStudioSettingsPage() {
@@ -117,6 +118,8 @@ export default function DesignStudioSettingsPage() {
         </p>
         <DesignStudioArchitectureDiagram />
       </section>
+
+      <Footer />
     </>
   );
 }

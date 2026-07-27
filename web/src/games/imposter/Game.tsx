@@ -5,6 +5,7 @@ import { removeRecentGame } from "./lib/recentGamesStore";
 import RevealBoard from "./components/RevealBoard";
 import DiscussionPanel from "./components/DiscussionPanel";
 import ResultsPanel from "./components/ResultsPanel";
+import Footer from "../../shared/components/Footer";
 import "./imposter.css";
 
 const POLL_INTERVAL_MS = 3000;
@@ -105,6 +106,8 @@ export default function ImposterGamePage() {
       )}
 
       {!loading && game?.phase === "RESULTS" && <ResultsPanel game={game} />}
+
+      <Footer />
     </>
   );
 }

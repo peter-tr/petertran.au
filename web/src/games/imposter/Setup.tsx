@@ -14,7 +14,7 @@ import { addRecentGame } from "./lib/recentGamesStore";
 import RecentGames from "./components/RecentGames";
 import LiveGames from "./components/LiveGames";
 import StatsPanel from "./components/StatsPanel";
-import Footer from "../../portfolio/components/Footer";
+import Footer from "../../shared/components/Footer";
 import "./imposter.css";
 
 const MIN_PLAYERS = 3;

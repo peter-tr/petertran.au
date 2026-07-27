@@ -5,6 +5,7 @@ import TemplatesSection from "./components/TemplatesSection";
 import { CANVAS_FORMATS, CUSTOM_SIZE_MIN, CUSTOM_SIZE_MAX } from "./lib/formats";
 import { formatEditedAgo } from "./lib/timeAgo";
 import type { NewDesignLocationState } from "./Editor";
+import Footer from "../shared/components/Footer";
 import "./design-studio.css";
 
 export default function Gallery() {
@@ -188,6 +189,8 @@ export default function Gallery() {
       </ul>
 
       <TemplatesSection initialTemplates={templates} />
+
+      <Footer />
     </div>
   );
 }
