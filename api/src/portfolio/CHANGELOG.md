@@ -1,5 +1,22 @@
 # portfolio
 
+## 1.4.0
+
+### Minor Changes
+
+- 9e77a5c: last-1-day/7-day/all-time stat toggles
+
+### Patch Changes
+
+- cfe30d6: enable federated field-level tracing for GraphOS Insights
+- e473b74: compute AWS cost date range in UTC, not local time
+- 25e3615: apply mechanical SonarCloud fixes across api/web/infra
+- 9721ecf: increase Anthropic cost display adjustment to $10
+- Updated dependencies [25e3615]
+- Updated dependencies [803209b]
+- Updated dependencies [7ff6b62]
+  - api-shared@1.3.0
+
 ## 1.3.2
 
 ### Patch Changes

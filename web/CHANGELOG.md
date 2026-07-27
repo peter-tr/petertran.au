@@ -1,5 +1,47 @@
 # web
 
+## 1.6.0
+
+### Minor Changes
+
+- 10cae99: identify GraphOS clients via apollographql-client-name
+- 9e77a5c: last-1-day/7-day/all-time stat toggles
+- 992ade4: Add a dedicated `/design-studio/settings` page, linked from the gallery header, showing the AI provider/model tier controls (previously only editable inline in the editor's AI panel) alongside a new "Portfolio data access" toggle for the new `allowSupergraphQuery` setting.
+- 17d834f: add a Settings toggle for the footer's real cost line
+
+  Lets a visitor hide the "real cost since launch" line in the footer - a per-browser localStorage preference, following the same pattern as the other Settings toggles (`useShowAlsoBuilt`, `usePageLoadWarmup`). When off, the `Footer` GraphQL query is skipped entirely rather than fetched and just hidden. Also notes that the AWS side of the displayed cost is within the $200 AWS Free Tier credit.
+
+- 7ff6b62: add a pantry settings toggle for the AI command bar's provider (direct Anthropic API or AWS Bedrock) and model tier (Haiku/Sonnet), matching design-studio's existing AiSettings pattern. Extracted the provider/model-ID resolution and Bedrock IAM policy into shared modules (`api-shared/ai-provider`, `infra/lib/shared/bedrock-models.ts`) so design-studio and pantry share one implementation instead of two copies. Price checking (Coles lookups) always stays on the direct Anthropic API, since Bedrock doesn't support the web_search/web_fetch tools it depends on.
+- 240ddbd: add a stale-while-revalidate cache for the pantry page: it now paints instantly from the last-loaded inventory/shopping list/settings on mount while a fresh copy loads in the background, instead of waiting on the network every visit. Controlled by a new "Instant load" toggle on the pantry settings page (`instantLoadCache` on `PantrySettings`, default on) - the cache is scoped per signed-in account (or the shared/default pantry when signed out) and clears immediately when the toggle is switched off.
+- b0487a5: add saveable/applyable "profiles" to the warm-schedule settings page
+
+  Snapshots the whole 6-project provisioned-concurrency config (all
+  schedules/concurrency/memory at once) under a name, stored in a new SSM
+  parameter alongside the live config. The settings page can now save the
+  current setup as a profile, apply a saved one back (flipping every
+  project's real EventBridge schedules and reconciling PC/memory
+  immediately, same as an individual project save), or delete one - so
+  switching between modes (e.g. "all cold, 1024MB" vs "PC everywhere,
+  512MB") no longer means hand-editing every row.
+
+### Patch Changes
+
+- 5971ccb: give the pantry sign-in popover a real background
+- 25e3615: apply mechanical SonarCloud fixes across api/web/infra
+- 738c292: update RequestsChart tests for the 3-way time-range toggle
+- a276c0a: sort category/tag lists with localeCompare, drop dead flex-basis
+- b00797a: save all dirty warm-schedule projects in one atomic request
+- 5611736: stop pantry sign-in button overflowing on mobile
+- 6540fbe: static router.yaml + per-app GraphOS client names
+- f43e405: tighten command bar assistant status-line spacing
+- 13e97fb: design-studio: title-based PNG export filename, AI panel polish, bottom toolbar
+
+  Export PNG now downloads using the design's own title instead of a hardcoded `design.png`. The AI panel's Accept/Discard buttons move below the prompt input with intent-colored borders, and the provider/model pickers collapse behind a cog icon instead of always showing. The toolbar moves from a vertical rail beside the canvas to a horizontal bar underneath it, freeing that width for the canvas; the layers list gets a bounded, scrollable height so a long layer list can't push the canvas down the page.
+
+- bb5ce9b: add an on-demand "Check cold start rate" action to the warm-schedule settings page
+
+  Runs a CloudWatch Logs Insights query (`filter @type = "REPORT" | stats count(@initDuration) as coldStarts, count(*) as total`) per project over the last 24h, aggregated across all of that project's target Lambdas, and surfaces the cold-start count/percentage next to each project's existing cost line - previously there was no way to tell from the settings page whether a given PC schedule was actually working. Kept as an explicit "check now" button rather than a live/cached figure, since Logs Insights queries are async and take several seconds each; the existing scheduled+cached pattern used for cost data would be overkill for a rarely-clicked diagnostic. `warm-schedule`'s Lambda gets new `logs:StartQuery`/`logs:GetQueryResults` IAM grants scoped to each target's own log group, and its timeout is bumped 60s -> 120s to give the new action real margin.
+
 ## 1.5.0
 
 ### Minor Changes

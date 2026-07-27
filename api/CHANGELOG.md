@@ -1,5 +1,29 @@
 # api
 
+## 1.5.0
+
+### Minor Changes
+
+- b0487a5: add saveable/applyable "profiles" to the warm-schedule settings page
+
+  Snapshots the whole 6-project provisioned-concurrency config (all
+  schedules/concurrency/memory at once) under a name, stored in a new SSM
+  parameter alongside the live config. The settings page can now save the
+  current setup as a profile, apply a saved one back (flipping every
+  project's real EventBridge schedules and reconciling PC/memory
+  immediately, same as an individual project save), or delete one - so
+  switching between modes (e.g. "all cold, 1024MB" vs "PC everywhere,
+  512MB") no longer means hand-editing every row.
+
+### Patch Changes
+
+- 25e3615: apply mechanical SonarCloud fixes across api/web/infra
+- b00797a: save all dirty warm-schedule projects in one atomic request
+- 41c8e3b: smoke-test the supergraph Router config before every deploy
+- bb5ce9b: add an on-demand "Check cold start rate" action to the warm-schedule settings page
+
+  Runs a CloudWatch Logs Insights query (`filter @type = "REPORT" | stats count(@initDuration) as coldStarts, count(*) as total`) per project over the last 24h, aggregated across all of that project's target Lambdas, and surfaces the cold-start count/percentage next to each project's existing cost line - previously there was no way to tell from the settings page whether a given PC schedule was actually working. Kept as an explicit "check now" button rather than a live/cached figure, since Logs Insights queries are async and take several seconds each; the existing scheduled+cached pattern used for cost data would be overkill for a rarely-clicked diagnostic. `warm-schedule`'s Lambda gets new `logs:StartQuery`/`logs:GetQueryResults` IAM grants scoped to each target's own log group, and its timeout is bumped 60s -> 120s to give the new action real margin.
+
 ## 1.4.0
 
 ### Minor Changes
