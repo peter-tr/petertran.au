@@ -91,19 +91,19 @@ export default function PortfolioSettingsPage() {
       </header>
 
       <div className="form-row">
-        <label className="form-label" htmlFor="show-also-built">
+        <label className="form-label form-checkbox-label" htmlFor="show-also-built">
           <input
             id="show-also-built"
             type="checkbox"
             checked={showAlsoBuilt}
             onChange={(e) => setShowAlsoBuilt(e.target.checked)}
           />{" "}
-          Show &quot;also built imposter and pantry&quot; note on home page
+          Show &quot;also built imposter, pantry, and design-studio&quot; note on home page
         </label>
       </div>
 
       <div className="form-row">
-        <label className="form-label" htmlFor="show-footer-cost">
+        <label className="form-label form-checkbox-label" htmlFor="show-footer-cost">
           <input
             id="show-footer-cost"
             type="checkbox"
@@ -117,7 +117,7 @@ export default function PortfolioSettingsPage() {
 
       {alertsAvailable && (
         <div className="form-row">
-          <label className="form-label" htmlFor="alerts-enabled">
+          <label className="form-label form-checkbox-label" htmlFor="alerts-enabled">
             <input
               id="alerts-enabled"
               type="checkbox"

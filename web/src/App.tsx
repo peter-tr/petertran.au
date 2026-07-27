@@ -73,12 +73,7 @@ function AppNav() {
             </li>
             <li>
               <NavLink to="/design-studio" className={activeNavLink}>
-                studio
-              </NavLink>
-            </li>
-            <li>
-              <NavLink to="/notes" className={activeNavLink}>
-                notes
+                design-studio
               </NavLink>
             </li>
           </ul>

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
-// Whether Hero shows the "also built imposter and pantry" line. There's no
+// Whether Hero shows the "also built imposter, pantry, and design-studio"
+// line. There's no
 // login/account system on this site, so it's a per-browser preference via
 // localStorage rather than anything server-backed - defaults to visible
 // (true) when the key has never been set.

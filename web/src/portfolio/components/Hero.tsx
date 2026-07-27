@@ -85,7 +85,8 @@ export default function Hero() {
       <h1 onClick={handleNameClick}>Peter Tran</h1>
       {showAlsoBuilt && (
         <p className="hero-secret">
-          // psst, also built <Link to="/imposter">imposter</Link> and <Link to="/pantry">pantry</Link>
+          // psst, also built <Link to="/imposter">imposter</Link>, <Link to="/pantry">pantry</Link>, and{" "}
+          <Link to="/design-studio">design-studio</Link>
         </p>
       )}
       {secretRevealed && (

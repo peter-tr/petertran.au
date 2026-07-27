@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { useDesignStudioAiSettings } from "./hooks/useDesignStudioAiSettings";
 import { AiProvider, AiModelTier } from "./api";
+import DesignStudioArchitectureDiagram from "./components/DesignStudioArchitectureDiagram";
 import "./design-studio.css";
 
 export default function DesignStudioSettingsPage() {
@@ -79,7 +80,7 @@ export default function DesignStudioSettingsPage() {
             data; it can never write anything or reach pantry/imposter&apos;s own data.
           </p>
           <div className="form-row design-studio-settings-row">
-            <label className="form-label" htmlFor="design-studio-allow-supergraph">
+            <label className="form-label form-checkbox-label" htmlFor="design-studio-allow-supergraph">
               <input
                 id="design-studio-allow-supergraph"
                 type="checkbox"
@@ -91,6 +92,31 @@ export default function DesignStudioSettingsPage() {
           </div>
         </section>
       )}
+
+      <section className="design-studio-panel">
+        <div className="design-studio-panel-header">
+          <h2 className="design-studio-panel-title">Architecture</h2>
+        </div>
+        <p className="project-desc" style={{ marginBottom: "1rem" }}>
+          Design Studio is its own Lambda, MongoDB Atlas cluster, and CDK stack, separate from the resume
+          site and from pantry (which uses DynamoDB).
+        </p>
+        <p className="project-desc" style={{ marginBottom: "1rem" }}>
+          MongoDB over this repo&apos;s usual DynamoDB, deliberately: a design document is large, deeply
+          nested, and gains new element types/properties as the editor grows - a document store absorbs that
+          field by field, with no migration step, unlike a pre-planned DynamoDB GSI per query shape. That
+          also happens to be the same reasoning behind Canva&apos;s own stack - their engineering team has{" "}
+          <a
+            href="https://www.mongodb.com/blog/post/video-canvas-lessons-scaling-mongodb-atlas-billion-documents-across-nodes"
+            target="_blank"
+            rel="noreferrer"
+          >
+            talked publicly about scaling MongoDB Atlas to 10+ billion documents
+          </a>{" "}
+          as the store behind every design a user opens, creates, or edits.
+        </p>
+        <DesignStudioArchitectureDiagram />
+      </section>
     </>
   );
 }

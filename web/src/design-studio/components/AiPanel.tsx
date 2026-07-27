@@ -26,9 +26,12 @@ interface AiPanelProps {
 // user having to reopen a form and start over each time. Provider/model
 // configuration lives only on the dedicated settings page (see
 // DesignStudioSettingsPage) - it's a global, not per-design, setting and
-// doesn't need a second picker duplicated in here. Rendered inside a
-// fixed-position slide-in drawer (see EditorWorkspace) rather than inline
-// above the canvas, so opening it doesn't push the canvas/toolbar down.
+// doesn't need a second picker duplicated in here. Rendered in place of the
+// Layers/Property panels in the side-panels column while open (see
+// EditorWorkspace) rather than appended below the whole workspace - that
+// placement made the prompt input/Send button easy to miss below the fold;
+// swapping it into the always-visible side column keeps it in view without
+// pushing the canvas/toolbar down.
 export default function AiPanel({
   messages,
   prompt,

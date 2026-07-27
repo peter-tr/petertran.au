@@ -75,6 +75,8 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+  max-width: 46rem;
+  margin: 0 auto 1.2rem;
 }
 
 .design-studio-gallery-grid {
@@ -98,6 +100,13 @@
   border-radius: var(--radius);
 }
 
+.design-studio-gallery-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
 .design-studio-gallery-card a {
   color: var(--paper);
   text-decoration: none;
@@ -109,6 +118,12 @@
 
 .design-studio-gallery-card a:hover {
   color: var(--type);
+}
+
+.design-studio-gallery-card-meta {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--muted);
 }
 
 .design-studio-gallery-card button {
@@ -228,6 +243,25 @@
   cursor: not-allowed;
 }
 
+.design-studio-template-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.design-studio-template-delete {
+  margin-top: 0.3rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+  background: transparent;
+  padding: 0.35rem 0.5rem;
+}
+
+.design-studio-template-delete:hover {
+  color: var(--string);
+  border-color: var(--string);
+}
+
 .design-studio-history-controls {
   display: flex;
   gap: 0.4rem;
@@ -257,7 +291,8 @@
   margin: 0 0 0.8rem;
 }
 
-.design-studio-template-form input {
+.design-studio-template-form input,
+.design-studio-template-form select {
   font-family: var(--font-sans);
   font-size: 0.85rem;
   color: var(--paper);
@@ -360,7 +395,8 @@
   }
 
   .design-studio-layers,
-  .design-studio-properties {
+  .design-studio-properties,
+  .design-studio-ai-panel {
     flex: 1 1 12rem;
   }
 
@@ -621,18 +657,6 @@
   color: var(--muted);
 }
 
-/* Below the canvas/toolbar/side-panels row (see EditorWorkspace - rendered
-   after .design-studio-workspace closes, not before it), so opening it
-   never pushes the canvas or toolbar down - only whatever was already below
-   the fold moves, same as any other section stacking on the page. A fixed
-   overlay was tried and dropped: on desktop it either covered the canvas or
-   had to dodge the side-panels rail with viewport-width-dependent offset
-   math, and on narrow viewports it covered the canvas outright. */
-.design-studio-ai-panel {
-  max-width: 46rem;
-  width: 100%;
-  margin: 1rem auto 0;
-}
 
 .design-studio-ai-panel-header {
   display: flex;
@@ -902,21 +926,103 @@
 
 /* ---------- settings page (mirrors pantry's pantry-head/pantry-panel) ---------- */
 
-.design-studio-gallery-head-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.8rem;
-}
-
 .design-studio-settings-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  flex-shrink: 0;
   font-family: var(--font-mono);
-  font-size: 0.8rem;
+  font-size: 1rem;
+  line-height: 1;
   color: var(--muted);
   text-decoration: none;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease;
 }
 
 .design-studio-settings-link:hover {
   color: var(--paper);
+  border-color: var(--paper);
+}
+
+.design-studio-info-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.3rem;
+  height: 1.3rem;
+  margin-left: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--muted-dim);
+  background: none;
+  border: 1px solid var(--rule);
+  border-radius: 50%;
+  cursor: pointer;
+  vertical-align: middle;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.design-studio-info-btn:hover,
+.design-studio-info-btn[aria-expanded="true"] {
+  color: var(--type);
+  border-color: var(--type);
+}
+
+.design-studio-about {
+  margin: -0.3rem 0 0.9rem;
+  font-family: var(--font-sans);
+  font-size: 0.84rem;
+  font-style: italic;
+  color: var(--muted);
+  max-width: 46rem;
+}
+
+.design-studio-help {
+  margin: -0.3rem 0 0.9rem;
+  padding: 0.7rem 0.9rem;
+  max-width: 46rem;
+  font-family: var(--font-sans);
+  font-size: 0.84rem;
+  color: var(--muted);
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+}
+
+.design-studio-help p {
+  margin: 0 0 0.6rem;
+}
+
+.design-studio-help p:last-child {
+  margin-bottom: 0;
+}
+
+.design-studio-help kbd {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--type);
+  background: var(--panel-2);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  padding: 0.05rem 0.3rem;
+}
+
+.design-studio-section-heading {
+  max-width: 46rem;
+  margin: 0 auto 0.6rem;
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--muted);
 }
 
 .design-studio-settings-head {

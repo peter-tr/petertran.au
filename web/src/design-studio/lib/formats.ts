@@ -15,3 +15,18 @@ export const CANVAS_FORMATS: CanvasFormat[] = [
 ];
 
 export const DEFAULT_FORMAT = CANVAS_FORMATS[0];
+
+// Fixed taxonomy for "Save as template"'s category field - matches the
+// starter templates' own categories (see api/src/design-studio/lib/templates.ts).
+// A free-text field here let category be effectively "whatever the user last
+// typed" (typos, casing drift, near-duplicates), which is what made the
+// gallery's category filter feel arbitrary; a closed list keeps every
+// template (seed or custom) filed under the same handful of buckets.
+export const TEMPLATE_CATEGORIES = [
+  "Poster",
+  "Presentation",
+  "Resume",
+  "Social Media",
+  "Business Card",
+  "Flyer",
+] as const;

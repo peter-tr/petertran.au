@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { runQuery, FOOTER_QUERY, type FooterQueryResult } from "../lib/graphql";
 import { useShowFooterCost } from "../hooks/useShowFooterCost";
 
@@ -30,7 +31,8 @@ export default function Footer({ email }: { email?: string }) {
       <span>
         <a href="https://github.com/peter-tr/petertran.au" target="_blank" rel="noreferrer">
           source
-        </a>
+        </a>{" "}
+        · <Link to="/notes">experiments</Link>
         {cost && showFooterCost && (
           <>
             {" "}

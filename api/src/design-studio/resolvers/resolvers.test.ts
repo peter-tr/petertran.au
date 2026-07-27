@@ -46,6 +46,7 @@ function makeTemplate(overrides: Partial<TemplateRecord> = {}): TemplateRecord {
         strokeWidth: 0,
       },
     ],
+    isCustom: false,
     ...overrides,
   };
 }
@@ -58,6 +59,7 @@ function makeStore(overrides: Partial<DesignStore> = {}): DesignStore {
     deleteDesign: vi.fn().mockResolvedValue(true),
     listTemplates: vi.fn().mockResolvedValue([]),
     saveTemplate: vi.fn(),
+    deleteTemplate: vi.fn().mockResolvedValue(true),
     getAiSettings: vi.fn().mockResolvedValue(DEFAULT_AI_SETTINGS),
     updateAiSettings: vi.fn(),
     ...overrides,
@@ -139,8 +141,17 @@ describe("createDesignStudioResolvers", () => {
       ...input,
       colors: ["#111111", "#222222"],
       popularity: 0,
+      isCustom: true,
     });
     expect(result.id).toBe("new-tpl");
+  });
+
+  it("Mutation.deleteTemplate returns the store's result", async () => {
+    const store = makeStore({ deleteTemplate: vi.fn().mockResolvedValue(false) });
+    const resolvers = createDesignStudioResolvers(store);
+
+    expect(await resolvers.Mutation.deleteTemplate({}, { id: "tpl-1" })).toBe(false);
+    expect(store.deleteTemplate).toHaveBeenCalledWith("tpl-1");
   });
 
   it("Mutation.generateDesignElements delegates to the injected generate function with the request context and stored AI settings", async () => {

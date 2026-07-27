@@ -10,6 +10,7 @@ import type {
   DesignQuery,
   SaveDesignMutation,
   DeleteDesignMutation,
+  DeleteTemplateMutation,
   TemplatesQuery,
   TemplatesQueryVariables,
   GalleryQuery,
@@ -131,6 +132,13 @@ const TEMPLATE_FIELDS = /* GraphQL */ `
       fontSize
       fontWeight
     }
+    isCustom
+  }
+`;
+
+export const DELETE_TEMPLATE_MUTATION = /* GraphQL */ `
+  mutation DeleteTemplate($id: ID!) {
+    deleteTemplate(id: $id)
   }
 `;
 
@@ -235,6 +243,12 @@ export async function saveAsTemplate(input: SaveAsTemplateArgs): Promise<Templat
   const data = await runDesignStudioQuery<SaveAsTemplateMutation>(SAVE_AS_TEMPLATE_MUTATION, { input });
 
   return data.saveAsTemplate;
+}
+
+export async function deleteTemplate(id: string): Promise<boolean> {
+  const data = await runDesignStudioQuery<DeleteTemplateMutation>(DELETE_TEMPLATE_MUTATION, { id });
+
+  return data.deleteTemplate;
 }
 
 export const GENERATE_DESIGN_ELEMENTS_MUTATION = /* GraphQL */ `
