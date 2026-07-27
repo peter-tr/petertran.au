@@ -6,6 +6,7 @@ import {
   type WarmSchedule,
   type Weekday,
   type ProjectCost,
+  type ColdStartStats,
 } from "../hooks/useWarmSchedule";
 
 const ALL_DAYS: Weekday[] = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
@@ -25,6 +26,7 @@ interface WarmScheduleProjectProps {
   draft: WarmSchedule;
   onChange: (schedule: WarmSchedule) => void;
   cost: ProjectCost | undefined;
+  coldStart: ColdStartStats | undefined;
   disabled: boolean;
 }
 
@@ -38,6 +40,7 @@ export default function WarmScheduleProject({
   draft,
   onChange,
   cost,
+  coldStart,
   disabled,
 }: WarmScheduleProjectProps) {
   function toggleDay(day: Weekday): void {
@@ -131,6 +134,15 @@ export default function WarmScheduleProject({
           · ~${cost.scheduledMonthlyCostUsd.toFixed(2)}/mo if this schedule runs as set
         </p>
       )}
+      {coldStart &&
+        (coldStart.error ? (
+          <p className="section-hint">Cold start check failed: {coldStart.error}</p>
+        ) : (
+          <p className="section-hint">
+            Last 24h: {coldStart.coldStartPercent}% cold starts ({coldStart.coldStartCount} of{" "}
+            {coldStart.totalInvocations} invocations)
+          </p>
+        ))}
       {invalid && (
         <p className="section-hint">
           Pick at least one day, with start before end, concurrency between 1 and {MAX_CONCURRENCY}, and a

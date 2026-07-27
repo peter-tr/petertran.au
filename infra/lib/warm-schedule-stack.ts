@@ -221,8 +221,11 @@ export class ProvisionedConcurrencyStack extends Stack {
       // memory - that path (UpdateFunctionConfiguration -> poll for
       // completion -> PublishVersion -> UpdateAlias, see handler.ts's
       // reconcileMemory()) completes in a few seconds in practice but polls
-      // with real margin built in.
-      timeout: Duration.seconds(60),
+      // with real margin built in. Bumped 60s -> 120s for the cold-start
+      // check action (handler.ts's queryColdStarts) - CloudWatch Logs
+      // Insights query completion time is less predictable than the
+      // config-poll paths that justified the original 60s.
+      timeout: Duration.seconds(120),
       environment: {
         LIVE_ALIAS_NAME,
         WARM_SCHEDULE_PARAM_NAME: scheduleParam.parameterName,
@@ -280,6 +283,18 @@ export class ProvisionedConcurrencyStack extends Stack {
         ],
         resources: targetFnNames.map(
           (name) => `arn:aws:lambda:${this.region}:${this.account}:function:${name}`
+        ),
+      })
+    );
+
+    // Settings-page "Check cold start rate" action (handler.ts's
+    // queryColdStarts) - scoped to each target's own log group, same
+    // "specific resource ARNs, not `*`" convention as the policies above.
+    warmScheduleFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["logs:StartQuery", "logs:GetQueryResults"],
+        resources: targetFnNames.map(
+          (name) => `arn:aws:logs:${this.region}:${this.account}:log-group:/aws/lambda/${name}:*`
         ),
       })
     );

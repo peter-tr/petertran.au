@@ -81,6 +81,18 @@ export interface ProjectCost {
 }
 export type WarmScheduleCosts = Record<WarmScheduleKey, ProjectCost>;
 
+// Mirrors warm-schedule/handler.ts's own ColdStartStats - real counts from a
+// CloudWatch Logs Insights query over the last 24h, only populated after
+// "Check cold start rate" is clicked (this is on-demand, not fetched on
+// page load, since the underlying query takes several seconds per project).
+export interface ColdStartStats {
+  coldStartCount: number;
+  totalInvocations: number;
+  coldStartPercent: number;
+  error?: string;
+}
+export type WarmScheduleColdStarts = Record<WarmScheduleKey, ColdStartStats>;
+
 // Named full-config snapshots (all 6 projects at once), keyed by
 // user-chosen name - lets "Save current as profile" / "Apply" switch every
 // project's schedule in one action instead of editing each row by hand.
@@ -96,6 +108,8 @@ export function useWarmSchedule() {
   const [config, setConfigState] = useState<WarmScheduleConfig | null>(null);
   const [costs, setCosts] = useState<WarmScheduleCosts | null>(null);
   const [profiles, setProfiles] = useState<WarmScheduleProfiles | null>(null);
+  const [coldStarts, setColdStarts] = useState<WarmScheduleColdStarts | null>(null);
+  const [checkingColdStarts, setCheckingColdStarts] = useState(false);
   // One flag for the whole batch, not per-project - saveAll POSTs every
   // dirty project at once, so there's no meaningful "just this one row is
   // saving" state to track anymore (see PortfolioSettingsPage's single
@@ -176,10 +190,34 @@ export function useWarmSchedule() {
   const applyProfile = useCallback((name: string) => runProfileAction(name, "apply"), [runProfileAction]);
   const deleteProfile = useCallback((name: string) => runProfileAction(name, "delete"), [runProfileAction]);
 
+  // A CloudWatch Logs Insights query per project (several seconds each), so
+  // this is on-demand rather than fetched alongside schedules/costs on load.
+  const checkColdStarts = useCallback(async () => {
+    if (!ENDPOINT) return;
+
+    setCheckingColdStarts(true);
+    setError(null);
+    try {
+      const res = await fetch(ENDPOINT, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "checkColdStarts" }),
+      });
+      const data: { coldStarts: WarmScheduleColdStarts } = await res.json();
+      setColdStarts(data.coldStarts);
+    } catch {
+      setError("Couldn't check cold start rate");
+    } finally {
+      setCheckingColdStarts(false);
+    }
+  }, []);
+
   return {
     config,
     costs,
     profiles,
+    coldStarts,
+    checkingColdStarts,
     saving,
     profilePending,
     error,
@@ -187,6 +225,7 @@ export function useWarmSchedule() {
     saveProfile,
     applyProfile,
     deleteProfile,
+    checkColdStarts,
     available: Boolean(ENDPOINT),
   };
 }

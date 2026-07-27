@@ -35,6 +35,8 @@ export default function PortfolioSettingsPage() {
     config: warmScheduleConfig,
     costs: warmScheduleCosts,
     profiles: warmScheduleProfiles,
+    coldStarts: warmScheduleColdStarts,
+    checkingColdStarts,
     saving: warmScheduleSaving,
     profilePending: warmScheduleProfilePending,
     error: warmScheduleError,
@@ -42,6 +44,7 @@ export default function PortfolioSettingsPage() {
     saveProfile: saveWarmScheduleProfile,
     applyProfile: applyWarmScheduleProfile,
     deleteProfile: deleteWarmScheduleProfile,
+    checkColdStarts,
     available: warmScheduleAvailable,
   } = useWarmSchedule();
   // Every project's draft lives here (not inside each WarmScheduleProject
@@ -167,7 +170,6 @@ export default function PortfolioSettingsPage() {
             onApply={applyWarmScheduleProfile}
             onDelete={deleteWarmScheduleProfile}
           />
-
           {warmScheduleDrafts &&
             WARM_SCHEDULE_KEYS.map((fn) => (
               <WarmScheduleProject
@@ -179,6 +181,7 @@ export default function PortfolioSettingsPage() {
                   setWarmScheduleDrafts((current) => (current ? { ...current, [fn]: schedule } : current))
                 }
                 cost={warmScheduleCosts?.[fn]}
+                coldStart={warmScheduleColdStarts?.[fn]}
                 disabled={warmScheduleSaving}
               />
             ))}
@@ -194,7 +197,20 @@ export default function PortfolioSettingsPage() {
             onClick={() => saveAllWarmSchedules(dirtyWarmSchedules)}
           >
             Save all
+          </button>{" "}
+          <button
+            className="run-btn"
+            type="button"
+            disabled={checkingColdStarts}
+            onClick={() => checkColdStarts()}
+          >
+            {checkingColdStarts ? "Checking…" : "Check cold start rate"}
           </button>
+          {checkingColdStarts && (
+            <p className="section-hint">
+              Querying CloudWatch Logs for the last 24h across every project - this can take up to a minute.
+            </p>
+          )}
           {warmScheduleError && <p className="section-hint">{warmScheduleError}</p>}
         </div>
       )}
