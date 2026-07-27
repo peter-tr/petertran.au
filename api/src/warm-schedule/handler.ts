@@ -13,11 +13,17 @@ import {
 } from "@aws-sdk/client-lambda";
 import { SSMClient, GetParameterCommand, PutParameterCommand } from "@aws-sdk/client-ssm";
 import { SchedulerClient, GetScheduleCommand, UpdateScheduleCommand } from "@aws-sdk/client-scheduler";
+import {
+  CloudWatchLogsClient,
+  StartQueryCommand,
+  GetQueryResultsCommand,
+} from "@aws-sdk/client-cloudwatch-logs";
 import { parseJsonBody, corsHeaders } from "api-shared/http";
 
 const lambdaClient = new LambdaClient({});
 const ssm = new SSMClient({});
 const scheduler = new SchedulerClient({});
+const logsClient = new CloudWatchLogsClient({});
 
 const ALIAS_NAME = process.env.LIVE_ALIAS_NAME!;
 const PARAM_NAME = process.env.WARM_SCHEDULE_PARAM_NAME!;
@@ -75,6 +81,20 @@ interface ProjectCost {
   // this reflects what a pending memory choice will cost once reconciled,
   // not what's costing right now.
   scheduledMonthlyCostUsd: number;
+}
+
+// One full day so a single check captures both a project's scheduled-warm
+// hours and its off-hours, without needing a range picker in the UI.
+const COLD_START_WINDOW_HOURS = 24;
+
+interface ColdStartStats {
+  coldStartCount: number;
+  totalInvocations: number;
+  coldStartPercent: number;
+  // Set (and the counts left at 0) if this project's Logs Insights query
+  // failed - lets one project's failure surface without blanking out the
+  // others' real results.
+  error?: string;
 }
 
 const ALL_WEEKDAYS: Weekday[] = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
@@ -274,6 +294,83 @@ async function computeAllProjectCosts(
   const costs = await Promise.all(keys.map((key) => computeProjectCost(key, config[key])));
 
   return Object.fromEntries(keys.map((key, i) => [key, costs[i]])) as Record<WarmScheduleKey, ProjectCost>;
+}
+
+// @initDuration is only present on a REPORT log line for a cold invocation -
+// the standard way to detect Lambda cold starts from logs (no native
+// CloudWatch metric distinguishes cold vs. warm). Logs Insights natively
+// supports querying multiple log groups in one call, so zeroTrustLab's 5
+// target Lambdas are aggregated into a single query same as every other
+// project's (usually one) target.
+async function queryColdStarts(
+  logGroupNames: string[],
+  hours: number
+): Promise<{ coldStartCount: number; totalInvocations: number }> {
+  const endTime = Math.floor(Date.now() / 1000);
+  const startTime = endTime - hours * 3600;
+
+  const { queryId } = await logsClient.send(
+    new StartQueryCommand({
+      logGroupNames,
+      startTime,
+      endTime,
+      queryString: 'filter @type = "REPORT" | stats count(@initDuration) as coldStarts, count(*) as total',
+    })
+  );
+
+  // Logs Insights queries are async - poll until Complete. In practice this
+  // repo's log volume completes in a few seconds; 30 attempts at 1s apart is
+  // a generous ceiling, not an expected duration (same idiom as
+  // reconcileMemory's own poll loop above).
+  for (let attempt = 0; attempt < 30; attempt++) {
+    const result = await logsClient.send(new GetQueryResultsCommand({ queryId }));
+    if (result.status === "Complete") {
+      const row = result.results?.[0] ?? [];
+      const field = (name: string) => Number(row.find((f) => f.field === name)?.value ?? 0);
+
+      return { coldStartCount: field("coldStarts"), totalInvocations: field("total") };
+    }
+    if (result.status === "Failed" || result.status === "Cancelled" || result.status === "Timeout") {
+      throw new Error(`Logs Insights query ${result.status} for ${logGroupNames.join(",")}`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+
+  throw new Error(`Logs Insights query timed out for ${logGroupNames.join(",")}`);
+}
+
+async function computeProjectColdStarts(key: WarmScheduleKey): Promise<ColdStartStats> {
+  const logGroupNames = TARGETS_BY_PROJECT[key].map((fn) => `/aws/lambda/${fn}`);
+
+  try {
+    const { coldStartCount, totalInvocations } = await queryColdStarts(
+      logGroupNames,
+      COLD_START_WINDOW_HOURS
+    );
+
+    return {
+      coldStartCount,
+      totalInvocations,
+      coldStartPercent:
+        totalInvocations > 0 ? Math.round((coldStartCount / totalInvocations) * 1000) / 10 : 0,
+    };
+  } catch (err) {
+    console.error(`computeProjectColdStarts(${key}) failed`, err);
+
+    return {
+      coldStartCount: 0,
+      totalInvocations: 0,
+      coldStartPercent: 0,
+      error: err instanceof Error ? err.message : "cold-start query failed",
+    };
+  }
+}
+
+async function computeAllColdStarts(): Promise<Record<WarmScheduleKey, ColdStartStats>> {
+  const keys = Object.keys(TARGETS_BY_PROJECT) as WarmScheduleKey[];
+  const stats = await Promise.all(keys.map(computeProjectColdStarts));
+
+  return Object.fromEntries(keys.map((key, i) => [key, stats[i]])) as Record<WarmScheduleKey, ColdStartStats>;
 }
 
 // Memory is baked into each published Lambda Version, unlike PC (a
@@ -588,7 +685,16 @@ async function processEvent(
       schedules?: unknown;
       profileAction?: string;
       name?: unknown;
+      action?: string;
     }>(event);
+
+    if (body.action === "checkColdStarts") {
+      return {
+        statusCode: 200,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ coldStarts: await computeAllColdStarts() }),
+      };
+    }
 
     if (body.profileAction !== undefined) {
       if (
