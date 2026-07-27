@@ -19,5 +19,6 @@ export const EXPORT_SHORTCUT_KEY = "5";
 // (e.g. a brand-new design the user hasn't titled yet).
 export function toExportFileName(name: string): string {
   const sanitized = name.trim().replace(/[/\\?%*:|"<>]/g, "-");
+
   return `${sanitized || "design"}.png`;
 }
