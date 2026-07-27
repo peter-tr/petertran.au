@@ -318,7 +318,14 @@ export class ProvisionedConcurrencyStack extends Stack {
     // alias ARN here caused a real AccessDeniedException the moment a
     // schedule's memoryMb diverged from a target's actual live memory (first
     // hit for supergraph-graphql and the zero-trust-lab targets, whose CDK
-    // memorySize was never changed in this rollout).
+    // memorySize was never changed in this rollout). GetAlias (healWeightedAlias's
+    // own read, run first on every reconcileTarget call) is the read
+    // counterpart of UpdateAlias/CreateAlias/DeleteAlias and resolves the
+    // same way - granted here, not alongside the alias-qualified PC actions
+    // above. Missing this caused every reconcile tick, for every project, to
+    // fail with AccessDeniedException before ever reaching the actual PC
+    // grant/delete call (confirmed live via warm-schedule's own CloudWatch
+    // Logs immediately after #232 - a real, ongoing incident this fixes).
     warmScheduleFn.addToRolePolicy(
       new iam.PolicyStatement({
         actions: [
@@ -326,6 +333,7 @@ export class ProvisionedConcurrencyStack extends Stack {
           "lambda:UpdateFunctionConfiguration",
           "lambda:PublishVersion",
           "lambda:UpdateAlias",
+          "lambda:GetAlias",
         ],
         resources: targetFnNames.map(
           (name) => `arn:aws:lambda:${this.region}:${this.account}:function:${name}`
