@@ -108,8 +108,22 @@ export function buildRouterYaml(subgraphNames: string[]): string {
     // just a curl example. Safe to leave on in prod: this only changes
     // what a browser GET renders, doesn't affect introspection/auth on the
     // actual POST /graphql operations.
+    //
+    // homepage.enabled must be explicitly false alongside this - Router
+    // refuses to start at all if both are true ("sandbox and homepage
+    // cannot be enabled at the same time"), since homepage defaults to
+    // true. Missing this crashed every cold start in production
+    // (confirmed live: "Failed to read configuration: could not
+    // deserialize configuration" on every INIT_REPORT) - real traffic was
+    // only saved because AWS Lambda's own alias+Provisioned-Concurrency
+    // safety mechanism detected PC couldn't warm the new (broken) version
+    // and kept 100% of traffic pinned to the last good one, which also
+    // left that old version undeletable and stuck CloudFormation's
+    // cleanup phase on the next deploy.
     "sandbox:\n" +
     "  enabled: true\n" +
+    "homepage:\n" +
+    "  enabled: false\n" +
     "\n" +
     // provided.al2023 gets zero automatic X-Ray instrumentation (that's
     // baked into each AWS-managed language runtime's own wrapper, not a
