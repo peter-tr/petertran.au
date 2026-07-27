@@ -2,7 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 import { createDesignStudioResolvers, type DesignStore } from "./resolvers";
 import type { AiSettingsRecord, DesignRecord, TemplateRecord } from "../lib/design";
 
-const DEFAULT_AI_SETTINGS: AiSettingsRecord = { provider: "ANTHROPIC", modelTier: "HAIKU" };
+const DEFAULT_AI_SETTINGS: AiSettingsRecord = {
+  provider: "ANTHROPIC",
+  modelTier: "HAIKU",
+  allowSupergraphQuery: false,
+};
 
 function makeDesign(overrides: Partial<DesignRecord> = {}): DesignRecord {
   return {
@@ -183,7 +187,11 @@ describe("createDesignStudioResolvers", () => {
   });
 
   it("Query.aiSettings returns the store's settings", async () => {
-    const settings: AiSettingsRecord = { provider: "BEDROCK", modelTier: "SONNET" };
+    const settings: AiSettingsRecord = {
+      provider: "BEDROCK",
+      modelTier: "SONNET",
+      allowSupergraphQuery: false,
+    };
     const store = makeStore({ getAiSettings: vi.fn().mockResolvedValue(settings) });
     const resolvers = createDesignStudioResolvers(store);
 
@@ -191,7 +199,11 @@ describe("createDesignStudioResolvers", () => {
   });
 
   it("Mutation.updateAiSettings passes the input straight through to the store", async () => {
-    const updated: AiSettingsRecord = { provider: "BEDROCK", modelTier: "SONNET" };
+    const updated: AiSettingsRecord = {
+      provider: "BEDROCK",
+      modelTier: "SONNET",
+      allowSupergraphQuery: false,
+    };
     const store = makeStore({ updateAiSettings: vi.fn().mockResolvedValue(updated) });
     const resolvers = createDesignStudioResolvers(store);
 

@@ -11,7 +11,11 @@ import type {
 } from "../design";
 import type { DesignStore } from "../../resolvers/resolvers";
 
-const DEFAULT_AI_SETTINGS: AiSettingsRecord = { provider: "BEDROCK", modelTier: "SONNET" };
+const DEFAULT_AI_SETTINGS: AiSettingsRecord = {
+  provider: "BEDROCK",
+  modelTier: "SONNET",
+  allowSupergraphQuery: false,
+};
 
 interface DesignDocument {
   _id: ObjectId;

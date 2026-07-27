@@ -11,7 +11,11 @@ import type {
 } from "../lib/design";
 import { STARTER_TEMPLATES } from "../lib/templates";
 
-const DEFAULT_AI_SETTINGS: AiSettingsRecord = { provider: "BEDROCK", modelTier: "SONNET" };
+const DEFAULT_AI_SETTINGS: AiSettingsRecord = {
+  provider: "BEDROCK",
+  modelTier: "SONNET",
+  allowSupergraphQuery: false,
+};
 
 // No real Anthropic call locally - same convention as pantry's
 // mockParseCommand, so the dev server never needs an API key. Produces a

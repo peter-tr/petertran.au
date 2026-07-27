@@ -27,6 +27,7 @@ describe("DesignStudioStack", () => {
   it("synthesizes with the Lambda, no DynamoDB table, and the Mongo URI resolved at deploy time", () => {
     const app = new App();
     const stack = new DesignStudioStack(app, "TestDesignStudioStack", {
+      supergraphUrl: "https://api.petertran.au",
       env: { account: "123456789012", region: "ap-southeast-2" },
     });
 
@@ -45,6 +46,7 @@ describe("DesignStudioStack", () => {
           // exact Fn::Join token shape isn't worth pinning in a test.
           MONGO_URI: Match.anyValue(),
           ANTHROPIC_API_KEY: Match.anyValue(),
+          SUPERGRAPH_URL: "https://api.petertran.au/graphql",
         },
       },
     });
@@ -68,6 +70,7 @@ describe("DesignStudioStack", () => {
     const app = new App();
     const stack = new DesignStudioStack(app, "TestEnvDesignStudioStack", {
       functionName: "design-studio-graphql-test",
+      supergraphUrl: "https://api.test.petertran.au",
       env: { account: "123456789012", region: "ap-southeast-2" },
     });
 

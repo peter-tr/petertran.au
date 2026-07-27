@@ -37,20 +37,30 @@ export default function Gallery() {
     <div className="design-studio-gallery">
       <header className="design-studio-gallery-head">
         <h1>Design Studio</h1>
-        <div className="design-studio-new-formats">
-          {CANVAS_FORMATS.map((format) => {
-            const state: NewDesignLocationState = {
-              seedName: `Untitled ${format.label.toLowerCase()}`,
-              seedWidth: format.width,
-              seedHeight: format.height,
-            };
+        <div className="design-studio-gallery-head-actions">
+          <div className="design-studio-new-formats">
+            {CANVAS_FORMATS.map((format) => {
+              const state: NewDesignLocationState = {
+                seedName: `Untitled ${format.label.toLowerCase()}`,
+                seedWidth: format.width,
+                seedHeight: format.height,
+              };
 
-            return (
-              <Link key={format.id} to="/design-studio/new" state={state} className="design-studio-tool-btn">
-                New {format.label}
-              </Link>
-            );
-          })}
+              return (
+                <Link
+                  key={format.id}
+                  to="/design-studio/new"
+                  state={state}
+                  className="design-studio-tool-btn"
+                >
+                  New {format.label}
+                </Link>
+              );
+            })}
+          </div>
+          <Link to="/design-studio/settings" className="design-studio-settings-link">
+            Settings
+          </Link>
         </div>
       </header>
 

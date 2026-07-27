@@ -2,10 +2,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AiSettingsRecord, DesignElementRecord } from "../design";
 
 const anthropicMessagesParse = vi.fn();
+const anthropicMessagesCreate = vi.fn();
 const bedrockMessagesParse = vi.fn();
-const getAnthropicClient = vi.fn(async () => ({ messages: { parse: anthropicMessagesParse } }));
+const getAnthropicClient = vi.fn(async () => ({
+  messages: { parse: anthropicMessagesParse, create: anthropicMessagesCreate },
+}));
 const getAnthropicBedrockClient = vi.fn(() => ({ messages: { parse: bedrockMessagesParse } }));
 const assertAiNotRateLimited = vi.fn<(ip: string | undefined) => Promise<void>>(async () => undefined);
+const gatherSupergraphContext = vi.fn<() => Promise<string | null>>(async () => null);
 
 vi.mock("api-shared/anthropic-client", () => ({
   getAnthropicClient: () => getAnthropicClient(),
@@ -16,13 +20,32 @@ vi.mock("api-shared/anthropic-bedrock-client", () => ({
 vi.mock("../util/ai-rate-limit", () => ({
   assertAiNotRateLimited: (ip: string | undefined) => assertAiNotRateLimited(ip),
 }));
+vi.mock("./supergraph-tool", () => ({
+  gatherSupergraphContext: (...args: unknown[]) => gatherSupergraphContext(...(args as [])),
+}));
 
 const { generateDesignElements } = await import("./generate-elements");
 
-const ANTHROPIC_HAIKU: AiSettingsRecord = { provider: "ANTHROPIC", modelTier: "HAIKU" };
-const ANTHROPIC_SONNET: AiSettingsRecord = { provider: "ANTHROPIC", modelTier: "SONNET" };
-const BEDROCK_HAIKU: AiSettingsRecord = { provider: "BEDROCK", modelTier: "HAIKU" };
-const BEDROCK_SONNET: AiSettingsRecord = { provider: "BEDROCK", modelTier: "SONNET" };
+const ANTHROPIC_HAIKU: AiSettingsRecord = {
+  provider: "ANTHROPIC",
+  modelTier: "HAIKU",
+  allowSupergraphQuery: false,
+};
+const ANTHROPIC_SONNET: AiSettingsRecord = {
+  provider: "ANTHROPIC",
+  modelTier: "SONNET",
+  allowSupergraphQuery: false,
+};
+const BEDROCK_HAIKU: AiSettingsRecord = {
+  provider: "BEDROCK",
+  modelTier: "HAIKU",
+  allowSupergraphQuery: false,
+};
+const BEDROCK_SONNET: AiSettingsRecord = {
+  provider: "BEDROCK",
+  modelTier: "SONNET",
+  allowSupergraphQuery: false,
+};
 
 function rawElement(overrides: Record<string, unknown> = {}) {
   return {
@@ -222,5 +245,52 @@ describe("generateDesignElements", () => {
     expect(call.thinking).toEqual({ type: "adaptive" });
     expect(call.output_config.effort).toBe("low");
     expect(call.max_tokens).toBeGreaterThan(2048);
+  });
+
+  it("never gathers supergraph context when allowSupergraphQuery is false", async () => {
+    anthropicMessagesParse.mockResolvedValueOnce({ parsed_output: { elements: [rawElement()] } });
+
+    await generateDesignElements("a poster", 900, 600, undefined, "1.2.3.4", ANTHROPIC_HAIKU);
+
+    expect(gatherSupergraphContext).not.toHaveBeenCalled();
+  });
+
+  it("gathers supergraph context and appends it to the prompt when allowSupergraphQuery is true", async () => {
+    gatherSupergraphContext.mockResolvedValueOnce("Real name: Peter Tran.");
+    anthropicMessagesParse.mockResolvedValueOnce({ parsed_output: { elements: [rawElement()] } });
+
+    const settings: AiSettingsRecord = {
+      provider: "ANTHROPIC",
+      modelTier: "HAIKU",
+      allowSupergraphQuery: true,
+    };
+    await generateDesignElements("a header with my name", 900, 600, undefined, "1.2.3.4", settings);
+
+    expect(gatherSupergraphContext).toHaveBeenCalledWith(
+      expect.anything(),
+      "claude-haiku-4-5",
+      "a header with my name"
+    );
+
+    const call = anthropicMessagesParse.mock.calls.at(-1)![0];
+    expect(call.messages[0].content).toContain("a header with my name");
+    expect(call.messages[0].content).toContain("Real name: Peter Tran.");
+  });
+
+  it("still succeeds when gatherSupergraphContext throws", async () => {
+    gatherSupergraphContext.mockRejectedValueOnce(new Error("supergraph unreachable"));
+    anthropicMessagesParse.mockResolvedValueOnce({ parsed_output: { elements: [rawElement()] } });
+
+    const settings: AiSettingsRecord = {
+      provider: "ANTHROPIC",
+      modelTier: "HAIKU",
+      allowSupergraphQuery: true,
+    };
+    const result = await generateDesignElements("a poster", 900, 600, undefined, "1.2.3.4", settings);
+
+    expect(result).toHaveLength(1);
+
+    const call = anthropicMessagesParse.mock.calls.at(-1)![0];
+    expect(call.messages[0].content).toBe("a poster");
   });
 });

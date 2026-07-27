@@ -145,6 +145,15 @@ whole editor, not per-user. Persisted in Mongo.
 type AiSettings {
   provider: AiProvider!
   modelTier: AiModelTier!
+  """
+  When true, generateDesignElements may call a read-only tool that queries
+  the portfolio subgraph (via the public composed supergraph endpoint) for
+  real resume/portfolio content to ground generation in - e.g. "make a
+  header using my current job title". Scoped to read-only queries against
+  portfolio's own fields only; can never mutate data or reach
+  pantry/imposter/design-studio's own subgraphs. Off by default.
+  """
+  allowSupergraphQuery: Boolean!
 }
 
 """
@@ -153,6 +162,7 @@ Input for updateAiSettings - omitted fields keep their current value.
 input AiSettingsInput {
   provider: AiProvider
   modelTier: AiModelTier
+  allowSupergraphQuery: Boolean
 }
 
 """
