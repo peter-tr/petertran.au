@@ -82,9 +82,11 @@ export interface ProjectCost {
 export type WarmScheduleCosts = Record<WarmScheduleKey, ProjectCost>;
 
 // Mirrors warm-schedule/handler.ts's own ColdStartStats - real counts from a
-// CloudWatch Logs Insights query over the last 24h, only populated after
-// "Check cold start rate" is clicked (this is on-demand, not fetched on
-// page load, since the underlying query takes several seconds per project).
+// CloudWatch Logs Insights query over the selected lookback window, fetched
+// automatically (on mount and whenever the window selection changes, see
+// useWarmSchedule below) since a single check across all 6 projects
+// completes in a few seconds, not the "several seconds per project" this
+// comment used to warn about needing an explicit button for.
 export interface ColdStartStats {
   coldStartCount: number;
   totalInvocations: number;
@@ -92,6 +94,17 @@ export interface ColdStartStats {
   error?: string;
 }
 export type WarmScheduleColdStarts = Record<WarmScheduleKey, ColdStartStats>;
+
+// Mirrors warm-schedule/handler.ts's own ALLOWED_COLD_START_WINDOW_MINUTES -
+// the settings page's window picker offers exactly these curated lookback
+// windows rather than a free-form input. Keep in sync by hand.
+export const COLD_START_WINDOW_OPTIONS = [
+  { label: "10 min", minutes: 10 },
+  { label: "1 hour", minutes: 60 },
+  { label: "24 hours", minutes: 1440 },
+] as const;
+
+const DEFAULT_COLD_START_WINDOW_MINUTES = 1440;
 
 // Named full-config snapshots (all 6 projects at once), keyed by
 // user-chosen name - lets "Save current as profile" / "Apply" switch every
@@ -109,7 +122,21 @@ export function useWarmSchedule() {
   const [costs, setCosts] = useState<WarmScheduleCosts | null>(null);
   const [profiles, setProfiles] = useState<WarmScheduleProfiles | null>(null);
   const [coldStarts, setColdStarts] = useState<WarmScheduleColdStarts | null>(null);
-  const [checkingColdStarts, setCheckingColdStarts] = useState(false);
+  // Starts true - a check always begins immediately on mount.
+  const [checkingColdStarts, setCheckingColdStarts] = useState(true);
+  const [coldStartWindowMinutes, setColdStartWindowMinutes] = useState(DEFAULT_COLD_START_WINDOW_MINUTES);
+  // Same "adjust state during render" idiom PortfolioSettingsPage.tsx's own
+  // warmScheduleDrafts reset uses: flips checkingColdStarts back to true the
+  // instant the window selection changes, synchronously during render - not
+  // inside the effect below, which would trip react-hooks/set-state-in-effect
+  // (every setState reachable from that effect must stay inside a promise
+  // callback, never called eagerly at the top of the effect body).
+  const [checkedColdStartWindowMinutes, setCheckedColdStartWindowMinutes] = useState(coldStartWindowMinutes);
+  if (coldStartWindowMinutes !== checkedColdStartWindowMinutes) {
+    setCheckedColdStartWindowMinutes(coldStartWindowMinutes);
+    setCheckingColdStarts(true);
+  }
+
   // One flag for the whole batch, not per-project - saveAll POSTs every
   // dirty project at once, so there's no meaningful "just this one row is
   // saving" state to track anymore (see PortfolioSettingsPage's single
@@ -190,27 +217,34 @@ export function useWarmSchedule() {
   const applyProfile = useCallback((name: string) => runProfileAction(name, "apply"), [runProfileAction]);
   const deleteProfile = useCallback((name: string) => runProfileAction(name, "delete"), [runProfileAction]);
 
-  // A CloudWatch Logs Insights query per project (several seconds each), so
-  // this is on-demand rather than fetched alongside schedules/costs on load.
-  const checkColdStarts = useCallback(async () => {
-    if (!ENDPOINT) return;
+  // Runs automatically on mount and every time the window selection changes
+  // (not just on an explicit button click) - a check across all 6 projects
+  // completes in a few seconds, cheap enough to just run whenever the
+  // settings page is open rather than needing a manual trigger. Every
+  // setState call here lives inside a promise callback (same idiom as
+  // usePantryAuth.ts's `refetch().finally(() => setReady(true))`), never
+  // synchronously in the callback's own top-level body, the same way this
+  // codebase's other fetch-on-mount effects avoid tripping
+  // react-hooks/set-state-in-effect.
+  const runColdStartCheck = useCallback(() => {
+    if (!ENDPOINT) return Promise.resolve();
 
-    setCheckingColdStarts(true);
-    setError(null);
-    try {
-      const res = await fetch(ENDPOINT, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action: "checkColdStarts" }),
-      });
-      const data: { coldStarts: WarmScheduleColdStarts } = await res.json();
-      setColdStarts(data.coldStarts);
-    } catch {
-      setError("Couldn't check cold start rate");
-    } finally {
-      setCheckingColdStarts(false);
-    }
-  }, []);
+    return fetch(ENDPOINT, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "checkColdStarts", windowMinutes: coldStartWindowMinutes }),
+    })
+      .then((res) => res.json())
+      .then((data: { coldStarts: WarmScheduleColdStarts }) => {
+        setColdStarts(data.coldStarts);
+        setError(null);
+      })
+      .catch(() => setError("Couldn't check cold start rate"));
+  }, [coldStartWindowMinutes]);
+
+  useEffect(() => {
+    runColdStartCheck().finally(() => setCheckingColdStarts(false));
+  }, [runColdStartCheck]);
 
   return {
     config,
@@ -218,6 +252,8 @@ export function useWarmSchedule() {
     profiles,
     coldStarts,
     checkingColdStarts,
+    coldStartWindowMinutes,
+    setColdStartWindowMinutes,
     saving,
     profilePending,
     error,
@@ -225,7 +261,6 @@ export function useWarmSchedule() {
     saveProfile,
     applyProfile,
     deleteProfile,
-    checkColdStarts,
     available: Boolean(ENDPOINT),
   };
 }

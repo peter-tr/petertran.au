@@ -83,9 +83,18 @@ interface ProjectCost {
   scheduledMonthlyCostUsd: number;
 }
 
-// One full day so a single check captures both a project's scheduled-warm
-// hours and its off-hours, without needing a range picker in the UI.
-const COLD_START_WINDOW_HOURS = 24;
+// Settings-page window picker offers exactly these curated lookback
+// windows - kept in sync by hand with
+// web/src/portfolio/hooks/useWarmSchedule.ts's own COLD_START_WINDOW_OPTIONS,
+// same "seeded in two places" convention as MAX_CONCURRENCY/MEMORY_OPTIONS_MB
+// above.
+const ALLOWED_COLD_START_WINDOW_MINUTES = [10, 60, 1440] as const;
+
+function isValidColdStartWindowMinutes(value: unknown): value is number {
+  return (
+    typeof value === "number" && (ALLOWED_COLD_START_WINDOW_MINUTES as readonly number[]).includes(value)
+  );
+}
 
 interface ColdStartStats {
   coldStartCount: number;
@@ -304,10 +313,10 @@ async function computeAllProjectCosts(
 // project's (usually one) target.
 async function queryColdStarts(
   logGroupNames: string[],
-  hours: number
+  windowMinutes: number
 ): Promise<{ coldStartCount: number; totalInvocations: number }> {
   const endTime = Math.floor(Date.now() / 1000);
-  const startTime = endTime - hours * 3600;
+  const startTime = endTime - windowMinutes * 60;
 
   const { queryId } = await logsClient.send(
     new StartQueryCommand({
@@ -339,14 +348,14 @@ async function queryColdStarts(
   throw new Error(`Logs Insights query timed out for ${logGroupNames.join(",")}`);
 }
 
-async function computeProjectColdStarts(key: WarmScheduleKey): Promise<ColdStartStats> {
+async function computeProjectColdStarts(
+  key: WarmScheduleKey,
+  windowMinutes: number
+): Promise<ColdStartStats> {
   const logGroupNames = TARGETS_BY_PROJECT[key].map((fn) => `/aws/lambda/${fn}`);
 
   try {
-    const { coldStartCount, totalInvocations } = await queryColdStarts(
-      logGroupNames,
-      COLD_START_WINDOW_HOURS
-    );
+    const { coldStartCount, totalInvocations } = await queryColdStarts(logGroupNames, windowMinutes);
 
     return {
       coldStartCount,
@@ -366,9 +375,9 @@ async function computeProjectColdStarts(key: WarmScheduleKey): Promise<ColdStart
   }
 }
 
-async function computeAllColdStarts(): Promise<Record<WarmScheduleKey, ColdStartStats>> {
+async function computeAllColdStarts(windowMinutes: number): Promise<Record<WarmScheduleKey, ColdStartStats>> {
   const keys = Object.keys(TARGETS_BY_PROJECT) as WarmScheduleKey[];
-  const stats = await Promise.all(keys.map(computeProjectColdStarts));
+  const stats = await Promise.all(keys.map((key) => computeProjectColdStarts(key, windowMinutes)));
 
   return Object.fromEntries(keys.map((key, i) => [key, stats[i]])) as Record<WarmScheduleKey, ColdStartStats>;
 }
@@ -686,13 +695,24 @@ async function processEvent(
       profileAction?: string;
       name?: unknown;
       action?: string;
+      windowMinutes?: unknown;
     }>(event);
 
     if (body.action === "checkColdStarts") {
+      if (!isValidColdStartWindowMinutes(body.windowMinutes)) {
+        return {
+          statusCode: 400,
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            error: `windowMinutes must be one of ${ALLOWED_COLD_START_WINDOW_MINUTES.join(", ")}`,
+          }),
+        };
+      }
+
       return {
         statusCode: 200,
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ coldStarts: await computeAllColdStarts() }),
+        body: JSON.stringify({ coldStarts: await computeAllColdStarts(body.windowMinutes) }),
       };
     }
 
