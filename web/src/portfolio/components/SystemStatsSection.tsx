@@ -23,7 +23,7 @@ type OperationsRange = "1d" | "7d" | "all";
 type OpsSortKey = "count" | "avgDurationMs";
 type OpsSort = { key: OpsSortKey; direction: "asc" | "desc" } | null;
 
-export default function SystemStatsSection({ staggerDelayMs = 0 }: { staggerDelayMs?: number }) {
+export default function SystemStatsSection() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,17 +42,11 @@ export default function SystemStatsSection({ staggerDelayMs = 0 }: { staggerDela
 
   // Fetch once on mount, matching Hero.tsx's pattern: setState only happens
   // inside then/catch, never synchronously in the effect body itself.
-  // staggerDelayMs (see Home.tsx/useStaggerHomeFetches) lets Hero's request
-  // land first and claim a warm portfolio-graphql slot before this one fires.
   useEffect(() => {
-    const timer = setTimeout(() => {
-      runQuery<SystemStatsResult>(SYSTEM_STATS_QUERY)
-        .then((result) => setStats(result.meta.systemStats))
-        .catch((err) => setError(err instanceof Error ? err.message : "Something went wrong."));
-    }, staggerDelayMs);
-
-    return () => clearTimeout(timer);
-  }, [staggerDelayMs]);
+    runQuery<SystemStatsResult>(SYSTEM_STATS_QUERY)
+      .then((result) => setStats(result.meta.systemStats))
+      .catch((err) => setError(err instanceof Error ? err.message : "Something went wrong."));
+  }, []);
 
   // Also refetch whenever a query completes anywhere in the explorer --
   // the operation-stats write happens server-side before that response is
