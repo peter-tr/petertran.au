@@ -126,6 +126,7 @@ describe("useWarmSchedule", () => {
     await act(() => result.current.refresh());
 
     expect(result.current.reactive).toEqual(activeReactive);
+
     // refresh() re-fetches the same GET endpoint, not the cold-start POST.
     const lastCall = (fetch as ReturnType<typeof vi.fn>).mock.calls.at(-1)!;
     expect(lastCall).toEqual(["https://api.test/warm-schedule"]);

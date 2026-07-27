@@ -663,6 +663,7 @@ describe("warm-schedule handler - reactive (cold-hit-triggered) PC", () => {
       .commandCalls(PutParameterCommand)
       .filter((c) => c.args[0].input.Name === REACTIVE_STATE_NAME);
     expect(stateWrites).toHaveLength(1);
+
     const written = JSON.parse(stateWrites[0].args[0].input.Value as string);
     expect(written.portfolio).toBe(WITHIN_WINDOW.getTime() + 60 * 60_000);
 
@@ -702,6 +703,7 @@ describe("warm-schedule handler - reactive (cold-hit-triggered) PC", () => {
 
     const putCalls = lambdaMock.commandCalls(PutProvisionedConcurrencyConfigCommand);
     expect(putCalls.map((c) => c.args[0].input.FunctionName)).toContain("portfolio-fn");
+
     // Every other target has no active window and is outside its schedule -
     // still torn down as normal.
     const deleteCalls = lambdaMock.commandCalls(DeleteProvisionedConcurrencyConfigCommand);
@@ -738,6 +740,7 @@ describe("warm-schedule handler - reactive (cold-hit-triggered) PC", () => {
     expect(result).toEqual({ statusCode: 200, headers: {}, body: "reconciled" });
 
     expect(lambdaMock.commandCalls(DeleteProvisionedConcurrencyConfigCommand)).toHaveLength(0);
+
     const putCalls = lambdaMock.commandCalls(PutProvisionedConcurrencyConfigCommand);
     expect(putCalls.map((c) => c.args[0].input.FunctionName)).toContain("portfolio-fn");
   });
@@ -745,6 +748,7 @@ describe("warm-schedule handler - reactive (cold-hit-triggered) PC", () => {
   it("reports reactive status (active/until) alongside schedules and costs in the GET response", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(WITHIN_WINDOW);
+
     const until = WITHIN_WINDOW.getTime() + 10 * 60_000;
     ssmMock.on(GetParameterCommand, { Name: "/warm-schedule/schedules" }).resolves({
       Parameter: { Value: JSON.stringify({ portfolio: { ...DEFAULT_SCHEDULE, reactiveEnabled: true } }) },
