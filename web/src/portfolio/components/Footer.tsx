@@ -4,25 +4,19 @@ import { useShowFooterCost } from "../hooks/useShowFooterCost";
 
 type Cost = FooterQueryResult["meta"];
 
-export default function Footer({ email, staggerDelayMs = 0 }: { email?: string; staggerDelayMs?: number }) {
+export default function Footer({ email }: { email?: string }) {
   const [cost, setCost] = useState<Cost | null>(null);
   const { showFooterCost } = useShowFooterCost();
 
-  // staggerDelayMs (see Home.tsx/useStaggerHomeFetches) lets Hero's request
-  // land first and claim a warm portfolio-graphql slot before this one fires.
   // Skipped entirely when the cost line is toggled off - this query only
   // exists to fetch the cost figures, so there's no call to make.
   useEffect(() => {
     if (!showFooterCost) return;
 
-    const timer = setTimeout(() => {
-      runQuery<FooterQueryResult>(FOOTER_QUERY)
-        .then((result) => setCost(result.meta))
-        .catch(() => {});
-    }, staggerDelayMs);
-
-    return () => clearTimeout(timer);
-  }, [staggerDelayMs, showFooterCost]);
+    runQuery<FooterQueryResult>(FOOTER_QUERY)
+      .then((result) => setCost(result.meta))
+      .catch(() => {});
+  }, [showFooterCost]);
 
   // `email` lets a caller that already has resume data (Resume.tsx) pass it
   // through directly; everyone else gets the hardcoded default.
@@ -36,8 +30,7 @@ export default function Footer({ email, staggerDelayMs = 0 }: { email?: string; 
       <span>
         <a href="https://github.com/peter-tr/petertran.au" target="_blank" rel="noreferrer">
           source
-        </a>{" "}
-        · built with AWS CDK · Lambda · DynamoDB · CloudFront
+        </a>
         {cost && showFooterCost && (
           <>
             {" "}

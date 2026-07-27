@@ -2,8 +2,6 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useShowAlsoBuilt } from "./hooks/useShowAlsoBuilt";
 import { useShowFooterCost } from "./hooks/useShowFooterCost";
-import { usePageLoadWarmup } from "./hooks/usePageLoadWarmup";
-import { useStaggerHomeFetches } from "./hooks/useStaggerHomeFetches";
 import {
   useWarmSchedule,
   schedulesEqual,
@@ -30,8 +28,6 @@ const WARM_SCHEDULE_KEYS = Object.keys(WARM_SCHEDULE_LABELS) as WarmScheduleKey[
 export default function PortfolioSettingsPage() {
   const { showAlsoBuilt, setShowAlsoBuilt } = useShowAlsoBuilt();
   const { showFooterCost, setShowFooterCost } = useShowFooterCost();
-  const { pageLoadWarmup, setPageLoadWarmup } = usePageLoadWarmup();
-  const { staggerHomeFetches, setStaggerHomeFetches } = useStaggerHomeFetches();
   const {
     config: warmScheduleConfig,
     costs: warmScheduleCosts,
@@ -116,31 +112,6 @@ export default function PortfolioSettingsPage() {
           />{" "}
           Show real AWS/Anthropic cost since launch in the footer (AWS side is within the $200 AWS Free Tier
           credit)
-        </label>
-      </div>
-
-      <div className="form-row">
-        <label className="form-label" htmlFor="page-load-warmup">
-          <input
-            id="page-load-warmup"
-            type="checkbox"
-            checked={pageLoadWarmup}
-            onChange={(e) => setPageLoadWarmup(e.target.checked)}
-          />{" "}
-          Warm pantry/imposter on page load (tighter timing, only helps this browser)
-        </label>
-      </div>
-
-      <div className="form-row">
-        <label className="form-label" htmlFor="stagger-home-fetches">
-          <input
-            id="stagger-home-fetches"
-            type="checkbox"
-            checked={staggerHomeFetches}
-            onChange={(e) => setStaggerHomeFetches(e.target.checked)}
-          />{" "}
-          Delay footer/stats queries slightly on home page load so Hero&apos;s query wins the warm Lambda slot
-          (only helps this browser)
         </label>
       </div>
 
