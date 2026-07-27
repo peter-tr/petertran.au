@@ -247,6 +247,50 @@ describe("generateDesignElements", () => {
     expect(call.max_tokens).toBeGreaterThan(2048);
   });
 
+  it("skips adaptive thinking/effort for a SONNET refinement, even though a fresh SONNET generation gets it", async () => {
+    anthropicMessagesParse.mockResolvedValueOnce({ parsed_output: { elements: [rawElement()] } });
+
+    const currentElements: DesignElementRecord[] = [
+      {
+        id: "a",
+        type: "RECTANGLE",
+        x: 0,
+        y: 0,
+        width: 900,
+        height: 600,
+        rotation: 0,
+        zIndex: 0,
+        fill: "#000",
+        stroke: "",
+        strokeWidth: 0,
+      },
+    ];
+
+    await generateDesignElements(
+      "make it bigger",
+      900,
+      600,
+      currentElements,
+      "1.2.3.4",
+      ANTHROPIC_SONNET
+    );
+
+    const call = anthropicMessagesParse.mock.calls.at(-1)![0];
+    expect(call.thinking).toBeUndefined();
+    expect(call.output_config.effort).toBeUndefined();
+    expect(call.max_tokens).toBe(2048);
+  });
+
+  it("passes a timeout under API Gateway's 29s hard limit as request options", async () => {
+    anthropicMessagesParse.mockResolvedValueOnce({ parsed_output: { elements: [rawElement()] } });
+
+    await generateDesignElements("a poster", 900, 600, undefined, "1.2.3.4", ANTHROPIC_HAIKU);
+
+    const options = anthropicMessagesParse.mock.calls.at(-1)![1];
+    expect(options.timeout).toBeGreaterThan(0);
+    expect(options.timeout).toBeLessThan(29_000);
+  });
+
   it("never gathers supergraph context when allowSupergraphQuery is false", async () => {
     anthropicMessagesParse.mockResolvedValueOnce({ parsed_output: { elements: [rawElement()] } });
 

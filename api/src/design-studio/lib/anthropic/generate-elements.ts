@@ -7,6 +7,17 @@ import type { AiSettingsRecord, DesignElementRecord, DesignElementType } from ".
 const MAX_PROMPT_LENGTH = 300;
 const MAX_ELEMENTS = 12;
 
+// API Gateway hard-caps every request at 29s - not configurable, and not
+// helped by this Lambda's own 40s timeout (design-studio-stack.ts) since API
+// Gateway kills the connection first regardless of what the Lambda would
+// still allow. 27s leaves ~2s slack for the response round-trip/JSON
+// handling on top of the Anthropic call itself, so a call that's about to
+// blow the budget fails with a normal thrown error (caught below, same
+// "Couldn't generate a design" message the client already shows) instead of
+// running past 29s into API Gateway's own generic timeout response.
+const TOTAL_TIME_BUDGET_MS = 27_000;
+const MIN_GENERATE_TIMEOUT_MS = 3_000;
+
 interface RawElement {
   type: DesignElementType;
   x: number;
@@ -224,6 +235,7 @@ export async function generateDesignElements(
   sourceIp: string | undefined,
   aiSettings: AiSettingsRecord
 ): Promise<DesignElementRecord[]> {
+  const startedAt = Date.now();
   const trimmed = prompt.trim();
   if (!trimmed) throw new Error("A prompt is required.");
   if (trimmed.length > MAX_PROMPT_LENGTH) {
@@ -261,26 +273,42 @@ export async function generateDesignElements(
   // Haiku doesn't support adaptive thinking or the effort parameter (errors
   // if sent) - only the Sonnet tier gets a deliberation pass before it picks
   // coordinates/colors, which is where layout quality actually comes from.
-  const supportsThinking = aiSettings.modelTier === "SONNET";
+  // Skipped on refinements regardless of tier though: API Gateway hard-caps
+  // any request at 29s (not configurable - raising this Lambda's own
+  // timeout past that, as design-studio-stack.ts already does for the
+  // supergraph tool_use loop, can't help once API Gateway kills the
+  // connection first) and a refinement's prompt - the full current-elements
+  // JSON plus the instruction - pushes Sonnet's thinking pass close to or
+  // over that ceiling in practice. First-generation prompts are much
+  // smaller and comfortably clear it, so only isRefinement forces this off.
+  const supportsThinking = aiSettings.modelTier === "SONNET" && !isRefinement;
 
-  const response = await client.messages.parse({
-    model,
-    // Thinking counts against max_tokens on models where it's enabled, so
-    // the Sonnet path gets more headroom than Haiku's fixed, small output.
-    max_tokens: supportsThinking ? 8192 : 2048,
-    system: buildSystemPrompt(width, height, isRefinement),
-    messages: [{ role: "user", content: finalUserContent }],
-    ...(supportsThinking ? { thinking: { type: "adaptive" } } : {}),
-    output_config: {
-      format: { type: "json_schema", schema: GENERATE_ELEMENTS_SCHEMA },
-      // "low", not the "medium" default - measured against this exact
-      // prompt+schema, "medium" took ~83s (this Lambda's timeout is 30s),
-      // "low" ~10s with no visible quality drop. Layout generation is
-      // simple enough a task that low effort's lighter deliberation is
-      // still enough; re-measure before raising this.
-      ...(supportsThinking ? { effort: "low" } : {}),
+  // Whatever's left of the 27s budget after the (optional) phase-1
+  // supergraph tool loop above - so the timeout adapts to however much of
+  // it that loop actually used, rather than assuming it used none.
+  const remainingBudgetMs = Math.max(MIN_GENERATE_TIMEOUT_MS, TOTAL_TIME_BUDGET_MS - (Date.now() - startedAt));
+
+  const response = await client.messages.parse(
+    {
+      model,
+      // Thinking counts against max_tokens on models where it's enabled, so
+      // the Sonnet path gets more headroom than Haiku's fixed, small output.
+      max_tokens: supportsThinking ? 8192 : 2048,
+      system: buildSystemPrompt(width, height, isRefinement),
+      messages: [{ role: "user", content: finalUserContent }],
+      ...(supportsThinking ? { thinking: { type: "adaptive" } } : {}),
+      output_config: {
+        format: { type: "json_schema", schema: GENERATE_ELEMENTS_SCHEMA },
+        // "low", not the "medium" default - measured against this exact
+        // prompt+schema, "medium" took ~83s (this Lambda's timeout is 30s),
+        // "low" ~10s with no visible quality drop. Layout generation is
+        // simple enough a task that low effort's lighter deliberation is
+        // still enough; re-measure before raising this.
+        ...(supportsThinking ? { effort: "low" } : {}),
+      },
     },
-  });
+    { timeout: remainingBudgetMs }
+  );
 
   const parsed = response.parsed_output as RawGenerateResult | null;
   if (!parsed?.elements.length) {
