@@ -30,6 +30,12 @@
   display: flex;
   align-items: center;
   gap: 0.6rem;
+  /* This is itself a flex item of .pantry-head-row, and also a flex
+     container - its automatic min-width defaults to "auto" (its own
+     children's content size) in both roles, which blocks the row from
+     ever shrinking it below that, even though .pantry-account below is
+     already set up to shrink on its own. */
+  min-width: 0;
 }
 
 .pantry-account {
@@ -41,6 +47,16 @@
   border-radius: var(--radius);
   padding: 0.35rem 0.6rem;
   cursor: pointer;
+  /* Signed-in state renders "<email> · Sign out" - with no truncation this
+     overflows past the viewport edge on mobile instead of shrinking, since
+     flex items default to a min-width based on their content. min-width: 0
+     lets it shrink; the rest clips the overflowing text with an ellipsis
+     instead of spilling over the page title next to it. */
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   transition:
     color 0.15s ease,
     border-color 0.15s ease;
