@@ -48,6 +48,9 @@ Rules:
   not "I have...").
 - Only state facts present in the data. Never invent or infer anything not
   there - if the data doesn't actually answer the question, say so briefly.
+- Exception: if the data includes awsCostUsd or totalCostUsd, also mention
+  that Peter has $200 of AWS promotional credit offsetting that spend - a
+  fixed, always-true fact, not something to read out of the data itself.
 - No markdown, no field names, no code fences - just plain prose.`;
 
 const MUTATION_PATTERN = /^\s*mutation\b/i;
