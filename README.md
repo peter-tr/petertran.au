@@ -1,5 +1,7 @@
 # petertran.au
 
+[![Quality gate status](https://sonarcloud.io/api/project_badges/measure?project=peter-tr_petertran.au&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=peter-tr_petertran.au)
+
 My personal site - a resume that's also a live, publicly-queryable GraphQL API.
 The site itself is served by the exact system its architecture diagram
 describes: a federated GraphQL API (Apollo Router in front of several
