@@ -94,6 +94,22 @@ export function buildRouterYaml(subgraphNames: string[]): string {
     "    - https://www.test.petertran.au\n" +
     "    - http://localhost:5173\n" +
     "    - http://localhost:3000\n" +
+    // The embedded Apollo Sandbox UI (see sandbox.enabled below) is served
+    // from studio.apollographql.com, not this project's own domain - its
+    // in-browser query editor makes requests back to this Router directly,
+    // so that origin needs to be allowed too or the Sandbox UI loads but
+    // every query it runs fails with a CORS error.
+    "    - https://studio.apollographql.com\n" +
+    "\n" +
+    // Full interactive query editor + schema explorer at the bare
+    // /graphql URL in a browser, closer to what dev/dev-server.ts's
+    // startStandaloneServer already gives locally - Router's own default
+    // (sandbox.enabled: false) instead shows a minimal built-in page with
+    // just a curl example. Safe to leave on in prod: this only changes
+    // what a browser GET renders, doesn't affect introspection/auth on the
+    // actual POST /graphql operations.
+    "sandbox:\n" +
+    "  enabled: true\n" +
     "\n" +
     // provided.al2023 gets zero automatic X-Ray instrumentation (that's
     // baked into each AWS-managed language runtime's own wrapper, not a
