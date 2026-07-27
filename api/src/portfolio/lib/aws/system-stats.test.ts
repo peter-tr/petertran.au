@@ -147,10 +147,11 @@ describe("getSystemStats", () => {
     expect(stats.operations[0].name).toBe("Op0"); // highest count (12)
   });
 
-  it("splits operationsLast30Days from the true all-time total using day-bucket keys", async () => {
+  it("splits operationsLast7Days and operationsLastDay from the true all-time total using day-bucket keys", async () => {
     ddbMock.on(QueryCommand).resolves({
       Items: [
-        opItem("Resume", "2026-06-14", 3, 300), // within last 30 days
+        opItem("Resume", "2026-06-15", 2, 200), // today, within both windows
+        opItem("Resume", "2026-06-11", 3, 300), // within last 7 days only
         opItem("Resume", "2020-01-01", 7, 700), // long past, all-time only
       ],
     });
@@ -158,9 +159,11 @@ describe("getSystemStats", () => {
     const stats = await getSystemStats(undefined);
 
     const allTime = stats.operations.find((o) => o.name === "Resume")!;
-    const recent = stats.operationsLast30Days.find((o) => o.name === "Resume")!;
-    expect(allTime.count).toBe(10);
-    expect(recent.count).toBe(3);
+    const last7Days = stats.operationsLast7Days.find((o) => o.name === "Resume")!;
+    const lastDay = stats.operationsLastDay.find((o) => o.name === "Resume")!;
+    expect(allTime.count).toBe(12);
+    expect(last7Days.count).toBe(5);
+    expect(lastDay.count).toBe(2);
   });
 
   it("keeps the most recent query/variables/traceId sample across an operation's buckets", async () => {

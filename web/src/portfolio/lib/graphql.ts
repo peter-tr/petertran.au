@@ -129,7 +129,15 @@ export const SYSTEM_STATS_QUERY = /* GraphQL */ `
           lastVariables
           lastTraceId
         }
-        operationsLast30Days {
+        operationsLastDay {
+          name
+          count
+          avgDurationMs
+          lastQuery
+          lastVariables
+          lastTraceId
+        }
+        operationsLast7Days {
           name
           count
           avgDurationMs

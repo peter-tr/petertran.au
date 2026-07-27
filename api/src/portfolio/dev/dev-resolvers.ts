@@ -141,7 +141,25 @@ export const devResolvers = {
           lastTraceId: null,
         },
       ],
-      operationsLast30Days: [
+      operationsLastDay: [
+        {
+          name: "Resume",
+          count: 3,
+          avgDurationMs: 55.9,
+          lastQuery: "query Resume {\n  person { name }\n  experience { role company }\n}",
+          lastVariables: null,
+          lastTraceId: "mock-trace-resume",
+        },
+        {
+          name: "Hero",
+          count: 2,
+          avgDurationMs: 34.8,
+          lastQuery: "query Hero {\n  person { name }\n  experience { role company isCurrent }\n}",
+          lastVariables: null,
+          lastTraceId: "mock-trace-hero",
+        },
+      ],
+      operationsLast7Days: [
         {
           name: "Resume",
           count: 12,

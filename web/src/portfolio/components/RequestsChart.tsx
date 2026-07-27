@@ -6,7 +6,7 @@ const CHART_HEIGHT = 110;
 const AXIS_BAND_HEIGHT = 22;
 const BAR_GAP = 3;
 
-type Range = "7d" | "30d";
+type Range = "1d" | "7d" | "all";
 
 // Scales the axis ceiling to the actual data range (rounded up to a clean
 // 1/2/5/10 step) instead of some fixed large scale - otherwise a personal
@@ -34,17 +34,26 @@ export default function RequestsChart({ data }: { data: DailyCount[] }) {
 
   if (data.length === 0) return null;
 
-  const visible = range === "7d" ? data.slice(-7) : data;
+  const visible = range === "1d" ? data.slice(-1) : range === "7d" ? data.slice(-7) : data;
   const max = Math.max(...visible.map((d) => d.count));
   const axisMax = niceAxisMax(max);
   const barSlot = CHART_WIDTH / visible.length;
   const barWidth = Math.min(24, barSlot - BAR_GAP);
-  const rangeLabel = range === "7d" ? "last 7 days" : "last 30 days";
+  const rangeLabel = range === "1d" ? "the last 1 day" : range === "7d" ? "the last 7 days" : "all time";
 
   return (
     <div className="requests-chart">
       <p className="chart-title">requests by day</p>
       <div className="ops-toggle" role="tablist" aria-label="Chart time range">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={range === "1d"}
+          className={range === "1d" ? "active" : ""}
+          onClick={() => setRange("1d")}
+        >
+          last 1 day
+        </button>
         <button
           type="button"
           role="tab"
@@ -57,11 +66,11 @@ export default function RequestsChart({ data }: { data: DailyCount[] }) {
         <button
           type="button"
           role="tab"
-          aria-selected={range === "30d"}
-          className={range === "30d" ? "active" : ""}
-          onClick={() => setRange("30d")}
+          aria-selected={range === "all"}
+          className={range === "all" ? "active" : ""}
+          onClick={() => setRange("all")}
         >
-          last 30 days
+          all time
         </button>
       </div>
       <svg

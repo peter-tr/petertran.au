@@ -340,11 +340,17 @@ type SystemStats {
   """
   operations: [OperationStats!]!
   """
-  Same breakdown as `operations`, but only counting the last 30 days.
+  Same breakdown as `operations`, but only counting the last (UTC) day.
   """
-  operationsLast30Days: [OperationStats!]!
+  operationsLastDay: [OperationStats!]!
   """
-  Daily request counts for the last 30 days, oldest first.
+  Same breakdown as `operations`, but only counting the last 7 days.
+  """
+  operationsLast7Days: [OperationStats!]!
+  """
+  Daily request counts, oldest first. Covers as much history as CloudWatch
+  still retains for this Lambda (up to 15 months), so this is effectively
+  "all time" - clients slice it down for shorter ranges.
   """
   requestsByDay: [DailyCount!]!
 }
