@@ -105,7 +105,11 @@ describe("gatherSupergraphContext", () => {
     expect(result).toBe("Use the name Peter Tran in the header.");
     expect(fetchMock).toHaveBeenCalledWith(
       "https://api.petertran.au/graphql",
-      expect.objectContaining({ method: "POST", body: JSON.stringify({ query: "{ person { name } }" }) })
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ query: "{ person { name } }" }),
+        headers: expect.objectContaining({ "apollographql-client-name": "design-studio-ai-tool" }),
+      })
     );
 
     // The 2nd Claude call's own messages include the tool_result from the

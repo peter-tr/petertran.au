@@ -37,7 +37,17 @@ async function executeSupergraphQuery(
 ): Promise<unknown> {
   const res = await fetch(supergraphUrl, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      // Router reads this by default (see web/src/shared/graphqlClient.ts's
+      // identical comment) to attribute traffic to a named client in GraphOS
+      // Studio - without it this server-to-server call showed up as
+      // "Unidentified client". Distinct from the browser-originated
+      // "design-studio" client name (real user traffic) since this is the
+      // AI tool's own portfolio-data lookup, not something a user's browser
+      // ever sends directly.
+      "apollographql-client-name": "design-studio-ai-tool",
+    },
     body: JSON.stringify({ query }),
     signal: AbortSignal.timeout(timeoutMs),
   });
