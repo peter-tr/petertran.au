@@ -136,8 +136,21 @@ export class ApiGatewayStack extends Stack {
         // GraphQL call outright. authorization: pantry's signed-in requests
         // carry a Cognito ID token here (see web/src/pantry/lib/auth.ts) -
         // same reasoning, the preflight blocks it client-side before it ever
-        // reaches a Lambda without this.
-        allowHeaders: ["content-type", "apollo-require-preflight", "x-amzn-trace-id", "authorization"],
+        // reaches a Lambda without this. apollographql-client-name:
+        // graphqlClient.ts sends this on every request (see PR #205) so
+        // GraphOS Studio can attribute traffic to a named client - missed
+        // updating this allowlist when that shipped, which silently broke
+        // every real browser request with a generic "Failed to fetch"
+        // (confirmed live 2026-07-27: curl without this header succeeded
+        // fine since it never triggers a preflight, masking the bug from
+        // every manual verification during that PR).
+        allowHeaders: [
+          "content-type",
+          "apollo-require-preflight",
+          "x-amzn-trace-id",
+          "authorization",
+          "apollographql-client-name",
+        ],
         maxAge: Duration.hours(1),
       },
     });
