@@ -266,14 +266,7 @@ describe("generateDesignElements", () => {
       },
     ];
 
-    await generateDesignElements(
-      "make it bigger",
-      900,
-      600,
-      currentElements,
-      "1.2.3.4",
-      ANTHROPIC_SONNET
-    );
+    await generateDesignElements("make it bigger", 900, 600, currentElements, "1.2.3.4", ANTHROPIC_SONNET);
 
     const call = anthropicMessagesParse.mock.calls.at(-1)![0];
     expect(call.thinking).toBeUndefined();

@@ -286,7 +286,10 @@ export async function generateDesignElements(
   // Whatever's left of the 27s budget after the (optional) phase-1
   // supergraph tool loop above - so the timeout adapts to however much of
   // it that loop actually used, rather than assuming it used none.
-  const remainingBudgetMs = Math.max(MIN_GENERATE_TIMEOUT_MS, TOTAL_TIME_BUDGET_MS - (Date.now() - startedAt));
+  const remainingBudgetMs = Math.max(
+    MIN_GENERATE_TIMEOUT_MS,
+    TOTAL_TIME_BUDGET_MS - (Date.now() - startedAt)
+  );
 
   const response = await client.messages.parse(
     {
