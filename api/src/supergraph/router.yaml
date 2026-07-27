@@ -55,6 +55,18 @@ cors:
     # so that origin needs to be allowed too or the Sandbox UI loads but
     # every query it runs fails with a CORS error.
     - https://studio.apollographql.com
+  # Apollo Studio's own hosted Explorer (studio.apollographql.com/graph/.../
+  # explorer, separate from the embedded Sandbox above) sends requests with
+  # credentials included (`credentials: "include"`) so its "Include
+  # cookies" toggle can work - the browser then requires this header on
+  # the response regardless of whether Access-Control-Allow-Origin already
+  # matches, or it silently rejects the response with a generic "Failed to
+  # fetch" (confirmed live via Studio's own Explorer, 2026-07-27). Doesn't
+  # change behavior for our own frontend traffic - nothing in this project
+  # sends cookies cross-origin (pantry deliberately uses an Authorization
+  # bearer header instead, exactly to avoid needing this), so this header
+  # is simply unused/inert for every request except Explorer's.
+  allow_credentials: true
 
 # Full interactive query editor + schema explorer at the bare /graphql URL
 # in a browser, closer to what dev/dev-server.ts's startStandaloneServer

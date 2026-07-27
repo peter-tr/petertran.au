@@ -1,6 +1,6 @@
 import { describe, it } from "vitest";
 import { App } from "aws-cdk-lib";
-import { Template } from "aws-cdk-lib/assertions";
+import { Template, Match } from "aws-cdk-lib/assertions";
 import { ApiGatewayStack } from "./api-gateway-stack";
 
 describe("ApiGatewayStack", () => {
@@ -49,10 +49,26 @@ describe("ApiGatewayStack", () => {
       Integration: {
         IntegrationResponses: [
           {
-            ResponseParameters: {
+            ResponseParameters: Match.objectLike({
               "method.response.header.Access-Control-Allow-Headers":
                 "'content-type,apollo-require-preflight,x-amzn-trace-id,authorization,apollographql-client-name'",
-            },
+              // Regression test: this origin was missing from allowOrigins
+              // entirely (confirmed live 2026-07-27) - CDK's mock preflight
+              // integration falls back to echoing the *first* configured
+              // origin for any request whose Origin isn't in the list at
+              // all, so both the embedded Sandbox UI and Apollo Studio's
+              // own Explorer failed CORS preflight this whole time.
+              "method.response.header.Access-Control-Allow-Credentials": "'true'",
+            }),
+            // CDK renders per-origin matching as a Velocity Template that
+            // overrides the response's Allow-Origin header at request time
+            // if the real Origin matches one of the non-default entries -
+            // this is what actually lets studio.apollographql.com's
+            // preflight succeed, not the static header above (which is
+            // just the first-listed origin as a fallback default).
+            ResponseTemplates: Match.objectLike({
+              "application/json": Match.stringLikeRegexp("https://studio\\.apollographql\\.com"),
+            }),
           },
         ],
       },
