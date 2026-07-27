@@ -814,6 +814,14 @@
   gap: 0.8rem;
 }
 
+/* .status-line's shared page-level padding (2rem top/bottom) is sized for
+   full-page loading/error states - inside a turn it dwarfs everything else
+   in the bubble, so scale it down to match the other turn elements' margins. */
+.pantry-command-turn-assistant .status-line {
+  padding: 0;
+  margin: 0.4rem 0 0;
+}
+
 .pantry-command-turn-user {
   align-self: flex-end;
   max-width: 85%;
