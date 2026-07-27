@@ -51,7 +51,7 @@ describe("ApiGatewayStack", () => {
           {
             ResponseParameters: Match.objectLike({
               "method.response.header.Access-Control-Allow-Headers":
-                "'content-type,apollo-require-preflight,x-amzn-trace-id,authorization,apollographql-client-name'",
+                "'content-type,apollo-require-preflight,x-amzn-trace-id,authorization,apollographql-client-name,apollo-federation-include-trace'",
               // Regression test: this origin was missing from allowOrigins
               // entirely (confirmed live 2026-07-27) - CDK's mock preflight
               // integration falls back to echoing the *first* configured

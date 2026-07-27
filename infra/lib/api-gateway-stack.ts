@@ -163,13 +163,22 @@ export class ApiGatewayStack extends Stack {
         // every real browser request with a generic "Failed to fetch"
         // (confirmed live 2026-07-27: curl without this header succeeded
         // fine since it never triggers a preflight, masking the bug from
-        // every manual verification during that PR).
+        // every manual verification during that PR). apollo-federation-
+        // include-trace: Studio's hosted Explorer sends this automatically
+        // on every request to a federated graph, to request per-field trace
+        // data (ftv1) for its response inspector - same "curl never
+        // triggers a preflight" blind spot as apollographql-client-name
+        // above, only surfaced by testing in a real browser (confirmed live
+        // 2026-07-27: "Request header field apollo-federation-include-trace
+        // is not allowed by Access-Control-Allow-Headers in preflight
+        // response").
         allowHeaders: [
           "content-type",
           "apollo-require-preflight",
           "x-amzn-trace-id",
           "authorization",
           "apollographql-client-name",
+          "apollo-federation-include-trace",
         ],
         maxAge: Duration.hours(1),
       },
