@@ -78,7 +78,7 @@
   z-index: 10;
   min-width: 15rem;
   padding: 0.8rem;
-  background: var(--bg);
+  background: var(--panel);
   border: 1px solid var(--rule);
   border-radius: var(--radius);
   box-shadow: 0 0.4rem 1rem rgba(0, 0, 0, 0.15);
