@@ -153,7 +153,7 @@ flowchart LR
     browser -->|"@microsoft/clarity"| clarity["Clarity"]
     browser -->|"X-Amzn-Trace-Id\n(self-generated)"| apigw["API Gateway\n(REST, tracingEnabled)"]
     apigw --> lambdas["Lambda subgraphs /\nsupergraph Router"]
-    lambdas -->|"ADOT layer / collector"| xray["X-Ray trace"]
+    lambdas -->|"ADOT layer (Node) /\naws_xray propagation (Router)"| xray["X-Ray trace"]
     lambdas -->|"ftv1 field timing"| graphos["Apollo GraphOS Studio"]
     lambdas --> data["DynamoDB / Mongo / Anthropic"]
     lambdas -->|"EMF metrics"| dashboard["CloudWatch dashboard\n+ alarms -> SNS -> email"]

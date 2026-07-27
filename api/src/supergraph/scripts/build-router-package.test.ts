@@ -11,7 +11,7 @@ const routerYaml = readFileSync(routerYamlPath, "utf-8");
 describe("verifyChecksum", () => {
   it("returns the hash when it matches the sha256sums.txt entry", () => {
     const artifactBuf = Buffer.from("fake router binary contents");
-    const artifactName = "router-v1.61.1-x86_64-unknown-linux-gnu.tar.gz";
+    const artifactName = "router-v2.16.0-x86_64-unknown-linux-gnu.tar.gz";
     const hash = createHash("sha256").update(artifactBuf).digest("hex");
     const sumsText = `${hash}  ${artifactName}\nsomeotherhash  some-other-file.tar.gz\n`;
 
@@ -20,7 +20,7 @@ describe("verifyChecksum", () => {
 
   it("throws on a hash mismatch instead of silently continuing", () => {
     const artifactBuf = Buffer.from("fake router binary contents");
-    const artifactName = "router-v1.61.1-x86_64-unknown-linux-gnu.tar.gz";
+    const artifactName = "router-v2.16.0-x86_64-unknown-linux-gnu.tar.gz";
     const sumsText = `0000000000000000000000000000000000000000000000000000000000000000  ${artifactName}\n`;
 
     expect(() => verifyChecksum(artifactBuf, sumsText, artifactName)).toThrow("sha256 mismatch");
@@ -28,7 +28,7 @@ describe("verifyChecksum", () => {
 
   it("throws when sha256sums.txt has no entry for the artifact", () => {
     const artifactBuf = Buffer.from("fake router binary contents");
-    const artifactName = "router-v1.61.1-x86_64-unknown-linux-gnu.tar.gz";
+    const artifactName = "router-v2.16.0-x86_64-unknown-linux-gnu.tar.gz";
     const sumsText = "somehash  some-unrelated-file.tar.gz\n";
 
     expect(() => verifyChecksum(artifactBuf, sumsText, artifactName)).toThrow(
@@ -49,6 +49,11 @@ describe("router.yaml", () => {
   });
 
   it("propagates the authorization header to subgraphs", () => {
+    // Regression test: Router 2.x requires an `operations:` key wrapping
+    // the propagation-rule list - Router 1.x accepted the list directly
+    // under `request:`. Confirmed via the real pinned binary's own
+    // `router config upgrade` against this exact file.
+    expect(routerYaml).toMatch(/request:\s*\n\s*operations:\s*\n\s*- propagate:/);
     expect(routerYaml).toContain('named: "authorization"');
   });
 
@@ -57,7 +62,12 @@ describe("router.yaml", () => {
     // OPTIONS preflight - it does not add CORS headers to the actual
     // GET/POST response, so without this config every browser (not curl)
     // silently discards every real response.
+    //
+    // Origins live under cors.policies[0].origins, not a flat cors.origins
+    // list, as of the Router 2.x config migration - confirmed via the real
+    // pinned binary's own `router config upgrade` against this exact file.
     expect(routerYaml).toContain("cors:");
+    expect(routerYaml).toMatch(/cors:\s*\n\s*allow_credentials: true\s*\n\s*policies:\s*\n\s*- origins:/);
     expect(routerYaml).toContain("https://www.petertran.au");
     expect(routerYaml).toContain("https://petertran.au");
     expect(routerYaml).toContain("https://test.petertran.au");
@@ -80,52 +90,47 @@ describe("router.yaml", () => {
     expect(routerYaml).toMatch(/homepage:\s*\n\s*enabled: false/);
   });
 
-  it("exports traces via OTLP to the local ADOT collector with X-Ray propagation", () => {
-    // provided.al2023 gets no automatic X-Ray instrumentation - this is
-    // what actually gets traces to X-Ray at all (verified against a real
-    // Lambda: zero traces without this, connected traces with it).
-    expect(routerYaml).toContain("otlp:");
-    expect(routerYaml).toContain("endpoint: http://localhost:4317");
+  it("propagates X-Ray trace headers to subgraphs without an OTLP exporter/ADOT layer", () => {
+    // No ADOT collector layer (removed 2026-07-27, see supergraph-stack.ts) -
+    // provided.al2023 gets no automatic X-Ray instrumentation, but aws_xray
+    // propagation alone still keeps the trace connected: confirmed directly
+    // against a real deployed Lambda with no otlp exporter block at all that
+    // subgraph segments still appear under the same trace ID as the
+    // platform-native supergraph-graphql-test segment. Router's own internal
+    // span (query_planning/compute_job timing) is the only thing lost by not
+    // running an OTLP exporter - not connectivity - and cost ~170-400ms of
+    // cold-start Init Duration for a span that covered ~11ms in a real trace.
     expect(routerYaml).toContain("aws_xray: true");
-    expect(routerYaml).toContain("sampler: 1.0");
-  });
-
-  it("flushes OTLP trace spans almost immediately, not on the 5s default", () => {
-    // Regression test: confirmed directly against a real Lambda that the
-    // 5s default batch flush interval is longer than a fast invocation
-    // survives before the execution environment freezes - spans never
-    // left Router's buffer at all, so no trace ever reached X-Ray.
-    expect(routerYaml).toContain("scheduled_delay: 1ms");
-  });
-
-  it("names the trace service instead of leaving it as OTel's unknown_service fallback", () => {
-    // Without a service name, OTel defaults to "unknown_service:<binary
-    // name>" - confirmed literally appearing as "unknown_service:router" in
-    // ADOT collector logs before this. Sets both service_name and
-    // resource["service.name"] since a real-Lambda spike couldn't
-    // conclusively confirm which one the awsxrayexporter reads - X-Ray's
-    // batch-get-traces never returned Router's own OTel-originated segment
-    // to check directly. Cosmetic and confirmed low-risk either way.
-    expect(routerYaml).toContain('service_name: "supergraph"');
-    expect(routerYaml).toContain('service.name: "supergraph"');
+    expect(routerYaml).not.toMatch(/tracing:\s*\n\s*otlp:/);
   });
 
   it("enables introspection for the dashboard's GraphiQL/schema tooling", () => {
     expect(routerYaml).toContain("introspection: true");
   });
 
-  it("keeps telemetry.apollo.batch_processor flat, not nested under a metrics key", () => {
-    // Regression test: a later Router release nests this under
-    // telemetry.apollo.metrics.usage_reports.batch_processor - using that
-    // shape against the pinned ROUTER_VERSION crashed Router outright
-    // ("Additional properties are not allowed ('metrics' was unexpected)"),
-    // taking prod down for several minutes. Re-verify this shape directly
-    // against apollo-router's apollo.rs source at the new tag before ever
-    // bumping ROUTER_VERSION - don't just re-add the nested shape here.
-    expect(routerYaml).not.toContain("usage_reports:");
-    expect(routerYaml).toMatch(
-      /apollo:\s*\n\s*field_level_instrumentation_sampler: always_on\s*\n\s*batch_processor:/
-    );
+  it("nests telemetry.apollo batch_processor config under metrics/tracing, matching Router 2.x", () => {
+    // Regression test: the flat telemetry.apollo.batch_processor shape this
+    // used to assert was correct for Router 1.61.1, but Router 2.x rejects
+    // it outright ("Additional properties are not allowed" the other way
+    // around - a flat batch_processor no longer parses). Confirmed via the
+    // real pinned v2.16.0 binary's own `router config upgrade`/
+    // `config validate` against this exact file. Re-verify this shape
+    // directly against apollo-router's apollo.rs source at the new tag
+    // before ever bumping ROUTER_VERSION again.
+    expect(routerYaml).toContain("metrics:");
+    expect(routerYaml).toMatch(/metrics:\s*\n\s*usage_reports:\s*\n\s*batch_processor:/);
+    expect(routerYaml).toMatch(/otlp:\s*\n\s*batch_processor:/);
+    expect(routerYaml).toMatch(/tracing:\s*\n\s*batch_processor:/);
+  });
+
+  it("enables subgraph_metrics reporting to Apollo Studio", () => {
+    // GraphOS Insights warned this graph had never reported subgraph-level
+    // metrics, which requires Router >=2.7.0 plus this flag (GA as of
+    // apollographql/router#8392). Ships over the metrics.otlp exporter, not
+    // metrics.usage_reports (per `router config schema`'s description),
+    // which is why metrics.otlp.batch_processor above also needs the
+    // near-zero scheduled_delay, not just usage_reports.
+    expect(routerYaml).toContain("subgraph_metrics: true");
   });
 
   it("gives Apollo Studio usage reporting a longer export timeout than the local OTLP one", () => {

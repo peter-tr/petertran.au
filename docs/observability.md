@@ -26,7 +26,7 @@ flowchart LR
     rum -.->|"enableXRay: true\n(both client + server side)"| xray["X-Ray trace"]
 
     apigw["API Gateway\n(REST API, tracingEnabled: true)"] --> lambdas["Lambda subgraphs /\nsupergraph Router"]
-    lambdas -->|"ADOT layer (Node) /\nADOT collector extension (Rust Router)"| xray
+    lambdas -->|"ADOT layer (Node) /\naws_xray propagation, no extension (Rust Router)"| xray
     lambdas -->|"ApolloServerPluginInlineTrace\n(ftv1 field timing)"| router["Apollo Router"]
     router -->|"usage reporting,\nfield_level_instrumentation_sampler: always_on"| graphos["Apollo GraphOS Studio"]
 
@@ -136,9 +136,18 @@ Two different instrumentation mechanisms, because the fleet mixes runtimes:
   plain HTTPS, where async context doesn't reliably survive a real `await`),
   go through `api/src/shared/xray.ts`'s `traced()`/`traceHeader()`.
 - **The supergraph Lambda** is a Rust binary (`provided.al2023`) with zero
-  automatic instrumentation, so `infra/lib/supergraph-stack.ts` instead runs
-  a separate ADOT **collector** as a Lambda extension, and `router.yaml`
-  exports OTLP to it over local gRPC with `propagation.aws_xray: true`.
+  automatic instrumentation. It used to run a separate ADOT **collector**
+  Lambda extension to receive Router's own OTLP-exported spans and forward
+  them to X-Ray, but that extension was removed 2026-07-27 - real cold-start
+  measurement found it cost ~170-400ms of Init Duration for a span that, in
+  a real production trace, covered ~11ms of query planning, and (confirmed
+  directly via X-Ray) trace connectivity to subgraphs survives without it.
+  `router.yaml`'s `telemetry.exporters.tracing.propagation.aws_xray: true`
+  alone is what keeps the trace connected - it makes Router read/emit the
+  same `X-Amzn-Trace-Id` format on its own outbound subgraph requests,
+  independent of whether anything is receiving/exporting Router's own spans.
+  What's lost by not running the collector is only Router's own internal
+  span (query planning/compute job timing), not connectivity.
 
 End to end: browser (RUM's self-generated trace ID) → API Gateway (REST API,
 `tracingEnabled: true`) → subgraph or supergraph Lambda → (supergraph only)
