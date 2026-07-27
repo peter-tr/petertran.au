@@ -41,8 +41,8 @@ export default function Footer({ email, staggerDelayMs = 0 }: { email?: string; 
         {cost && showFooterCost && (
           <>
             {" "}
-            · real cost since launch: ${cost.totalCostUsd.toFixed(4)} (AWS ${cost.awsCostUsd.toFixed(4)}, within
-            the $200 AWS Free Tier credit + Anthropic ${cost.anthropicCostUsd.toFixed(4)})
+            · real cost since launch: ${cost.totalCostUsd.toFixed(4)} (AWS ${cost.awsCostUsd.toFixed(4)},
+            within the $200 AWS Free Tier credit + Anthropic ${cost.anthropicCostUsd.toFixed(4)})
           </>
         )}
       </span>
