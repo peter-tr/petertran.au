@@ -89,6 +89,6 @@ describe("DesignStudioSettingsPage", () => {
 
     renderPage();
 
-    await screen.findByText(/network down/);
+    expect(await screen.findByText(/network down/)).toBeInTheDocument();
   });
 });

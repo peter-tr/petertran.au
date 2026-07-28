@@ -132,7 +132,7 @@ const COLD_START_WINDOW_STORAGE_KEY = "portfolio:coldStartWindowMinutes";
 function readStoredColdStartWindowMinutes(): number {
   try {
     const raw = localStorage.getItem(COLD_START_WINDOW_STORAGE_KEY);
-    const parsed = raw === null ? NaN : Number(raw);
+    const parsed = raw === null ? Number.NaN : Number(raw);
 
     return isValidColdStartWindowMinutes(parsed) ? parsed : DEFAULT_COLD_START_WINDOW_MINUTES;
   } catch {
@@ -166,14 +166,17 @@ export function useWarmSchedule() {
   const [coldStarts, setColdStarts] = useState<WarmScheduleColdStarts | null>(null);
   // Starts true - a check always begins immediately on mount.
   const [checkingColdStarts, setCheckingColdStarts] = useState(true);
-  const [coldStartWindowMinutes, setColdStartWindowMinutesState] = useState(readStoredColdStartWindowMinutes);
+  const [coldStartWindowMinutesRaw, setColdStartWindowMinutesRaw] = useState(
+    readStoredColdStartWindowMinutes
+  );
+  const coldStartWindowMinutes = coldStartWindowMinutesRaw;
   const setColdStartWindowMinutes = useCallback((minutes: number) => {
     try {
       localStorage.setItem(COLD_START_WINDOW_STORAGE_KEY, String(minutes));
     } catch {
       // Fail silently -- this preference is a convenience, not a requirement.
     }
-    setColdStartWindowMinutesState(minutes);
+    setColdStartWindowMinutesRaw(minutes);
   }, []);
   // Same "adjust state during render" idiom PortfolioSettingsPage.tsx's own
   // warmScheduleDrafts reset uses: flips checkingColdStarts back to true the

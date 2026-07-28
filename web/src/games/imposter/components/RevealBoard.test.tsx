@@ -91,7 +91,7 @@ describe("RevealBoard", () => {
     fireEvent.click(screen.getByText("Alice"));
     fireEvent.click(screen.getByText("Tap to reveal your word"));
 
-    await screen.findByText("No hint this time - you'll have to bluff blind.");
+    expect(await screen.findByText("No hint this time - you'll have to bluff blind.")).toBeInTheDocument();
   });
 
   it("shows an error and re-enables the button when the reveal fails", async () => {
