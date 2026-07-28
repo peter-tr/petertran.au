@@ -360,6 +360,37 @@ a {
   opacity: 0.85;
 }
 
+/* A sibling project (Pantry, Design Studio, Imposter) linked from the
+   portfolio diagram - greyed out and dashed, like arch-node-infra, but its
+   own class since it means "separate deployment you can click through to"
+   rather than "AWS provisioning/observability". */
+.arch-node-external {
+  stroke: var(--muted-dim);
+  stroke-dasharray: 4 3;
+  opacity: 0.55;
+  transition: opacity 0.15s ease;
+}
+
+.arch-link {
+  cursor: pointer;
+}
+
+.arch-link:hover .arch-node-external,
+.arch-link:focus-visible .arch-node-external {
+  opacity: 0.9;
+}
+
+.arch-edge-secondary {
+  stroke: var(--muted-dim);
+  stroke-dasharray: 4 3;
+  opacity: 0.7;
+}
+
+.arch-arrowhead-muted {
+  fill: var(--muted-dim);
+  opacity: 0.7;
+}
+
 /* Shared by Footer.tsx (shared/components/Footer.tsx) across all
    projects' pages, not just portfolio's - lives here rather than
    portfolio.css so pantry/imposter pages don't need to pull in the whole
