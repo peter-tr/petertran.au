@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { FaAws, FaCarrot, FaDisplay, FaGlobe, FaMasksTheater, FaPalette } from "react-icons/fa6";
 import { SiAnthropic, SiApollographql, SiGithubactions, SiTypescript } from "react-icons/si";
@@ -39,18 +39,30 @@ function ExternalProjectNode({
   const centerY = y + height / 2;
 
   return (
-    <Link to={to} className="arch-link" aria-label={`Open ${label} (${path})`}>
-      <rect x={x} y={y} width={width} height={height} rx="8" className="arch-node arch-node-external" />
-      <NodeIcon x={x + 12} y={y + 10}>
-        {icon}
-      </NodeIcon>
-      <text x={centerX} y={centerY - 5} className="arch-node-label">
-        {label}
-      </text>
-      <text x={centerX} y={centerY + 13} className="arch-node-sublabel">
-        {path}
-      </text>
-    </Link>
+    <Fragment>
+      <Link to={to} className="arch-link" aria-label={`Open ${label} (${path})`}>
+        <rect x={x} y={y} width={width} height={height} rx="8" className="arch-node arch-node-external" />
+        <NodeIcon x={x + 12} y={y + 10}>
+          {icon}
+        </NodeIcon>
+        <text x={centerX} y={centerY - 5} className="arch-node-label">
+          {label}
+        </text>
+        <text x={centerX} y={centerY + 13} className="arch-node-sublabel">
+          {path}
+        </text>
+      </Link>
+      {/* dangling stub, arrowhead pointing at nothing - each of these has its
+          own Lambda/database/etc. behind it that this diagram doesn't draw */}
+      <line
+        x1={x + width}
+        y1={centerY}
+        x2={x + width + 35}
+        y2={centerY}
+        className="arch-edge arch-edge-secondary"
+        markerEnd="url(#arrow-muted)"
+      />
+    </Fragment>
   );
 }
 
@@ -60,7 +72,7 @@ export default function ArchitectureDiagram() {
       className="arch-diagram"
       viewBox="0 0 1170 670"
       role="img"
-      aria-label="Architecture diagram: CrazyDomains delegates DNS to Route 53, which the browser queries before loading the static site from CloudFront and S3, sending GraphQL requests to API Gateway at api.petertran.au, and sending performance and error telemetry to CloudWatch RUM. API Gateway routes GraphQL requests to an Apollo Federation Supergraph gateway Lambda, which fetches the portfolio subgraph over HTTPS back through the same API Gateway to the Portfolio Lambda. The Portfolio Lambda reads and writes resume data, rate limits, and usage stats in DynamoDB, fetches two API keys from Secrets Manager (one for Anthropic messages, one for Anthropic cost/usage reporting) to call the Anthropic API (Claude Haiku), sends contact-form emails via SES (verified through DNS records in the same Route 53 zone), and reports metrics, traces, and cost data to CloudWatch and X-Ray. The Supergraph Gateway also points, greyed out since they aren't actually federated into this page, to three separately deployed sibling projects - Design Studio, Pantry, and Imposter - each clickable, opening that project's own page. AWS CDK provisions all of it, deployed by GitHub Actions."
+      aria-label="Architecture diagram: the browser is the entry point everything else flows from. It queries Route 53 (delegated from CrazyDomains) before loading the static site from CloudFront and S3, sending GraphQL requests to API Gateway at api.petertran.au, and sending performance and error telemetry to CloudWatch RUM. API Gateway routes GraphQL requests to an Apollo Federation Supergraph gateway Lambda, which fetches the portfolio subgraph over HTTPS back through the same API Gateway to the Portfolio Lambda. The Portfolio Lambda reads and writes resume data, rate limits, and usage stats in DynamoDB, fetches two API keys from Secrets Manager (one for Anthropic messages, one for Anthropic cost/usage reporting) to call the Anthropic API (Claude Haiku), sends contact-form emails via SES (verified through DNS records in the same Route 53 zone), and reports metrics, traces, and cost data to CloudWatch and X-Ray. The Supergraph Gateway also points, greyed out since they aren't actually federated into this page, to three separately deployed sibling projects - Design Studio, Pantry, and Imposter; each is clickable, opening that project's own page, and each has a dangling arrow pointing off to nothing, standing in for its own further infrastructure (Lambda, database, etc.) that this diagram doesn't draw. AWS CDK provisions all of it, deployed by GitHub Actions."
     >
       <defs>
         <marker
@@ -241,9 +253,15 @@ export default function ArchitectureDiagram() {
         </text>
       </g>
 
-      {/* Browser */}
+      {/* Browser - the one node everything else in this diagram flows from,
+          so it gets its own callout + glow + pulsing dot rather than just
+          blending in with the other edge-tier boxes. */}
+      <text x="660" y="12" className="arch-entry-callout">
+        ▾ you start here
+      </text>
       <g>
-        <rect x="570" y="20" width="180" height="40" rx="8" className="arch-node arch-node-edge" />
+        <rect x="570" y="20" width="180" height="40" rx="8" className="arch-node arch-node-edge arch-node-entry" />
+        <circle cx="742" cy="28" r="4" className="arch-entry-dot" />
         <NodeIcon x={582} y={32}>
           <FaDisplay size={16} />
         </NodeIcon>
@@ -302,7 +320,7 @@ export default function ArchitectureDiagram() {
         to="/design-studio"
         x={870}
         y={110}
-        width={280}
+        width={230}
         height={60}
         icon={<FaPalette size={16} />}
         label="Design Studio"
@@ -341,7 +359,7 @@ export default function ArchitectureDiagram() {
         to="/pantry"
         x={870}
         y={200}
-        width={280}
+        width={230}
         height={60}
         icon={<FaCarrot size={16} />}
         label="Pantry"
@@ -366,7 +384,7 @@ export default function ArchitectureDiagram() {
         to="/imposter"
         x={870}
         y={290}
-        width={280}
+        width={230}
         height={60}
         icon={<FaMasksTheater size={16} />}
         label="Imposter"
