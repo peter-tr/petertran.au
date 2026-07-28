@@ -258,7 +258,10 @@ describe("warm-schedule handler - config GET/POST", () => {
     const result = await handler(httpEvent("GET"));
     const { costs } = JSON.parse(result.body as string);
 
-    expect(costs.pantry.last24hCostUsd).toBeCloseTo(costs.pantry.scheduledMonthlyCostUsd / DAYS_PER_MONTH, 10);
+    expect(costs.pantry.last24hCostUsd).toBeCloseTo(
+      costs.pantry.scheduledMonthlyCostUsd / DAYS_PER_MONTH,
+      10
+    );
     expect(consoleErrorSpy).toHaveBeenCalled();
 
     consoleErrorSpy.mockRestore();

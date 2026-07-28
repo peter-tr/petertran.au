@@ -87,8 +87,8 @@ export default function WarmScheduleProject({
           disabled={disabled}
           onChange={(e) => onChange({ ...draft, reactiveEnabled: e.target.checked })}
         />{" "}
-        Warm for 1hr after a real cold start (independent of the toggle above - works whether that&apos;s on or
-        off)
+        Warm for 1hr after a real cold start (independent of the toggle above - works whether that&apos;s on
+        or off)
       </label>
 
       <div className="warm-schedule-days">
