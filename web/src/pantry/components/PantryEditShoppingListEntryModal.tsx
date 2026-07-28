@@ -20,7 +20,7 @@ export default function PantryEditShoppingListEntryModal({
   onAddCategory,
   onClose,
   onSave,
-}: PantryEditShoppingListEntryModalProps) {
+}: Readonly<PantryEditShoppingListEntryModalProps>) {
   const [name, setName] = useState(entry.name);
   const [quantity, setQuantity] = useState(entry.quantity != null ? String(entry.quantity) : "");
   const [unit, setUnit] = useState(entry.unit ?? "");
@@ -75,8 +75,17 @@ export default function PantryEditShoppingListEntryModal({
   }
 
   return (
-    <div className="pantry-modal-backdrop" onClick={onClose}>
-      <div className="pantry-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="pantry-modal-backdrop">
+      {/* See PantryEditItemModal - a real button rather than a click
+          handler on the backdrop div, so "click outside to dismiss" is
+          reachable from the keyboard too. */}
+      <button
+        type="button"
+        className="pantry-modal-backdrop-close"
+        aria-label="Close without saving"
+        onClick={onClose}
+      />
+      <div className="pantry-modal">
         <p className="pantry-modal-title">Edit shopping list entry</p>
 
         <div className="form-row">

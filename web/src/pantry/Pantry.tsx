@@ -46,7 +46,7 @@ export default function Pantry() {
     <>
       <header className="pantry-head pantry-head-row">
         <h1>
-          Pantry
+          Pantry{" "}
           <button
             type="button"
             className="pantry-info-btn"

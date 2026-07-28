@@ -235,8 +235,8 @@ export default function PantrySettingsPage() {
           <div className="pantry-sync-errors">
             <p className="form-label">Recent errors</p>
             <ul>
-              {syncStatus.errors.map((e, i) => (
-                <li key={i}>
+              {syncStatus.errors.map((e) => (
+                <li key={`${e.occurredAt}-${e.itemName}`}>
                   <span className="pantry-sync-error-item">{e.itemName}</span> - {e.message}
                 </li>
               ))}

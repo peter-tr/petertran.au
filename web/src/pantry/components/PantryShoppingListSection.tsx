@@ -53,13 +53,211 @@ function sortEntries(entries: ShoppingListEntry[], sort: string): ShoppingListEn
   return copy.sort((a, b) => b.addedAt.localeCompare(a.addedAt));
 }
 
+interface ShoppingEntryEditRowProps {
+  draft: EditDraft;
+  busy: boolean;
+  onDraftChange: (next: EditDraft) => void;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+// The inline "confirm what you actually bought" row - name/quantity/unit
+// only, editable before recordPurchase is called.
+function ShoppingEntryEditRow({
+  draft,
+  busy,
+  onDraftChange,
+  onConfirm,
+  onCancel,
+}: Readonly<ShoppingEntryEditRowProps>) {
+  const unitOptions =
+    draft.unit && !UNIT_OPTIONS.includes(draft.unit) ? [draft.unit, ...UNIT_OPTIONS] : UNIT_OPTIONS;
+
+  return (
+    <li className="pantry-shopping-item pantry-shopping-item-editing">
+      <div className="pantry-shopping-edit-row">
+        <input
+          className="form-input"
+          value={draft.name}
+          onChange={(e) => onDraftChange({ ...draft, name: e.target.value })}
+          maxLength={200}
+          disabled={busy}
+          autoFocus
+          onKeyDown={(e) => {
+            if (e.key === "Enter") onConfirm();
+            if (e.key === "Escape") onCancel();
+          }}
+        />
+        <input
+          className="form-input pantry-shopping-edit-qty"
+          type="number"
+          inputMode="decimal"
+          min="0"
+          value={draft.quantity}
+          onChange={(e) => onDraftChange({ ...draft, quantity: e.target.value })}
+          placeholder="Qty"
+          disabled={busy}
+        />
+        <select
+          className="form-input pantry-shopping-edit-unit"
+          value={draft.unit}
+          onChange={(e) => onDraftChange({ ...draft, unit: e.target.value })}
+          disabled={busy}
+        >
+          <option value="">No unit</option>
+          {unitOptions.map((u) => (
+            <option key={u} value={u}>
+              {u}
+            </option>
+          ))}
+        </select>
+      </div>
+      <span className="pantry-shopping-item-actions">
+        <button type="button" className="run-btn" onClick={onConfirm} disabled={busy}>
+          {busy ? "…" : "Confirm bought"}
+        </button>
+        <button type="button" className="pantry-details-toggle" onClick={onCancel} disabled={busy}>
+          cancel
+        </button>
+      </span>
+    </li>
+  );
+}
+
+interface ShoppingEntryNameProps {
+  entry: ShoppingListEntry;
+  simple: boolean;
+  nerdMode: boolean;
+  onEdit: () => void;
+}
+
+// The entry's name and everything shown alongside it - a real button, since
+// clicking it opens the full edit modal.
+function ShoppingEntryName({ entry, simple, nerdMode, onEdit }: Readonly<ShoppingEntryNameProps>) {
+  return (
+    <button
+      type="button"
+      className={`pantry-shopping-item-name ${entry.urgent ? "pantry-shopping-item-urgent" : ""}`}
+      title="Click to edit"
+      onClick={onEdit}
+    >
+      {entry.name}
+      {entry.quantity != null && (
+        <span className="pantry-shopping-qty">
+          {" "}
+          ({entry.quantity}
+          {entry.unit ? ` ${entry.unit}` : ""})
+        </span>
+      )}
+      {!simple && entry.note && <span className="pantry-shopping-note"> - {entry.note}</span>}
+      {!simple && entry.category && <span className="pantry-item-category"> {entry.category}</span>}
+      {!simple && entry.recipeTag && <span className="pantry-shopping-recipe-tag"> · {entry.recipeTag}</span>}
+      {entry.trackPrice && (
+        <span className="pantry-item-last-known-price" title={entry.lastKnownPrice?.note ?? undefined}>
+          {" · "}
+          {formatLastKnownPrice(entry.lastKnownPrice)}
+        </span>
+      )}
+      {!simple && entry.trackPrice && nerdMode && entry.lastKnownPrice && (
+        <span className="pantry-nerd-debug-info">
+          {" · "}
+          {formatDebugInfo(entry.lastKnownPrice.debugInfo)}
+        </span>
+      )}
+    </button>
+  );
+}
+
+interface ShoppingEntryActionsProps {
+  entry: ShoppingListEntry;
+  simple: boolean;
+  busy: boolean;
+  onToggleUrgent: () => void;
+  onToggleTrackPrice: () => void;
+  onBought: () => void;
+  onRemove: () => void;
+}
+
+function ShoppingEntryActions({
+  entry,
+  simple,
+  busy,
+  onToggleUrgent,
+  onToggleTrackPrice,
+  onBought,
+  onRemove,
+}: Readonly<ShoppingEntryActionsProps>) {
+  const colesLink = entry.trackPrice ? colesLinkFor(entry.name, entry.lastKnownPrice) : null;
+
+  return (
+    <span className="pantry-shopping-item-actions">
+      {!simple && (
+        <button
+          type="button"
+          className={`pantry-shopping-urgent-toggle ${entry.urgent ? "active" : ""}`}
+          onClick={onToggleUrgent}
+          disabled={busy}
+          title={entry.urgent ? "Urgent - needed ASAP" : "Mark as urgent"}
+          aria-label={entry.urgent ? "Unmark as urgent" : "Mark as urgent"}
+        >
+          !
+        </button>
+      )}
+      {!simple && (
+        <button
+          type="button"
+          className={`pantry-track-price-toggle ${entry.trackPrice ? "active" : ""}`}
+          onClick={onToggleTrackPrice}
+          disabled={busy}
+          title={
+            entry.trackPrice
+              ? "Tracking price - checked daily against Coles"
+              : "Track price (checked daily against Coles)"
+          }
+          aria-label={entry.trackPrice ? "Stop tracking price" : "Track price"}
+        >
+          $
+        </button>
+      )}
+      {!simple && colesLink && (
+        <a
+          className="pantry-coles-link"
+          href={colesLink}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={
+            entry.lastKnownPrice?.productUrl
+              ? "Open this product on Coles"
+              : "Not the exact product priced above - a plain Coles search for this name"
+          }
+        >
+          {entry.lastKnownPrice?.productUrl ? "Coles ↗" : "Search Coles ↗"}
+        </a>
+      )}
+      <button type="button" className="pantry-delete-btn" onClick={onBought} disabled={busy}>
+        {busy ? "…" : "bought"}
+      </button>
+      <button
+        type="button"
+        className="pantry-shopping-remove-btn"
+        onClick={onRemove}
+        disabled={busy}
+        aria-label={`Remove ${entry.name} without buying it`}
+        title="Remove without buying"
+      >
+        ✕
+      </button>
+    </span>
+  );
+}
+
 export default function PantryShoppingListSection({
   entries,
   items,
   settings,
   onSettingsChange,
   onChanged,
-}: PantryShoppingListSectionProps) {
+}: Readonly<PantryShoppingListSectionProps>) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -327,191 +525,34 @@ export default function PantryShoppingListSection({
             <ul className="pantry-shopping-list">
               {filteredEntries.map((entry) =>
                 editingId === entry.id && draft ? (
-                  <li key={entry.id} className="pantry-shopping-item pantry-shopping-item-editing">
-                    <div className="pantry-shopping-edit-row">
-                      <input
-                        className="form-input"
-                        value={draft.name}
-                        onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-                        maxLength={200}
-                        disabled={busyId === entry.id}
-                        autoFocus
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") confirmBought(entry);
-                          if (e.key === "Escape") cancelEdit();
-                        }}
-                      />
-                      <input
-                        className="form-input pantry-shopping-edit-qty"
-                        type="number"
-                        inputMode="decimal"
-                        min="0"
-                        value={draft.quantity}
-                        onChange={(e) => setDraft({ ...draft, quantity: e.target.value })}
-                        placeholder="Qty"
-                        disabled={busyId === entry.id}
-                      />
-                      <select
-                        className="form-input pantry-shopping-edit-unit"
-                        value={draft.unit}
-                        onChange={(e) => setDraft({ ...draft, unit: e.target.value })}
-                        disabled={busyId === entry.id}
-                      >
-                        <option value="">No unit</option>
-                        {(draft.unit && !UNIT_OPTIONS.includes(draft.unit)
-                          ? [draft.unit, ...UNIT_OPTIONS]
-                          : UNIT_OPTIONS
-                        ).map((u) => (
-                          <option key={u} value={u}>
-                            {u}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <span className="pantry-shopping-item-actions">
-                      <button
-                        type="button"
-                        className="run-btn"
-                        onClick={() => confirmBought(entry)}
-                        disabled={busyId === entry.id}
-                      >
-                        {busyId === entry.id ? "…" : "Confirm bought"}
-                      </button>
-                      <button
-                        type="button"
-                        className="pantry-details-toggle"
-                        onClick={cancelEdit}
-                        disabled={busyId === entry.id}
-                      >
-                        cancel
-                      </button>
-                    </span>
-                  </li>
+                  <ShoppingEntryEditRow
+                    key={entry.id}
+                    draft={draft}
+                    busy={busyId === entry.id}
+                    onDraftChange={setDraft}
+                    onConfirm={() => confirmBought(entry)}
+                    onCancel={cancelEdit}
+                  />
                 ) : (
                   <li
                     key={entry.id}
                     className={`pantry-shopping-item ${settings.shoppingSimple ? "pantry-shopping-item-simple" : ""}`}
                   >
-                    <span
-                      className={`pantry-shopping-item-name ${entry.urgent ? "pantry-shopping-item-urgent" : ""}`}
-                      role="button"
-                      tabIndex={0}
-                      title="Click to edit"
-                      onClick={() => setShowEditId(entry.id)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          setShowEditId(entry.id);
-                        }
-                      }}
-                    >
-                      {entry.name}
-                      {entry.quantity != null && (
-                        <span className="pantry-shopping-qty">
-                          {" "}
-                          ({entry.quantity}
-                          {entry.unit ? ` ${entry.unit}` : ""})
-                        </span>
-                      )}
-                      {!settings.shoppingSimple && entry.note && (
-                        <span className="pantry-shopping-note"> - {entry.note}</span>
-                      )}
-                      {!settings.shoppingSimple && entry.category && (
-                        <span className="pantry-item-category"> {entry.category}</span>
-                      )}
-                      {!settings.shoppingSimple && entry.recipeTag && (
-                        <span className="pantry-shopping-recipe-tag"> · {entry.recipeTag}</span>
-                      )}
-                      {entry.trackPrice && (
-                        <span
-                          className="pantry-item-last-known-price"
-                          title={entry.lastKnownPrice?.note ?? undefined}
-                        >
-                          {" · "}
-                          {formatLastKnownPrice(entry.lastKnownPrice)}
-                        </span>
-                      )}
-                      {!settings.shoppingSimple &&
-                        entry.trackPrice &&
-                        settings.nerdModeShoppingList &&
-                        entry.lastKnownPrice && (
-                          <span className="pantry-nerd-debug-info">
-                            {" · "}
-                            {formatDebugInfo(entry.lastKnownPrice.debugInfo)}
-                          </span>
-                        )}
-                    </span>
-                    <span className="pantry-shopping-item-actions">
-                      {!settings.shoppingSimple && (
-                        <button
-                          type="button"
-                          className={`pantry-shopping-urgent-toggle ${entry.urgent ? "active" : ""}`}
-                          onClick={() => toggleUrgent(entry)}
-                          disabled={busyId === entry.id}
-                          title={entry.urgent ? "Urgent - needed ASAP" : "Mark as urgent"}
-                          aria-label={entry.urgent ? "Unmark as urgent" : "Mark as urgent"}
-                        >
-                          !
-                        </button>
-                      )}
-                      {!settings.shoppingSimple && (
-                        <button
-                          type="button"
-                          className={`pantry-track-price-toggle ${entry.trackPrice ? "active" : ""}`}
-                          onClick={() => toggleTrackPrice(entry)}
-                          disabled={busyId === entry.id}
-                          title={
-                            entry.trackPrice
-                              ? "Tracking price - checked daily against Coles"
-                              : "Track price (checked daily against Coles)"
-                          }
-                          aria-label={entry.trackPrice ? "Stop tracking price" : "Track price"}
-                        >
-                          $
-                        </button>
-                      )}
-                      {!settings.shoppingSimple &&
-                        entry.trackPrice &&
-                        (() => {
-                          const link = colesLinkFor(entry.name, entry.lastKnownPrice);
-
-                          return (
-                            link && (
-                              <a
-                                className="pantry-coles-link"
-                                href={link}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                title={
-                                  entry.lastKnownPrice?.productUrl
-                                    ? "Open this product on Coles"
-                                    : "Not the exact product priced above - a plain Coles search for this name"
-                                }
-                              >
-                                {entry.lastKnownPrice?.productUrl ? "Coles ↗" : "Search Coles ↗"}
-                              </a>
-                            )
-                          );
-                        })()}
-                      <button
-                        type="button"
-                        className="pantry-delete-btn"
-                        onClick={() => startBought(entry)}
-                        disabled={busyId === entry.id}
-                      >
-                        {busyId === entry.id ? "…" : "bought"}
-                      </button>
-                      <button
-                        type="button"
-                        className="pantry-shopping-remove-btn"
-                        onClick={() => handleRemove(entry.id)}
-                        disabled={busyId === entry.id}
-                        aria-label={`Remove ${entry.name} without buying it`}
-                        title="Remove without buying"
-                      >
-                        ✕
-                      </button>
-                    </span>
+                    <ShoppingEntryName
+                      entry={entry}
+                      simple={settings.shoppingSimple}
+                      nerdMode={settings.nerdModeShoppingList}
+                      onEdit={() => setShowEditId(entry.id)}
+                    />
+                    <ShoppingEntryActions
+                      entry={entry}
+                      simple={settings.shoppingSimple}
+                      busy={busyId === entry.id}
+                      onToggleUrgent={() => toggleUrgent(entry)}
+                      onToggleTrackPrice={() => toggleTrackPrice(entry)}
+                      onBought={() => startBought(entry)}
+                      onRemove={() => handleRemove(entry.id)}
+                    />
 
                     {showEditId === entry.id && (
                       <PantryEditShoppingListEntryModal

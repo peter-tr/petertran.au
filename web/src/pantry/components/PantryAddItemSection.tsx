@@ -27,7 +27,7 @@ export default function PantryAddItemSection({
   settings,
   onSettingsChange,
   onAdded,
-}: PantryAddItemSectionProps) {
+}: Readonly<PantryAddItemSectionProps>) {
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [category, setCategory] = useState("");

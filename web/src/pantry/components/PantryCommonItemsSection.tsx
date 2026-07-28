@@ -18,7 +18,7 @@ export default function PantryCommonItemsSection({
   commonItems,
   onCommonItemsChange,
   onAdded,
-}: PantryCommonItemsSectionProps) {
+}: Readonly<PantryCommonItemsSectionProps>) {
   const [openName, setOpenName] = useState<string | null>(null);
   const [pickerQty, setPickerQty] = useState(1);
   const [pickerUnit, setPickerUnit] = useState("pcs");
@@ -77,20 +77,23 @@ export default function PantryCommonItemsSection({
       <div className="pantry-common-items">
         {commonItems.map((name) => (
           <div key={name} className="pantry-common-item">
-            <button type="button" className="pantry-common-item-btn" onClick={() => toggleOpen(name)}>
-              {name}
-              <span
+            {/* Two sibling buttons inside the chip rather than a delete
+                control nested inside the name button - a button can't
+                contain another button, and the nested version needed a
+                fake role plus stopPropagation to behave like one. */}
+            <div className="pantry-common-item-chip">
+              <button type="button" className="pantry-common-item-btn" onClick={() => toggleOpen(name)}>
+                {name}
+              </button>
+              <button
+                type="button"
                 className="pantry-common-item-delete"
-                role="button"
                 aria-label={`Remove ${name} from common items`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  deleteCommonItem(name);
-                }}
+                onClick={() => deleteCommonItem(name)}
               >
                 ×
-              </span>
-            </button>
+              </button>
+            </div>
 
             {openName === name && (
               <div className="pantry-common-item-picker">
