@@ -19,12 +19,19 @@ import { formatDebugInfo } from "../lib/priceDisplay";
 
 type ActionsStatus = "pending" | "confirming" | "done" | "cancelled";
 
+// Tracked separately from actionsStatus - a price check isn't an action the
+// user is confirming before it happens, it's a single already-agreed-to
+// live lookup.
+type PriceCheckStatus = "idle" | "checking" | "done" | "error";
+
 interface UserTurn {
+  id: string;
   role: "user";
   text: string;
 }
 
 interface AssistantTurn {
+  id: string;
   role: "assistant";
   result: ParsedCommand;
   actionsStatus: ActionsStatus;
@@ -42,10 +49,7 @@ interface AssistantTurn {
   // follow-up like "make it vegetarian" can't accidentally apply to a
   // suggestion the user already said they're done with.
   dismissedRecipes: Set<number>;
-  // Tracks the "want me to check now?" offer's own button separately from
-  // actionsStatus - a price check isn't an action the user is confirming
-  // before it happens, it's a single already-agreed-to live lookup.
-  priceCheckStatus: "idle" | "checking" | "done" | "error";
+  priceCheckStatus: PriceCheckStatus;
 }
 
 type Turn = UserTurn | AssistantTurn;
@@ -60,6 +64,17 @@ interface PantryCommandBarProps {
 // personal pantry's inventory/shopping-list state is small, but there's no
 // reason to let token cost grow unbounded across a very long conversation.
 const MAX_HISTORY_TURNS = 10;
+
+// Turns are only ever appended, but each one carries local state (servings,
+// exclusions, dismissals) that has to stay attached to it across renders -
+// so they get a real identity rather than being keyed on array position.
+let turnSeq = 0;
+
+function nextTurnId(): string {
+  turnSeq += 1;
+
+  return `turn-${turnSeq}`;
+}
 
 // haveInInventory only ever means "this ingredient exists somewhere in
 // inventory", set once by the AI - it's never re-checked as the servings
@@ -102,16 +117,14 @@ function buildRecipeShoppingActions(
       const scaledQuantityMatch = ing.quantity > 0 ? amount?.match(/^([\d.]+)/) : null;
       const quantity = scaledQuantityMatch ? Number(scaledQuantityMatch[1]) : null;
       const unit = quantity !== null ? amount!.replace(/^[\d.]+\s*/, "").trim() || null : null;
-      const note =
-        quantity !== null
-          ? `For: ${recipe.name}`
-          : amount
-            ? `${amount} - for: ${recipe.name}`
-            : `For: ${recipe.name}`;
+      const amountSuffix = amount ? ` (${amount})` : "";
+
+      let note = `For: ${recipe.name}`;
+      if (quantity === null && amount) note = `${amount} - for: ${recipe.name}`;
 
       return {
         type: PantryActionType.AddToShoppingList,
-        summary: `Add "${ing.name}"${amount ? ` (${amount})` : ""} to the shopping list (for: ${recipe.name})`,
+        summary: `Add "${ing.name}"${amountSuffix} to the shopping list (for: ${recipe.name})`,
         mutationName: "addToShoppingList",
         argsJson: JSON.stringify({
           name: ing.name,
@@ -129,6 +142,70 @@ function buildRecipeShoppingActions(
 // whatever the user has set the stepper to (default: baseServings itself).
 function servingsFor(turn: AssistantTurn, recipeIndex: number, recipe: RecipeSuggestion): number {
   return turn.recipeServings[recipeIndex] ?? recipe.baseServings;
+}
+
+function excludedIndexesFor(turn: AssistantTurn, recipe: RecipeSuggestion, recipeIndex: number): number[] {
+  return recipe.ingredients
+    .map((_, ii) => ii)
+    .filter((ii) => turn.excludedIngredients.has(`${recipeIndex}-${ii}`));
+}
+
+// Recipe turns carry client-only state (servings, excluded ingredients)
+// the server never saw - merged in here so the AI can tell that a follow-up
+// like "remove the salt" already happened, and what serving count is
+// currently showing. Dismissed recipes are dropped entirely (not just
+// flagged) - once the user clicks "✕" on one, it should be as if it was
+// never suggested for the rest of the conversation.
+function withClientRecipeState(turn: AssistantTurn) {
+  const recipes = turn.result.recipes ?? [];
+
+  return {
+    ...turn.result,
+    recipes: recipes
+      .map((recipe, ri) => ({
+        ...recipe,
+        currentServings: servingsFor(turn, ri, recipe),
+        excludedIngredientIndexes: excludedIndexesFor(turn, recipe, ri),
+      }))
+      .filter((_, ri) => !turn.dismissedRecipes.has(ri)),
+  };
+}
+
+// Feeds Claude back its own prior structured output as the assistant's side
+// of the conversation, so a reply like "shopping list, 1 bottle" can
+// complete an earlier clarifying question instead of being parsed alone as
+// a new, likely-unclear input.
+function toHistoryMessage(turn: Turn): ConversationMessage {
+  if (turn.role === "user") return { role: "user", content: turn.text };
+
+  const content = turn.result.recipes ? withClientRecipeState(turn) : turn.result;
+
+  return { role: "assistant", content: JSON.stringify(content) };
+}
+
+// Fine-grained control: drop a single proposed action from the batch
+// without cancelling the whole thing.
+function withoutAction(turn: Turn, actionIndex: number): Turn {
+  if (turn.role !== "assistant" || !turn.result.actions) return turn;
+
+  return {
+    ...turn,
+    result: { ...turn.result, actions: turn.result.actions.filter((_, ai) => ai !== actionIndex) },
+  };
+}
+
+function ingredientIcon(haveInInventory: boolean, insufficient: boolean): string {
+  if (!haveInInventory) return "+";
+
+  return insufficient ? "△" : "✓";
+}
+
+// Only ever shown on an ingredient that can actually be clicked off.
+function ingredientTitle(excluded: boolean, insufficient: boolean): string {
+  if (excluded) return "Click to include again";
+  if (insufficient) return "You don't have enough at this serving count - click to skip";
+
+  return "Click to skip";
 }
 
 interface CapabilityGroup {
@@ -168,7 +245,413 @@ const CAPABILITIES: CapabilityGroup[] = [
   },
 ];
 
-export default function PantryCommandBar({ items, onChanged, nerdMode }: PantryCommandBarProps) {
+interface PriceCheckOfferProps {
+  status: PriceCheckStatus;
+  onCheck: () => void;
+}
+
+// The one-off live Coles check the user explicitly opted into from the
+// "want me to check now?" offer - a single real Anthropic call, so it takes
+// a few seconds, not the instant round-trip everything else here is.
+function PriceCheckOffer({ status, onCheck }: Readonly<PriceCheckOfferProps>) {
+  if (status === "done") {
+    return <p className="pantry-command-price-offer">Checked - see the updated price on the list below.</p>;
+  }
+
+  if (status === "error") {
+    return (
+      <p className="pantry-command-price-offer">
+        Couldn&apos;t check just now.{" "}
+        <button type="button" className="run-btn" onClick={onCheck}>
+          Try again
+        </button>
+      </p>
+    );
+  }
+
+  return (
+    <p className="pantry-command-price-offer">
+      <button type="button" className="run-btn" disabled={status === "checking"} onClick={onCheck}>
+        {status === "checking" ? "Checking…" : "Check Coles now"}
+      </button>
+    </p>
+  );
+}
+
+interface IngredientRowProps {
+  ingredient: RecipeIngredient;
+  ratio: number;
+  items: InventoryItem[];
+  excluded: boolean;
+  onToggle: () => void;
+}
+
+function IngredientRow({ ingredient, ratio, items, excluded, onToggle }: Readonly<IngredientRowProps>) {
+  const matched = ingredient.itemId ? (items.find((it) => it.id === ingredient.itemId) ?? null) : null;
+  const sufficiency = ingredient.haveInInventory
+    ? checkSufficiency(ingredient.amount, ingredient.quantity, ratio, matched)
+    : "unknown";
+  const insufficient = sufficiency === "insufficient";
+  // Only something you're short of is worth clicking off - the rest was
+  // never going on the shopping list anyway.
+  const clickable = !ingredient.haveInInventory || insufficient;
+  const amount = scaleAmount(ingredient.amount, ingredient.quantity, ratio);
+  const price = scalePrice(ingredient.estimatedPriceAud, ingredient.quantity, ratio);
+  const className = [
+    ingredient.haveInInventory ? "pantry-command-ingredient-have" : "pantry-command-ingredient-missing",
+    insufficient ? "pantry-command-ingredient-insufficient" : "",
+    excluded ? "pantry-command-ingredient-excluded" : "",
+    clickable ? "pantry-command-ingredient-clickable" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const label = (
+    <>
+      {ingredientIcon(ingredient.haveInInventory, insufficient)} {ingredient.name}
+      {amount && <span className="pantry-command-ingredient-amount"> ({amount})</span>}
+      {insufficient && matched && (
+        <span className="pantry-command-ingredient-amount">
+          {" "}
+          - have {matched.quantity}
+          {matched.unit ? ` ${matched.unit}` : ""}
+        </span>
+      )}
+      {price > 0 && <span className="pantry-command-ingredient-price"> ~${price.toFixed(2)}</span>}
+    </>
+  );
+
+  return (
+    <li className={className}>
+      {clickable ? (
+        <button
+          type="button"
+          className="pantry-command-ingredient-btn"
+          title={ingredientTitle(excluded, insufficient)}
+          onClick={onToggle}
+        >
+          {label}
+        </button>
+      ) : (
+        label
+      )}
+    </li>
+  );
+}
+
+interface RecipeCardProps {
+  recipe: RecipeSuggestion;
+  turn: AssistantTurn;
+  turnIndex: number;
+  recipeIndex: number;
+  items: InventoryItem[];
+  onDismiss: (turnIndex: number, recipeIndex: number) => void;
+  onSetServings: (turnIndex: number, recipeIndex: number, next: number) => void;
+  onToggleIngredient: (turnIndex: number, recipeIndex: number, ingredientIndex: number) => void;
+  onAddMissing: (turnIndex: number, recipe: RecipeSuggestion, recipeIndex: number) => void;
+}
+
+function RecipeCard({
+  recipe,
+  turn,
+  turnIndex,
+  recipeIndex,
+  items,
+  onDismiss,
+  onSetServings,
+  onToggleIngredient,
+  onAddMissing,
+}: Readonly<RecipeCardProps>) {
+  const servings = servingsFor(turn, recipeIndex, recipe);
+  const ratio = servings / recipe.baseServings;
+  const missingCount = recipe.ingredients.filter(
+    (ing, ii) =>
+      isEffectivelyMissing(ing, ratio, items) && !turn.excludedIngredients.has(`${recipeIndex}-${ii}`)
+  ).length;
+  const totalPriceAud = recipe.ingredients.reduce(
+    (sum, ing) => sum + scalePrice(ing.estimatedPriceAud, ing.quantity, ratio),
+    0
+  );
+
+  return (
+    <div className="pantry-command-recipe">
+      <div className="pantry-command-recipe-header">
+        <div className="pantry-command-recipe-title">
+          <p className="pantry-command-recipe-name">{recipe.name}</p>
+          <button
+            type="button"
+            className="pantry-shopping-remove-btn"
+            onClick={() => onDismiss(turnIndex, recipeIndex)}
+            aria-label={`Dismiss "${recipe.name}"`}
+            title="Not interested in this one"
+          >
+            ✕
+          </button>
+        </div>
+        <div className="pantry-command-servings">
+          <button
+            type="button"
+            className="qty-stepper-btn"
+            onClick={() => onSetServings(turnIndex, recipeIndex, servings - 1)}
+            disabled={servings <= 1}
+          >
+            −
+          </button>
+          <span className="pantry-command-servings-count">
+            {servings} serving{servings > 1 ? "s" : ""}
+          </span>
+          <button
+            type="button"
+            className="qty-stepper-btn"
+            onClick={() => onSetServings(turnIndex, recipeIndex, servings + 1)}
+          >
+            +
+          </button>
+        </div>
+      </div>
+      {recipe.description && <p className="pantry-command-recipe-desc">{recipe.description}</p>}
+      <p className="pantry-command-recipe-nutrition">
+        {Math.round(recipe.caloriesPerServing)} kcal · {Math.round(recipe.proteinGPerServing)}g protein ·{" "}
+        {Math.round(recipe.carbsGPerServing)}g carbs · {Math.round(recipe.fatGPerServing)}g fat
+      </p>
+      <ul className="pantry-command-recipe-ingredients">
+        {recipe.ingredients.map((ing, ii) => (
+          <IngredientRow
+            key={ing.name}
+            ingredient={ing}
+            ratio={ratio}
+            items={items}
+            excluded={turn.excludedIngredients.has(`${recipeIndex}-${ii}`)}
+            onToggle={() => onToggleIngredient(turnIndex, recipeIndex, ii)}
+          />
+        ))}
+      </ul>
+      <p className="pantry-command-recipe-total">Estimated total: ~${totalPriceAud.toFixed(2)} AUD</p>
+      {missingCount > 0 && (
+        <button
+          type="button"
+          className="pantry-details-toggle"
+          onClick={() => onAddMissing(turnIndex, recipe, recipeIndex)}
+        >
+          + add {missingCount} missing ingredient{missingCount > 1 ? "s" : ""} to shopping list
+        </button>
+      )}
+    </div>
+  );
+}
+
+type RecipeListProps = Omit<RecipeCardProps, "recipe" | "recipeIndex">;
+
+function RecipeList({ turn, turnIndex, items, ...handlers }: Readonly<RecipeListProps>) {
+  const recipes = turn.result.recipes ?? [];
+
+  return (
+    <div className="pantry-command-recipes">
+      {recipes.every((_, ri) => turn.dismissedRecipes.has(ri)) && (
+        <p className="pantry-command-turn-done">All suggestions dismissed.</p>
+      )}
+      {recipes.map((recipe, ri) =>
+        turn.dismissedRecipes.has(ri) ? null : (
+          <RecipeCard
+            key={recipe.name}
+            recipe={recipe}
+            recipeIndex={ri}
+            turn={turn}
+            turnIndex={turnIndex}
+            items={items}
+            {...handlers}
+          />
+        )
+      )}
+    </div>
+  );
+}
+
+interface ProposedActionsPanelProps {
+  turn: AssistantTurn;
+  turnIndex: number;
+  actions: ProposedAction[];
+  onRemoveAction: (turnIndex: number, actionIndex: number) => void;
+  onCancel: (turnIndex: number) => void;
+  onConfirm: (turnIndex: number, actions: ProposedAction[]) => void;
+}
+
+function ProposedActionsPanel({
+  turn,
+  turnIndex,
+  actions,
+  onRemoveAction,
+  onCancel,
+  onConfirm,
+}: Readonly<ProposedActionsPanelProps>) {
+  // Collapsed to a single line once applied - the per-action cards were
+  // only ever useful before confirming, and stayed expanded afterward for
+  // no reason.
+  if (turn.actionsStatus === "done") {
+    return (
+      <div className="pantry-command-actions">
+        <p className="pantry-command-turn-done">
+          ✓ Added {actions.length} item{actions.length > 1 ? "s" : ""}
+        </p>
+      </div>
+    );
+  }
+
+  if (turn.actionsStatus === "cancelled") {
+    return (
+      <div className="pantry-command-actions">
+        <p className="pantry-command-turn-done">Cancelled</p>
+      </div>
+    );
+  }
+
+  const confirming = turn.actionsStatus === "confirming";
+
+  return (
+    <div className="pantry-command-actions">
+      {turn.result.message && <p className="status-line">// {turn.result.message}</p>}
+      {actions.map((action, ai) => (
+        <div className="pantry-command-action" key={action.summary}>
+          <div className="pantry-command-action-row">
+            <p className="pantry-command-action-summary">
+              {action.summary}
+              {action.estimatedPriceAud !== null && (
+                <span
+                  className="pantry-command-action-estimate"
+                  title="Rough estimate from Claude's own knowledge - not a live/confirmed price"
+                >
+                  {" "}
+                  ~${action.estimatedPriceAud.toFixed(2)}
+                </span>
+              )}
+            </p>
+            <button
+              type="button"
+              className="pantry-shopping-remove-btn"
+              onClick={() => onRemoveAction(turnIndex, ai)}
+              disabled={confirming}
+              aria-label={`Remove "${action.summary}" from this batch`}
+              title="Remove this action"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      ))}
+      {turn.actionsError && <p className="status-line">// {turn.actionsError}</p>}
+      <div className="pantry-modal-actions">
+        <button
+          type="button"
+          className="pantry-details-toggle"
+          onClick={() => onCancel(turnIndex)}
+          disabled={confirming}
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          className="run-btn"
+          onClick={() => onConfirm(turnIndex, actions)}
+          disabled={confirming}
+        >
+          {confirming ? "Applying…" : "Confirm"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+interface AssistantTurnViewProps {
+  turn: AssistantTurn;
+  turnIndex: number;
+  items: InventoryItem[];
+  nerdMode: boolean;
+  // Recipes represent "the current suggestion we're iterating on" - only
+  // the latest turn's render as live cards (see lastRecipesTurnIndex).
+  showRecipes: boolean;
+  onCheckPrice: (turnIndex: number, itemId: string, list: string) => void;
+  onDismissRecipe: (turnIndex: number, recipeIndex: number) => void;
+  onSetServings: (turnIndex: number, recipeIndex: number, next: number) => void;
+  onToggleIngredient: (turnIndex: number, recipeIndex: number, ingredientIndex: number) => void;
+  onAddMissing: (turnIndex: number, recipe: RecipeSuggestion, recipeIndex: number) => void;
+  onRemoveAction: (turnIndex: number, actionIndex: number) => void;
+  onCancelActions: (turnIndex: number) => void;
+  onConfirmActions: (turnIndex: number, actions: ProposedAction[]) => void;
+}
+
+function AssistantTurnView({
+  turn,
+  turnIndex,
+  items,
+  nerdMode,
+  showRecipes,
+  onCheckPrice,
+  onDismissRecipe,
+  onSetServings,
+  onToggleIngredient,
+  onAddMissing,
+  onRemoveAction,
+  onCancelActions,
+  onConfirmActions,
+}: Readonly<AssistantTurnViewProps>) {
+  const { result } = turn;
+  const priceCheckItemId = result.offerPriceCheckItemId;
+  const priceCheckList = result.offerPriceCheckList;
+  const actions = result.actions ?? [];
+  const hasRecipes = showRecipes && !!result.recipes && result.recipes.length > 0;
+
+  return (
+    <div className="pantry-command-turn-assistant">
+      {result.answer && <p className="pantry-command-answer">{result.answer}</p>}
+
+      {priceCheckItemId && priceCheckList && (
+        <PriceCheckOffer
+          status={turn.priceCheckStatus}
+          onCheck={() => onCheckPrice(turnIndex, priceCheckItemId, priceCheckList)}
+        />
+      )}
+
+      {result.answerItems && result.answerItems.length > 0 && (
+        <ul className="pantry-command-answer-items">
+          {result.answerItems.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+      )}
+
+      {hasRecipes && (
+        <RecipeList
+          turn={turn}
+          turnIndex={turnIndex}
+          items={items}
+          onDismiss={onDismissRecipe}
+          onSetServings={onSetServings}
+          onToggleIngredient={onToggleIngredient}
+          onAddMissing={onAddMissing}
+        />
+      )}
+
+      {result.message && !result.answer && actions.length === 0 && (
+        <p className="status-line">// {result.message}</p>
+      )}
+
+      {actions.length > 0 && (
+        <ProposedActionsPanel
+          turn={turn}
+          turnIndex={turnIndex}
+          actions={actions}
+          onRemoveAction={onRemoveAction}
+          onCancel={onCancelActions}
+          onConfirm={onConfirmActions}
+        />
+      )}
+
+      {nerdMode && <p className="pantry-nerd-debug-info">{formatDebugInfo(result.debugInfo)}</p>}
+    </div>
+  );
+}
+
+export default function PantryCommandBar({ items, onChanged, nerdMode }: Readonly<PantryCommandBarProps>) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [input, setInput] = useState("");
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -218,19 +701,8 @@ export default function PantryCommandBar({ items, onChanged, nerdMode }: PantryC
     setTurns((prev) => prev.map((t, i) => (i === index && t.role === "assistant" ? { ...t, ...patch } : t)));
   }
 
-  // Fine-grained control: drop a single proposed action from the batch
-  // without cancelling the whole thing.
   function removeAction(turnIndex: number, actionIndex: number) {
-    setTurns((prev) =>
-      prev.map((t, i) => {
-        if (i !== turnIndex || t.role !== "assistant" || !t.result.actions) return t;
-
-        return {
-          ...t,
-          result: { ...t.result, actions: t.result.actions.filter((_, ai) => ai !== actionIndex) },
-        };
-      })
-    );
+    setTurns((prev) => prev.map((t, i) => (i === turnIndex ? withoutAction(t, actionIndex) : t)));
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -239,38 +711,9 @@ export default function PantryCommandBar({ items, onChanged, nerdMode }: PantryC
     const trimmed = input.trim();
     if (!trimmed || thinking) return;
 
-    // Feeds Claude back its own prior structured output as the assistant's
-    // side of the conversation, so a reply like "shopping list, 1 bottle"
-    // can complete an earlier clarifying question instead of being parsed
-    // alone as a new, likely-unclear input. Recipe turns get client-only
-    // state (servings, excluded ingredients) merged in first - the server
-    // never saw those, so without this the AI has no way to know a
-    // follow-up like "remove the salt" already happened, or what serving
-    // count is currently showing. Dismissed recipes are dropped entirely
-    // (not just flagged) - once the user clicks "✕" on one, it should be as
-    // if it was never suggested for the rest of the conversation.
-    const history: ConversationMessage[] = turns.slice(-MAX_HISTORY_TURNS).map((t) => {
-      if (t.role === "user") return { role: "user", content: t.text };
+    const history: ConversationMessage[] = turns.slice(-MAX_HISTORY_TURNS).map(toHistoryMessage);
 
-      const content = t.result.recipes
-        ? {
-            ...t.result,
-            recipes: t.result.recipes
-              .map((r, ri) => ({
-                ...r,
-                currentServings: servingsFor(t, ri, r),
-                excludedIngredientIndexes: r.ingredients
-                  .map((_, ii) => ii)
-                  .filter((ii) => t.excludedIngredients.has(`${ri}-${ii}`)),
-              }))
-              .filter((_, ri) => !t.dismissedRecipes.has(ri)),
-          }
-        : t.result;
-
-      return { role: "assistant", content: JSON.stringify(content) };
-    });
-
-    setTurns((prev) => [...prev, { role: "user", text: trimmed }]);
+    setTurns((prev) => [...prev, { id: nextTurnId(), role: "user", text: trimmed }]);
     setInput("");
     resetTextareaHeight();
     setThinking(true);
@@ -281,6 +724,7 @@ export default function PantryCommandBar({ items, onChanged, nerdMode }: PantryC
       setTurns((prev) => [
         ...prev,
         {
+          id: nextTurnId(),
           role: "assistant",
           result: data.parseCommand,
           actionsStatus: "pending",
@@ -348,6 +792,10 @@ export default function PantryCommandBar({ items, onChanged, nerdMode }: PantryC
     });
   }
 
+  function cancelActions(turnIndex: number) {
+    updateAssistantTurn(turnIndex, { actionsStatus: "cancelled" });
+  }
+
   async function confirmActions(turnIndex: number, actions: ProposedAction[]) {
     updateAssistantTurn(turnIndex, { actionsStatus: "confirming", actionsError: null });
 
@@ -375,9 +823,6 @@ export default function PantryCommandBar({ items, onChanged, nerdMode }: PantryC
     }
   }
 
-  // The one-off live Coles check the user explicitly opted into from the
-  // "want me to check now?" offer - a single real Anthropic call, so this
-  // takes a few seconds, not the instant round-trip everything else here is.
   async function checkPriceNow(turnIndex: number, itemId: string, list: string) {
     updateAssistantTurn(turnIndex, { priceCheckStatus: "checking" });
     try {
@@ -389,11 +834,10 @@ export default function PantryCommandBar({ items, onChanged, nerdMode }: PantryC
     }
   }
 
-  // Recipes represent "the current suggestion we're iterating on" - only
-  // the latest one should render as a live card, or a refinement like
-  // "remove garlic" would appear to duplicate the card instead of updating
-  // it. Older turns' answer/message/actions still render normally; this
-  // only suppresses stale recipe cards.
+  // Only the latest recipe turn renders as a live card, or a refinement
+  // like "remove garlic" would appear to duplicate the card instead of
+  // updating it. Older turns' answer/message/actions still render normally;
+  // this only suppresses stale recipe cards.
   const lastRecipesTurnIndex = turns.reduce(
     (acc, t, i) => (t.role === "assistant" && t.result.recipes && t.result.recipes.length > 0 ? i : acc),
     -1
@@ -403,7 +847,7 @@ export default function PantryCommandBar({ items, onChanged, nerdMode }: PantryC
     <section className="pantry-panel pantry-command-bar">
       <div className="pantry-panel-header">
         <h2 className="pantry-panel-title">
-          Ask or tell it what to do
+          Ask or tell it what to do{" "}
           <button
             type="button"
             className="pantry-info-btn"
@@ -451,294 +895,26 @@ export default function PantryCommandBar({ items, onChanged, nerdMode }: PantryC
         <div className="pantry-command-turns">
           {turns.map((turn, i) =>
             turn.role === "user" ? (
-              <p className="pantry-command-turn-user" key={i}>
+              <p className="pantry-command-turn-user" key={turn.id}>
                 {turn.text}
               </p>
             ) : (
-              <div className="pantry-command-turn-assistant" key={i}>
-                {turn.result.answer && <p className="pantry-command-answer">{turn.result.answer}</p>}
-
-                {turn.result.offerPriceCheckItemId && turn.result.offerPriceCheckList && (
-                  <p className="pantry-command-price-offer">
-                    {turn.priceCheckStatus === "done" ? (
-                      "Checked - see the updated price on the list below."
-                    ) : turn.priceCheckStatus === "error" ? (
-                      <>
-                        Couldn&apos;t check just now.{" "}
-                        <button
-                          type="button"
-                          className="run-btn"
-                          onClick={() =>
-                            checkPriceNow(
-                              i,
-                              turn.result.offerPriceCheckItemId!,
-                              turn.result.offerPriceCheckList!
-                            )
-                          }
-                        >
-                          Try again
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        type="button"
-                        className="run-btn"
-                        disabled={turn.priceCheckStatus === "checking"}
-                        onClick={() =>
-                          checkPriceNow(
-                            i,
-                            turn.result.offerPriceCheckItemId!,
-                            turn.result.offerPriceCheckList!
-                          )
-                        }
-                      >
-                        {turn.priceCheckStatus === "checking" ? "Checking…" : "Check Coles now"}
-                      </button>
-                    )}
-                  </p>
-                )}
-
-                {turn.result.answerItems && turn.result.answerItems.length > 0 && (
-                  <ul className="pantry-command-answer-items">
-                    {turn.result.answerItems.map((item, ii) => (
-                      <li key={ii}>{item}</li>
-                    ))}
-                  </ul>
-                )}
-
-                {i === lastRecipesTurnIndex && turn.result.recipes && turn.result.recipes.length > 0 && (
-                  <div className="pantry-command-recipes">
-                    {turn.result.recipes.every((_, ri) => turn.dismissedRecipes.has(ri)) && (
-                      <p className="pantry-command-turn-done">All suggestions dismissed.</p>
-                    )}
-                    {turn.result.recipes.map((recipe, ri) => {
-                      if (turn.dismissedRecipes.has(ri)) return null;
-
-                      const servings = servingsFor(turn, ri, recipe);
-                      const ratio = servings / recipe.baseServings;
-                      const missingCount = recipe.ingredients.filter(
-                        (ing, ii) =>
-                          isEffectivelyMissing(ing, ratio, items) &&
-                          !turn.excludedIngredients.has(`${ri}-${ii}`)
-                      ).length;
-                      const totalPriceAud = recipe.ingredients.reduce(
-                        (sum, ing) => sum + scalePrice(ing.estimatedPriceAud, ing.quantity, ratio),
-                        0
-                      );
-
-                      return (
-                        <div className="pantry-command-recipe" key={ri}>
-                          <div className="pantry-command-recipe-header">
-                            <div className="pantry-command-recipe-title">
-                              <p className="pantry-command-recipe-name">{recipe.name}</p>
-                              <button
-                                type="button"
-                                className="pantry-shopping-remove-btn"
-                                onClick={() => dismissRecipe(i, ri)}
-                                aria-label={`Dismiss "${recipe.name}"`}
-                                title="Not interested in this one"
-                              >
-                                ✕
-                              </button>
-                            </div>
-                            <div className="pantry-command-servings">
-                              <button
-                                type="button"
-                                className="qty-stepper-btn"
-                                onClick={() => setServings(i, ri, servings - 1)}
-                                disabled={servings <= 1}
-                              >
-                                −
-                              </button>
-                              <span className="pantry-command-servings-count">
-                                {servings} serving{servings > 1 ? "s" : ""}
-                              </span>
-                              <button
-                                type="button"
-                                className="qty-stepper-btn"
-                                onClick={() => setServings(i, ri, servings + 1)}
-                              >
-                                +
-                              </button>
-                            </div>
-                          </div>
-                          {recipe.description && (
-                            <p className="pantry-command-recipe-desc">{recipe.description}</p>
-                          )}
-                          <p className="pantry-command-recipe-nutrition">
-                            {Math.round(recipe.caloriesPerServing)} kcal ·{" "}
-                            {Math.round(recipe.proteinGPerServing)}g protein ·{" "}
-                            {Math.round(recipe.carbsGPerServing)}g carbs · {Math.round(recipe.fatGPerServing)}
-                            g fat
-                          </p>
-                          <ul className="pantry-command-recipe-ingredients">
-                            {recipe.ingredients.map((ing, ii) => {
-                              const excluded = turn.excludedIngredients.has(`${ri}-${ii}`);
-                              const matched = ing.itemId
-                                ? (items.find((it) => it.id === ing.itemId) ?? null)
-                                : null;
-                              const sufficiency = ing.haveInInventory
-                                ? checkSufficiency(ing.amount, ing.quantity, ratio, matched)
-                                : "unknown";
-                              const insufficient = sufficiency === "insufficient";
-                              const clickable = !ing.haveInInventory || insufficient;
-                              const amount = scaleAmount(ing.amount, ing.quantity, ratio);
-                              const price = scalePrice(ing.estimatedPriceAud, ing.quantity, ratio);
-                              const icon = !ing.haveInInventory ? "+" : insufficient ? "△" : "✓";
-
-                              return (
-                                <li
-                                  key={ii}
-                                  className={[
-                                    ing.haveInInventory
-                                      ? "pantry-command-ingredient-have"
-                                      : "pantry-command-ingredient-missing",
-                                    insufficient ? "pantry-command-ingredient-insufficient" : "",
-                                    excluded ? "pantry-command-ingredient-excluded" : "",
-                                    clickable ? "pantry-command-ingredient-clickable" : "",
-                                  ]
-                                    .filter(Boolean)
-                                    .join(" ")}
-                                  role={clickable ? "button" : undefined}
-                                  tabIndex={clickable ? 0 : undefined}
-                                  title={
-                                    clickable
-                                      ? excluded
-                                        ? "Click to include again"
-                                        : insufficient
-                                          ? "You don't have enough at this serving count - click to skip"
-                                          : "Click to skip"
-                                      : undefined
-                                  }
-                                  onClick={clickable ? () => toggleExcludedIngredient(i, ri, ii) : undefined}
-                                  onKeyDown={
-                                    clickable
-                                      ? (e) => {
-                                          if (e.key === "Enter" || e.key === " ") {
-                                            e.preventDefault();
-                                            toggleExcludedIngredient(i, ri, ii);
-                                          }
-                                        }
-                                      : undefined
-                                  }
-                                >
-                                  {icon} {ing.name}
-                                  {amount && (
-                                    <span className="pantry-command-ingredient-amount"> ({amount})</span>
-                                  )}
-                                  {insufficient && matched && (
-                                    <span className="pantry-command-ingredient-amount">
-                                      {" "}
-                                      - have {matched.quantity}
-                                      {matched.unit ? ` ${matched.unit}` : ""}
-                                    </span>
-                                  )}
-                                  {price > 0 && (
-                                    <span className="pantry-command-ingredient-price">
-                                      {" "}
-                                      ~${price.toFixed(2)}
-                                    </span>
-                                  )}
-                                </li>
-                              );
-                            })}
-                          </ul>
-                          <p className="pantry-command-recipe-total">
-                            Estimated total: ~${totalPriceAud.toFixed(2)} AUD
-                          </p>
-                          {missingCount > 0 && (
-                            <button
-                              type="button"
-                              className="pantry-details-toggle"
-                              onClick={() => handleAddMissingIngredients(i, recipe, ri)}
-                            >
-                              + add {missingCount} missing ingredient{missingCount > 1 ? "s" : ""} to shopping
-                              list
-                            </button>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {turn.result.message &&
-                  !turn.result.answer &&
-                  !(turn.result.actions && turn.result.actions.length > 0) && (
-                    <p className="status-line">// {turn.result.message}</p>
-                  )}
-
-                {turn.result.actions && turn.result.actions.length > 0 && (
-                  <div className="pantry-command-actions">
-                    {turn.actionsStatus === "done" ? (
-                      // Collapsed to a single line once applied - the
-                      // per-action cards were only ever useful before
-                      // confirming, and stayed expanded afterward for no
-                      // reason.
-                      <p className="pantry-command-turn-done">
-                        ✓ Added {turn.result.actions.length} item
-                        {turn.result.actions.length > 1 ? "s" : ""}
-                      </p>
-                    ) : turn.actionsStatus === "cancelled" ? (
-                      <p className="pantry-command-turn-done">Cancelled</p>
-                    ) : (
-                      <>
-                        {turn.result.message && <p className="status-line">// {turn.result.message}</p>}
-                        {turn.result.actions.map((action, ai) => (
-                          <div className="pantry-command-action" key={ai}>
-                            <div className="pantry-command-action-row">
-                              <p className="pantry-command-action-summary">
-                                {action.summary}
-                                {action.estimatedPriceAud !== null && (
-                                  <span
-                                    className="pantry-command-action-estimate"
-                                    title="Rough estimate from Claude's own knowledge - not a live/confirmed price"
-                                  >
-                                    {" "}
-                                    ~${action.estimatedPriceAud.toFixed(2)}
-                                  </span>
-                                )}
-                              </p>
-                              <button
-                                type="button"
-                                className="pantry-shopping-remove-btn"
-                                onClick={() => removeAction(i, ai)}
-                                disabled={turn.actionsStatus === "confirming"}
-                                aria-label={`Remove "${action.summary}" from this batch`}
-                                title="Remove this action"
-                              >
-                                ✕
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                        {turn.actionsError && <p className="status-line">// {turn.actionsError}</p>}
-                        <div className="pantry-modal-actions">
-                          <button
-                            type="button"
-                            className="pantry-details-toggle"
-                            onClick={() => updateAssistantTurn(i, { actionsStatus: "cancelled" })}
-                            disabled={turn.actionsStatus === "confirming"}
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            type="button"
-                            className="run-btn"
-                            onClick={() => confirmActions(i, turn.result.actions!)}
-                            disabled={turn.actionsStatus === "confirming"}
-                          >
-                            {turn.actionsStatus === "confirming" ? "Applying…" : "Confirm"}
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )}
-                {nerdMode && (
-                  <p className="pantry-nerd-debug-info">{formatDebugInfo(turn.result.debugInfo)}</p>
-                )}
-              </div>
+              <AssistantTurnView
+                key={turn.id}
+                turn={turn}
+                turnIndex={i}
+                items={items}
+                nerdMode={nerdMode}
+                showRecipes={i === lastRecipesTurnIndex}
+                onCheckPrice={checkPriceNow}
+                onDismissRecipe={dismissRecipe}
+                onSetServings={setServings}
+                onToggleIngredient={toggleExcludedIngredient}
+                onAddMissing={handleAddMissingIngredients}
+                onRemoveAction={removeAction}
+                onCancelActions={cancelActions}
+                onConfirmActions={confirmActions}
+              />
             )
           )}
         </div>

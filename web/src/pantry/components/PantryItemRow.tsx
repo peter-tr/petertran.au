@@ -55,7 +55,7 @@ export default function PantryItemRow({
   onAddCategory,
   onChanged,
   onError,
-}: PantryItemRowProps) {
+}: Readonly<PantryItemRowProps>) {
   const [busy, setBusy] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
@@ -149,21 +149,14 @@ export default function PantryItemRow({
   return (
     <li className="pantry-item-row">
       <div className="pantry-item-info">
-        <span
+        <button
+          type="button"
           className="pantry-item-name"
-          role="button"
-          tabIndex={0}
           title="Click to edit"
           onClick={() => setShowEdit(true)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              setShowEdit(true);
-            }
-          }}
         >
           {item.name}
-        </span>
+        </button>
         {item.category && <span className="pantry-item-category">{item.category}</span>}
         <div className="pantry-item-toggles">
           <button
@@ -286,8 +279,8 @@ export default function PantryItemRow({
 
       {showHistory && item.purchases.length > 0 && (
         <ul className="pantry-purchase-history">
-          {[...item.purchases].reverse().map((p, i) => (
-            <li key={i}>
+          {[...item.purchases].reverse().map((p) => (
+            <li key={`${p.date}-${p.quantity}-${p.price}`}>
               {p.date} — {p.quantity}
               {item.unit ? ` ${item.unit}` : ""}
               {p.price !== null ? ` · $${p.price.toFixed(2)}` : ""}

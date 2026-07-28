@@ -20,7 +20,7 @@ export default function PantryManualAddSection({
   settings,
   onSettingsChange,
   onAdded,
-}: PantryManualAddSectionProps) {
+}: Readonly<PantryManualAddSectionProps>) {
   return (
     <section className="pantry-panel">
       <div className="pantry-panel-header">

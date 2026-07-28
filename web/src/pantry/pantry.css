@@ -551,9 +551,16 @@
   flex-shrink: 0;
 }
 
+/* A <button> (it opens the edit modal), reset back to plain inline text. */
 .pantry-shopping-item-name {
   cursor: pointer;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
   border-bottom: 1px dashed transparent;
+  padding: 0;
+  text-align: left;
 }
 
 .pantry-shopping-item-name:hover {
@@ -668,23 +675,34 @@
   gap: 0.3rem;
 }
 
-.pantry-common-item-btn {
+/* The pill itself is the wrapper, not the name button - the delete "×" is a
+   real sibling button rather than a fake one nested inside it. */
+.pantry-common-item-chip {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  font-family: var(--font-mono);
-  font-size: 0.76rem;
-  color: var(--muted);
   background: var(--panel);
   border: 1px solid var(--rule);
   border-radius: 999px;
   padding: 0.3rem 0.5rem 0.3rem 0.7rem;
+}
+
+.pantry-common-item-chip:hover {
+  border-color: var(--type);
+}
+
+.pantry-common-item-btn {
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  color: var(--muted);
+  background: none;
+  border: none;
+  padding: 0;
   cursor: pointer;
 }
 
-.pantry-common-item-btn:hover {
+.pantry-common-item-chip:hover .pantry-common-item-btn {
   color: var(--type);
-  border-color: var(--type);
 }
 
 .pantry-common-item-delete {
@@ -692,6 +710,9 @@
   font-size: 0.9rem;
   line-height: 1;
   padding: 0 0.15rem;
+  background: none;
+  border: none;
+  cursor: pointer;
 }
 
 .pantry-common-item-delete:hover {
@@ -998,6 +1019,27 @@
   cursor: pointer;
 }
 
+/* Only the skip/include-able ingredients get a button inside the <li>;
+   it inherits the row's own color so the have/missing/excluded classes
+   above still drive how it reads. */
+.pantry-command-ingredient-btn {
+  display: block;
+  width: 100%;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+/* Restated rather than inherited - a button is an atomic box, so the
+   line-through on the <li> doesn't reliably reach inside it. */
+.pantry-command-ingredient-excluded .pantry-command-ingredient-btn {
+  text-decoration: line-through;
+}
+
 .pantry-command-ingredient-clickable:hover {
   color: var(--type);
 }
@@ -1120,6 +1162,9 @@
   overflow: hidden;
 }
 
+/* Both a <span> (simple density) and a <button> (the rename control in the
+   detailed row) wear this class - the resets below are what keep the button
+   looking like plain text. */
 .pantry-item-name {
   font-family: var(--font-sans);
   font-size: 0.9rem;
@@ -1128,7 +1173,11 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   cursor: pointer;
+  background: none;
+  border: none;
   border-bottom: 1px dashed transparent;
+  padding: 0;
+  text-align: left;
 }
 
 .pantry-item-name:hover {
@@ -1426,7 +1475,20 @@
   z-index: 50;
 }
 
+/* Covers the whole backdrop and sits behind the modal - "click outside to
+   dismiss" as a real, keyboard-reachable button. */
+.pantry-modal-backdrop-close {
+  position: absolute;
+  inset: 0;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: default;
+}
+
 .pantry-modal {
+  position: relative;
+  z-index: 1;
   width: 100%;
   max-width: 28rem;
   max-height: 90vh;
@@ -1585,7 +1647,7 @@
   .pantry-item-name {
     overflow: visible;
     white-space: normal;
-    word-break: break-word;
+    overflow-wrap: break-word;
   }
 
   .pantry-item-meta {

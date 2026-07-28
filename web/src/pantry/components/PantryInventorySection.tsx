@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import PantryItemRow from "./PantryItemRow";
 import { StorageLocation, type InventoryItem, type PantrySettings, type PantrySettingsInput } from "../api";
 
@@ -128,7 +128,7 @@ export default function PantryInventorySection({
   settings,
   onSettingsChange,
   onChanged,
-}: PantryInventorySectionProps) {
+}: Readonly<PantryInventorySectionProps>) {
   const [error, setError] = useState<string | null>(null);
 
   const view: ViewMode = isViewMode(settings.view) ? settings.view : "location";
@@ -158,6 +158,44 @@ export default function PantryInventorySection({
     : visibleItems;
 
   const groups = groupItems(filteredItems, view, sort);
+
+  let itemList: ReactNode;
+  if (items.length === 0) {
+    itemList = <p className="status-line">// nothing tracked yet - add your first item below.</p>;
+  } else if (filteredItems.length === 0) {
+    itemList = <p className="status-line">// no items match the current filters.</p>;
+  } else {
+    itemList = groups.map((group) => {
+      const groupId = `${view}:${group.key}`;
+      const isCollapsed = collapsed.has(groupId);
+
+      return (
+        <div key={group.key} className="pantry-location-group">
+          <button type="button" className="pantry-location-heading" onClick={() => toggleGroup(group.key)}>
+            <span className="pantry-collapse-caret">{isCollapsed ? "▸" : "▾"}</span>
+            {group.label}
+            <span className="pantry-group-count">({group.items.length})</span>
+          </button>
+          {!isCollapsed && (
+            <ul className="pantry-item-list">
+              {group.items.map((item) => (
+                <PantryItemRow
+                  key={item.id}
+                  item={item}
+                  simple={settings.simple}
+                  nerdMode={settings.nerdModeInventory}
+                  categories={settings.categories}
+                  onAddCategory={(name) => onSettingsChange({ categories: [...settings.categories, name] })}
+                  onChanged={onChanged}
+                  onError={setError}
+                />
+              ))}
+            </ul>
+          )}
+        </div>
+      );
+    });
+  }
 
   return (
     <section className="pantry-panel">
@@ -266,54 +304,13 @@ export default function PantryInventorySection({
 
           {!settings.simple && (
             <p className="pantry-legend">
-              <span className="pantry-staple-toggle active">★</span> staple
-              <span className="pantry-low-priority-toggle-btn active">↓</span> low priority
+              <span className="pantry-staple-toggle active">★</span> staple{" "}
+              <span className="pantry-low-priority-toggle-btn active">↓</span> low priority{" "}
               <span className="pantry-nearly-empty-toggle active">!</span> nearly empty
             </p>
           )}
 
-          {items.length === 0 ? (
-            <p className="status-line">// nothing tracked yet - add your first item below.</p>
-          ) : filteredItems.length === 0 ? (
-            <p className="status-line">// no items match the current filters.</p>
-          ) : (
-            groups.map((group) => {
-              const groupId = `${view}:${group.key}`;
-              const isCollapsed = collapsed.has(groupId);
-
-              return (
-                <div key={group.key} className="pantry-location-group">
-                  <button
-                    type="button"
-                    className="pantry-location-heading"
-                    onClick={() => toggleGroup(group.key)}
-                  >
-                    <span className="pantry-collapse-caret">{isCollapsed ? "▸" : "▾"}</span>
-                    {group.label}
-                    <span className="pantry-group-count">({group.items.length})</span>
-                  </button>
-                  {!isCollapsed && (
-                    <ul className="pantry-item-list">
-                      {group.items.map((item) => (
-                        <PantryItemRow
-                          key={item.id}
-                          item={item}
-                          simple={settings.simple}
-                          nerdMode={settings.nerdModeInventory}
-                          categories={settings.categories}
-                          onAddCategory={(name) =>
-                            onSettingsChange({ categories: [...settings.categories, name] })
-                          }
-                          onChanged={onChanged}
-                          onError={setError}
-                        />
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              );
-            })
-          )}
+          {itemList}
         </>
       )}
     </section>
