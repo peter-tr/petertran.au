@@ -112,6 +112,7 @@ describe("putSettings", () => {
       optionsCollapsed: false,
       collapsedGroups: [],
       commonItems: [],
+      inventoryListCollapsed: false,
       shoppingListCollapsed: false,
       showLowPriority: false,
       categoryFilter: null,

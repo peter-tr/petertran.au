@@ -6,6 +6,9 @@ interface QuantityStepperProps {
   min?: number;
   step?: number;
   disabled?: boolean;
+  // Set only where a visible <label> points at this stepper (the edit
+  // modals) - the inline steppers on each row have no label of their own.
+  inputId?: string;
 }
 
 // How long to wait after the last +/- click before actually sending it -
@@ -20,7 +23,8 @@ export default function QuantityStepper({
   min = 1,
   step = 1,
   disabled,
-}: QuantityStepperProps) {
+  inputId,
+}: Readonly<QuantityStepperProps>) {
   // Typing is tracked as free text and only clamped/committed on blur or
   // Enter - clamping on every keystroke made it impossible to clear the
   // field and type a new multi-digit number (it would snap back to `min`
@@ -98,6 +102,7 @@ export default function QuantityStepper({
         −
       </button>
       <input
+        id={inputId}
         type="number"
         inputMode="numeric"
         className="qty-stepper-input"

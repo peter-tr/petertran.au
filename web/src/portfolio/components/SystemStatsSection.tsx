@@ -30,14 +30,14 @@ export default function SystemStatsSection() {
   const [opsRange, setOpsRange] = useState<OperationsRange>("7d");
   const [opsSort, setOpsSort] = useState<OpsSort>(null);
 
+  // Clicking a column cycles it desc -> asc -> unsorted; clicking a different
+  // column starts that one at desc.
   function toggleOpsSort(key: OpsSortKey) {
-    setOpsSort((current) =>
-      current?.key === key
-        ? current.direction === "desc"
-          ? { key, direction: "asc" }
-          : null
-        : { key, direction: "desc" }
-    );
+    setOpsSort((current) => {
+      if (current?.key !== key) return { key, direction: "desc" };
+
+      return current.direction === "desc" ? { key, direction: "asc" } : null;
+    });
   }
 
   // Fetch once on mount, matching Hero.tsx's pattern: setState only happens
@@ -199,19 +199,27 @@ function SortableOpsHeader({
   sortKey,
   sort,
   onToggle,
-}: {
+}: Readonly<{
   label: string;
   sortKey: OpsSortKey;
   sort: OpsSort;
   onToggle: (key: OpsSortKey) => void;
-}) {
+}>) {
   const active = sort?.key === sortKey ? sort.direction : null;
 
+  let ariaSort: "descending" | "ascending" | "none" = "none";
+  if (active === "desc") ariaSort = "descending";
+  else if (active === "asc") ariaSort = "ascending";
+
+  let arrow = "";
+  if (active === "desc") arrow = "▾";
+  else if (active === "asc") arrow = "▴";
+
   return (
-    <th aria-sort={active === "desc" ? "descending" : active === "asc" ? "ascending" : "none"}>
+    <th aria-sort={ariaSort}>
       <button type="button" className="ops-sort-btn" onClick={() => onToggle(sortKey)}>
         {label}
-        <span className="ops-sort-arrow">{active ? (active === "desc" ? "▾" : "▴") : ""}</span>
+        <span className="ops-sort-arrow">{arrow}</span>
       </button>
     </th>
   );

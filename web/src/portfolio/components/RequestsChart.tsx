@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import type { DailyCount } from "../lib/graphql";
 
 const CHART_WIDTH = 720;
@@ -7,6 +7,15 @@ const AXIS_BAND_HEIGHT = 22;
 const BAR_GAP = 3;
 
 type Range = "1d" | "7d" | "all";
+
+// How many trailing days each range shows (null = every day there is), and
+// how it reads in the chart's accessible description.
+const RANGE_DAYS: Record<Range, number | null> = { "1d": 1, "7d": 7, all: null };
+const RANGE_LABELS: Record<Range, string> = {
+  "1d": "the last 1 day",
+  "7d": "the last 7 days",
+  all: "all time",
+};
 
 // Scales the axis ceiling to the actual data range (rounded up to a clean
 // 1/2/5/10 step) instead of some fixed large scale - otherwise a personal
@@ -29,17 +38,19 @@ function formatDay(iso: string): string {
   return new Date(iso).toLocaleDateString([], { month: "short", day: "numeric" });
 }
 
-export default function RequestsChart({ data }: { data: DailyCount[] }) {
+export default function RequestsChart({ data }: Readonly<{ data: DailyCount[] }>) {
   const [range, setRange] = useState<Range>("7d");
+  const titleId = useId();
 
   if (data.length === 0) return null;
 
-  const visible = range === "1d" ? data.slice(-1) : range === "7d" ? data.slice(-7) : data;
+  const days = RANGE_DAYS[range];
+  const visible = days === null ? data : data.slice(-days);
   const max = Math.max(...visible.map((d) => d.count));
   const axisMax = niceAxisMax(max);
   const barSlot = CHART_WIDTH / visible.length;
   const barWidth = Math.min(24, barSlot - BAR_GAP);
-  const rangeLabel = range === "1d" ? "the last 1 day" : range === "7d" ? "the last 7 days" : "all time";
+  const rangeLabel = RANGE_LABELS[range];
 
   return (
     <div className="requests-chart">
@@ -76,9 +87,13 @@ export default function RequestsChart({ data }: { data: DailyCount[] }) {
       <svg
         viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT + AXIS_BAND_HEIGHT}`}
         className="requests-chart-svg"
-        role="img"
-        aria-label={`Bar chart of requests per day for the ${rangeLabel}, ranging from 0 to ${max}.`}
+        aria-labelledby={titleId}
       >
+        {/* SVG's own native accessible-name element, rather than an
+            aria-label behind role="img". */}
+        <title id={titleId}>
+          Bar chart of requests per day for {rangeLabel}, ranging from 0 to {max}.
+        </title>
         <text x={CHART_WIDTH} y={10} textAnchor="end" className="chart-axis-tick">
           {axisMax}
         </text>

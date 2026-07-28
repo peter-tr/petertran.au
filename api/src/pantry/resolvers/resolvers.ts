@@ -74,16 +74,14 @@ export const resolvers = {
         getSettings(context.pantryPk),
       ]);
 
-      return parseCommand(
-        args.input,
-        args.history ?? [],
+      return parseCommand(args.input, args.history ?? [], {
         inventory,
         shoppingList,
-        settings.categories,
-        context.sourceIp,
-        settings.aiProvider,
-        settings.aiModelTier
-      );
+        categories: settings.categories,
+        sourceIp: context.sourceIp,
+        aiProvider: settings.aiProvider,
+        aiModelTier: settings.aiModelTier,
+      });
     },
     // Null when unauthenticated (using the default/shared pantry) - the
     // client's account indicator treats that as "signed out", not an error.
@@ -175,15 +173,13 @@ export const resolvers = {
 
       const existing = await getItem(context.pantryPk, args.id);
       if (existing?.isStaple) {
-        await upsertShoppingListEntry(
-          context.pantryPk,
-          existing.name,
-          null,
-          null,
-          null,
-          true,
-          existing.category
-        );
+        await upsertShoppingListEntry(context.pantryPk, {
+          name: existing.name,
+          quantity: null,
+          unit: null,
+          isStaple: true,
+          category: existing.category,
+        });
       }
 
       return deleteItem(context.pantryPk, args.id);
@@ -205,17 +201,16 @@ export const resolvers = {
     ): Promise<ShoppingListEntry> => {
       await assertNotRateLimited(context.sourceIp);
 
-      return upsertShoppingListEntry(
-        context.pantryPk,
-        args.name,
-        args.quantity ?? null,
-        args.unit ?? null,
-        args.note ?? null,
-        args.isStaple ?? false,
-        args.category ?? null,
-        args.recipeTag ?? null,
-        args.urgent ?? false
-      );
+      return upsertShoppingListEntry(context.pantryPk, {
+        name: args.name,
+        quantity: args.quantity ?? null,
+        unit: args.unit ?? null,
+        note: args.note ?? null,
+        isStaple: args.isStaple ?? false,
+        category: args.category ?? null,
+        recipeTag: args.recipeTag ?? null,
+        urgent: args.urgent ?? false,
+      });
     },
 
     updateShoppingListEntry: async (

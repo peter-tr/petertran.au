@@ -7,7 +7,7 @@ interface SectionProps {
   wide?: boolean;
 }
 
-export default function Section({ id, typeName, children, wide }: SectionProps) {
+export default function Section({ id, typeName, children, wide }: Readonly<SectionProps>) {
   const ref = useRef<HTMLElement>(null);
   const [inView, setInView] = useState(false);
   const [collapsed, setCollapsed] = useState(false);

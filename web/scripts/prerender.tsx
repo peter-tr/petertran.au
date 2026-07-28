@@ -118,7 +118,7 @@ function readEnvVar(name: string): string {
 // useEffect fetch (which never runs during SSR anyway, and importing the
 // real component would drag in ../lib/graphql.ts's import.meta.env usage -
 // a Vite-only global this plain Node script doesn't have).
-function StaticFooter({ email }: { email: string }) {
+function StaticFooter({ email }: Readonly<{ email: string }>) {
   return (
     <footer className="footer">
       <span>
@@ -233,7 +233,12 @@ async function main() {
   console.log(`Prerendered /resume (${resumeBody.length} chars) -> ${resumePath}`);
 }
 
-main().catch((err) => {
+// Top-level await rather than a .catch() chain - this is a standalone ESM
+// script (web/package.json is type: module, run through tsx), so failures
+// still surface exactly the same way, just without the extra callback.
+try {
+  await main();
+} catch (err) {
   console.error("Prerender failed:", err);
   process.exit(1);
-});
+}

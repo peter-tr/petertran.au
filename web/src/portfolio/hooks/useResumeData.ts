@@ -9,12 +9,10 @@ import type { ResumeData } from "../lib/types";
 let cachedFetch: Promise<ResumeData> | null = null;
 
 function fetchResumeData(): Promise<ResumeData> {
-  if (!cachedFetch) {
-    cachedFetch = runQuery<ResumeData>(RESUME_QUERY).catch((err) => {
-      cachedFetch = null; // don't cache a failure - let the next mount retry
-      throw err;
-    });
-  }
+  cachedFetch ??= runQuery<ResumeData>(RESUME_QUERY).catch((err) => {
+    cachedFetch = null; // don't cache a failure - let the next mount retry
+    throw err;
+  });
 
   return cachedFetch;
 }

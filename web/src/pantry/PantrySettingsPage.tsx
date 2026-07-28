@@ -13,6 +13,7 @@ import {
   type PriceSyncStatus,
   type PriceSyncStatusResult,
 } from "./api";
+import Footer from "../shared/components/Footer";
 import "./pantry.css";
 
 const HOURS = Array.from({ length: 24 }, (_, h) => h);
@@ -234,8 +235,8 @@ export default function PantrySettingsPage() {
           <div className="pantry-sync-errors">
             <p className="form-label">Recent errors</p>
             <ul>
-              {syncStatus.errors.map((e, i) => (
-                <li key={i}>
+              {syncStatus.errors.map((e) => (
+                <li key={`${e.occurredAt}-${e.itemName}`}>
                   <span className="pantry-sync-error-item">{e.itemName}</span> - {e.message}
                 </li>
               ))}
@@ -354,6 +355,8 @@ export default function PantrySettingsPage() {
         </p>
         <PantryArchitectureDiagram />
       </section>
+
+      <Footer />
     </>
   );
 }

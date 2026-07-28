@@ -1,9 +1,18 @@
-const TOKEN_PATTERN =
-  /(#[^\n]*)|("(?:[^"\\]|\\.)*")|(\$[A-Za-z_]\w*)|\b(query|mutation|subscription|fragment|on)\b|([A-Za-z_]\w*)|(\.\.\.|[{}()[\]:,!])/g;
+// Kept deliberately small - classifying in tokenize() below instead of in the
+// pattern itself. Keywords get no branch of their own (the name branch already
+// matches them in full, so "on" inside "onClick" can't be mis-split), `$vars`
+// share that same name branch via the optional `\$`, and "..." is its own
+// branch rather than an alternation nested inside the punctuation one.
+// Identical tokens out, far less regex to reason about.
+const TOKEN_PATTERN = /(#[^\n]*)|("(?:[^"\\]|\\.)*")|(\$?[A-Za-z_]\w*)|(\.\.\.)|([{}()[\]:,!])/g;
 
 interface Token {
   text: string;
   className?: string;
+  // Offset of this token in the source it was tokenized from - unique per
+  // token, so it works as a stable React key without falling back to the
+  // array index.
+  start: number;
 }
 
 const INDENT = "  ";
@@ -19,17 +28,32 @@ const INDENT = "  ";
 // actually samples is a simple selection set.
 const KEYWORDS = new Set(["query", "mutation", "subscription", "fragment", "on"]);
 
-export function formatQuery(source: string): string {
-  // Untyped "gap" tokens from tokenize() (e.g. a numeric literal like "1",
-  // which nothing in TOKEN_PATTERN matches) can carry incidental surrounding
-  // whitespace - trim those down to their real text so spacing below is only
-  // ever added once, deliberately, rather than inherited from the input.
+// Untyped "gap" tokens from tokenize() (e.g. a numeric literal like "1",
+// which nothing in TOKEN_PATTERN matches) can carry incidental surrounding
+// whitespace - trim those down to their real text so spacing in formatQuery
+// is only ever added once, deliberately, rather than inherited from the input.
+function significantTokens(source: string): string[] {
   const significant: string[] = [];
   for (const token of tokenize(source)) {
     const text = token.className ? token.text : token.text.trim();
     if (text !== "") significant.push(text);
   }
 
+  return significant;
+}
+
+// A new line means a fresh selection: right after "{" opens a real selection
+// set, or right after a sibling field/fragment-spread that just ended
+// (anything other than "{"/":"/an operation keyword, since those precede a
+// name that's part of the SAME construct).
+function startsNewLine(prev: string | null, inline: boolean): boolean {
+  if (inline || prev === null) return false;
+  if (prev === "{") return true;
+
+  return prev !== ":" && !KEYWORDS.has(prev);
+}
+
+export function formatQuery(source: string): string {
   let out = "";
   let indent = 0;
   let parenDepth = 0;
@@ -60,7 +84,7 @@ export function formatQuery(source: string): string {
     prev = text;
   }
 
-  for (const text of significant) {
+  for (const text of significantTokens(source)) {
     const inline = parenDepth > 0 || objDepth > 0;
 
     switch (text) {
@@ -95,20 +119,21 @@ export function formatQuery(source: string): string {
       case "[":
         append(text);
         break;
-      default: {
-        // A new line means a fresh selection: right after "{" opens a real
-        // selection set, or right after a sibling field/fragment-spread that
-        // just ended (anything other than "{"/":"/an operation keyword,
-        // since those precede a name that's part of the SAME construct).
-        const startsSelection =
-          !inline && prev !== null && prev !== "{" && prev !== ":" && !KEYWORDS.has(prev);
-        const afterOpenBrace = prev === "{" && !inline;
-        append(text, afterOpenBrace || startsSelection);
-      }
+      default:
+        append(text, startsNewLine(prev, inline));
     }
   }
 
   return out;
+}
+
+// The name branch of TOKEN_PATTERN covers three different things - "$id"
+// variables, operation keywords, and plain field/type names - so they're told
+// apart here rather than by giving each its own alternation branch.
+function nameClassName(name: string): string {
+  if (name.startsWith("$")) return "gql-variable";
+
+  return KEYWORDS.has(name) ? "gql-keyword" : "gql-name";
 }
 
 function tokenize(source: string): Token[] {
@@ -119,31 +144,29 @@ function tokenize(source: string): Token[] {
 
   while ((match = TOKEN_PATTERN.exec(source))) {
     if (match.index > lastIndex) {
-      tokens.push({ text: source.slice(lastIndex, match.index) });
+      tokens.push({ text: source.slice(lastIndex, match.index), start: lastIndex });
     }
 
-    const [full, comment, string, variable, keyword, name, punct] = match;
+    const [full, comment, string, name, spread, punct] = match;
     let className: string | undefined;
     if (comment) className = "gql-comment";
     else if (string) className = "gql-string";
-    else if (variable) className = "gql-variable";
-    else if (keyword) className = "gql-keyword";
-    else if (name) className = "gql-name";
-    else if (punct) className = "gql-punct";
-    tokens.push({ text: full, className });
+    else if (name) className = nameClassName(name);
+    else if (spread || punct) className = "gql-punct";
+    tokens.push({ text: full, className, start: match.index });
     lastIndex = match.index + full.length;
   }
-  if (lastIndex < source.length) tokens.push({ text: source.slice(lastIndex) });
+  if (lastIndex < source.length) tokens.push({ text: source.slice(lastIndex), start: lastIndex });
 
   return tokens;
 }
 
-export default function GraphQLCode({ code }: { code: string }) {
+export default function GraphQLCode({ code }: Readonly<{ code: string }>) {
   return (
     <pre className="op-query">
-      {tokenize(formatQuery(code)).map((token, i) =>
+      {tokenize(formatQuery(code)).map((token) =>
         token.className ? (
-          <span key={i} className={token.className}>
+          <span key={token.start} className={token.className}>
             {token.text}
           </span>
         ) : (

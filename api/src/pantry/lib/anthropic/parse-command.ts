@@ -150,7 +150,9 @@ function formatKnownPrice(price: InventoryItem["lastKnownPrice"]): string {
   if (!price) return "";
   if (price.colesPrice === null) return ` colesPriceCheckedButUnconfirmed=${price.checkedAt}`;
 
-  return ` colesPrice=${price.colesPrice}(checked ${price.checkedAt}${price.note ? `, ${price.note}` : ""})`;
+  const noteSuffix = price.note ? `, ${price.note}` : "";
+
+  return ` colesPrice=${price.colesPrice}(checked ${price.checkedAt}${noteSuffix})`;
 }
 
 function formatInventoryForPrompt(inventory: InventoryItem[]): string {
@@ -170,10 +172,12 @@ function formatShoppingListForPrompt(shoppingList: ShoppingListEntry[]): string 
   if (shoppingList.length === 0) return "(empty)";
 
   return shoppingList
-    .map(
-      (e) =>
-        `- id=${e.id} name="${e.name}"${e.quantity != null ? ` quantity=${e.quantity} unit=${e.unit ?? "none"}` : " (no quantity set)"}${formatKnownPrice(e.lastKnownPrice)}`
-    )
+    .map((e) => {
+      const quantityText =
+        e.quantity != null ? ` quantity=${e.quantity} unit=${e.unit ?? "none"}` : " (no quantity set)";
+
+      return `- id=${e.id} name="${e.name}"${quantityText}${formatKnownPrice(e.lastKnownPrice)}`;
+    })
     .join("\n");
 }
 
@@ -378,104 +382,132 @@ function estimateFor(a: RawAction): number | null {
   return a.estimatedPriceAud > 0 ? a.estimatedPriceAud : null;
 }
 
+function buildRecordPurchaseAction(a: RawAction, estimatedPriceAud: number | null): ProposedAction | null {
+  if (!a.name || !a.location || a.quantity == null) return null;
+
+  return {
+    type: a.type,
+    summary: a.summary,
+    mutationName: "recordPurchase",
+    estimatedPriceAud,
+    argsJson: JSON.stringify({
+      input: {
+        name: a.name,
+        location: a.location,
+        category: a.category,
+        quantity: a.quantity,
+        unit: a.unit,
+        price: a.price,
+        purchasedAt: a.purchasedAt,
+        expiresAt: a.expiresAt,
+        isStaple: flagValue(a, "STAPLE"),
+        lowPriority: flagValue(a, "LOW_PRIORITY"),
+        nearlyEmpty: flagValue(a, "NEARLY_EMPTY"),
+        trackPrice: flagValue(a, "TRACK_PRICE"),
+      },
+    }),
+  };
+}
+
+function buildUpdateInventoryItemInput(a: RawAction): Record<string, unknown> {
+  const input: Record<string, unknown> = {};
+  if (a.name != null) input.name = a.name;
+  if (a.location != null) input.location = a.location;
+  if (a.category != null) input.category = a.category;
+  if (a.quantity != null) input.quantity = a.quantity;
+  if (a.unit != null) input.unit = a.unit;
+  if (a.price != null) input.price = a.price;
+  if (a.purchasedAt != null) input.purchasedAt = a.purchasedAt;
+  if (a.expiresAt != null) input.expiresAt = a.expiresAt;
+
+  const isStaple = flagValue(a, "STAPLE");
+  const lowPriority = flagValue(a, "LOW_PRIORITY");
+  const nearlyEmpty = flagValue(a, "NEARLY_EMPTY");
+  const trackPrice = flagValue(a, "TRACK_PRICE");
+  if (isStaple != null) input.isStaple = isStaple;
+  if (lowPriority != null) input.lowPriority = lowPriority;
+  if (nearlyEmpty != null) input.nearlyEmpty = nearlyEmpty;
+  if (trackPrice != null) input.trackPrice = trackPrice;
+
+  return input;
+}
+
+function buildUpdateInventoryItemAction(
+  a: RawAction,
+  estimatedPriceAud: number | null
+): ProposedAction | null {
+  if (!a.itemId) return null;
+
+  return {
+    type: a.type,
+    summary: a.summary,
+    mutationName: "updateInventoryItem",
+    estimatedPriceAud,
+    argsJson: JSON.stringify({ id: a.itemId, input: buildUpdateInventoryItemInput(a) }),
+  };
+}
+
+function buildRemoveInventoryItemAction(
+  a: RawAction,
+  estimatedPriceAud: number | null
+): ProposedAction | null {
+  if (!a.itemId) return null;
+
+  return {
+    type: a.type,
+    summary: a.summary,
+    mutationName: "removeInventoryItem",
+    estimatedPriceAud,
+    argsJson: JSON.stringify({ id: a.itemId }),
+  };
+}
+
+function buildAddToShoppingListAction(a: RawAction, estimatedPriceAud: number | null): ProposedAction | null {
+  if (!a.name) return null;
+
+  return {
+    type: a.type,
+    summary: a.summary,
+    mutationName: "addToShoppingList",
+    estimatedPriceAud,
+    argsJson: JSON.stringify({
+      name: a.name,
+      quantity: a.quantity,
+      unit: a.unit,
+      note: a.note,
+      category: a.category,
+    }),
+  };
+}
+
+function buildRemoveFromShoppingListAction(
+  a: RawAction,
+  estimatedPriceAud: number | null
+): ProposedAction | null {
+  if (!a.itemId) return null;
+
+  return {
+    type: a.type,
+    summary: a.summary,
+    mutationName: "removeFromShoppingList",
+    estimatedPriceAud,
+    argsJson: JSON.stringify({ id: a.itemId }),
+  };
+}
+
 function toProposedAction(a: RawAction): ProposedAction | null {
   const estimatedPriceAud = estimateFor(a);
   switch (a.type) {
-    case "RECORD_PURCHASE": {
-      if (!a.name || !a.location || a.quantity == null) return null;
-
-      return {
-        type: a.type,
-        summary: a.summary,
-        mutationName: "recordPurchase",
-        estimatedPriceAud,
-        argsJson: JSON.stringify({
-          input: {
-            name: a.name,
-            location: a.location,
-            category: a.category,
-            quantity: a.quantity,
-            unit: a.unit,
-            price: a.price,
-            purchasedAt: a.purchasedAt,
-            expiresAt: a.expiresAt,
-            isStaple: flagValue(a, "STAPLE"),
-            lowPriority: flagValue(a, "LOW_PRIORITY"),
-            nearlyEmpty: flagValue(a, "NEARLY_EMPTY"),
-            trackPrice: flagValue(a, "TRACK_PRICE"),
-          },
-        }),
-      };
-    }
-    case "UPDATE_INVENTORY_ITEM": {
-      if (!a.itemId) return null;
-
-      const input: Record<string, unknown> = {};
-      if (a.name != null) input.name = a.name;
-      if (a.location != null) input.location = a.location;
-      if (a.category != null) input.category = a.category;
-      if (a.quantity != null) input.quantity = a.quantity;
-      if (a.unit != null) input.unit = a.unit;
-      if (a.price != null) input.price = a.price;
-      if (a.purchasedAt != null) input.purchasedAt = a.purchasedAt;
-      if (a.expiresAt != null) input.expiresAt = a.expiresAt;
-
-      const isStaple = flagValue(a, "STAPLE");
-      const lowPriority = flagValue(a, "LOW_PRIORITY");
-      const nearlyEmpty = flagValue(a, "NEARLY_EMPTY");
-      const trackPrice = flagValue(a, "TRACK_PRICE");
-      if (isStaple != null) input.isStaple = isStaple;
-      if (lowPriority != null) input.lowPriority = lowPriority;
-      if (nearlyEmpty != null) input.nearlyEmpty = nearlyEmpty;
-      if (trackPrice != null) input.trackPrice = trackPrice;
-
-      return {
-        type: a.type,
-        summary: a.summary,
-        mutationName: "updateInventoryItem",
-        estimatedPriceAud,
-        argsJson: JSON.stringify({ id: a.itemId, input }),
-      };
-    }
-    case "REMOVE_INVENTORY_ITEM": {
-      if (!a.itemId) return null;
-
-      return {
-        type: a.type,
-        summary: a.summary,
-        mutationName: "removeInventoryItem",
-        estimatedPriceAud,
-        argsJson: JSON.stringify({ id: a.itemId }),
-      };
-    }
-    case "ADD_TO_SHOPPING_LIST": {
-      if (!a.name) return null;
-
-      return {
-        type: a.type,
-        summary: a.summary,
-        mutationName: "addToShoppingList",
-        estimatedPriceAud,
-        argsJson: JSON.stringify({
-          name: a.name,
-          quantity: a.quantity,
-          unit: a.unit,
-          note: a.note,
-          category: a.category,
-        }),
-      };
-    }
-    case "REMOVE_FROM_SHOPPING_LIST": {
-      if (!a.itemId) return null;
-
-      return {
-        type: a.type,
-        summary: a.summary,
-        mutationName: "removeFromShoppingList",
-        estimatedPriceAud,
-        argsJson: JSON.stringify({ id: a.itemId }),
-      };
-    }
+    case "RECORD_PURCHASE":
+      return buildRecordPurchaseAction(a, estimatedPriceAud);
+    case "UPDATE_INVENTORY_ITEM":
+      return buildUpdateInventoryItemAction(a, estimatedPriceAud);
+    case "REMOVE_INVENTORY_ITEM":
+      return buildRemoveInventoryItemAction(a, estimatedPriceAud);
+    case "ADD_TO_SHOPPING_LIST":
+      return buildAddToShoppingListAction(a, estimatedPriceAud);
+    case "REMOVE_FROM_SHOPPING_LIST":
+      return buildRemoveFromShoppingListAction(a, estimatedPriceAud);
   }
 }
 
@@ -540,16 +572,129 @@ function sanitizeRecipes(recipes: RawRecipe[], inventoryIds: Set<string>): Recip
   }));
 }
 
+// Defensive, same rule as everywhere else Claude names an id - never pass
+// one through that isn't a real, current item in the list it claims, in
+// case of a stale id from earlier in the conversation.
+function buildAnswerModeResult(
+  parsed: RawParseResult,
+  debugInfo: AiCallDebugInfo,
+  inventoryIds: Set<string>,
+  shoppingListIds: Set<string>
+): ParsedCommandResult {
+  const offerValid =
+    parsed.offerPriceCheckItemId !== "" &&
+    parsed.offerPriceCheckList !== "" &&
+    (parsed.offerPriceCheckList === "inventory" ? inventoryIds : shoppingListIds).has(
+      parsed.offerPriceCheckItemId
+    );
+
+  return {
+    answer: parsed.answer,
+    answerItems: parsed.answerItems.length ? parsed.answerItems : null,
+    actions: null,
+    recipes: null,
+    message: null,
+    debugInfo,
+    offerPriceCheckItemId: offerValid ? parsed.offerPriceCheckItemId : null,
+    offerPriceCheckList: offerValid ? (parsed.offerPriceCheckList as "inventory" | "shoppingList") : null,
+  };
+}
+
+// Recipes mode isn't mutually exclusive with actions - a follow-up like "I
+// have cinnamon already" both updates the recipe and needs a real inventory
+// action, so any actions the model included ride along too.
+function buildRecipesModeResult(
+  parsed: RawParseResult,
+  debugInfo: AiCallDebugInfo,
+  inventoryIds: Set<string>,
+  shoppingListIds: Set<string>
+): ParsedCommandResult {
+  const { actions, droppedCount } = buildActions(parsed.actions, inventoryIds, shoppingListIds);
+
+  return {
+    answer: null,
+    answerItems: null,
+    actions,
+    recipes: sanitizeRecipes(parsed.recipes, inventoryIds),
+    message:
+      parsed.message ??
+      (droppedCount > 0
+        ? "Some of what you asked couldn't be matched to a real item and was skipped."
+        : null),
+    debugInfo,
+    offerPriceCheckItemId: null,
+    offerPriceCheckList: null,
+  };
+}
+
+function buildUnclearModeResult(parsed: RawParseResult, debugInfo: AiCallDebugInfo): ParsedCommandResult {
+  return {
+    answer: null,
+    answerItems: null,
+    actions: null,
+    recipes: null,
+    message: parsed.message ?? "I couldn't understand that - try rephrasing.",
+    debugInfo,
+    offerPriceCheckItemId: null,
+    offerPriceCheckList: null,
+  };
+}
+
+function buildActionsModeResult(
+  parsed: RawParseResult,
+  debugInfo: AiCallDebugInfo,
+  inventoryIds: Set<string>,
+  shoppingListIds: Set<string>
+): ParsedCommandResult {
+  const { actions, droppedCount } = buildActions(parsed.actions, inventoryIds, shoppingListIds);
+
+  if (!actions) {
+    return {
+      answer: null,
+      answerItems: null,
+      actions: null,
+      recipes: null,
+      message:
+        droppedCount > 0
+          ? "Couldn't find one of the items you mentioned - it may have already been removed or renamed."
+          : "I couldn't turn that into an action - try rephrasing.",
+      debugInfo,
+      offerPriceCheckItemId: null,
+      offerPriceCheckList: null,
+    };
+  }
+
+  return {
+    answer: null,
+    answerItems: null,
+    actions,
+    recipes: null,
+    message:
+      droppedCount > 0 ? "Some of what you asked couldn't be matched to a real item and was skipped." : null,
+    debugInfo,
+    offerPriceCheckItemId: null,
+    offerPriceCheckList: null,
+  };
+}
+
+// Bundles everything parseCommand needs beyond the immediate input/history -
+// inventory/settings data plus the caller's AI configuration - into one
+// object so the function stays under SonarQube's 7-parameter limit (S107).
+export interface ParseCommandContext {
+  inventory: InventoryItem[];
+  shoppingList: ShoppingListEntry[];
+  categories: string[];
+  sourceIp: string | undefined;
+  aiProvider: AiProvider;
+  aiModelTier: AiModelTier;
+}
+
 export async function parseCommand(
   input: string,
   history: ConversationMessage[],
-  inventory: InventoryItem[],
-  shoppingList: ShoppingListEntry[],
-  categories: string[],
-  sourceIp: string | undefined,
-  aiProvider: AiProvider,
-  aiModelTier: AiModelTier
+  context: ParseCommandContext
 ): Promise<ParsedCommandResult> {
+  const { inventory, shoppingList, categories, sourceIp, aiProvider, aiModelTier } = context;
   const trimmed = input.trim();
   if (!trimmed) throw new Error("input is required.");
   if (trimmed.length > MAX_INPUT_LENGTH) {
@@ -586,91 +731,12 @@ export async function parseCommand(
   const inventoryIds = new Set(inventory.map((i) => i.id));
   const shoppingListIds = new Set(shoppingList.map((e) => e.id));
 
-  if (parsed.mode === "answer") {
-    // Defensive, same rule as everywhere else Claude names an id - never
-    // pass one through that isn't a real, current item in the list it
-    // claims, in case of a stale id from earlier in the conversation.
-    const offerValid =
-      parsed.offerPriceCheckItemId !== "" &&
-      parsed.offerPriceCheckList !== "" &&
-      (parsed.offerPriceCheckList === "inventory" ? inventoryIds : shoppingListIds).has(
-        parsed.offerPriceCheckItemId
-      );
-
-    return {
-      answer: parsed.answer,
-      answerItems: parsed.answerItems.length ? parsed.answerItems : null,
-      actions: null,
-      recipes: null,
-      message: null,
-      debugInfo,
-      offerPriceCheckItemId: offerValid ? parsed.offerPriceCheckItemId : null,
-      offerPriceCheckList: offerValid ? (parsed.offerPriceCheckList as "inventory" | "shoppingList") : null,
-    };
-  }
-
+  if (parsed.mode === "answer")
+    return buildAnswerModeResult(parsed, debugInfo, inventoryIds, shoppingListIds);
   if (parsed.mode === "recipes") {
-    // Recipes mode isn't mutually exclusive with actions - a follow-up like
-    // "I have cinnamon already" both updates the recipe and needs a real
-    // inventory action, so any actions the model included ride along too.
-    const { actions, droppedCount } = buildActions(parsed.actions, inventoryIds, shoppingListIds);
-
-    return {
-      answer: null,
-      answerItems: null,
-      actions,
-      recipes: sanitizeRecipes(parsed.recipes, inventoryIds),
-      message:
-        parsed.message ??
-        (droppedCount > 0
-          ? "Some of what you asked couldn't be matched to a real item and was skipped."
-          : null),
-      debugInfo,
-      offerPriceCheckItemId: null,
-      offerPriceCheckList: null,
-    };
+    return buildRecipesModeResult(parsed, debugInfo, inventoryIds, shoppingListIds);
   }
+  if (parsed.mode === "unclear") return buildUnclearModeResult(parsed, debugInfo);
 
-  if (parsed.mode === "unclear") {
-    return {
-      answer: null,
-      answerItems: null,
-      actions: null,
-      recipes: null,
-      message: parsed.message ?? "I couldn't understand that - try rephrasing.",
-      debugInfo,
-      offerPriceCheckItemId: null,
-      offerPriceCheckList: null,
-    };
-  }
-
-  const { actions, droppedCount } = buildActions(parsed.actions, inventoryIds, shoppingListIds);
-
-  if (!actions) {
-    return {
-      answer: null,
-      answerItems: null,
-      actions: null,
-      recipes: null,
-      message:
-        droppedCount > 0
-          ? "Couldn't find one of the items you mentioned - it may have already been removed or renamed."
-          : "I couldn't turn that into an action - try rephrasing.",
-      debugInfo,
-      offerPriceCheckItemId: null,
-      offerPriceCheckList: null,
-    };
-  }
-
-  return {
-    answer: null,
-    answerItems: null,
-    actions,
-    recipes: null,
-    message:
-      droppedCount > 0 ? "Some of what you asked couldn't be matched to a real item and was skipped." : null,
-    debugInfo,
-    offerPriceCheckItemId: null,
-    offerPriceCheckList: null,
-  };
+  return buildActionsModeResult(parsed, debugInfo, inventoryIds, shoppingListIds);
 }

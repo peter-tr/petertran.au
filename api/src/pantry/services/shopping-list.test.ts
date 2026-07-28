@@ -216,17 +216,16 @@ describe("upsertShoppingListEntry", () => {
     ddbMock.on(QueryCommand).resolves({ Items: [] });
     ddbMock.on(PutCommand).resolves({});
 
-    const entry = await upsertShoppingListEntry(
-      TEST_PK,
-      "Milk",
-      2,
-      "liters",
-      "for pancakes",
-      true,
-      "Dairy",
-      "Pancakes",
-      true
-    );
+    const entry = await upsertShoppingListEntry(TEST_PK, {
+      name: "Milk",
+      quantity: 2,
+      unit: "liters",
+      note: "for pancakes",
+      isStaple: true,
+      category: "Dairy",
+      recipeTag: "Pancakes",
+      urgent: true,
+    });
 
     expect(entry.name).toBe("Milk");
     expect(entry.quantity).toBe(2);
@@ -247,7 +246,7 @@ describe("upsertShoppingListEntry", () => {
     ddbMock.on(PutCommand).resolves({});
 
     // "eggs" (plural) normalizes to the same needle as stored "Eggs".
-    const entry = await upsertShoppingListEntry(TEST_PK, "eggs", 2, "dozen");
+    const entry = await upsertShoppingListEntry(TEST_PK, { name: "eggs", quantity: 2, unit: "dozen" });
 
     expect(entry.id).toBe("existing");
     expect(entry.quantity).toBe(2);
@@ -259,7 +258,7 @@ describe("upsertShoppingListEntry", () => {
     });
     ddbMock.on(PutCommand).resolves({});
 
-    const entry = await upsertShoppingListEntry(TEST_PK, "Eggs", null, null, null, false, null, null, false);
+    const entry = await upsertShoppingListEntry(TEST_PK, { name: "Eggs", quantity: null, unit: null });
 
     expect(entry.isStaple).toBe(true);
     expect(entry.urgent).toBe(true);
@@ -282,7 +281,7 @@ describe("upsertShoppingListEntry", () => {
     });
     ddbMock.on(PutCommand).resolves({});
 
-    const entry = await upsertShoppingListEntry(TEST_PK, "Eggs", null, null, null);
+    const entry = await upsertShoppingListEntry(TEST_PK, { name: "Eggs", quantity: null, unit: null });
 
     expect(entry.quantity).toBe(3);
     expect(entry.unit).toBe("kg");

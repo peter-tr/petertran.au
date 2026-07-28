@@ -23,7 +23,7 @@ export default function Toolbar({
   onZoomOut,
   onZoomReset,
   vertical,
-}: ToolbarProps) {
+}: Readonly<ToolbarProps>) {
   return (
     <div className={"design-studio-toolbar" + (vertical ? " design-studio-toolbar--vertical" : "")}>
       {TOOLS.map((tool) => (
@@ -50,9 +50,10 @@ export default function Toolbar({
         <span className="design-studio-tool-shortcut">{EXPORT_SHORTCUT_KEY}</span>
       </button>
       <hr className="design-studio-toolbar-rule" />
-      <div
+      {/* A real <fieldset> rather than a <div role="group"> - same grouping
+          semantics, from the native element instead of an ARIA override. */}
+      <fieldset
         className={"design-studio-zoom-controls" + (vertical ? " design-studio-zoom-controls--vertical" : "")}
-        role="group"
         aria-label="Canvas zoom"
       >
         <button type="button" className="design-studio-zoom-btn" onClick={onZoomOut} title="Zoom out">
@@ -69,7 +70,7 @@ export default function Toolbar({
         <button type="button" className="design-studio-zoom-btn" onClick={onZoomIn} title="Zoom in">
           +
         </button>
-      </div>
+      </fieldset>
     </div>
   );
 }

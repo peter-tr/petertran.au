@@ -74,7 +74,8 @@ async function fetchBreakdown(traceId: string): Promise<TraceSegment[]> {
   let survivingLambdaId: string | null = null;
   const idRemap = new Map<string, string>();
   const kept: { node: RawSegment; name: string }[] = [];
-  for (const node of real.sort((a, b) => a.start_time - b.start_time)) {
+  real.sort((a, b) => a.start_time - b.start_time);
+  for (const node of real) {
     const name = displayName(node);
     if (name === "Lambda") {
       if (sawLambda) {

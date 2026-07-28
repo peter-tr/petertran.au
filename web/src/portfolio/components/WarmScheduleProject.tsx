@@ -31,6 +31,18 @@ interface WarmScheduleProjectProps {
   coldStart: ColdStartStats | undefined;
   coldStartWindowLabel: string;
   disabled: boolean;
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
+}
+
+// Pulled out of the JSX below so the "how many warm instances right now"
+// line isn't a ternary nested inside another ternary's template literal.
+function liveConcurrencyLabel(cost: ProjectCost): string {
+  if (cost.liveConcurrency <= 0) return "Currently cold (no PC active)";
+
+  const plural = cost.liveConcurrency === 1 ? "" : "s";
+
+  return `Currently ${cost.liveConcurrency} warm instance${plural} ($${cost.liveHourlyCostUsd.toFixed(4)}/hr)`;
 }
 
 // One project's day/time editor - a controlled component whose `draft`
@@ -47,7 +59,9 @@ export default function WarmScheduleProject({
   coldStart,
   coldStartWindowLabel,
   disabled,
-}: WarmScheduleProjectProps) {
+  collapsed,
+  onToggleCollapsed,
+}: Readonly<WarmScheduleProjectProps>) {
   function toggleDay(day: Weekday): void {
     onChange({
       ...draft,
@@ -61,112 +75,136 @@ export default function WarmScheduleProject({
 
   return (
     <div className="warm-schedule">
-      <label className="form-label form-checkbox-label" htmlFor={`warm-schedule-${fn}-enabled`}>
-        <input
-          id={`warm-schedule-${fn}-enabled`}
-          type="checkbox"
-          checked={draft.enabled}
-          disabled={disabled}
-          onChange={(e) => onChange({ ...draft, enabled: e.target.checked })}
-        />{" "}
-        {label}
-      </label>
+      <button
+        type="button"
+        className="warm-schedule-header"
+        aria-expanded={!collapsed}
+        onClick={onToggleCollapsed}
+      >
+        <span className="warm-schedule-name">{label}</span>
+        <span className="warm-schedule-collapse-indicator">{collapsed ? "▸" : "▾"}</span>
+      </button>
 
-      <label className="form-label" htmlFor={`warm-schedule-${fn}-reactive`}>
-        <input
-          id={`warm-schedule-${fn}-reactive`}
-          type="checkbox"
-          checked={draft.reactiveEnabled}
-          disabled={disabled}
-          onChange={(e) => onChange({ ...draft, reactiveEnabled: e.target.checked })}
-        />{" "}
-        Also warm for 1hr after a real cold start
-      </label>
+      {!collapsed && (
+        <>
+          {/* Two independent toggles, not a master switch + sub-option -
+              either can be on/off regardless of the other (see the shared
+              intro paragraph above this list for that explanation, stated
+              once rather than repeated on every row). Reactive comes first
+              since it's self-contained; the schedule toggle sits directly
+              above the days/time/concurrency/memory editor it controls. */}
+          <label className="form-label form-checkbox-label" htmlFor={`warm-schedule-${fn}-reactive`}>
+            <input
+              id={`warm-schedule-${fn}-reactive`}
+              type="checkbox"
+              checked={draft.reactiveEnabled}
+              disabled={disabled}
+              onChange={(e) => onChange({ ...draft, reactiveEnabled: e.target.checked })}
+            />{" "}
+            Warm for 1hr after a real cold start
+          </label>
 
-      <div className="warm-schedule-days">
-        {ALL_DAYS.map((day) => (
-          <button
-            key={day}
-            type="button"
-            className={`warm-schedule-day-btn${draft.days.includes(day) ? " active" : ""}`}
-            aria-pressed={draft.days.includes(day)}
-            disabled={disabled}
-            onClick={() => toggleDay(day)}
-          >
-            {DAY_LABELS[day]}
-          </button>
-        ))}
-      </div>
+          <label className="form-label form-checkbox-label" htmlFor={`warm-schedule-${fn}-enabled`}>
+            <input
+              id={`warm-schedule-${fn}-enabled`}
+              type="checkbox"
+              checked={draft.enabled}
+              disabled={disabled}
+              onChange={(e) => onChange({ ...draft, enabled: e.target.checked })}
+            />{" "}
+            Warm on a schedule
+          </label>
 
-      <div className="warm-schedule-times">
-        <input
-          className="form-input"
-          type="time"
-          aria-label={`${label} start time`}
-          value={draft.start}
-          disabled={disabled}
-          onChange={(e) => onChange({ ...draft, start: e.target.value })}
-        />
-        <span className="warm-schedule-times-sep">to</span>
-        <input
-          className="form-input"
-          type="time"
-          aria-label={`${label} end time`}
-          value={draft.end}
-          disabled={disabled}
-          onChange={(e) => onChange({ ...draft, end: e.target.value })}
-        />
-        <span className="warm-schedule-times-sep">×</span>
-        <input
-          className="form-input warm-schedule-concurrency-input"
-          type="number"
-          min={1}
-          max={MAX_CONCURRENCY}
-          aria-label={`${label} provisioned concurrency`}
-          value={draft.concurrency}
-          disabled={disabled}
-          onChange={(e) => onChange({ ...draft, concurrency: Number(e.target.value) })}
-        />
-        <span className="warm-schedule-times-sep">@</span>
-        <select
-          className="form-input"
-          aria-label={`${label} memory size`}
-          value={draft.memoryMb}
-          disabled={disabled}
-          onChange={(e) => onChange({ ...draft, memoryMb: Number(e.target.value) })}
-        >
-          {MEMORY_OPTIONS_MB.map((mb) => (
-            <option key={mb} value={mb}>
-              {mb}MB
-            </option>
-          ))}
-        </select>
-      </div>
-      {cost && (
-        <p className="section-hint">
-          {cost.liveConcurrency > 0
-            ? `Currently ${cost.liveConcurrency} warm instance${cost.liveConcurrency === 1 ? "" : "s"} ($${cost.liveHourlyCostUsd.toFixed(4)}/hr)`
-            : "Currently cold (no PC active)"}{" "}
-          · ~${cost.scheduledMonthlyCostUsd.toFixed(2)}/mo if this schedule runs as set
-          {reactiveStatus?.active &&
-            reactiveStatus.until &&
-            ` · reactively warm until ${new Date(reactiveStatus.until).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`}
-        </p>
-      )}
-      {coldStart &&
-        (coldStart.error ? (
-          <p className="section-hint">Cold start check failed: {coldStart.error}</p>
-        ) : (
-          <p className="section-hint">
-            Last {coldStartWindowLabel}: {coldStart.coldStartPercent}% cold starts ({coldStart.coldStartCount}{" "}
-            of {coldStart.totalInvocations} invocations)
-          </p>
-        ))}
-      {invalid && (
-        <p className="section-hint">
-          Pick at least one day, with start before end, concurrency between 1 and {MAX_CONCURRENCY}, and a
-          valid memory size.
-        </p>
+          {draft.enabled && (
+            <>
+              <div className="warm-schedule-days">
+                {ALL_DAYS.map((day) => (
+                  <button
+                    key={day}
+                    type="button"
+                    className={`warm-schedule-day-btn${draft.days.includes(day) ? " active" : ""}`}
+                    aria-pressed={draft.days.includes(day)}
+                    disabled={disabled}
+                    onClick={() => toggleDay(day)}
+                  >
+                    {DAY_LABELS[day]}
+                  </button>
+                ))}
+              </div>
+
+              <div className="warm-schedule-times">
+                <input
+                  className="form-input"
+                  type="time"
+                  aria-label={`${label} start time`}
+                  value={draft.start}
+                  disabled={disabled}
+                  onChange={(e) => onChange({ ...draft, start: e.target.value })}
+                />
+                <span className="warm-schedule-times-sep">to</span>
+                <input
+                  className="form-input"
+                  type="time"
+                  aria-label={`${label} end time`}
+                  value={draft.end}
+                  disabled={disabled}
+                  onChange={(e) => onChange({ ...draft, end: e.target.value })}
+                />
+                <span className="warm-schedule-times-sep">×</span>
+                <input
+                  className="form-input warm-schedule-concurrency-input"
+                  type="number"
+                  min={1}
+                  max={MAX_CONCURRENCY}
+                  aria-label={`${label} provisioned concurrency`}
+                  value={draft.concurrency}
+                  disabled={disabled}
+                  onChange={(e) => onChange({ ...draft, concurrency: Number(e.target.value) })}
+                />
+                <span className="warm-schedule-times-sep">@</span>
+                <select
+                  className="form-input"
+                  aria-label={`${label} memory size`}
+                  value={draft.memoryMb}
+                  disabled={disabled}
+                  onChange={(e) => onChange({ ...draft, memoryMb: Number(e.target.value) })}
+                >
+                  {MEMORY_OPTIONS_MB.map((mb) => (
+                    <option key={mb} value={mb}>
+                      {mb}MB
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </>
+          )}
+
+          {cost && (
+            <p className="section-hint">
+              {liveConcurrencyLabel(cost)} · ~${cost.scheduledMonthlyCostUsd.toFixed(2)}/mo if this schedule
+              runs as set · ~$
+              {cost.last24hCostUsd.toFixed(2)} est. last 24h
+              {reactiveStatus?.active &&
+                reactiveStatus.until &&
+                ` · reactively warm until ${new Date(reactiveStatus.until).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`}
+            </p>
+          )}
+          {coldStart &&
+            (coldStart.error ? (
+              <p className="section-hint">Cold start check failed: {coldStart.error}</p>
+            ) : (
+              <p className="section-hint">
+                Last {coldStartWindowLabel}: {coldStart.coldStartPercent}% cold starts (
+                {coldStart.coldStartCount} of {coldStart.totalInvocations} invocations)
+              </p>
+            ))}
+          {invalid && (
+            <p className="section-hint">
+              Pick at least one day, with start before end, concurrency between 1 and {MAX_CONCURRENCY}, and a
+              valid memory size.
+            </p>
+          )}
+        </>
       )}
     </div>
   );

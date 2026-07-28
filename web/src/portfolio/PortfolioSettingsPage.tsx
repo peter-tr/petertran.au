@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useShowAlsoBuilt } from "./hooks/useShowAlsoBuilt";
-import { useShowFooterCost } from "./hooks/useShowFooterCost";
+import { useShowFooterCost } from "../shared/hooks/useShowFooterCost";
 import {
   useWarmSchedule,
   schedulesEqual,
@@ -11,15 +11,17 @@ import {
   type WarmSchedule,
 } from "./hooks/useWarmSchedule";
 import { useAlertsEnabled } from "./hooks/useAlertsEnabled";
+import { useCollapsedKeys } from "./hooks/useCollapsedKeys";
 import WarmScheduleProject from "./components/WarmScheduleProject";
 import WarmScheduleProfiles from "./components/WarmScheduleProfiles";
+import Footer from "../shared/components/Footer";
 import "./portfolio.css";
 
 const WARM_SCHEDULE_LABELS: Record<WarmScheduleKey, string> = {
-  portfolio: "this resume site",
+  portfolio: "portfolio",
   pantry: "pantry",
   imposter: "imposter",
-  supergraph: "supergraph (GraphQL gateway in front of the three above)",
+  supergraph: "supergraph",
   designStudio: "design-studio",
   zeroTrustLab: "zero-trust-lab (no real visitors - only speeds up your own testing of it)",
 };
@@ -77,6 +79,9 @@ export default function PortfolioSettingsPage() {
   const totalScheduledMonthlyCostUsd = warmScheduleCosts
     ? WARM_SCHEDULE_KEYS.reduce((sum, fn) => sum + warmScheduleCosts[fn].scheduledMonthlyCostUsd, 0)
     : 0;
+  const totalLast24hCostUsd = warmScheduleCosts
+    ? WARM_SCHEDULE_KEYS.reduce((sum, fn) => sum + warmScheduleCosts[fn].last24hCostUsd, 0)
+    : 0;
   const {
     enabled: alertsEnabled,
     pending: alertsPending,
@@ -84,6 +89,12 @@ export default function PortfolioSettingsPage() {
     setEnabled: setAlertsEnabled,
     available: alertsAvailable,
   } = useAlertsEnabled();
+  // In-memory only (same as ExperienceSection/EducationSection's own use of
+  // this hook) - keyed by each project's stable `fn` key, so Save/Refresh/
+  // profile actions (which replace warmScheduleConfig/Drafts with a fresh
+  // object) never reset which rows are expanded, since this state lives
+  // independently of that data.
+  const { isCollapsed: isWarmScheduleCollapsed, toggle: toggleWarmScheduleCollapsed } = useCollapsedKeys();
 
   return (
     <>
@@ -139,7 +150,8 @@ export default function PortfolioSettingsPage() {
             Keep warm with provisioned concurrency (Sydney time) - no cold starts for real visitors during the
             window you set below. Prices below are live, from each project's real Lambda memory size and
             currently-allocated provisioned concurrency. Each project can also opt in to warming reactively
-            for 1hr after a real cold start, on top of (or instead of) the scheduled window.
+            for 1hr after a real cold start - independent of the scheduled window, so it works whether that's
+            on or off.
           </p>
           <WarmScheduleProfiles
             profiles={warmScheduleProfiles}
@@ -149,7 +161,10 @@ export default function PortfolioSettingsPage() {
             onApply={applyWarmScheduleProfile}
             onDelete={deleteWarmScheduleProfile}
           />
-          <div className="warm-schedule-days" role="group" aria-label="Cold start check window">
+          {/* A real <fieldset> rather than a <div role="group"> - same
+              grouping semantics, from the native element instead of an ARIA
+              override. */}
+          <fieldset className="warm-schedule-days" aria-label="Cold start check window">
             {COLD_START_WINDOW_OPTIONS.map((option) => (
               <button
                 key={option.minutes}
@@ -161,7 +176,7 @@ export default function PortfolioSettingsPage() {
                 {option.label}
               </button>
             ))}
-          </div>
+          </fieldset>
           <p className="section-hint">
             Cold start rate below is checked automatically, over the window selected above.
             {checkingColdStarts && " Checking…"}
@@ -182,11 +197,14 @@ export default function PortfolioSettingsPage() {
                 coldStart={warmScheduleColdStarts?.[fn]}
                 coldStartWindowLabel={coldStartWindowLabel}
                 disabled={warmScheduleSaving}
+                collapsed={isWarmScheduleCollapsed(fn)}
+                onToggleCollapsed={() => toggleWarmScheduleCollapsed(fn)}
               />
             ))}
           {warmScheduleCosts && (
             <p className="section-hint">
-              Total: ~${totalScheduledMonthlyCostUsd.toFixed(2)}/mo if all schedules run as set
+              Total: ~${totalScheduledMonthlyCostUsd.toFixed(2)}/mo if all schedules run as set · ~$
+              {totalLast24hCostUsd.toFixed(2)} est. across all Lambdas in the last 24h
             </p>
           )}
           <button
@@ -207,6 +225,8 @@ export default function PortfolioSettingsPage() {
       <p className="section-hint">
         <Link to="/">← back home</Link>
       </p>
+
+      <Footer />
     </>
   );
 }

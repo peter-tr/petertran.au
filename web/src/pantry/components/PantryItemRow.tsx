@@ -55,10 +55,8 @@ export default function PantryItemRow({
   onAddCategory,
   onChanged,
   onError,
-}: PantryItemRowProps) {
+}: Readonly<PantryItemRowProps>) {
   const [busy, setBusy] = useState(false);
-  const [editingName, setEditingName] = useState(false);
-  const [draftName, setDraftName] = useState(item.name);
   const [showHistory, setShowHistory] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
 
@@ -114,17 +112,6 @@ export default function PantryItemRow({
     }
   }
 
-  function commitNameEdit() {
-    const trimmed = draftName.trim();
-    setEditingName(false);
-    if (!trimmed || trimmed === item.name) {
-      setDraftName(item.name);
-
-      return;
-    }
-    saveField({ name: trimmed });
-  }
-
   // Simple mode is deliberately name + stepper + delete only - no meta line,
   // category, staple toggle, or rename/history interactions - for keeping
   // the page scannable (especially on mobile) when you don't need the detail.
@@ -144,8 +131,15 @@ export default function PantryItemRow({
             step={stepForUnit(item.unit)}
             disabled={busy}
           />
-          <button type="button" className="pantry-delete-btn" onClick={handleDelete} disabled={busy}>
-            delete
+          <button
+            type="button"
+            className="pantry-delete-btn"
+            onClick={handleDelete}
+            disabled={busy}
+            aria-label={`Delete ${item.name}`}
+            title="Delete"
+          >
+            ✕
           </button>
         </div>
       </li>
@@ -155,40 +149,14 @@ export default function PantryItemRow({
   return (
     <li className="pantry-item-row">
       <div className="pantry-item-info">
-        {editingName ? (
-          <input
-            className="pantry-item-name-input"
-            value={draftName}
-            autoFocus
-            maxLength={200}
-            disabled={busy}
-            onChange={(e) => setDraftName(e.target.value)}
-            onBlur={commitNameEdit}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") commitNameEdit();
-              if (e.key === "Escape") {
-                setDraftName(item.name);
-                setEditingName(false);
-              }
-            }}
-          />
-        ) : (
-          <span
-            className="pantry-item-name"
-            role="button"
-            tabIndex={0}
-            title="Click to rename"
-            onClick={() => setEditingName(true)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                setEditingName(true);
-              }
-            }}
-          >
-            {item.name}
-          </span>
-        )}
+        <button
+          type="button"
+          className="pantry-item-name"
+          title="Click to edit"
+          onClick={() => setShowEdit(true)}
+        >
+          {item.name}
+        </button>
         {item.category && <span className="pantry-item-category">{item.category}</span>}
         <div className="pantry-item-toggles">
           <button
@@ -297,18 +265,22 @@ export default function PantryItemRow({
               )
             );
           })()}
-        <button type="button" className="pantry-edit-btn" onClick={() => setShowEdit(true)} disabled={busy}>
-          edit
-        </button>
-        <button type="button" className="pantry-delete-btn" onClick={handleDelete} disabled={busy}>
-          delete
+        <button
+          type="button"
+          className="pantry-delete-btn"
+          onClick={handleDelete}
+          disabled={busy}
+          aria-label={`Delete ${item.name}`}
+          title="Delete"
+        >
+          ✕
         </button>
       </div>
 
       {showHistory && item.purchases.length > 0 && (
         <ul className="pantry-purchase-history">
-          {[...item.purchases].reverse().map((p, i) => (
-            <li key={i}>
+          {[...item.purchases].reverse().map((p) => (
+            <li key={`${p.date}-${p.quantity}-${p.price}`}>
               {p.date} — {p.quantity}
               {item.unit ? ` ${item.unit}` : ""}
               {p.price !== null ? ` · $${p.price.toFixed(2)}` : ""}

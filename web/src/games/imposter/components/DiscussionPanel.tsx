@@ -14,7 +14,7 @@ interface DiscussionPanelProps {
   onGameUpdate: (game: ImposterGame) => void;
 }
 
-export default function DiscussionPanel({ gameId, players, onGameUpdate }: DiscussionPanelProps) {
+export default function DiscussionPanel({ gameId, players, onGameUpdate }: Readonly<DiscussionPanelProps>) {
   const [revealing, setRevealing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [peekPlayer, setPeekPlayer] = useState<ImposterPlayer | null>(null);

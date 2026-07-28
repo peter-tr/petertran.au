@@ -12,6 +12,18 @@
   letter-spacing: -0.01em;
 }
 
+/* Carries the <h1>'s own type styling so the clickable name is visually
+   identical to the plain heading it replaced. */
+.hero-name-btn {
+  font: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
 @keyframes hero-secret-in {
   from {
     opacity: 0;
@@ -35,10 +47,23 @@
   color: var(--signal);
   text-decoration: none;
   border-bottom: 1px solid var(--signal-dim);
+  /* Keeps "design-studio" atomic - without this, the browser treats its
+     hyphen as a break opportunity and splits it mid-word ("design-"/
+     "studio") on narrow screens instead of wrapping the whole link. */
+  white-space: nowrap;
 }
 
 .hero-secret a:hover {
   border-color: var(--signal);
+}
+
+@media (max-width: 640px) {
+  /* Small enough that the whole "// psst, also built ..." line fits on one
+     row at mobile widths instead of wrapping - same idea as the other
+     compact mono UI text on this site (e.g. pantry's control labels). */
+  .hero-secret {
+    font-size: 0.68rem;
+  }
 }
 
 /* Small unobtrusive link revealed by clicking the h1 three times - same
@@ -1063,10 +1088,44 @@
   border-top: 1px solid var(--rule);
 }
 
+.warm-schedule-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.warm-schedule-name {
+  font-family: var(--font-sans);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--paper);
+}
+
+.warm-schedule-collapse-indicator {
+  flex-shrink: 0;
+  color: var(--muted-dim);
+  font-size: 0.8rem;
+}
+
 .warm-schedule-days {
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;
+  /* Also used on a <fieldset> (the cold-start window group on Settings) -
+     strip its default border/padding/min-width so both render identically. */
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
 }
 
 .warm-schedule-day-btn {

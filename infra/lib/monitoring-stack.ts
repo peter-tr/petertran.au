@@ -171,6 +171,225 @@ interface ProjectData {
   table?: { tableName: string; table: dynamodb.ITable };
 }
 
+function getOrCreateProjectData(projects: Map<string, ProjectData>, project: string): ProjectData {
+  let data = projects.get(project);
+  if (!data) {
+    data = {
+      alarms: [],
+      latencyMetrics: [],
+      invocationMetrics: [],
+      errorMetrics: [],
+      graphqlLogGroupNames: [],
+    };
+    projects.set(project, data);
+  }
+
+  return data;
+}
+
+function registerFunctionTarget(
+  scope: Construct,
+  target: MonitoredFunction,
+  alarmTopic: sns.Topic | undefined,
+  projects: Map<string, ProjectData>
+): void {
+  const fn = lambda.Function.fromFunctionName(scope, `${target.id}Fn`, target.functionName);
+  const data = getOrCreateProjectData(projects, target.project);
+
+  if (alarmTopic) {
+    data.alarms.push(
+      ...createLambdaAlarms(scope, target.id, {
+        fn,
+        functionName: target.functionName,
+        alarmTopic,
+        timeoutSeconds: target.timeoutSeconds,
+      })
+    );
+  }
+
+  data.latencyMetrics.push(
+    fn.metricDuration({ statistic: "p50", label: `${target.functionName} p50` }),
+    fn.metricDuration({ statistic: "p99", label: `${target.functionName} p99` })
+  );
+  data.invocationMetrics.push(fn.metricInvocations({ label: target.functionName }));
+  data.errorMetrics.push(
+    fn.metricErrors({ label: `${target.functionName} errors` }),
+    fn.metricThrottles({ label: `${target.functionName} throttles` })
+  );
+
+  if (target.emitsGraphqlOperations) {
+    data.graphqlLogGroupNames.push(`/aws/lambda/${target.functionName}`);
+  }
+}
+
+function registerTableTarget(
+  scope: Construct,
+  target: MonitoredTable,
+  projects: Map<string, ProjectData>
+): void {
+  const table = dynamodb.Table.fromTableName(scope, `${target.id}Table`, target.tableName);
+  getOrCreateProjectData(projects, target.project).table = { tableName: target.tableName, table };
+}
+
+// One-time, account/region-wide opt-in that grants Application Signals
+// permission to discover instrumented resources (xray:GetServiceGraph,
+// logs:StartQuery, cloudwatch:GetMetricData, etc - see CDK's
+// aws_applicationsignals.CfnDiscovery docs). Gated to prod only - this stack
+// also deploys as PetertranTestMonitoringStack for the on-demand test env,
+// and this resource is account-wide, not per-stack, so a second copy would
+// just fight over the same underlying service-linked role.
+function createAlarmTopic(scope: Construct): sns.Topic {
+  const alarmTopic = new sns.Topic(scope, "AlarmsTopic", {
+    topicName: "petertran-au-alarms",
+    displayName: "petertran.au alarms",
+    masterKey: kms.Alias.fromAliasName(scope, "SnsManagedKey", "alias/aws/sns"),
+  });
+  alarmTopic.addSubscription(new subscriptions.EmailSubscription(ALARM_EMAIL));
+  new applicationsignals.CfnDiscovery(scope, "ApplicationSignalsServiceRole", {});
+
+  return alarmTopic;
+}
+
+// Backs the Settings page's "email me when an alarm fires" toggle - real AWS
+// state, not a per-browser preference, since it mutes/unmutes the one shared
+// alarm subscription for every visitor to the settings page, same reasoning
+// as ProvisionedConcurrencyStack's warm-schedule toggle not being a
+// localStorage preference either. Lives in this stack (not its own) since it
+// only ever touches alarmTopic's own subscription - no reason to split it
+// out the way warm-schedule split from its producing stacks, since there's
+// nothing cross-cutting about it. Prod only, same as the topic/alarms it
+// manages.
+function createAlertsSettingsFunction(scope: Construct, alarmTopic: sns.Topic): void {
+  const alertsSettingsFn = new lambda.Function(scope, "AlertsSettingsFunction", {
+    functionName: FUNCTION_NAMES.alertsSettings,
+    runtime: lambda.Runtime.NODEJS_20_X,
+    handler: "alerts-settings/handler.handler",
+    code: lambda.Code.fromAsset(path.join(__dirname, "../../api/dist")),
+    memorySize: 128,
+    timeout: Duration.seconds(10),
+    environment: {
+      ALARM_TOPIC_ARN: alarmTopic.topicArn,
+      ALARM_EMAIL,
+    },
+    tracing: lambda.Tracing.ACTIVE,
+  });
+  alertsSettingsFn.addToRolePolicy(
+    new iam.PolicyStatement({
+      actions: ["sns:ListSubscriptionsByTopic"],
+      resources: [alarmTopic.topicArn],
+    })
+  );
+  alertsSettingsFn.addToRolePolicy(
+    new iam.PolicyStatement({
+      // `*`, not `${alarmTopic.topicArn}:*` - tried the scoped wildcard first
+      // (subscription ARNs are the topic ARN with a UUID suffix,
+      // `<topicArn>:<uuid>`, not known until the subscription actually
+      // exists), but confirmed live (via iam:SimulatePrincipalPolicy against
+      // the real deployed role, and against the real subscription ARN,
+      // cross-checked with the real Lambda's own AccessDenied logs) that
+      // AWS's IAM engine does not match a `topicArn:*` pattern against a real
+      // `topicArn:<uuid>` subscription ARN for these two actions - same "AWS
+      // API with no usable resource-level ARN scoping" category as the
+      // CloudWatch/X-Ray/Cost Explorer grant in site-stack.ts, just
+      // discovered empirically rather than up front.
+      actions: ["sns:GetSubscriptionAttributes", "sns:SetSubscriptionAttributes"],
+      resources: ["*"],
+    })
+  );
+}
+
+// Compact - a whole row per alarm (the old layout) badly overstated how much
+// space an AlarmStatusWidget actually needs; it renders as a dense grid, not
+// a one-alarm-per-line list. Skipped entirely (and its width redistributed
+// to the graphs) when there's nothing to show - the test-env dashboard never
+// has alarms at all.
+function buildMetricsRow(data: ProjectData): cloudwatch.IWidget[] {
+  const metricsRow: cloudwatch.IWidget[] = [];
+  if (data.alarms.length > 0) {
+    metricsRow.push(
+      new cloudwatch.AlarmStatusWidget({ title: "Alarms", alarms: data.alarms, width: 6, height: 6 })
+    );
+  }
+
+  const graphWidth = data.alarms.length > 0 ? 6 : 8;
+
+  metricsRow.push(
+    new cloudwatch.GraphWidget({
+      title: "Latency (p50 / p99)",
+      view: cloudwatch.GraphWidgetView.TIME_SERIES,
+      left: data.latencyMetrics,
+      leftYAxis: { label: "ms", showUnits: false },
+      width: graphWidth,
+      height: 6,
+    }),
+    // Bar, not line - a low-traffic personal project's invocation/error
+    // counts are sparse and spiky, which reads as a flat, unreadable line
+    // hugging zero with the occasional spike. Bars make individual events
+    // visible at a glance instead.
+    new cloudwatch.GraphWidget({
+      title: "Invocations",
+      view: cloudwatch.GraphWidgetView.BAR,
+      left: data.invocationMetrics,
+      width: graphWidth,
+      height: 6,
+    }),
+    new cloudwatch.GraphWidget({
+      title: "Errors & throttles",
+      view: cloudwatch.GraphWidgetView.BAR,
+      left: data.errorMetrics,
+      width: graphWidth,
+      height: 6,
+    })
+  );
+
+  return metricsRow;
+}
+
+function buildDetailRow(data: ProjectData): cloudwatch.IWidget[] {
+  const detailRow: cloudwatch.IWidget[] = [];
+  if (data.graphqlLogGroupNames.length > 0) {
+    detailRow.push(
+      new cloudwatch.LogQueryWidget({
+        title: "GraphQL operations by name",
+        logGroupNames: data.graphqlLogGroupNames,
+        view: cloudwatch.LogQueryVisualizationType.BAR,
+        queryLines: [
+          "filter ispresent(OperationCount) and ispresent(operationName)",
+          "stats sum(OperationCount) as count by operationName",
+          "sort count desc",
+          "limit 10",
+        ],
+        width: data.table ? 12 : 24,
+        height: 6,
+      })
+    );
+  }
+  if (data.table) {
+    detailRow.push(
+      new cloudwatch.GraphWidget({
+        title: `${data.table.tableName} table`,
+        left: [
+          data.table.table.metricConsumedReadCapacityUnits(),
+          data.table.table.metricConsumedWriteCapacityUnits(),
+        ],
+        right: [data.table.table.metricThrottledRequestsForOperations()],
+        width: data.graphqlLogGroupNames.length > 0 ? 12 : 24,
+        height: 6,
+      })
+    );
+  }
+
+  return detailRow;
+}
+
+function addProjectDashboardRows(dashboard: cloudwatch.Dashboard, project: string, data: ProjectData): void {
+  dashboard.addWidgets(new cloudwatch.TextWidget({ markdown: `## ${project}`, width: 24, height: 1 }));
+  dashboard.addWidgets(...buildMetricsRow(data));
+
+  const detailRow = buildDetailRow(data);
+  if (detailRow.length > 0) dashboard.addWidgets(...detailRow);
+}
+
 export interface MonitoringStackProps extends StackProps {
   // True only for the on-demand test env's own dashboard (see
   // infra/bin/app.ts) - dashboard-only, no alarms/SNS topic/alerts-toggle
@@ -209,211 +428,24 @@ export class MonitoringStack extends Stack {
     const monitoredFunctions = isTestEnv ? TEST_FUNCTIONS : PROD_FUNCTIONS;
     const monitoredTables = isTestEnv ? TEST_TABLES : PROD_TABLES;
 
-    let alarmTopic: sns.Topic | undefined;
-    if (!isTestEnv) {
-      alarmTopic = new sns.Topic(this, "AlarmsTopic", {
-        topicName: "petertran-au-alarms",
-        displayName: "petertran.au alarms",
-        masterKey: kms.Alias.fromAliasName(this, "SnsManagedKey", "alias/aws/sns"),
-      });
-      alarmTopic.addSubscription(new subscriptions.EmailSubscription(ALARM_EMAIL));
-
-      // One-time, account/region-wide opt-in that grants Application Signals
-      // permission to discover instrumented resources (xray:GetServiceGraph,
-      // logs:StartQuery, cloudwatch:GetMetricData, etc - see CDK's
-      // aws_applicationsignals.CfnDiscovery docs). Gated to prod only, same
-      // as alarmTopic above - this stack also deploys as
-      // PetertranTestMonitoringStack for the on-demand test env, and this
-      // resource is account-wide, not per-stack, so a second copy would just
-      // fight over the same underlying service-linked role.
-      new applicationsignals.CfnDiscovery(this, "ApplicationSignalsServiceRole", {});
-    }
+    const alarmTopic = isTestEnv ? undefined : createAlarmTopic(this);
 
     const projects = new Map<string, ProjectData>();
-    function dataFor(project: string): ProjectData {
-      let data = projects.get(project);
-      if (!data) {
-        data = {
-          alarms: [],
-          latencyMetrics: [],
-          invocationMetrics: [],
-          errorMetrics: [],
-          graphqlLogGroupNames: [],
-        };
-        projects.set(project, data);
-      }
-
-      return data;
-    }
-
     for (const target of monitoredFunctions) {
-      const fn = lambda.Function.fromFunctionName(this, `${target.id}Fn`, target.functionName);
-      const data = dataFor(target.project);
-
-      if (alarmTopic) {
-        data.alarms.push(
-          ...createLambdaAlarms(this, target.id, {
-            fn,
-            functionName: target.functionName,
-            alarmTopic,
-            timeoutSeconds: target.timeoutSeconds,
-          })
-        );
-      }
-
-      data.latencyMetrics.push(
-        fn.metricDuration({ statistic: "p50", label: `${target.functionName} p50` }),
-        fn.metricDuration({ statistic: "p99", label: `${target.functionName} p99` })
-      );
-      data.invocationMetrics.push(fn.metricInvocations({ label: target.functionName }));
-      data.errorMetrics.push(
-        fn.metricErrors({ label: `${target.functionName} errors` }),
-        fn.metricThrottles({ label: `${target.functionName} throttles` })
-      );
-
-      if (target.emitsGraphqlOperations) {
-        data.graphqlLogGroupNames.push(`/aws/lambda/${target.functionName}`);
-      }
+      registerFunctionTarget(this, target, alarmTopic, projects);
     }
-
     for (const target of monitoredTables) {
-      const table = dynamodb.Table.fromTableName(this, `${target.id}Table`, target.tableName);
-      dataFor(target.project).table = { tableName: target.tableName, table };
+      registerTableTarget(this, target, projects);
     }
 
-    // Backs the Settings page's "email me when an alarm fires" toggle - real
-    // AWS state, not a per-browser preference, since it mutes/unmutes the
-    // one shared alarm subscription for every visitor to the settings page,
-    // same reasoning as ProvisionedConcurrencyStack's warm-schedule toggle
-    // not being a localStorage preference either. Lives in this stack (not
-    // its own) since it only ever touches alarmTopic's own subscription -
-    // no reason to split it out the way warm-schedule split from its
-    // producing stacks, since there's nothing cross-cutting about it. Prod
-    // only, same as the topic/alarms it manages.
-    if (alarmTopic) {
-      const alertsSettingsFn = new lambda.Function(this, "AlertsSettingsFunction", {
-        functionName: FUNCTION_NAMES.alertsSettings,
-        runtime: lambda.Runtime.NODEJS_20_X,
-        handler: "alerts-settings/handler.handler",
-        code: lambda.Code.fromAsset(path.join(__dirname, "../../api/dist")),
-        memorySize: 128,
-        timeout: Duration.seconds(10),
-        environment: {
-          ALARM_TOPIC_ARN: alarmTopic.topicArn,
-          ALARM_EMAIL,
-        },
-        tracing: lambda.Tracing.ACTIVE,
-      });
-      alertsSettingsFn.addToRolePolicy(
-        new iam.PolicyStatement({
-          actions: ["sns:ListSubscriptionsByTopic"],
-          resources: [alarmTopic.topicArn],
-        })
-      );
-      alertsSettingsFn.addToRolePolicy(
-        new iam.PolicyStatement({
-          // `*`, not `${alarmTopic.topicArn}:*` - tried the scoped wildcard
-          // first (subscription ARNs are the topic ARN with a UUID suffix,
-          // `<topicArn>:<uuid>`, not known until the subscription actually
-          // exists), but confirmed live (via iam:SimulatePrincipalPolicy
-          // against the real deployed role, and against the real
-          // subscription ARN, cross-checked with the real Lambda's own
-          // AccessDenied logs) that AWS's IAM engine does not match a
-          // `topicArn:*` pattern against a real `topicArn:<uuid>`
-          // subscription ARN for these two actions - same "AWS API with no
-          // usable resource-level ARN scoping" category as the
-          // CloudWatch/X-Ray/Cost Explorer grant in site-stack.ts, just
-          // discovered empirically rather than up front.
-          actions: ["sns:GetSubscriptionAttributes", "sns:SetSubscriptionAttributes"],
-          resources: ["*"],
-        })
-      );
-    }
+    if (alarmTopic) createAlertsSettingsFunction(this, alarmTopic);
 
     const dashboard = new cloudwatch.Dashboard(this, "Dashboard", {
       dashboardName: isTestEnv ? "petertran-au-test" : "petertran-au",
     });
 
     for (const [project, data] of projects) {
-      dashboard.addWidgets(new cloudwatch.TextWidget({ markdown: `## ${project}`, width: 24, height: 1 }));
-
-      // Compact - a whole row per alarm (the old layout) badly overstated
-      // how much space an AlarmStatusWidget actually needs; it renders as a
-      // dense grid, not a one-alarm-per-line list. Skipped entirely (and
-      // its width redistributed to the graphs) when there's nothing to show
-      // - the test-env dashboard never has alarms at all.
-      const metricsRow: cloudwatch.IWidget[] = [];
-      if (data.alarms.length > 0) {
-        metricsRow.push(
-          new cloudwatch.AlarmStatusWidget({ title: "Alarms", alarms: data.alarms, width: 6, height: 6 })
-        );
-      }
-
-      const graphWidth = data.alarms.length > 0 ? 6 : 8;
-
-      metricsRow.push(
-        new cloudwatch.GraphWidget({
-          title: "Latency (p50 / p99)",
-          view: cloudwatch.GraphWidgetView.TIME_SERIES,
-          left: data.latencyMetrics,
-          leftYAxis: { label: "ms", showUnits: false },
-          width: graphWidth,
-          height: 6,
-        }),
-        // Bar, not line - a low-traffic personal project's invocation/error
-        // counts are sparse and spiky, which reads as a flat, unreadable
-        // line hugging zero with the occasional spike. Bars make individual
-        // events visible at a glance instead.
-        new cloudwatch.GraphWidget({
-          title: "Invocations",
-          view: cloudwatch.GraphWidgetView.BAR,
-          left: data.invocationMetrics,
-          width: graphWidth,
-          height: 6,
-        }),
-        new cloudwatch.GraphWidget({
-          title: "Errors & throttles",
-          view: cloudwatch.GraphWidgetView.BAR,
-          left: data.errorMetrics,
-          width: graphWidth,
-          height: 6,
-        })
-      );
-      dashboard.addWidgets(...metricsRow);
-
-      const detailRow: cloudwatch.IWidget[] = [];
-      if (data.graphqlLogGroupNames.length > 0) {
-        detailRow.push(
-          new cloudwatch.LogQueryWidget({
-            title: "GraphQL operations by name",
-            logGroupNames: data.graphqlLogGroupNames,
-            view: cloudwatch.LogQueryVisualizationType.BAR,
-            queryLines: [
-              "filter ispresent(OperationCount) and ispresent(operationName)",
-              "stats sum(OperationCount) as count by operationName",
-              "sort count desc",
-              "limit 10",
-            ],
-            width: data.table ? 12 : 24,
-            height: 6,
-          })
-        );
-      }
-      if (data.table) {
-        detailRow.push(
-          new cloudwatch.GraphWidget({
-            title: `${data.table.tableName} table`,
-            left: [
-              data.table.table.metricConsumedReadCapacityUnits(),
-              data.table.table.metricConsumedWriteCapacityUnits(),
-            ],
-            right: [data.table.table.metricThrottledRequestsForOperations()],
-            width: data.graphqlLogGroupNames.length > 0 ? 12 : 24,
-            height: 6,
-          })
-        );
-      }
-      if (detailRow.length > 0) dashboard.addWidgets(...detailRow);
+      addProjectDashboardRows(dashboard, project, data);
     }
   }
 }

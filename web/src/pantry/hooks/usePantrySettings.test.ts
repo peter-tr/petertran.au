@@ -25,6 +25,7 @@ function makeSettings(overrides: Partial<PantrySettings> = {}): PantrySettings {
     optionsCollapsed: false,
     collapsedGroups: [],
     commonItems: [],
+    inventoryListCollapsed: false,
     shoppingListCollapsed: false,
     showLowPriority: true,
     categoryFilter: null,

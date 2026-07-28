@@ -1,6 +1,15 @@
 import { getAnthropicClient } from "api-shared/anthropic-client";
-import { getAllItems, setLastKnownPrice, type LastKnownPrice } from "../../services/inventory";
-import { getShoppingList, setShoppingListLastKnownPrice } from "../../services/shopping-list";
+import {
+  getAllItems,
+  setLastKnownPrice,
+  type InventoryItem,
+  type LastKnownPrice,
+} from "../../services/inventory";
+import {
+  getShoppingList,
+  setShoppingListLastKnownPrice,
+  type ShoppingListEntry,
+} from "../../services/shopping-list";
 import { startPriceSync, recordPriceCheckProgress, finishPriceSync } from "../../services/price-sync-status";
 import { buildDebugInfo, type AiCallDebugInfo } from "./debug-info";
 
@@ -34,6 +43,20 @@ For EACH item in the list, independently:
 - Never construct, guess, or infer a URL yourself - only one you actually fetched or saw linked in a search result.
 
 Return exactly one entry per item in "results", with "name" copied EXACTLY as given in the input list (used to match results back to items) - never merge, skip, or reorder items.`;
+
+// A plain trailing-character scan, not a `/[.,;)]+$/` regex - a quantified
+// character class immediately before an end anchor is flagged by SonarQube's
+// static regex analyzer as super-linear on backtracking (S8786); this is
+// equivalent (same trailing chars stripped) and inherently linear since no
+// regex engine is involved.
+const TRAILING_PUNCTUATION = ".,;)";
+
+function stripTrailingPunctuation(value: string): string {
+  let end = value.length;
+  while (end > 0 && TRAILING_PUNCTUATION.includes(value[end - 1])) end--;
+
+  return value.slice(0, end);
+}
 
 interface BatchPriceResult {
   name: string;
@@ -90,6 +113,7 @@ async function checkPricesBatch(
   const toolBudget = Math.min(names.length * 3, 30);
   const timeoutMs = Math.min(30_000 + names.length * 15_000, 300_000);
   const maxTokens = Math.min(400 + names.length * 200, 4096);
+  const itemListText = names.map((n) => `- ${n}`).join("\n");
 
   const response = await client.messages.parse(
     {
@@ -103,7 +127,7 @@ async function checkPricesBatch(
       messages: [
         {
           role: "user",
-          content: `Look up the current Coles price for each of these items:\n${names.map((n) => `- ${n}`).join("\n")}`,
+          content: `Look up the current Coles price for each of these items:\n${itemListText}`,
         },
       ],
       output_config: { format: { type: "json_schema", schema: BATCH_PRICE_CHECK_SCHEMA } },
@@ -120,8 +144,8 @@ async function checkPricesBatch(
   for (const r of parsed?.results ?? []) {
     // Same URL validation as before - never pass through a malformed/
     // hallucinated link just because a field happened to be present.
-    const rawUrl = r.productUrl?.replace(/[.,;)]+$/, "") ?? null;
-    const productUrl = rawUrl && rawUrl.startsWith("https://www.coles.com.au/product/") ? rawUrl : null;
+    const rawUrl = r.productUrl != null ? stripTrailingPunctuation(r.productUrl) : null;
+    const productUrl = rawUrl?.startsWith("https://www.coles.com.au/product/") ? rawUrl : null;
     results.set(r.name, { ...r, productUrl });
   }
 
@@ -164,15 +188,12 @@ interface TrackedTarget {
   apply: (price: LastKnownPrice) => Promise<void>;
 }
 
-// Triggered only by the "sync prices now" settings button - no automatic
-// schedule and no per-item auto-trigger (both removed after a real credit-
-// exhaustion incident) - a best-effort background refresh, not a data path
-// anything else depends on, so a failure just leaves lastKnownPrice stale
-// rather than anything user-visible breaking.
-export async function checkTrackedPrices(pk: string): Promise<void> {
-  const [items, shoppingList] = await Promise.all([getAllItems(pk), getShoppingList(pk)]);
-
-  const targets: TrackedTarget[] = [
+function buildTrackedTargets(
+  pk: string,
+  items: InventoryItem[],
+  shoppingList: ShoppingListEntry[]
+): TrackedTarget[] {
+  return [
     ...items
       .filter((i) => i.trackPrice)
       .map((i): TrackedTarget => ({
@@ -190,6 +211,92 @@ export async function checkTrackedPrices(pk: string): Promise<void> {
         apply: (price) => setShoppingListLastKnownPrice(pk, e.id, price),
       })),
   ].slice(0, MAX_ITEMS_PER_RUN);
+}
+
+type PriceBatch = { results: Map<string, BatchPriceResult>; debugInfo: AiCallDebugInfo };
+
+// The batch's real cost/duration is shared across every item in it, not a
+// distinct call each - split evenly so nerd mode shows a fair per-item share
+// instead of the whole batch's total repeated on every row (which would look
+// like N times the real spend if someone eyeballed a few rows and added them
+// up). searchesUsed/fetchesUsed are GraphQL Ints, so this rounds rather than
+// leaving a fraction.
+function computePerItemDebugInfo(batch: PriceBatch | null, targetCount: number): AiCallDebugInfo | null {
+  if (!batch) return null;
+
+  return {
+    costUsd: batch.debugInfo.costUsd / targetCount,
+    durationMs: Math.round(batch.debugInfo.durationMs / targetCount),
+    searchesUsed: Math.round(batch.debugInfo.searchesUsed / targetCount),
+    fetchesUsed: Math.round(batch.debugInfo.fetchesUsed / targetCount),
+  };
+}
+
+// Records this target's outcome (batch-wide failure, missing result, or a
+// real price) and, on success, persists it via the target's own list-
+// specific setter - pulled out of checkTrackedPrices' loop so its three
+// independent outcomes (each with their own recordPriceCheckProgress call)
+// don't all nest inside that function's own batch/error control flow.
+async function applyPriceResultForTarget(
+  pk: string,
+  target: TrackedTarget,
+  batch: PriceBatch | null,
+  batchError: string | null,
+  perItemDebugInfo: AiCallDebugInfo | null
+): Promise<void> {
+  if (batchError) {
+    await recordPriceCheckProgress(pk, {
+      itemName: target.name,
+      message: batchError,
+      occurredAt: new Date().toISOString(),
+    });
+
+    return;
+  }
+
+  const entry = batch!.results.get(target.name);
+  if (!entry) {
+    console.error(`Price check missing for "${target.name}"`);
+    await recordPriceCheckProgress(pk, {
+      itemName: target.name,
+      message: "No result returned for this item in the batch response.",
+      occurredAt: new Date().toISOString(),
+    });
+
+    return;
+  }
+
+  try {
+    const price: LastKnownPrice = {
+      colesPrice: entry.colesPrice,
+      productUrl: entry.productUrl,
+      note: entry.note,
+      checkedAt: new Date().toISOString(),
+      debugInfo: perItemDebugInfo!,
+    };
+    await target.apply(price);
+
+    const noteSuffix = price.note ? ` (${price.note})` : "";
+    console.log(`Checked "${target.name}": Coles $${price.colesPrice ?? "?"}${noteSuffix}`);
+    await recordPriceCheckProgress(pk);
+  } catch (err) {
+    console.error(`Failed to save price for "${target.name}":`, err);
+    await recordPriceCheckProgress(pk, {
+      itemName: target.name,
+      message: err instanceof Error ? err.message : "Unknown error",
+      occurredAt: new Date().toISOString(),
+    });
+  }
+}
+
+// Triggered only by the "sync prices now" settings button - no automatic
+// schedule and no per-item auto-trigger (both removed after a real credit-
+// exhaustion incident) - a best-effort background refresh, not a data path
+// anything else depends on, so a failure just leaves lastKnownPrice stale
+// rather than anything user-visible breaking.
+export async function checkTrackedPrices(pk: string): Promise<void> {
+  const [items, shoppingList] = await Promise.all([getAllItems(pk), getShoppingList(pk)]);
+  const targets = buildTrackedTargets(pk, items, shoppingList);
 
   if (targets.length === 0) {
     console.log(`No trackPrice items for pk="${pk}" - skipping price check.`);
@@ -199,7 +306,7 @@ export async function checkTrackedPrices(pk: string): Promise<void> {
 
   await startPriceSync(pk, targets.length);
 
-  let batch: { results: Map<string, BatchPriceResult>; debugInfo: AiCallDebugInfo } | null = null;
+  let batch: PriceBatch | null = null;
   let batchError: string | null = null;
   try {
     batch = await checkPricesBatch(targets.map((t) => t.name));
@@ -208,64 +315,10 @@ export async function checkTrackedPrices(pk: string): Promise<void> {
     console.error("Batch price check failed entirely:", err);
   }
 
-  // The batch's real cost/duration is shared across every item in it, not
-  // a distinct call each - split evenly so nerd mode shows a fair per-item
-  // share instead of the whole batch's total repeated on every row (which
-  // would look like N times the real spend if someone eyeballed a few rows
-  // and added them up). searchesUsed/fetchesUsed are GraphQL Ints, so this
-  // rounds rather than leaving a fraction.
-  const perItemDebugInfo: AiCallDebugInfo | null = batch
-    ? {
-        costUsd: batch.debugInfo.costUsd / targets.length,
-        durationMs: Math.round(batch.debugInfo.durationMs / targets.length),
-        searchesUsed: Math.round(batch.debugInfo.searchesUsed / targets.length),
-        fetchesUsed: Math.round(batch.debugInfo.fetchesUsed / targets.length),
-      }
-    : null;
+  const perItemDebugInfo = computePerItemDebugInfo(batch, targets.length);
 
   for (const target of targets) {
-    if (batchError) {
-      await recordPriceCheckProgress(pk, {
-        itemName: target.name,
-        message: batchError,
-        occurredAt: new Date().toISOString(),
-      });
-      continue;
-    }
-
-    const entry = batch!.results.get(target.name);
-    if (!entry) {
-      const message = "No result returned for this item in the batch response.";
-      console.error(`Price check missing for "${target.name}"`);
-      await recordPriceCheckProgress(pk, {
-        itemName: target.name,
-        message,
-        occurredAt: new Date().toISOString(),
-      });
-      continue;
-    }
-
-    try {
-      const price: LastKnownPrice = {
-        colesPrice: entry.colesPrice,
-        productUrl: entry.productUrl,
-        note: entry.note,
-        checkedAt: new Date().toISOString(),
-        debugInfo: perItemDebugInfo!,
-      };
-      await target.apply(price);
-      console.log(
-        `Checked "${target.name}": Coles $${price.colesPrice ?? "?"}${price.note ? ` (${price.note})` : ""}`
-      );
-      await recordPriceCheckProgress(pk);
-    } catch (err) {
-      console.error(`Failed to save price for "${target.name}":`, err);
-      await recordPriceCheckProgress(pk, {
-        itemName: target.name,
-        message: err instanceof Error ? err.message : "Unknown error",
-        occurredAt: new Date().toISOString(),
-      });
-    }
+    await applyPriceResultForTarget(pk, target, batch, batchError, perItemDebugInfo);
   }
 
   await finishPriceSync(pk);

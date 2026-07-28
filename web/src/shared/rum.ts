@@ -22,6 +22,9 @@ export function initRum(): void {
     // config here instead of hardcoding the prod domain so this keeps
     // matching if RUM is ever pointed at a non-prod environment too.
     const apiOrigin = new URL(graphqlEndpoint).origin;
+    // Escaped up here rather than inline in the RegExp below, so that
+    // pattern isn't a template literal nested inside another one.
+    const apiOriginPattern = apiOrigin.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
 
     const config: AwsRumConfig = {
       identityPoolId,
@@ -45,9 +48,7 @@ export function initRum(): void {
             // and send it as an `X-Amzn-Trace-Id` header instead of the
             // Lambda minting an unrelated one on arrival. Scoped to our own
             // API only, not any future third-party fetch this page might make.
-            addXRayTraceIdHeader: [
-              new RegExp(`^${apiOrigin.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)}/`),
-            ],
+            addXRayTraceIdHeader: [new RegExp(`^${apiOriginPattern}/`)],
           },
         ],
       ],

@@ -23,18 +23,18 @@ jobs:
       # push attributed to github-actions[bot], landing every Version
       # Packages PR update in GitHub's approval-required state for
       # GITHUB_TOKEN-authored pull_request runs.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           token: ${{ secrets.CHANGESET_PAT }}
           fetch-depth: 0
           fetch-tags: true
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
-      - run: npm ci
+      - run: npm ci --ignore-scripts
 
       # Mirrors deploy.yml's tag-release job (highest existing release-N tag
       # + 1) so the PR title always shows the release number that will

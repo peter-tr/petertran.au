@@ -7,7 +7,7 @@ interface PropertyPanelProps {
 
 const FONT_FAMILIES = ["IBM Plex Sans", "IBM Plex Mono", "Georgia", "Arial"];
 
-export default function PropertyPanel({ element, onChange }: PropertyPanelProps) {
+export default function PropertyPanel({ element, onChange }: Readonly<PropertyPanelProps>) {
   if (!element) {
     return (
       <div className="design-studio-properties">
@@ -21,7 +21,7 @@ export default function PropertyPanel({ element, onChange }: PropertyPanelProps)
     <div className="design-studio-properties">
       <h2>Properties</h2>
       <label className="design-studio-field">
-        Fill
+        <span>Fill</span>
         <input
           type="color"
           value={element.fill}
@@ -29,7 +29,7 @@ export default function PropertyPanel({ element, onChange }: PropertyPanelProps)
         />
       </label>
       <label className="design-studio-field">
-        Stroke
+        <span>Stroke</span>
         <input
           type="color"
           value={element.stroke || "#000000"}
@@ -37,7 +37,7 @@ export default function PropertyPanel({ element, onChange }: PropertyPanelProps)
         />
       </label>
       <label className="design-studio-field">
-        Stroke width
+        <span>Stroke width</span>
         <input
           type="number"
           min={0}
@@ -50,7 +50,7 @@ export default function PropertyPanel({ element, onChange }: PropertyPanelProps)
       {element.type === "text" && (
         <>
           <label className="design-studio-field">
-            Font
+            <span>Font</span>
             <select
               value={element.fontFamily}
               onChange={(e) => onChange({ ...element, fontFamily: e.target.value })}
@@ -63,7 +63,7 @@ export default function PropertyPanel({ element, onChange }: PropertyPanelProps)
             </select>
           </label>
           <label className="design-studio-field">
-            Size
+            <span>Size</span>
             <input
               type="number"
               min={8}
@@ -78,7 +78,7 @@ export default function PropertyPanel({ element, onChange }: PropertyPanelProps)
               checked={element.fontWeight >= 600}
               onChange={(e) => onChange({ ...element, fontWeight: e.target.checked ? 700 : 400 })}
             />
-            Bold
+            <span>Bold</span>
           </label>
         </>
       )}

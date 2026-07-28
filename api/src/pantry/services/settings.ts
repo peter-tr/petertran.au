@@ -12,6 +12,7 @@ export interface PantrySettings {
   optionsCollapsed: boolean;
   collapsedGroups: string[];
   commonItems: string[];
+  inventoryListCollapsed: boolean;
   shoppingListCollapsed: boolean;
   showLowPriority: boolean;
   categoryFilter: string | null;
@@ -53,6 +54,7 @@ export interface PantrySettingsInput {
   optionsCollapsed?: boolean;
   collapsedGroups?: string[];
   commonItems?: string[];
+  inventoryListCollapsed?: boolean;
   shoppingListCollapsed?: boolean;
   showLowPriority?: boolean;
   categoryFilter?: string | null;
@@ -85,6 +87,7 @@ const DEFAULT_SETTINGS: PantrySettings = {
   simple: false,
   optionsCollapsed: false,
   collapsedGroups: [],
+  inventoryListCollapsed: false,
   shoppingListCollapsed: false,
   showLowPriority: false,
   categoryFilter: null,

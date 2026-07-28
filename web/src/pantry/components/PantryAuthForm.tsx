@@ -8,7 +8,7 @@ interface PantryAuthFormProps {
   onClose: () => void;
 }
 
-export default function PantryAuthForm({ pending, error, onSubmit, onClose }: PantryAuthFormProps) {
+export default function PantryAuthForm({ pending, error, onSubmit, onClose }: Readonly<PantryAuthFormProps>) {
   const [mode, setMode] = useState<PantryAuthMode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

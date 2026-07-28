@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import RevealBoard from "./RevealBoard";
 import { runImposterQuery } from "../lib/api";
@@ -70,7 +70,7 @@ describe("RevealBoard", () => {
     fireEvent.click(screen.getByText("Alice"));
     fireEvent.click(screen.getByText("Tap to reveal your word"));
 
-    await waitFor(() => expect(screen.getByText("Tiger")).toBeInTheDocument());
+    await screen.findByText("Tiger");
     expect(screen.getByText("You are the IMPOSTER")).toBeInTheDocument();
     expect(runImposterQueryMock).toHaveBeenCalledWith(expect.any(String), {
       gameId: "abcde",
@@ -91,9 +91,7 @@ describe("RevealBoard", () => {
     fireEvent.click(screen.getByText("Alice"));
     fireEvent.click(screen.getByText("Tap to reveal your word"));
 
-    await waitFor(() =>
-      expect(screen.getByText("No hint this time - you'll have to bluff blind.")).toBeInTheDocument()
-    );
+    expect(await screen.findByText("No hint this time - you'll have to bluff blind.")).toBeInTheDocument();
   });
 
   it("shows an error and re-enables the button when the reveal fails", async () => {
@@ -103,7 +101,7 @@ describe("RevealBoard", () => {
     fireEvent.click(screen.getByText("Alice"));
     fireEvent.click(screen.getByText("Tap to reveal your word"));
 
-    await waitFor(() => expect(screen.getByText(/network down/)).toBeInTheDocument());
+    await screen.findByText(/network down/);
     expect(screen.getByRole("button", { name: "Tap to reveal your word" })).not.toBeDisabled();
   });
 
@@ -122,10 +120,10 @@ describe("RevealBoard", () => {
 
     fireEvent.click(screen.getByText("Alice"));
     fireEvent.click(screen.getByText("Tap to reveal your word"));
-    await waitFor(() => expect(screen.getByText("Tiger")).toBeInTheDocument());
+    await screen.findByText("Tiger");
 
-    // Close by clicking the backdrop (modal content itself stops propagation).
-    fireEvent.click(document.querySelector(".imposter-modal-backdrop")!);
+    // Close by clicking the scrim button that sits behind the modal content.
+    fireEvent.click(document.querySelector(".imposter-modal-scrim")!);
 
     expect(screen.getByText("Alice").closest("button")).toHaveClass("imposter-box-done");
     expect(onAllRevealed).not.toHaveBeenCalled();
@@ -145,9 +143,9 @@ describe("RevealBoard", () => {
 
     fireEvent.click(screen.getByText("Alice"));
     fireEvent.click(screen.getByText("Tap to reveal your word"));
-    await waitFor(() => expect(screen.getByText("Tiger")).toBeInTheDocument());
+    await screen.findByText("Tiger");
 
-    fireEvent.click(document.querySelector(".imposter-modal-backdrop")!);
+    fireEvent.click(document.querySelector(".imposter-modal-scrim")!);
 
     expect(onAllRevealed).toHaveBeenCalledWith(expect.objectContaining({ phase: "DISCUSSION" }));
   });

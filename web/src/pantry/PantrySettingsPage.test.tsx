@@ -35,6 +35,7 @@ function makeSettings(overrides: Partial<PantrySettings> = {}): PantrySettings {
     optionsCollapsed: false,
     collapsedGroups: [],
     commonItems: [],
+    inventoryListCollapsed: false,
     shoppingListCollapsed: false,
     showLowPriority: true,
     categoryFilter: null,
@@ -108,7 +109,7 @@ describe("PantrySettingsPage", () => {
 
     renderPage();
 
-    await waitFor(() => screen.getByLabelText("Send time (Australia/Sydney)"));
+    await screen.findByLabelText("Send time (Australia/Sydney)");
     expect(screen.getByRole("option", { name: "12:00am" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "1:00pm" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "11:00pm" })).toBeInTheDocument();

@@ -58,9 +58,14 @@ describe("RequestsChart", () => {
 
   it("labels the svg with the max count for the visible range", () => {
     const data = [day(-2, 3), day(-1, 8), day(0, 5)];
-    render(<RequestsChart data={data} />);
+    const { container } = render(<RequestsChart data={data} />);
 
-    expect(screen.getByRole("img", { name: /ranging from 0 to 8/ })).toBeInTheDocument();
+    // The svg names itself with its own <title> child (aria-labelledby),
+    // rather than an aria-label behind role="img".
+    const svg = container.querySelector("svg.requests-chart-svg");
+    const title = svg?.querySelector(":scope > title");
+    expect(title?.textContent).toMatch(/ranging from 0 to 8/);
+    expect(svg).toHaveAttribute("aria-labelledby", title?.id);
   });
 
   it("rounds the axis max up to a clean 1/2/5/10 step above the data max", () => {

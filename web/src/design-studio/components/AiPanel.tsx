@@ -45,7 +45,7 @@ export default function AiPanel({
   style,
   onStyleChange,
   onClose,
-}: AiPanelProps) {
+}: Readonly<AiPanelProps>) {
   return (
     <div className="design-studio-ai-panel">
       <div className="design-studio-ai-panel-header">

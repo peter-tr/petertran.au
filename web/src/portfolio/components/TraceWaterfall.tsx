@@ -68,7 +68,7 @@ function flattenVisible(nodes: TreeNode[], depth: number, collapsed: Set<string>
   }
 }
 
-export default function TraceWaterfall({ segments }: { segments: TraceSegment[] }) {
+export default function TraceWaterfall({ segments }: Readonly<{ segments: TraceSegment[] }>) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   if (segments.length === 0) return null;
 

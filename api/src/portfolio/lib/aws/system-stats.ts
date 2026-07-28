@@ -219,46 +219,48 @@ async function getOperationStats(): Promise<{
   const lastDayAgg = new Map<string, OperationAggregate>();
   const last7DaysAgg = new Map<string, OperationAggregate>();
 
-  const applyTo = (
-    map: Map<string, OperationAggregate>,
-    name: string,
-    day: string,
-    count: number,
-    totalMs: number,
-    lastQuery: string | null,
-    lastVariables: string | null,
-    lastTraceId: string | null
-  ) => {
-    const entry = map.get(name) ?? newAggregate();
-    entry.count += count;
-    entry.totalMs += totalMs;
-    if (lastQuery && (!entry.latestSampleDay || day > entry.latestSampleDay)) {
-      entry.latestSampleDay = day;
-      entry.lastQuery = lastQuery;
-      entry.lastVariables = lastVariables;
-      entry.lastTraceId = lastTraceId;
+  // One bucket-row's worth of fields to fold into an aggregate - bundled
+  // into a single object (rather than 7 separate applyTo parameters) to
+  // stay under SonarQube's 7-parameter limit (S107).
+  interface OperationSample {
+    name: string;
+    day: string;
+    count: number;
+    totalMs: number;
+    lastQuery: string | null;
+    lastVariables: string | null;
+    lastTraceId: string | null;
+  }
+
+  const applyTo = (map: Map<string, OperationAggregate>, sample: OperationSample) => {
+    const entry = map.get(sample.name) ?? newAggregate();
+    entry.count += sample.count;
+    entry.totalMs += sample.totalMs;
+    if (sample.lastQuery && (!entry.latestSampleDay || sample.day > entry.latestSampleDay)) {
+      entry.latestSampleDay = sample.day;
+      entry.lastQuery = sample.lastQuery;
+      entry.lastVariables = sample.lastVariables;
+      entry.lastTraceId = sample.lastTraceId;
     }
-    map.set(name, entry);
+    map.set(sample.name, entry);
   };
 
   for (const item of res.Items ?? []) {
     const withoutPrefix = (item.sk as string).slice(OPERATION_PREFIX.length);
     const separatorIndex = withoutPrefix.lastIndexOf("#");
-    const name = separatorIndex >= 0 ? withoutPrefix.slice(0, separatorIndex) : withoutPrefix;
-    const day = separatorIndex >= 0 ? withoutPrefix.slice(separatorIndex + 1) : "";
-    const count = (item.count as number | undefined) ?? 0;
-    const totalMs = (item.totalMs as number | undefined) ?? 0;
-    const lastQuery = (item.lastQuery as string | undefined) ?? null;
-    const lastVariables = (item.lastVariables as string | null | undefined) ?? null;
-    const lastTraceId = (item.lastTraceId as string | undefined) ?? null;
+    const sample: OperationSample = {
+      name: separatorIndex >= 0 ? withoutPrefix.slice(0, separatorIndex) : withoutPrefix,
+      day: separatorIndex >= 0 ? withoutPrefix.slice(separatorIndex + 1) : "",
+      count: (item.count as number | undefined) ?? 0,
+      totalMs: (item.totalMs as number | undefined) ?? 0,
+      lastQuery: (item.lastQuery as string | undefined) ?? null,
+      lastVariables: (item.lastVariables as string | null | undefined) ?? null,
+      lastTraceId: (item.lastTraceId as string | undefined) ?? null,
+    };
 
-    applyTo(allTimeAgg, name, day, count, totalMs, lastQuery, lastVariables, lastTraceId);
-    if (lastDayKeys.has(day)) {
-      applyTo(lastDayAgg, name, day, count, totalMs, lastQuery, lastVariables, lastTraceId);
-    }
-    if (last7DaysKeys.has(day)) {
-      applyTo(last7DaysAgg, name, day, count, totalMs, lastQuery, lastVariables, lastTraceId);
-    }
+    applyTo(allTimeAgg, sample);
+    if (lastDayKeys.has(sample.day)) applyTo(lastDayAgg, sample);
+    if (last7DaysKeys.has(sample.day)) applyTo(last7DaysAgg, sample);
   }
 
   return {

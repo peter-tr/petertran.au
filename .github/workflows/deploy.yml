@@ -5,8 +5,7 @@ on:
     branches: [main]
 
 permissions:
-  id-token: write
-  contents: write
+  contents: read
 
 # Two merges landing close together would otherwise run two overlapping
 # `cdk deploy`s against the same stacks - cancel the older run so only the
@@ -51,7 +50,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Tag and publish release
         env:

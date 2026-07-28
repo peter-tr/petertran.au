@@ -28,7 +28,7 @@ export default function PantryEditItemModal({
   onAddCategory,
   onClose,
   onSave,
-}: PantryEditItemModalProps) {
+}: Readonly<PantryEditItemModalProps>) {
   const [name, setName] = useState(item.name);
   const [quantity, setQuantity] = useState(item.quantity);
   const [unit, setUnit] = useState(item.unit ?? "");
@@ -94,8 +94,18 @@ export default function PantryEditItemModal({
   }
 
   return (
-    <div className="pantry-modal-backdrop" onClick={onClose}>
-      <div className="pantry-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="pantry-modal-backdrop">
+      {/* A real button rather than a click handler on the backdrop div
+          itself, so dismissing by "clicking outside" is reachable from the
+          keyboard too. It sits behind the modal (see .pantry-modal's
+          z-index), so clicks inside the modal never reach it. */}
+      <button
+        type="button"
+        className="pantry-modal-backdrop-close"
+        aria-label="Close without saving"
+        onClick={onClose}
+      />
+      <div className="pantry-modal">
         <p className="pantry-modal-title">Edit item</p>
 
         <div className="form-row">
@@ -114,8 +124,11 @@ export default function PantryEditItemModal({
 
         <div className="pantry-edit-grid">
           <div className="form-row">
-            <label className="form-label">Quantity</label>
+            <label className="form-label" htmlFor="pantry-edit-quantity">
+              Quantity
+            </label>
             <QuantityStepper
+              inputId="pantry-edit-quantity"
               value={quantity}
               onChange={setQuantity}
               min={0}

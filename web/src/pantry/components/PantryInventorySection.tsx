@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import PantryItemRow from "./PantryItemRow";
 import { StorageLocation, type InventoryItem, type PantrySettings, type PantrySettingsInput } from "../api";
 
 type ViewMode = "location" | "category" | "priority" | "all";
-type SortMode = "recent" | "name" | "expiry" | "quantity";
+type SortMode = "recent" | "name" | "expiry" | "quantity" | "lowStock";
 
 interface Group {
   key: string;
@@ -35,6 +35,15 @@ function sortItems(items: InventoryItem[], sort: SortMode): InventoryItem[] {
       });
     case "quantity":
       return copy.sort((a, b) => b.quantity - a.quantity);
+    case "lowStock":
+      // Nearly-empty items float to the top; falls back to most-recently-
+      // added within each of the two groups (nearly-empty first, then not),
+      // same tiebreak pattern as the shopping list's "urgent" sort.
+      return copy.sort((a, b) => {
+        if (a.nearlyEmpty !== b.nearlyEmpty) return a.nearlyEmpty ? -1 : 1;
+
+        return b.addedAt.localeCompare(a.addedAt);
+      });
     case "recent":
     default:
       return copy.sort((a, b) => b.addedAt.localeCompare(a.addedAt));
@@ -70,12 +79,12 @@ function groupItems(items: InventoryItem[], view: ViewMode, sort: SortMode): Gro
     // Only splits into two visible groups when low-priority items are
     // actually being shown (the "+ show N low priority" toggle above the
     // list) - with them hidden, everything remaining is inherently
-    // "needs attention" already, so a second empty group would be noise.
-    const attention = items.filter((i) => !i.lowPriority);
+    // "regular" already, so a second empty group would be noise.
+    const regular = items.filter((i) => !i.lowPriority);
     const low = items.filter((i) => i.lowPriority);
 
     return [
-      { key: "attention", label: "Needs attention", items: sortItems(attention, sort) },
+      { key: "regular", label: "Regular", items: sortItems(regular, sort) },
       { key: "low", label: "Low priority", items: sortItems(low, sort) },
     ].filter((g) => g.items.length > 0);
   }
@@ -96,6 +105,7 @@ const SORT_LABELS: Record<SortMode, string> = {
   name: "Name",
   expiry: "Expiry",
   quantity: "Quantity",
+  lowStock: "Low stock first",
 };
 
 function isViewMode(v: string): v is ViewMode {
@@ -118,7 +128,7 @@ export default function PantryInventorySection({
   settings,
   onSettingsChange,
   onChanged,
-}: PantryInventorySectionProps) {
+}: Readonly<PantryInventorySectionProps>) {
   const [error, setError] = useState<string | null>(null);
 
   const view: ViewMode = isViewMode(settings.view) ? settings.view : "location";
@@ -149,6 +159,44 @@ export default function PantryInventorySection({
 
   const groups = groupItems(filteredItems, view, sort);
 
+  let itemList: ReactNode;
+  if (items.length === 0) {
+    itemList = <p className="status-line">// nothing tracked yet - add your first item below.</p>;
+  } else if (filteredItems.length === 0) {
+    itemList = <p className="status-line">// no items match the current filters.</p>;
+  } else {
+    itemList = groups.map((group) => {
+      const groupId = `${view}:${group.key}`;
+      const isCollapsed = collapsed.has(groupId);
+
+      return (
+        <div key={group.key} className="pantry-location-group">
+          <button type="button" className="pantry-location-heading" onClick={() => toggleGroup(group.key)}>
+            <span className="pantry-collapse-caret">{isCollapsed ? "▸" : "▾"}</span>
+            {group.label}
+            <span className="pantry-group-count">({group.items.length})</span>
+          </button>
+          {!isCollapsed && (
+            <ul className="pantry-item-list">
+              {group.items.map((item) => (
+                <PantryItemRow
+                  key={item.id}
+                  item={item}
+                  simple={settings.simple}
+                  nerdMode={settings.nerdModeInventory}
+                  categories={settings.categories}
+                  onAddCategory={(name) => onSettingsChange({ categories: [...settings.categories, name] })}
+                  onChanged={onChanged}
+                  onError={setError}
+                />
+              ))}
+            </ul>
+          )}
+        </div>
+      );
+    });
+  }
+
   return (
     <section className="pantry-panel">
       <div className="pantry-panel-header">
@@ -160,142 +208,110 @@ export default function PantryInventorySection({
         >
           {settings.optionsCollapsed ? "+ options" : "− options"}
         </button>
+        <button
+          type="button"
+          className="pantry-details-toggle"
+          onClick={() => onSettingsChange({ inventoryListCollapsed: !settings.inventoryListCollapsed })}
+        >
+          {settings.inventoryListCollapsed ? "+ show" : "− hide"}
+        </button>
       </div>
-
-      {!settings.optionsCollapsed && (
-        <div className="pantry-panel-header-controls">
-          <div className="pantry-control-group">
-            <span className="pantry-control-label">Group by</span>
-            <div className="pantry-view-tabs">
-              {(Object.keys(VIEW_LABELS) as ViewMode[]).map((v) => (
-                <button
-                  key={v}
-                  type="button"
-                  className={`pantry-view-tab ${view === v ? "active" : ""}`}
-                  onClick={() => onSettingsChange({ view: v })}
-                >
-                  {VIEW_LABELS[v]}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="pantry-control-group">
-            <span className="pantry-control-label">Sort by</span>
-            <div className="pantry-view-tabs">
-              {(Object.keys(SORT_LABELS) as SortMode[]).map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  className={`pantry-view-tab ${sort === s ? "active" : ""}`}
-                  onClick={() => onSettingsChange({ sort: s })}
-                >
-                  {SORT_LABELS[s]}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="pantry-control-group">
-            <span className="pantry-control-label">Show</span>
-            <div className="pantry-view-tabs">
-              <button
-                type="button"
-                className={`pantry-view-tab ${!settings.simple ? "active" : ""}`}
-                onClick={() => onSettingsChange({ simple: false })}
-              >
-                Details
-              </button>
-              <button
-                type="button"
-                className={`pantry-view-tab ${settings.simple ? "active" : ""}`}
-                onClick={() => onSettingsChange({ simple: true })}
-              >
-                Simple
-              </button>
-            </div>
-          </div>
-          {categories.length > 0 && (
-            <div className="pantry-control-group">
-              <span className="pantry-control-label">Category</span>
-              <select
-                className="pantry-category-filter"
-                value={settings.categoryFilter ?? ""}
-                onChange={(e) => onSettingsChange({ categoryFilter: e.target.value || null })}
-              >
-                <option value="">All categories</option>
-                {categories.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-          {lowPriorityCount > 0 && (
-            <div className="pantry-control-group">
-              <span className="pantry-control-label">Low priority</span>
-              <button
-                type="button"
-                className="pantry-details-toggle pantry-low-priority-toggle"
-                onClick={() => onSettingsChange({ showLowPriority: !settings.showLowPriority })}
-              >
-                {settings.showLowPriority ? "− hide" : `+ show ${lowPriorityCount}`}
-              </button>
-            </div>
-          )}
-        </div>
-      )}
 
       {error && <p className="status-line">// {error}</p>}
 
-      {!settings.simple && (
-        <p className="pantry-legend">
-          <span className="pantry-staple-toggle active">★</span> staple
-          <span className="pantry-low-priority-toggle-btn active">↓</span> low priority
-          <span className="pantry-nearly-empty-toggle active">!</span> nearly empty
-        </p>
-      )}
-
-      {items.length === 0 ? (
-        <p className="status-line">// nothing tracked yet - add your first item below.</p>
-      ) : filteredItems.length === 0 ? (
-        <p className="status-line">// no items match the current filters.</p>
-      ) : (
-        groups.map((group) => {
-          const groupId = `${view}:${group.key}`;
-          const isCollapsed = collapsed.has(groupId);
-
-          return (
-            <div key={group.key} className="pantry-location-group">
-              <button
-                type="button"
-                className="pantry-location-heading"
-                onClick={() => toggleGroup(group.key)}
-              >
-                <span className="pantry-collapse-caret">{isCollapsed ? "▸" : "▾"}</span>
-                {group.label}
-                <span className="pantry-group-count">({group.items.length})</span>
-              </button>
-              {!isCollapsed && (
-                <ul className="pantry-item-list">
-                  {group.items.map((item) => (
-                    <PantryItemRow
-                      key={item.id}
-                      item={item}
-                      simple={settings.simple}
-                      nerdMode={settings.nerdModeInventory}
-                      categories={settings.categories}
-                      onAddCategory={(name) =>
-                        onSettingsChange({ categories: [...settings.categories, name] })
-                      }
-                      onChanged={onChanged}
-                      onError={setError}
-                    />
+      {!settings.inventoryListCollapsed && (
+        <>
+          {!settings.optionsCollapsed && (
+            <div className="pantry-panel-header-controls">
+              <div className="pantry-control-group">
+                <span className="pantry-control-label">Group by</span>
+                <select
+                  className="pantry-category-filter"
+                  value={view}
+                  onChange={(e) => onSettingsChange({ view: e.target.value })}
+                >
+                  {(Object.keys(VIEW_LABELS) as ViewMode[]).map((v) => (
+                    <option key={v} value={v}>
+                      {VIEW_LABELS[v]}
+                    </option>
                   ))}
-                </ul>
+                </select>
+              </div>
+              <div className="pantry-control-group">
+                <span className="pantry-control-label">Sort by</span>
+                <select
+                  className="pantry-category-filter"
+                  value={sort}
+                  onChange={(e) => onSettingsChange({ sort: e.target.value })}
+                >
+                  {(Object.keys(SORT_LABELS) as SortMode[]).map((s) => (
+                    <option key={s} value={s}>
+                      {SORT_LABELS[s]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="pantry-control-group">
+                <span className="pantry-control-label">Show</span>
+                <div className="pantry-view-tabs">
+                  <button
+                    type="button"
+                    className={`pantry-view-tab ${!settings.simple ? "active" : ""}`}
+                    onClick={() => onSettingsChange({ simple: false })}
+                  >
+                    Details
+                  </button>
+                  <button
+                    type="button"
+                    className={`pantry-view-tab ${settings.simple ? "active" : ""}`}
+                    onClick={() => onSettingsChange({ simple: true })}
+                  >
+                    Simple
+                  </button>
+                </div>
+              </div>
+              {categories.length > 0 && (
+                <div className="pantry-control-group">
+                  <span className="pantry-control-label">Category</span>
+                  <select
+                    className="pantry-category-filter"
+                    value={settings.categoryFilter ?? ""}
+                    onChange={(e) => onSettingsChange({ categoryFilter: e.target.value || null })}
+                  >
+                    <option value="">All categories</option>
+                    {categories.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {lowPriorityCount > 0 && (
+                <div className="pantry-control-group">
+                  <span className="pantry-control-label">Low priority</span>
+                  <button
+                    type="button"
+                    className="pantry-details-toggle pantry-low-priority-toggle"
+                    onClick={() => onSettingsChange({ showLowPriority: !settings.showLowPriority })}
+                  >
+                    {settings.showLowPriority ? "− hide" : `+ show ${lowPriorityCount}`}
+                  </button>
+                </div>
               )}
             </div>
-          );
-        })
+          )}
+
+          {!settings.simple && (
+            <p className="pantry-legend">
+              <span className="pantry-staple-toggle active">★</span> staple{" "}
+              <span className="pantry-low-priority-toggle-btn active">↓</span> low priority{" "}
+              <span className="pantry-nearly-empty-toggle active">!</span> nearly empty
+            </p>
+          )}
+
+          {itemList}
+        </>
       )}
     </section>
   );

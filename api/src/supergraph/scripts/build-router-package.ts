@@ -65,7 +65,9 @@ async function main() {
   const tmpDir = mkdtempSync(join(tmpdir(), "router-download-"));
   const tarPath = join(tmpDir, ARTIFACT);
   writeFileSync(tarPath, artifactBuf);
-  execFileSync("tar", ["-xzf", tarPath, "-C", tmpDir]);
+  // Absolute path, not a bare "tar" PATH lookup - this build script runs both
+  // in CI (ubuntu-latest) and on a dev's Mac, and /usr/bin/tar exists on both.
+  execFileSync("/usr/bin/tar", ["-xzf", tarPath, "-C", tmpDir]);
 
   const extractedBinary = join(tmpDir, "dist", "router");
   const routerOutPath = join(distDir, "router");
@@ -97,8 +99,10 @@ async function main() {
 // Guarded so a test can import verifyChecksum above without also
 // triggering a real network download as a side effect of the import.
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  main().catch((err) => {
+  try {
+    await main();
+  } catch (err) {
     console.error(err);
     process.exit(1);
-  });
+  }
 }

@@ -20,12 +20,14 @@ import {
   StartQueryCommand,
   GetQueryResultsCommand,
 } from "@aws-sdk/client-cloudwatch-logs";
+import { CloudWatchClient, GetMetricDataCommand } from "@aws-sdk/client-cloudwatch";
 import { parseJsonBody, corsHeaders } from "api-shared/http";
 
 const lambdaClient = new LambdaClient({});
 const ssm = new SSMClient({});
 const scheduler = new SchedulerClient({});
 const logsClient = new CloudWatchLogsClient({});
+const cloudwatch = new CloudWatchClient({});
 
 const ALIAS_NAME = process.env.LIVE_ALIAS_NAME!;
 const PARAM_NAME = process.env.WARM_SCHEDULE_PARAM_NAME!;
@@ -81,10 +83,22 @@ const REACTIVE_WINDOW_MINUTES = 60;
 // granted for, independent of traffic.
 const PC_PRICE_PER_GB_SECOND_USD = 0.000005236;
 const SECONDS_PER_HOUR = 3600;
+const SECONDS_PER_DAY = 86400;
 // Calendar months aren't a whole number of weeks - average weeks/month
 // (365.25 / 7 / 12) so a schedule's cost projects consistently regardless
 // of which month it's viewed in.
 const WEEKS_PER_MONTH = 365.25 / 7 / 12;
+const DAYS_PER_MONTH = WEEKS_PER_MONTH * 7;
+
+// Real ap-southeast-2 on-demand Lambda rates, x86 architecture, Tier-1 usage
+// (AWS Price List API - pricing.us-east-1.amazonaws.com/offers/v1.0/aws/
+// AWSLambda/current/ap-southeast-2/index.json, pulled 2026-07-28) - separate
+// from PC_PRICE_PER_GB_SECOND_USD above, which is Provisioned Concurrency's
+// own (cheaper, always-on-regardless-of-traffic) rate. This project's usage
+// is nowhere near the Tier-2/3 volume thresholds (6B/15B+ GB-seconds/month),
+// so Tier-1 is the only rate that ever actually applies.
+const ON_DEMAND_REQUEST_PRICE_USD = 0.0000002; // per request
+const ON_DEMAND_DURATION_PRICE_PER_GB_SECOND_USD = 0.0000166667; // per GB-second
 
 interface ProjectCost {
   // Real, currently-allocated PC units across every target Lambda in this
@@ -101,6 +115,13 @@ interface ProjectCost {
   // this reflects what a pending memory choice will cost once reconciled,
   // not what's costing right now.
   scheduledMonthlyCostUsd: number;
+  // Estimate, not a Cost-Explorer-verified bill: real on-demand execution
+  // cost from the last 24h's actual CloudWatch Invocations/Duration sums
+  // (see getTargetOnDemandCostUsd) plus this project's share of its
+  // scheduled PC cost, averaged to a daily figure (scheduledMonthlyCostUsd /
+  // days-per-month) since no historical PC-allocation time series is stored
+  // anywhere to reconstruct the real per-day PC hours from.
+  last24hCostUsd: number;
 }
 
 // Settings-page window picker offers exactly these curated lookback
@@ -333,8 +354,69 @@ async function getTargetLiveState(
   };
 }
 
+// Real on-demand execution cost for one target over the last 24h, from
+// CloudWatch's own Invocations/Duration sums (the two most basic,
+// universally-emitted Lambda metrics - dimensioned just by FunctionName, no
+// PC-specific dimension to get wrong) times the verified rates above. Never
+// throws - a metrics-query failure degrades to "$0 for this target" rather
+// than failing the whole cost response, same reasoning as
+// computeProjectColdStarts's per-project error isolation below.
+async function getTargetOnDemandCostUsd(functionName: string, memoryMb: number): Promise<number> {
+  try {
+    const endTime = new Date();
+    const startTime = new Date(endTime.getTime() - SECONDS_PER_DAY * 1000);
+
+    const { MetricDataResults } = await cloudwatch.send(
+      new GetMetricDataCommand({
+        StartTime: startTime,
+        EndTime: endTime,
+        MetricDataQueries: [
+          {
+            Id: "invocations",
+            MetricStat: {
+              Metric: {
+                Namespace: "AWS/Lambda",
+                MetricName: "Invocations",
+                Dimensions: [{ Name: "FunctionName", Value: functionName }],
+              },
+              Period: SECONDS_PER_DAY,
+              Stat: "Sum",
+            },
+          },
+          {
+            Id: "duration",
+            MetricStat: {
+              Metric: {
+                Namespace: "AWS/Lambda",
+                MetricName: "Duration",
+                Dimensions: [{ Name: "FunctionName", Value: functionName }],
+              },
+              Period: SECONDS_PER_DAY,
+              Stat: "Sum",
+            },
+          },
+        ],
+      })
+    );
+
+    const invocations = MetricDataResults?.find((r) => r.Id === "invocations")?.Values?.[0] ?? 0;
+    const durationMsSum = MetricDataResults?.find((r) => r.Id === "duration")?.Values?.[0] ?? 0;
+    const memoryGb = memoryMb / 1024;
+
+    return (
+      invocations * ON_DEMAND_REQUEST_PRICE_USD +
+      (durationMsSum / 1000) * memoryGb * ON_DEMAND_DURATION_PRICE_PER_GB_SECOND_USD
+    );
+  } catch (err) {
+    console.error(`getTargetOnDemandCostUsd(${functionName}) failed - reporting $0`, err);
+
+    return 0;
+  }
+}
+
 async function computeProjectCost(key: WarmScheduleKey, schedule: WarmSchedule): Promise<ProjectCost> {
-  const targetStates = await Promise.all(TARGETS_BY_PROJECT[key].map(getTargetLiveState));
+  const targetNames = TARGETS_BY_PROJECT[key];
+  const targetStates = await Promise.all(targetNames.map(getTargetLiveState));
 
   const scheduledMemoryGb = schedule.memoryMb / 1024;
   let liveConcurrency = 0;
@@ -348,10 +430,17 @@ async function computeProjectCost(key: WarmScheduleKey, schedule: WarmSchedule):
       scheduledMemoryGb * schedule.concurrency * PC_PRICE_PER_GB_SECOND_USD * SECONDS_PER_HOUR;
   }
 
+  const scheduledMonthlyCostUsd = scheduledHourlyCostUsd * hoursPerWeek(schedule) * WEEKS_PER_MONTH;
+
+  const last24hOnDemandCostUsd = await Promise.all(
+    targetNames.map((name, i) => getTargetOnDemandCostUsd(name, targetStates[i].memoryMb))
+  ).then((costs) => costs.reduce((sum, cost) => sum + cost, 0));
+
   return {
     liveConcurrency,
     liveHourlyCostUsd,
-    scheduledMonthlyCostUsd: scheduledHourlyCostUsd * hoursPerWeek(schedule) * WEEKS_PER_MONTH,
+    scheduledMonthlyCostUsd,
+    last24hCostUsd: last24hOnDemandCostUsd + scheduledMonthlyCostUsd / DAYS_PER_MONTH,
   };
 }
 
@@ -510,7 +599,7 @@ async function healWeightedAlias(functionName: string): Promise<void> {
   // change, not a cutover. The manual recovery for this same incident
   // (2026-07-27) did exactly this: `aws lambda update-alias --function-
   // version <already-serving-version> --routing-config '{}'`.
-  const [stuckVersion] = weights.reduce((a, b) => (b[1] > a[1] ? b : a));
+  const [stuckVersion] = weights.reduce((a, b) => (b[1] > a[1] ? b : a), weights[0]);
   console.warn(
     `healWeightedAlias(${functionName}): alias had a weighted RoutingConfig ` +
       `blocking PC - clearing it and pinning to version ${stuckVersion}, which was already serving all traffic`
@@ -816,6 +905,176 @@ function isValidSchedule(value: unknown): value is WarmSchedule {
   );
 }
 
+interface ProcessEventBody {
+  schedules?: unknown;
+  profileAction?: string;
+  name?: unknown;
+  action?: string;
+  windowMinutes?: unknown;
+}
+
+async function handleCheckColdStarts(windowMinutes: unknown): Promise<APIGatewayProxyResult> {
+  if (!isValidColdStartWindowMinutes(windowMinutes)) {
+    return {
+      statusCode: 400,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        error: `windowMinutes must be one of ${ALLOWED_COLD_START_WINDOW_MINUTES.join(", ")}`,
+      }),
+    };
+  }
+
+  return {
+    statusCode: 200,
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ coldStarts: await computeAllColdStarts(windowMinutes) }),
+  };
+}
+
+async function handleProfileAction(body: ProcessEventBody): Promise<APIGatewayProxyResult> {
+  if (
+    (body.profileAction !== "save" && body.profileAction !== "apply" && body.profileAction !== "delete") ||
+    !isValidProfileName(body.name)
+  ) {
+    return {
+      statusCode: 400,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        error: `profileAction must be save/apply/delete, name must be a non-empty string up to ${MAX_PROFILE_NAME_LENGTH} chars`,
+      }),
+    };
+  }
+
+  const name = body.name;
+  let config: WarmScheduleConfig;
+  let profiles: WarmScheduleProfiles;
+
+  if (body.profileAction === "save") {
+    profiles = await saveProfile(name);
+    config = await getConfig();
+  } else if (body.profileAction === "delete") {
+    profiles = await deleteProfile(name);
+    config = await getConfig();
+  } else {
+    const applied = await applyProfile(name);
+    if (!applied) {
+      return {
+        statusCode: 400,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ error: `no saved profile named "${name}"` }),
+      };
+    }
+    config = applied;
+    profiles = await getProfiles();
+  }
+
+  return {
+    statusCode: 200,
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(await buildStatus(config, profiles)),
+  };
+}
+
+// Every dirty project is merged into `config` and persisted in a single
+// getConfig/setConfig round trip - saving them via separate concurrent POSTs
+// (the previous shape of this endpoint) raced: each request's getConfig()
+// could read the SSM parameter before a sibling request's setConfig() had
+// written its own change, so whichever request's setConfig() landed last
+// silently clobbered the others back out. This is what made the settings
+// page's "Save all" button appear to save only the most recently edited
+// project.
+async function handleSchedulesSave(body: ProcessEventBody): Promise<APIGatewayProxyResult> {
+  const entries =
+    body.schedules && typeof body.schedules === "object" && !Array.isArray(body.schedules)
+      ? (Object.entries(body.schedules) as [string, unknown][])
+      : null;
+  const isValidEntries =
+    entries !== null &&
+    entries.length > 0 &&
+    entries.every(([key, schedule]) => key in TARGETS_BY_PROJECT && isValidSchedule(schedule));
+
+  if (!isValidEntries) {
+    return {
+      statusCode: 400,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        error:
+          "schedules must be a non-empty object mapping project name " +
+          "(portfolio/pantry/imposter/supergraph/designStudio/zeroTrustLab) to a valid " +
+          "{ enabled, days, start, end, concurrency, memoryMb, reactiveEnabled } " +
+          `(concurrency an integer 1-${MAX_CONCURRENCY}, memoryMb one of ${MEMORY_OPTIONS_MB.join("/")})`,
+      }),
+    };
+  }
+
+  const validEntries = entries as [WarmScheduleKey, WarmSchedule][];
+  const config = await getConfig();
+  for (const [key, schedule] of validEntries) {
+    config[key] = schedule;
+  }
+  await setConfig(config);
+
+  const reactiveState = await getReactiveState();
+  const now = new Date();
+  await Promise.all(
+    validEntries.map(([key, schedule]) =>
+      Promise.all([
+        updateProjectSchedules(key, schedule),
+        reconcileProject(key, schedule, reactiveState, now),
+      ])
+    )
+  );
+
+  return {
+    statusCode: 200,
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(await buildStatus(config, await getProfiles())),
+  };
+}
+
+async function handlePostRequest(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
+  const body = parseJsonBody<ProcessEventBody>(event);
+
+  if (body.action === "checkColdStarts") return handleCheckColdStarts(body.windowMinutes);
+  if (body.profileAction !== undefined) return handleProfileAction(body);
+
+  return handleSchedulesSave(body);
+}
+
+async function handleReconcilePing(): Promise<APIGatewayProxyResult> {
+  const [config, reactiveState] = await Promise.all([getConfig(), getReactiveState()]);
+  const now = new Date();
+  await Promise.all(
+    (Object.keys(TARGETS_BY_PROJECT) as WarmScheduleKey[]).map((key) =>
+      reconcileProject(key, config[key], reactiveState, now)
+    )
+  );
+
+  return { statusCode: 200, body: "reconciled" };
+}
+
+// Unlike the on/off action, concurrency/memory aren't part of the trigger
+// payload itself (the EventBridge Schedule's input is just {project, action},
+// set once at CDK synth time / on a settings save) - fetch the current
+// config to know how much concurrency to grant and which memory size to
+// reconcile toward. A reactive window still active for this project
+// overrides an "off" trigger - the scheduled window closing shouldn't tear
+// down PC a real cold hit just earned for the next hour.
+async function handleWarmScheduleTrigger(event: WarmScheduleTrigger): Promise<APIGatewayProxyResult> {
+  const [config, reactiveState] = await Promise.all([getConfig(), getReactiveState()]);
+  const shouldBeWarm =
+    event.action === "on" ||
+    isWithinReactiveWindow(event.project, config[event.project], reactiveState, new Date());
+  await reconcileProjectTo(
+    event.project,
+    shouldBeWarm,
+    config[event.project].concurrency,
+    config[event.project].memoryMb
+  );
+
+  return { statusCode: 200, body: "reconciled" };
+}
+
 async function processEvent(
   event: APIGatewayProxyEvent | ReconcilePing | WarmScheduleTrigger | ColdStartLogEvent
 ): Promise<APIGatewayProxyResult> {
@@ -825,169 +1084,9 @@ async function processEvent(
     return { statusCode: 200, body: "ok" };
   }
 
-  if (isReconcilePing(event)) {
-    const [config, reactiveState] = await Promise.all([getConfig(), getReactiveState()]);
-    const now = new Date();
-    await Promise.all(
-      (Object.keys(TARGETS_BY_PROJECT) as WarmScheduleKey[]).map((key) =>
-        reconcileProject(key, config[key], reactiveState, now)
-      )
-    );
-
-    return { statusCode: 200, body: "reconciled" };
-  }
-
-  if (isWarmScheduleTrigger(event)) {
-    // Unlike the on/off action, concurrency/memory aren't part of the
-    // trigger payload itself (the EventBridge Schedule's input is just
-    // {project, action}, set once at CDK synth time / on a settings save) -
-    // fetch the current config to know how much concurrency to grant and
-    // which memory size to reconcile toward. A reactive window still active
-    // for this project overrides an "off" trigger - the scheduled window
-    // closing shouldn't tear down PC a real cold hit just earned for the
-    // next hour.
-    const [config, reactiveState] = await Promise.all([getConfig(), getReactiveState()]);
-    const shouldBeWarm =
-      event.action === "on" ||
-      isWithinReactiveWindow(event.project, config[event.project], reactiveState, new Date());
-    await reconcileProjectTo(
-      event.project,
-      shouldBeWarm,
-      config[event.project].concurrency,
-      config[event.project].memoryMb
-    );
-
-    return { statusCode: 200, body: "reconciled" };
-  }
-
-  if (event.httpMethod === "POST") {
-    const body = parseJsonBody<{
-      schedules?: unknown;
-      profileAction?: string;
-      name?: unknown;
-      action?: string;
-      windowMinutes?: unknown;
-    }>(event);
-
-    if (body.action === "checkColdStarts") {
-      if (!isValidColdStartWindowMinutes(body.windowMinutes)) {
-        return {
-          statusCode: 400,
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            error: `windowMinutes must be one of ${ALLOWED_COLD_START_WINDOW_MINUTES.join(", ")}`,
-          }),
-        };
-      }
-
-      return {
-        statusCode: 200,
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ coldStarts: await computeAllColdStarts(body.windowMinutes) }),
-      };
-    }
-
-    if (body.profileAction !== undefined) {
-      if (
-        (body.profileAction !== "save" &&
-          body.profileAction !== "apply" &&
-          body.profileAction !== "delete") ||
-        !isValidProfileName(body.name)
-      ) {
-        return {
-          statusCode: 400,
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            error: `profileAction must be save/apply/delete, name must be a non-empty string up to ${MAX_PROFILE_NAME_LENGTH} chars`,
-          }),
-        };
-      }
-
-      const name = body.name;
-      let config: WarmScheduleConfig;
-      let profiles: WarmScheduleProfiles;
-
-      if (body.profileAction === "save") {
-        profiles = await saveProfile(name);
-        config = await getConfig();
-      } else if (body.profileAction === "delete") {
-        profiles = await deleteProfile(name);
-        config = await getConfig();
-      } else {
-        const applied = await applyProfile(name);
-        if (!applied) {
-          return {
-            statusCode: 400,
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ error: `no saved profile named "${name}"` }),
-          };
-        }
-        config = applied;
-        profiles = await getProfiles();
-      }
-
-      return {
-        statusCode: 200,
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(await buildStatus(config, profiles)),
-      };
-    }
-
-    const entries =
-      body.schedules && typeof body.schedules === "object" && !Array.isArray(body.schedules)
-        ? (Object.entries(body.schedules) as [string, unknown][])
-        : null;
-    const isValidEntries =
-      entries !== null &&
-      entries.length > 0 &&
-      entries.every(([key, schedule]) => key in TARGETS_BY_PROJECT && isValidSchedule(schedule));
-
-    if (!isValidEntries) {
-      return {
-        statusCode: 400,
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          error:
-            "schedules must be a non-empty object mapping project name " +
-            "(portfolio/pantry/imposter/supergraph/designStudio/zeroTrustLab) to a valid " +
-            "{ enabled, days, start, end, concurrency, memoryMb, reactiveEnabled } " +
-            `(concurrency an integer 1-${MAX_CONCURRENCY}, memoryMb one of ${MEMORY_OPTIONS_MB.join("/")})`,
-        }),
-      };
-    }
-
-    // Every dirty project is merged into `config` and persisted in a single
-    // getConfig/setConfig round trip - saving them via separate concurrent
-    // POSTs (the previous shape of this endpoint) raced: each request's
-    // getConfig() could read the SSM parameter before a sibling request's
-    // setConfig() had written its own change, so whichever request's
-    // setConfig() landed last silently clobbered the others back out. This
-    // is what made the settings page's "Save all" button appear to save
-    // only the most recently edited project.
-    const validEntries = entries as [WarmScheduleKey, WarmSchedule][];
-    const config = await getConfig();
-    for (const [key, schedule] of validEntries) {
-      config[key] = schedule;
-    }
-    await setConfig(config);
-
-    const reactiveState = await getReactiveState();
-    const now = new Date();
-    await Promise.all(
-      validEntries.map(([key, schedule]) =>
-        Promise.all([
-          updateProjectSchedules(key, schedule),
-          reconcileProject(key, schedule, reactiveState, now),
-        ])
-      )
-    );
-
-    return {
-      statusCode: 200,
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(await buildStatus(config, await getProfiles())),
-    };
-  }
+  if (isReconcilePing(event)) return handleReconcilePing();
+  if (isWarmScheduleTrigger(event)) return handleWarmScheduleTrigger(event);
+  if (event.httpMethod === "POST") return handlePostRequest(event);
 
   const config = await getConfig();
 

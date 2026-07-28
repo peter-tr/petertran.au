@@ -15,6 +15,7 @@ import {
 } from "@aws-sdk/client-lambda";
 import { SSMClient, GetParameterCommand, PutParameterCommand } from "@aws-sdk/client-ssm";
 import { SchedulerClient, GetScheduleCommand, UpdateScheduleCommand } from "@aws-sdk/client-scheduler";
+import { CloudWatchClient, GetMetricDataCommand } from "@aws-sdk/client-cloudwatch";
 
 // Read as module-level consts at import time in handler.ts. A static
 // `import` is hoisted above these assignments regardless of where it's
@@ -50,6 +51,7 @@ import { gzipSync } from "node:zlib";
 const lambdaMock = mockClient(LambdaClient);
 const ssmMock = mockClient(SSMClient);
 const schedulerMock = mockClient(SchedulerClient);
+const cloudwatchMock = mockClient(CloudWatchClient);
 
 const ALL_ZTL_TARGETS = [
   "ztl-idp-bridge-fn",
@@ -112,6 +114,13 @@ beforeEach(() => {
   lambdaMock.reset();
   ssmMock.reset();
   schedulerMock.reset();
+  cloudwatchMock.reset();
+  // No usage by default - every GET/POST/reconcile response now computes a
+  // last-24h cost estimate per project (see handler.ts's
+  // getTargetOnDemandCostUsd), so every existing test that doesn't care
+  // about it needs a default that resolves to $0 rather than throwing
+  // aws-sdk-client-mock's "not configured" error.
+  cloudwatchMock.on(GetMetricDataCommand).resolves({ MetricDataResults: [] });
   lambdaMock.on(PutProvisionedConcurrencyConfigCommand).resolves({});
   lambdaMock.on(DeleteProvisionedConcurrencyConfigCommand).resolves({});
   // Cost lookups (and reconcileMemory's live-memory check) the GET/POST/
@@ -202,6 +211,60 @@ describe("warm-schedule handler - config GET/POST", () => {
 
     // zeroTrustLab sums cost across its 5 targets, all defaulting to 256MB here.
     expect(costs.zeroTrustLab.liveConcurrency).toBe(0);
+  });
+
+  it("GET's last-24h cost combines real CloudWatch on-demand usage with an averaged share of the scheduled PC cost", async () => {
+    ssmMock.on(GetParameterCommand).resolves({});
+
+    const DAYS_PER_MONTH = (365.25 / 7 / 12) * 7;
+    cloudwatchMock.on(GetMetricDataCommand).callsFake((input) => {
+      const fnName = input.MetricDataQueries[0].MetricStat.Metric.Dimensions[0].Value;
+      if (fnName !== "pantry-fn") return { MetricDataResults: [] };
+
+      // 1,000 invocations, 500,000ms (500s) total duration this target
+      // actually ran in the last 24h.
+      return {
+        MetricDataResults: [
+          { Id: "invocations", Values: [1000] },
+          { Id: "duration", Values: [500000] },
+        ],
+      };
+    });
+
+    const result = await handler(httpEvent("GET"));
+    const { costs } = JSON.parse(result.body as string);
+
+    // pantry-fn's real live memory is 256MB (0.25GB, from the beforeEach mock).
+    const executionCostUsd = 1000 * 0.0000002 + 500 * 0.25 * 0.0000166667;
+    const pcShareUsd = costs.pantry.scheduledMonthlyCostUsd / DAYS_PER_MONTH;
+    expect(costs.pantry.last24hCostUsd).toBeCloseTo(executionCostUsd + pcShareUsd, 10);
+
+    // No CloudWatch usage mocked for portfolio-fn (defaults to empty results
+    // via beforeEach) - its estimate is just the averaged PC share.
+    expect(costs.portfolio.last24hCostUsd).toBeCloseTo(
+      costs.portfolio.scheduledMonthlyCostUsd / DAYS_PER_MONTH,
+      10
+    );
+  });
+
+  it("GET's last-24h cost degrades to just the averaged PC share when a target's CloudWatch metrics query fails", async () => {
+    ssmMock.on(GetParameterCommand).resolves({});
+
+    const DAYS_PER_MONTH = (365.25 / 7 / 12) * 7;
+    cloudwatchMock.on(GetMetricDataCommand).rejects(new Error("throttled"));
+
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const result = await handler(httpEvent("GET"));
+    const { costs } = JSON.parse(result.body as string);
+
+    expect(costs.pantry.last24hCostUsd).toBeCloseTo(
+      costs.pantry.scheduledMonthlyCostUsd / DAYS_PER_MONTH,
+      10
+    );
+    expect(consoleErrorSpy).toHaveBeenCalled();
+
+    consoleErrorSpy.mockRestore();
   });
 
   it("POST with an invalid schedule returns 400", async () => {

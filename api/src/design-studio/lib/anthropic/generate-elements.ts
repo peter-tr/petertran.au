@@ -219,7 +219,7 @@ function sanitizeElement(
     zIndex,
     fill: raw.fill || "#63c7be",
     stroke: raw.stroke ?? "",
-    strokeWidth: raw.strokeWidth > 0 ? raw.strokeWidth : 0,
+    strokeWidth: Math.max(raw.strokeWidth, 0),
     text: isText ? (raw.text ?? "") : undefined,
     fontFamily: isText ? (raw.fontFamily ?? "IBM Plex Sans") : undefined,
     fontSize: isText ? fontSize : undefined,

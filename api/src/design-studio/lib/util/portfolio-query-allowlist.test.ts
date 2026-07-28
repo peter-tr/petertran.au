@@ -18,53 +18,50 @@ describe("validatePortfolioQuery", () => {
     });
   });
 
-  it("rejects a mutation", () => {
-    const result = validatePortfolioQuery('mutation { sendMessage(input: { name: "x" }) { ok } }');
+  it.each([
+    {
+      description: "rejects a mutation",
+      query: 'mutation { sendMessage(input: { name: "x" }) { ok } }',
+      expectedReasonSubstring: '"mutation"',
+    },
+    {
+      description: "rejects a subscription",
+      query: "subscription { person { name } }",
+      expectedReasonSubstring: '"subscription"',
+    },
+    {
+      description: "rejects the meta field",
+      query: "{ meta { systemStats { uptime } } }",
+      expectedReasonSubstring: '"meta"',
+    },
+    {
+      description: "rejects the _service introspection field",
+      query: "{ _service { sdl } }",
+      expectedReasonSubstring: "_service",
+    },
+    {
+      description: "rejects a field not in the portfolio allowlist",
+      query: "{ inventory { name } }",
+      expectedReasonSubstring: '"inventory"',
+    },
+    {
+      description: "rejects invalid GraphQL syntax",
+      query: "{ person { ",
+      expectedReasonSubstring: "Not valid GraphQL",
+    },
+    {
+      description: "rejects a document with more than one operation",
+      query: "query A { person { name } } query B { projects { name } }",
+      expectedReasonSubstring: "exactly one operation",
+    },
+    {
+      description: "rejects a fragment spread at the root selection set",
+      query: "{ ...PersonFields } fragment PersonFields on Query { person { name } }",
+      expectedReasonSubstring: "Fragments are not allowed",
+    },
+  ])("$description", ({ query, expectedReasonSubstring }) => {
+    const result = validatePortfolioQuery(query);
     expect(result.ok).toBe(false);
-    expect(result.reason).toContain('"mutation"');
-  });
-
-  it("rejects a subscription", () => {
-    const result = validatePortfolioQuery("subscription { person { name } }");
-    expect(result.ok).toBe(false);
-    expect(result.reason).toContain('"subscription"');
-  });
-
-  it("rejects the meta field", () => {
-    const result = validatePortfolioQuery("{ meta { systemStats { uptime } } }");
-    expect(result.ok).toBe(false);
-    expect(result.reason).toContain('"meta"');
-  });
-
-  it("rejects the _service introspection field", () => {
-    const result = validatePortfolioQuery("{ _service { sdl } }");
-    expect(result.ok).toBe(false);
-    expect(result.reason).toContain("_service");
-  });
-
-  it("rejects a field not in the portfolio allowlist", () => {
-    const result = validatePortfolioQuery("{ inventory { name } }");
-    expect(result.ok).toBe(false);
-    expect(result.reason).toContain('"inventory"');
-  });
-
-  it("rejects invalid GraphQL syntax", () => {
-    const result = validatePortfolioQuery("{ person { ");
-    expect(result.ok).toBe(false);
-    expect(result.reason).toContain("Not valid GraphQL");
-  });
-
-  it("rejects a document with more than one operation", () => {
-    const result = validatePortfolioQuery("query A { person { name } } query B { projects { name } }");
-    expect(result.ok).toBe(false);
-    expect(result.reason).toContain("exactly one operation");
-  });
-
-  it("rejects a fragment spread at the root selection set", () => {
-    const result = validatePortfolioQuery(
-      "{ ...PersonFields } fragment PersonFields on Query { person { name } }"
-    );
-    expect(result.ok).toBe(false);
-    expect(result.reason).toContain("Fragments are not allowed");
+    expect(result.reason).toContain(expectedReasonSubstring);
   });
 });

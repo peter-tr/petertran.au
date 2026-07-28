@@ -79,10 +79,20 @@ export default function Hero() {
   const displayRole = result?.role ?? "Backend Software Engineer";
   const displayCompany = result?.company ?? "Commonwealth Bank of Australia";
 
+  let connectionLabel = "connecting…";
+  if (errored) connectionLabel = "offline";
+  else if (dataReady) connectionLabel = "live";
+
   return (
     <header className="hero">
       <p className="eyebrow">backend software engineer · sydney, australia</p>
-      <h1 onClick={handleNameClick}>Peter Tran</h1>
+      <h1>
+        {/* A real button rather than a click handler on the <h1>, so the
+            hidden settings easter egg is reachable from the keyboard too. */}
+        <button type="button" className="hero-name-btn" onClick={handleNameClick}>
+          Peter Tran
+        </button>
+      </h1>
       {showAlsoBuilt && (
         <p className="hero-secret">
           // psst, also built <Link to="/imposter">imposter</Link>, <Link to="/pantry">pantry</Link>, and{" "}
@@ -105,7 +115,7 @@ export default function Hero() {
           <span>hero.graphql</span>
           <span className="terminal-status">
             <span className={`dot ${dataReady && !errored ? "live" : ""}`} />
-            {errored ? "offline" : dataReady ? "live" : "connecting…"}
+            {connectionLabel}
           </span>
         </div>
         <div className="terminal-body">

@@ -7,7 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 const ENDPOINT = import.meta.env.VITE_ALERTS_SETTINGS_ENDPOINT;
 
 export function useAlertsEnabled() {
-  const [enabled, setEnabledState] = useState<boolean | null>(null);
+  const [enabled, setEnabled] = useState<boolean | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -15,11 +15,13 @@ export function useAlertsEnabled() {
     if (!ENDPOINT) return;
     fetch(ENDPOINT)
       .then((res) => res.json())
-      .then((data: { enabled: boolean }) => setEnabledState(data.enabled))
+      .then((data: { enabled: boolean }) => setEnabled(data.enabled))
       .catch(() => setError("Couldn't load alert email status"));
   }, []);
 
-  const setEnabled = useCallback((value: boolean) => {
+  // Wraps the plain state setter with the POST round-trip, and is what
+  // callers get as `setEnabled`.
+  const updateEnabled = useCallback((value: boolean) => {
     if (!ENDPOINT) return;
     setPending(true);
     setError(null);
@@ -29,10 +31,10 @@ export function useAlertsEnabled() {
       body: JSON.stringify({ enabled: value }),
     })
       .then((res) => res.json())
-      .then((data: { enabled: boolean }) => setEnabledState(data.enabled))
+      .then((data: { enabled: boolean }) => setEnabled(data.enabled))
       .catch(() => setError("Couldn't update alert email status"))
       .finally(() => setPending(false));
   }, []);
 
-  return { enabled, pending, error, setEnabled, available: Boolean(ENDPOINT) };
+  return { enabled, pending, error, setEnabled: updateEnabled, available: Boolean(ENDPOINT) };
 }

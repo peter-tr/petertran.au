@@ -83,6 +83,9 @@ export interface ProjectCost {
   // $/mo if the configured schedule runs as set - uses the schedule's own
   // memoryMb, so this reflects a pending memory choice before it's saved.
   scheduledMonthlyCostUsd: number;
+  // Estimate (not a Cost-Explorer-verified bill) - see handler.ts's
+  // ProjectCost for exactly what this combines.
+  last24hCostUsd: number;
 }
 export type WarmScheduleCosts = Record<WarmScheduleKey, ProjectCost>;
 
@@ -120,6 +123,29 @@ export const COLD_START_WINDOW_OPTIONS = [
 
 const DEFAULT_COLD_START_WINDOW_MINUTES = 1440;
 
+// Per-browser preference (no login/account system here, same reasoning as
+// useShowAlsoBuilt/useShowFooterCost) - remembers the last-picked lookback
+// window across visits instead of resetting to the 24h default every time
+// the settings page loads.
+const COLD_START_WINDOW_STORAGE_KEY = "portfolio:coldStartWindowMinutes";
+
+function readStoredColdStartWindowMinutes(): number {
+  try {
+    const raw = localStorage.getItem(COLD_START_WINDOW_STORAGE_KEY);
+    const parsed = raw === null ? Number.NaN : Number(raw);
+
+    return isValidColdStartWindowMinutes(parsed) ? parsed : DEFAULT_COLD_START_WINDOW_MINUTES;
+  } catch {
+    // Storage unavailable (private browsing, quota, etc.) -- fall back to
+    // the default, same as a fresh visitor with no stored preference.
+    return DEFAULT_COLD_START_WINDOW_MINUTES;
+  }
+}
+
+function isValidColdStartWindowMinutes(value: number): boolean {
+  return COLD_START_WINDOW_OPTIONS.some((option) => option.minutes === value);
+}
+
 // Named full-config snapshots (all 6 projects at once), keyed by
 // user-chosen name - lets "Save current as profile" / "Apply" switch every
 // project's schedule in one action instead of editing each row by hand.
@@ -133,14 +159,25 @@ interface WarmScheduleResponse {
 }
 
 export function useWarmSchedule() {
-  const [config, setConfigState] = useState<WarmScheduleConfig | null>(null);
+  const [config, setConfig] = useState<WarmScheduleConfig | null>(null);
   const [costs, setCosts] = useState<WarmScheduleCosts | null>(null);
   const [profiles, setProfiles] = useState<WarmScheduleProfiles | null>(null);
   const [reactive, setReactive] = useState<WarmScheduleReactive | null>(null);
   const [coldStarts, setColdStarts] = useState<WarmScheduleColdStarts | null>(null);
   // Starts true - a check always begins immediately on mount.
   const [checkingColdStarts, setCheckingColdStarts] = useState(true);
-  const [coldStartWindowMinutes, setColdStartWindowMinutes] = useState(DEFAULT_COLD_START_WINDOW_MINUTES);
+  const [coldStartWindowMinutesRaw, setColdStartWindowMinutesRaw] = useState(
+    readStoredColdStartWindowMinutes
+  );
+  const coldStartWindowMinutes = coldStartWindowMinutesRaw;
+  const setColdStartWindowMinutes = useCallback((minutes: number) => {
+    try {
+      localStorage.setItem(COLD_START_WINDOW_STORAGE_KEY, String(minutes));
+    } catch {
+      // Fail silently -- this preference is a convenience, not a requirement.
+    }
+    setColdStartWindowMinutesRaw(minutes);
+  }, []);
   // Same "adjust state during render" idiom PortfolioSettingsPage.tsx's own
   // warmScheduleDrafts reset uses: flips checkingColdStarts back to true the
   // instant the window selection changes, synchronously during render - not
@@ -178,7 +215,7 @@ export function useWarmSchedule() {
     return fetch(ENDPOINT)
       .then((res) => res.json())
       .then((data: WarmScheduleResponse) => {
-        setConfigState(data.schedules);
+        setConfig(data.schedules);
         setCosts(data.costs);
         setProfiles(data.profiles);
         setReactive(data.reactive);
@@ -209,7 +246,7 @@ export function useWarmSchedule() {
         body: JSON.stringify({ schedules }),
       });
       const data: WarmScheduleResponse = await res.json();
-      setConfigState(data.schedules);
+      setConfig(data.schedules);
       setCosts(data.costs);
       setProfiles(data.profiles);
       setReactive(data.reactive);
@@ -236,7 +273,7 @@ export function useWarmSchedule() {
           // Unlike saveAll, "apply" can change every project's schedule at
           // once, so the whole config is replaced wholesale rather than
           // merged one key at a time.
-          setConfigState(data.schedules);
+          setConfig(data.schedules);
           setCosts(data.costs);
           setProfiles(data.profiles);
           setReactive(data.reactive);

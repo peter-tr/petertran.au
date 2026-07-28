@@ -13,7 +13,7 @@ export default function PantryInlineAddToggle({
   placeholder,
   toggleLabel,
   onAdd,
-}: PantryInlineAddToggleProps) {
+}: Readonly<PantryInlineAddToggleProps>) {
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
