@@ -260,7 +260,14 @@ export default function ArchitectureDiagram() {
         ▾ you start here
       </text>
       <g>
-        <rect x="570" y="20" width="180" height="40" rx="8" className="arch-node arch-node-edge arch-node-entry" />
+        <rect
+          x="570"
+          y="20"
+          width="180"
+          height="40"
+          rx="8"
+          className="arch-node arch-node-edge arch-node-entry"
+        />
         <circle cx="742" cy="28" r="4" className="arch-entry-dot" />
         <NodeIcon x={582} y={32}>
           <FaDisplay size={16} />
