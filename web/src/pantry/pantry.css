@@ -1466,6 +1466,12 @@
   .qty-stepper-input {
     font-size: 16px;
   }
+
+  /* Same iOS Safari auto-zoom fix as .form-input in base.css - the sign-in
+     form's inputs aren't .form-input either. */
+  .pantry-auth-form input {
+    font-size: 16px;
+  }
 }
 
 @media (max-width: 640px) {
