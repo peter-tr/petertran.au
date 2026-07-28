@@ -166,33 +166,31 @@ export default function PantryInventorySection({
         <div className="pantry-panel-header-controls">
           <div className="pantry-control-group">
             <span className="pantry-control-label">Group by</span>
-            <div className="pantry-view-tabs">
+            <select
+              className="pantry-category-filter"
+              value={view}
+              onChange={(e) => onSettingsChange({ view: e.target.value })}
+            >
               {(Object.keys(VIEW_LABELS) as ViewMode[]).map((v) => (
-                <button
-                  key={v}
-                  type="button"
-                  className={`pantry-view-tab ${view === v ? "active" : ""}`}
-                  onClick={() => onSettingsChange({ view: v })}
-                >
+                <option key={v} value={v}>
                   {VIEW_LABELS[v]}
-                </button>
+                </option>
               ))}
-            </div>
+            </select>
           </div>
           <div className="pantry-control-group">
             <span className="pantry-control-label">Sort by</span>
-            <div className="pantry-view-tabs">
+            <select
+              className="pantry-category-filter"
+              value={sort}
+              onChange={(e) => onSettingsChange({ sort: e.target.value })}
+            >
               {(Object.keys(SORT_LABELS) as SortMode[]).map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  className={`pantry-view-tab ${sort === s ? "active" : ""}`}
-                  onClick={() => onSettingsChange({ sort: s })}
-                >
+                <option key={s} value={s}>
                   {SORT_LABELS[s]}
-                </button>
+                </option>
               ))}
-            </div>
+            </select>
           </div>
           <div className="pantry-control-group">
             <span className="pantry-control-label">Show</span>
