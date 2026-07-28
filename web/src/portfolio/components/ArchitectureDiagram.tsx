@@ -25,7 +25,7 @@ function ExternalProjectNode({
   icon,
   label,
   path,
-}: {
+}: Readonly<{
   to: string;
   x: number;
   y: number;
@@ -34,7 +34,7 @@ function ExternalProjectNode({
   icon: ReactNode;
   label: string;
   path: string;
-}) {
+}>) {
   const centerX = x + width / 2;
   const centerY = y + height / 2;
 
