@@ -50,7 +50,7 @@ export abstract class CachedCostFetcher {
   private async run(): Promise<number> {
     const guarded = await this.guard();
 
-    return guarded !== null ? guarded : this.fetchAllTimeCostUsd();
+    return guarded ?? this.fetchAllTimeCostUsd();
   }
 
   private ttl(): number {

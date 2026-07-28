@@ -31,16 +31,18 @@ function escapeHtml(value: string): string {
 }
 
 function formatEntryText(e: ShoppingListEntry): string {
-  const amount = e.quantity != null ? ` (${e.quantity}${e.unit ? ` ${e.unit}` : ""})` : "";
+  const unitSuffix = e.unit ? ` ${e.unit}` : "";
+  const amount = e.quantity != null ? ` (${e.quantity}${unitSuffix})` : "";
   const category = e.category ? ` [${e.category}]` : "";
 
   return `- ${e.name}${amount}${category}`;
 }
 
 function formatEntryHtml(e: ShoppingListEntry): string {
+  const unitSuffix = e.unit ? ` ${escapeHtml(e.unit)}` : "";
   const amount =
     e.quantity != null
-      ? ` <span style="color:#666;">(${escapeHtml(String(e.quantity))}${e.unit ? ` ${escapeHtml(e.unit)}` : ""})</span>`
+      ? ` <span style="color:#666;">(${escapeHtml(String(e.quantity))}${unitSuffix})</span>`
       : "";
   const category = e.category
     ? ` <span style="color:#999; font-size:0.85em;">[${escapeHtml(e.category)}]</span>`

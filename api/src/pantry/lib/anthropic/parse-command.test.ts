@@ -104,16 +104,14 @@ async function run(
 ) {
   messagesParse.mockResolvedValue({ usage: usage(), parsed_output: parsed });
 
-  return parseCommand(
-    input,
-    (opts.history as never) ?? [],
-    opts.inventory ?? [],
-    opts.shoppingList ?? [],
-    ["Dairy"],
-    "1.2.3.4",
-    "ANTHROPIC",
-    "HAIKU"
-  );
+  return parseCommand(input, (opts.history as never) ?? [], {
+    inventory: opts.inventory ?? [],
+    shoppingList: opts.shoppingList ?? [],
+    categories: ["Dairy"],
+    sourceIp: "1.2.3.4",
+    aiProvider: "ANTHROPIC",
+    aiModelTier: "HAIKU",
+  });
 }
 
 describe("parseCommand - input validation", () => {

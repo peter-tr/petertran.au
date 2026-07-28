@@ -905,6 +905,176 @@ function isValidSchedule(value: unknown): value is WarmSchedule {
   );
 }
 
+interface ProcessEventBody {
+  schedules?: unknown;
+  profileAction?: string;
+  name?: unknown;
+  action?: string;
+  windowMinutes?: unknown;
+}
+
+async function handleCheckColdStarts(windowMinutes: unknown): Promise<APIGatewayProxyResult> {
+  if (!isValidColdStartWindowMinutes(windowMinutes)) {
+    return {
+      statusCode: 400,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        error: `windowMinutes must be one of ${ALLOWED_COLD_START_WINDOW_MINUTES.join(", ")}`,
+      }),
+    };
+  }
+
+  return {
+    statusCode: 200,
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ coldStarts: await computeAllColdStarts(windowMinutes) }),
+  };
+}
+
+async function handleProfileAction(body: ProcessEventBody): Promise<APIGatewayProxyResult> {
+  if (
+    (body.profileAction !== "save" && body.profileAction !== "apply" && body.profileAction !== "delete") ||
+    !isValidProfileName(body.name)
+  ) {
+    return {
+      statusCode: 400,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        error: `profileAction must be save/apply/delete, name must be a non-empty string up to ${MAX_PROFILE_NAME_LENGTH} chars`,
+      }),
+    };
+  }
+
+  const name = body.name;
+  let config: WarmScheduleConfig;
+  let profiles: WarmScheduleProfiles;
+
+  if (body.profileAction === "save") {
+    profiles = await saveProfile(name);
+    config = await getConfig();
+  } else if (body.profileAction === "delete") {
+    profiles = await deleteProfile(name);
+    config = await getConfig();
+  } else {
+    const applied = await applyProfile(name);
+    if (!applied) {
+      return {
+        statusCode: 400,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ error: `no saved profile named "${name}"` }),
+      };
+    }
+    config = applied;
+    profiles = await getProfiles();
+  }
+
+  return {
+    statusCode: 200,
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(await buildStatus(config, profiles)),
+  };
+}
+
+// Every dirty project is merged into `config` and persisted in a single
+// getConfig/setConfig round trip - saving them via separate concurrent POSTs
+// (the previous shape of this endpoint) raced: each request's getConfig()
+// could read the SSM parameter before a sibling request's setConfig() had
+// written its own change, so whichever request's setConfig() landed last
+// silently clobbered the others back out. This is what made the settings
+// page's "Save all" button appear to save only the most recently edited
+// project.
+async function handleSchedulesSave(body: ProcessEventBody): Promise<APIGatewayProxyResult> {
+  const entries =
+    body.schedules && typeof body.schedules === "object" && !Array.isArray(body.schedules)
+      ? (Object.entries(body.schedules) as [string, unknown][])
+      : null;
+  const isValidEntries =
+    entries !== null &&
+    entries.length > 0 &&
+    entries.every(([key, schedule]) => key in TARGETS_BY_PROJECT && isValidSchedule(schedule));
+
+  if (!isValidEntries) {
+    return {
+      statusCode: 400,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        error:
+          "schedules must be a non-empty object mapping project name " +
+          "(portfolio/pantry/imposter/supergraph/designStudio/zeroTrustLab) to a valid " +
+          "{ enabled, days, start, end, concurrency, memoryMb, reactiveEnabled } " +
+          `(concurrency an integer 1-${MAX_CONCURRENCY}, memoryMb one of ${MEMORY_OPTIONS_MB.join("/")})`,
+      }),
+    };
+  }
+
+  const validEntries = entries as [WarmScheduleKey, WarmSchedule][];
+  const config = await getConfig();
+  for (const [key, schedule] of validEntries) {
+    config[key] = schedule;
+  }
+  await setConfig(config);
+
+  const reactiveState = await getReactiveState();
+  const now = new Date();
+  await Promise.all(
+    validEntries.map(([key, schedule]) =>
+      Promise.all([
+        updateProjectSchedules(key, schedule),
+        reconcileProject(key, schedule, reactiveState, now),
+      ])
+    )
+  );
+
+  return {
+    statusCode: 200,
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(await buildStatus(config, await getProfiles())),
+  };
+}
+
+async function handlePostRequest(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
+  const body = parseJsonBody<ProcessEventBody>(event);
+
+  if (body.action === "checkColdStarts") return handleCheckColdStarts(body.windowMinutes);
+  if (body.profileAction !== undefined) return handleProfileAction(body);
+
+  return handleSchedulesSave(body);
+}
+
+async function handleReconcilePing(): Promise<APIGatewayProxyResult> {
+  const [config, reactiveState] = await Promise.all([getConfig(), getReactiveState()]);
+  const now = new Date();
+  await Promise.all(
+    (Object.keys(TARGETS_BY_PROJECT) as WarmScheduleKey[]).map((key) =>
+      reconcileProject(key, config[key], reactiveState, now)
+    )
+  );
+
+  return { statusCode: 200, body: "reconciled" };
+}
+
+// Unlike the on/off action, concurrency/memory aren't part of the trigger
+// payload itself (the EventBridge Schedule's input is just {project, action},
+// set once at CDK synth time / on a settings save) - fetch the current
+// config to know how much concurrency to grant and which memory size to
+// reconcile toward. A reactive window still active for this project
+// overrides an "off" trigger - the scheduled window closing shouldn't tear
+// down PC a real cold hit just earned for the next hour.
+async function handleWarmScheduleTrigger(event: WarmScheduleTrigger): Promise<APIGatewayProxyResult> {
+  const [config, reactiveState] = await Promise.all([getConfig(), getReactiveState()]);
+  const shouldBeWarm =
+    event.action === "on" ||
+    isWithinReactiveWindow(event.project, config[event.project], reactiveState, new Date());
+  await reconcileProjectTo(
+    event.project,
+    shouldBeWarm,
+    config[event.project].concurrency,
+    config[event.project].memoryMb
+  );
+
+  return { statusCode: 200, body: "reconciled" };
+}
+
 async function processEvent(
   event: APIGatewayProxyEvent | ReconcilePing | WarmScheduleTrigger | ColdStartLogEvent
 ): Promise<APIGatewayProxyResult> {
@@ -914,169 +1084,9 @@ async function processEvent(
     return { statusCode: 200, body: "ok" };
   }
 
-  if (isReconcilePing(event)) {
-    const [config, reactiveState] = await Promise.all([getConfig(), getReactiveState()]);
-    const now = new Date();
-    await Promise.all(
-      (Object.keys(TARGETS_BY_PROJECT) as WarmScheduleKey[]).map((key) =>
-        reconcileProject(key, config[key], reactiveState, now)
-      )
-    );
-
-    return { statusCode: 200, body: "reconciled" };
-  }
-
-  if (isWarmScheduleTrigger(event)) {
-    // Unlike the on/off action, concurrency/memory aren't part of the
-    // trigger payload itself (the EventBridge Schedule's input is just
-    // {project, action}, set once at CDK synth time / on a settings save) -
-    // fetch the current config to know how much concurrency to grant and
-    // which memory size to reconcile toward. A reactive window still active
-    // for this project overrides an "off" trigger - the scheduled window
-    // closing shouldn't tear down PC a real cold hit just earned for the
-    // next hour.
-    const [config, reactiveState] = await Promise.all([getConfig(), getReactiveState()]);
-    const shouldBeWarm =
-      event.action === "on" ||
-      isWithinReactiveWindow(event.project, config[event.project], reactiveState, new Date());
-    await reconcileProjectTo(
-      event.project,
-      shouldBeWarm,
-      config[event.project].concurrency,
-      config[event.project].memoryMb
-    );
-
-    return { statusCode: 200, body: "reconciled" };
-  }
-
-  if (event.httpMethod === "POST") {
-    const body = parseJsonBody<{
-      schedules?: unknown;
-      profileAction?: string;
-      name?: unknown;
-      action?: string;
-      windowMinutes?: unknown;
-    }>(event);
-
-    if (body.action === "checkColdStarts") {
-      if (!isValidColdStartWindowMinutes(body.windowMinutes)) {
-        return {
-          statusCode: 400,
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            error: `windowMinutes must be one of ${ALLOWED_COLD_START_WINDOW_MINUTES.join(", ")}`,
-          }),
-        };
-      }
-
-      return {
-        statusCode: 200,
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ coldStarts: await computeAllColdStarts(body.windowMinutes) }),
-      };
-    }
-
-    if (body.profileAction !== undefined) {
-      if (
-        (body.profileAction !== "save" &&
-          body.profileAction !== "apply" &&
-          body.profileAction !== "delete") ||
-        !isValidProfileName(body.name)
-      ) {
-        return {
-          statusCode: 400,
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            error: `profileAction must be save/apply/delete, name must be a non-empty string up to ${MAX_PROFILE_NAME_LENGTH} chars`,
-          }),
-        };
-      }
-
-      const name = body.name;
-      let config: WarmScheduleConfig;
-      let profiles: WarmScheduleProfiles;
-
-      if (body.profileAction === "save") {
-        profiles = await saveProfile(name);
-        config = await getConfig();
-      } else if (body.profileAction === "delete") {
-        profiles = await deleteProfile(name);
-        config = await getConfig();
-      } else {
-        const applied = await applyProfile(name);
-        if (!applied) {
-          return {
-            statusCode: 400,
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ error: `no saved profile named "${name}"` }),
-          };
-        }
-        config = applied;
-        profiles = await getProfiles();
-      }
-
-      return {
-        statusCode: 200,
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(await buildStatus(config, profiles)),
-      };
-    }
-
-    const entries =
-      body.schedules && typeof body.schedules === "object" && !Array.isArray(body.schedules)
-        ? (Object.entries(body.schedules) as [string, unknown][])
-        : null;
-    const isValidEntries =
-      entries !== null &&
-      entries.length > 0 &&
-      entries.every(([key, schedule]) => key in TARGETS_BY_PROJECT && isValidSchedule(schedule));
-
-    if (!isValidEntries) {
-      return {
-        statusCode: 400,
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          error:
-            "schedules must be a non-empty object mapping project name " +
-            "(portfolio/pantry/imposter/supergraph/designStudio/zeroTrustLab) to a valid " +
-            "{ enabled, days, start, end, concurrency, memoryMb, reactiveEnabled } " +
-            `(concurrency an integer 1-${MAX_CONCURRENCY}, memoryMb one of ${MEMORY_OPTIONS_MB.join("/")})`,
-        }),
-      };
-    }
-
-    // Every dirty project is merged into `config` and persisted in a single
-    // getConfig/setConfig round trip - saving them via separate concurrent
-    // POSTs (the previous shape of this endpoint) raced: each request's
-    // getConfig() could read the SSM parameter before a sibling request's
-    // setConfig() had written its own change, so whichever request's
-    // setConfig() landed last silently clobbered the others back out. This
-    // is what made the settings page's "Save all" button appear to save
-    // only the most recently edited project.
-    const validEntries = entries as [WarmScheduleKey, WarmSchedule][];
-    const config = await getConfig();
-    for (const [key, schedule] of validEntries) {
-      config[key] = schedule;
-    }
-    await setConfig(config);
-
-    const reactiveState = await getReactiveState();
-    const now = new Date();
-    await Promise.all(
-      validEntries.map(([key, schedule]) =>
-        Promise.all([
-          updateProjectSchedules(key, schedule),
-          reconcileProject(key, schedule, reactiveState, now),
-        ])
-      )
-    );
-
-    return {
-      statusCode: 200,
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(await buildStatus(config, await getProfiles())),
-    };
-  }
+  if (isReconcilePing(event)) return handleReconcilePing();
+  if (isWarmScheduleTrigger(event)) return handleWarmScheduleTrigger(event);
+  if (event.httpMethod === "POST") return handlePostRequest(event);
 
   const config = await getConfig();
 

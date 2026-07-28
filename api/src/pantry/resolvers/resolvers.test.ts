@@ -248,16 +248,14 @@ describe("Query.parseCommand", () => {
     const context = ctx({ sourceIp: "9.9.9.9" });
     await resolvers.Query.parseCommand(null, { input: "what do I have" }, context);
 
-    expect(parseCommand).toHaveBeenCalledWith(
-      "what do I have",
-      [],
+    expect(parseCommand).toHaveBeenCalledWith("what do I have", [], {
       inventory,
       shoppingList,
-      ["Dairy", "Produce"],
-      "9.9.9.9",
-      "ANTHROPIC",
-      "HAIKU"
-    );
+      categories: ["Dairy", "Produce"],
+      sourceIp: "9.9.9.9",
+      aiProvider: "ANTHROPIC",
+      aiModelTier: "HAIKU",
+    });
   });
 
   it("defaults history to an empty array when not given", async () => {
@@ -407,7 +405,13 @@ describe("Mutation.removeInventoryItem", () => {
 
     const result = await resolvers.Mutation.removeInventoryItem(null, { id: "x" }, ctx());
 
-    expect(upsertShoppingListEntry).toHaveBeenCalledWith(TEST_PK, "Milk", null, null, null, true, "Dairy");
+    expect(upsertShoppingListEntry).toHaveBeenCalledWith(TEST_PK, {
+      name: "Milk",
+      quantity: null,
+      unit: null,
+      isStaple: true,
+      category: "Dairy",
+    });
     expect(deleteItem).toHaveBeenCalledWith(TEST_PK, "x");
     expect(result).toBe(true);
   });
@@ -444,17 +448,16 @@ describe("Mutation.addToShoppingList", () => {
     );
 
     expect(assertNotRateLimited).toHaveBeenCalledWith("7.7.7.7");
-    expect(upsertShoppingListEntry).toHaveBeenCalledWith(
-      TEST_PK,
-      "Bread",
-      null,
-      null,
-      null,
-      false,
-      null,
-      null,
-      false
-    );
+    expect(upsertShoppingListEntry).toHaveBeenCalledWith(TEST_PK, {
+      name: "Bread",
+      quantity: null,
+      unit: null,
+      note: null,
+      isStaple: false,
+      category: null,
+      recipeTag: null,
+      urgent: false,
+    });
     expect(result).toBe(entry);
   });
 
@@ -476,17 +479,16 @@ describe("Mutation.addToShoppingList", () => {
       ctx()
     );
 
-    expect(upsertShoppingListEntry).toHaveBeenCalledWith(
-      TEST_PK,
-      "Bread",
-      2,
-      "loaves",
-      "for the week",
-      true,
-      "Bread",
-      "Sandwiches",
-      true
-    );
+    expect(upsertShoppingListEntry).toHaveBeenCalledWith(TEST_PK, {
+      name: "Bread",
+      quantity: 2,
+      unit: "loaves",
+      note: "for the week",
+      isStaple: true,
+      category: "Bread",
+      recipeTag: "Sandwiches",
+      urgent: true,
+    });
   });
 });
 

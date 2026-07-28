@@ -9,6 +9,11 @@ import type { EdgeAuthContext } from "./authorizer";
 const DOMAIN_A_URL = process.env.DOMAIN_A_URL!;
 const DOMAIN_B_URL = process.env.DOMAIN_B_URL;
 
+const DOMAIN_URLS: Record<string, string | undefined> = {
+  "domain-a": DOMAIN_A_URL,
+  "domain-b": DOMAIN_B_URL,
+};
+
 export async function handler(
   event: APIGatewayProxyEventV2WithLambdaAuthorizer<EdgeAuthContext>
 ): Promise<APIGatewayProxyStructuredResultV2> {
@@ -19,7 +24,7 @@ export async function handler(
   const { jwt } = event.requestContext.authorizer.lambda;
 
   const [prefix, ...rest] = event.rawPath.split("/").filter(Boolean);
-  const targetBase = prefix === "domain-a" ? DOMAIN_A_URL : prefix === "domain-b" ? DOMAIN_B_URL : undefined;
+  const targetBase = DOMAIN_URLS[prefix];
   if (!targetBase) return { statusCode: 404, body: "unknown domain" };
 
   const targetUrl = `${targetBase.replace(/\/$/, "")}/${rest.join("/")}`;

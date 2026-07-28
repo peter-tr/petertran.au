@@ -15,10 +15,26 @@ function dayKey(date: Date): string {
 // Lambda is never the name the client actually sent. Stripping it back down
 // is what keeps the systemStats/CloudWatch breakdown keyed by "Footer"
 // instead of "Footer__portfolio__0".
-const FEDERATION_SUFFIX_PATTERN = /__\w+__\d+$/;
+//
+// Two lastIndexOf splits, not a single `/__\w+__\d+$/` regex - \w overlaps
+// with \d, so that pattern's two adjacent quantifiers gave SonarQube's
+// static analyzer a super-linear-backtracking flag (S8786). This is
+// equivalent for every real Apollo-generated name (subgraph names never
+// contain "__") and inherently linear since no backtracking is involved.
+const TRAILING_DIGITS_PATTERN = /^\d+$/;
 
 export function stripFederationSuffix(operationName: string): string {
-  return operationName.replace(FEDERATION_SUFFIX_PATTERN, "");
+  const lastSeparator = operationName.lastIndexOf("__");
+  if (lastSeparator === -1) return operationName;
+
+  const fetchIndex = operationName.slice(lastSeparator + 2);
+  if (!TRAILING_DIGITS_PATTERN.test(fetchIndex)) return operationName;
+
+  const withoutFetchIndex = operationName.slice(0, lastSeparator);
+  const subgraphSeparator = withoutFetchIndex.lastIndexOf("__");
+  if (subgraphSeparator === -1) return operationName;
+
+  return withoutFetchIndex.slice(0, subgraphSeparator);
 }
 
 // CloudWatch auto-parses any stdout line shaped like this (Embedded Metric

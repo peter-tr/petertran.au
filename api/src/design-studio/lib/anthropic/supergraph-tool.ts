@@ -60,6 +60,51 @@ async function executeSupergraphQuery(
   return body.data;
 }
 
+// Resolves a single tool_use block into its tool_result - pulled out of
+// gatherSupergraphContext's loop so the input-shape check, the
+// allowlist-validation rejection, and the query-execution try/catch (three
+// independent failure modes, each returning its own tool_result rather than
+// throwing) don't all nest inside that function's own iteration/budget
+// control flow.
+async function resolveToolUseBlock(
+  block: Anthropic.ToolUseBlock,
+  supergraphUrl: string,
+  deadlineAt: number
+): Promise<Anthropic.ToolResultBlockParam> {
+  const input = block.input as { query?: unknown };
+  if (typeof input.query !== "string") {
+    return { type: "tool_result", tool_use_id: block.id, content: "query must be a string.", is_error: true };
+  }
+
+  const validation = validatePortfolioQuery(input.query);
+  if (!validation.ok) {
+    // Returned as a tool_result the model can react to and retry with a
+    // corrected query (within the remaining budget), rather than throwing
+    // and killing the whole generateDesignElements call over a scoping
+    // mistake.
+    return {
+      type: "tool_result",
+      tool_use_id: block.id,
+      content: `Query rejected: ${validation.reason}`,
+      is_error: true,
+    };
+  }
+
+  try {
+    const fetchTimeoutMs = Math.max(0, Math.min(SUPERGRAPH_REQUEST_TIMEOUT_MS, deadlineAt - Date.now()));
+    const data = await executeSupergraphQuery(supergraphUrl, input.query, fetchTimeoutMs);
+
+    return { type: "tool_result", tool_use_id: block.id, content: JSON.stringify(data) };
+  } catch (err) {
+    return {
+      type: "tool_result",
+      tool_use_id: block.id,
+      content: `Query failed: ${err instanceof Error ? err.message : "unknown error"}`,
+      is_error: true,
+    };
+  }
+}
+
 // "Phase 1" of generateDesignElements - a short, bounded tool_use loop that
 // lets Claude decide whether real portfolio data would help this prompt,
 // run before (and separate from) the existing structured-output ("phase 2")
@@ -131,45 +176,7 @@ export async function gatherSupergraphContext(
     const toolResults: Anthropic.ToolResultBlockParam[] = [];
     for (const block of response.content) {
       if (block.type !== "tool_use") continue;
-
-      const input = block.input as { query?: unknown };
-      if (typeof input.query !== "string") {
-        toolResults.push({
-          type: "tool_result",
-          tool_use_id: block.id,
-          content: "query must be a string.",
-          is_error: true,
-        });
-        continue;
-      }
-
-      const validation = validatePortfolioQuery(input.query);
-      if (!validation.ok) {
-        // Returned as a tool_result the model can react to and retry with a
-        // corrected query (within the remaining budget), rather than
-        // throwing and killing the whole generateDesignElements call over
-        // a scoping mistake.
-        toolResults.push({
-          type: "tool_result",
-          tool_use_id: block.id,
-          content: `Query rejected: ${validation.reason}`,
-          is_error: true,
-        });
-        continue;
-      }
-
-      try {
-        const fetchTimeoutMs = Math.max(0, Math.min(SUPERGRAPH_REQUEST_TIMEOUT_MS, deadlineAt - Date.now()));
-        const data = await executeSupergraphQuery(supergraphUrl, input.query, fetchTimeoutMs);
-        toolResults.push({ type: "tool_result", tool_use_id: block.id, content: JSON.stringify(data) });
-      } catch (err) {
-        toolResults.push({
-          type: "tool_result",
-          tool_use_id: block.id,
-          content: `Query failed: ${err instanceof Error ? err.message : "unknown error"}`,
-          is_error: true,
-        });
-      }
+      toolResults.push(await resolveToolUseBlock(block, supergraphUrl, deadlineAt));
     }
 
     messages.push({ role: "user", content: toolResults });
