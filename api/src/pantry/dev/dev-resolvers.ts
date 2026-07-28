@@ -15,6 +15,7 @@ let settings: PantrySettings = {
   simple: false,
   optionsCollapsed: false,
   collapsedGroups: [],
+  inventoryListCollapsed: false,
   shoppingListCollapsed: false,
   showLowPriority: false,
   categoryFilter: null,

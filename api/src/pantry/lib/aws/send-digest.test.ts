@@ -35,6 +35,7 @@ function baseSettings(overrides: Partial<PantrySettings> = {}): PantrySettings {
     optionsCollapsed: false,
     collapsedGroups: [],
     commonItems: [],
+    inventoryListCollapsed: false,
     shoppingListCollapsed: false,
     showLowPriority: false,
     categoryFilter: null,

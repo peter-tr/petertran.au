@@ -350,13 +350,14 @@ using that same pantry.
 type PantrySettings {
   """
   Which grouping the Inventory list is currently viewed by: "location",
-  "category", "priority" (needs attention vs. low priority), or "all".
+  "category", "priority" (regular vs. low priority), or "all".
   """
   view: String!
   """
   How items are ordered within each group: "recent" (most recently added
   first, the default), "name" (A-Z), "expiry" (soonest first, no-expiry
-  items last), or "quantity" (highest first).
+  items last), "quantity" (highest first), or "lowStock" (nearly-empty
+  items first, then most recently added).
   """
   sort: String!
   """
@@ -375,6 +376,11 @@ type PantrySettings {
   The user-curated quick-add list shown in Common Items.
   """
   commonItems: [String!]!
+  """
+  True if the Inventory panel is collapsed - same concept as
+  shoppingListCollapsed, just for the other list.
+  """
+  inventoryListCollapsed: Boolean!
   """
   True if the Shopping list panel is collapsed.
   """
@@ -492,6 +498,7 @@ input PantrySettingsInput {
   optionsCollapsed: Boolean
   collapsedGroups: [String!]
   commonItems: [String!]
+  inventoryListCollapsed: Boolean
   shoppingListCollapsed: Boolean
   showLowPriority: Boolean
   categoryFilter: String
