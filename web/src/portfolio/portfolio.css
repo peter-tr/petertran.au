@@ -35,10 +35,23 @@
   color: var(--signal);
   text-decoration: none;
   border-bottom: 1px solid var(--signal-dim);
+  /* Keeps "design-studio" atomic - without this, the browser treats its
+     hyphen as a break opportunity and splits it mid-word ("design-"/
+     "studio") on narrow screens instead of wrapping the whole link. */
+  white-space: nowrap;
 }
 
 .hero-secret a:hover {
   border-color: var(--signal);
+}
+
+@media (max-width: 640px) {
+  /* Small enough that the whole "// psst, also built ..." line fits on one
+     row at mobile widths instead of wrapping - same idea as the other
+     compact mono UI text on this site (e.g. pantry's control labels). */
+  .hero-secret {
+    font-size: 0.68rem;
+  }
 }
 
 /* Small unobtrusive link revealed by clicking the h1 three times - same
