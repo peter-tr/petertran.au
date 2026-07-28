@@ -353,6 +353,18 @@ export class ProvisionedConcurrencyStack extends Stack {
       })
     );
 
+    // Settings-page last-24h cost estimate (handler.ts's
+    // getTargetOnDemandCostUsd) - CloudWatch metric read actions don't
+    // support resource-level restriction (AWS always requires `Resource:
+    // "*"` for GetMetricData/GetMetricStatistics/ListMetrics), unlike the
+    // logs/lambda policies above which scope to specific ARNs.
+    warmScheduleFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["cloudwatch:GetMetricData"],
+        resources: ["*"],
+      })
+    );
+
     // Shared by every project's on/off schedule below (rather than letting
     // each auto-create its own) - flipping a schedule's cron/State later
     // still requires resending its full definition including the role

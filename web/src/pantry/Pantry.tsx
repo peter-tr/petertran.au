@@ -7,7 +7,7 @@ import PantryManualAddSection from "./components/PantryManualAddSection";
 import PantryShoppingListSection from "./components/PantryShoppingListSection";
 import PantryAuthForm from "./components/PantryAuthForm";
 import { usePantryHome } from "./hooks/usePantryHome";
-import { usePantryAuth } from "./hooks/usePantryAuth";
+import { usePantryAuth, type PantryAuthMode } from "./hooks/usePantryAuth";
 import "./pantry.css";
 
 export default function Pantry() {
@@ -22,6 +22,24 @@ export default function Pantry() {
   // which looked like the toggle "getting stuck" instead of flipping back.
   async function refetchAll() {
     await refetch();
+  }
+
+  // usePantryHome's items/shoppingList/settings are scoped to whichever
+  // identity's token is currently stored (see homeCache's "keys by the
+  // signed-in identity" comment) - without this, signing in/out only
+  // updated the header's account indicator, leaving the page showing the
+  // previous identity's data until a manual reload re-ran usePantryHome's
+  // mount effect.
+  async function handleAuthSubmit(mode: PantryAuthMode, emailInput: string, password: string) {
+    const ok = await submit(mode, emailInput, password);
+    if (ok) await refetchAll();
+
+    return ok;
+  }
+
+  async function handleSignOut() {
+    signOut();
+    await refetchAll();
   }
 
   return (
@@ -41,7 +59,7 @@ export default function Pantry() {
         </h1>
         <div className="pantry-head-actions">
           {email ? (
-            <button type="button" className="pantry-account" onClick={signOut} title="Sign out">
+            <button type="button" className="pantry-account" onClick={handleSignOut} title="Sign out">
               {email} · Sign out
             </button>
           ) : (
@@ -53,7 +71,7 @@ export default function Pantry() {
                 <PantryAuthForm
                   pending={pending}
                   error={authError}
-                  onSubmit={submit}
+                  onSubmit={handleAuthSubmit}
                   onClose={() => setAuthFormOpen(false)}
                 />
               )}

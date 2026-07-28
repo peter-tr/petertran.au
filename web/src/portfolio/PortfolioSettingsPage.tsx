@@ -17,7 +17,7 @@ import Footer from "../shared/components/Footer";
 import "./portfolio.css";
 
 const WARM_SCHEDULE_LABELS: Record<WarmScheduleKey, string> = {
-  portfolio: "this resume site",
+  portfolio: "portfolio",
   pantry: "pantry",
   imposter: "imposter",
   supergraph: "supergraph (GraphQL gateway in front of the three above)",
@@ -77,6 +77,9 @@ export default function PortfolioSettingsPage() {
     : false;
   const totalScheduledMonthlyCostUsd = warmScheduleCosts
     ? WARM_SCHEDULE_KEYS.reduce((sum, fn) => sum + warmScheduleCosts[fn].scheduledMonthlyCostUsd, 0)
+    : 0;
+  const totalLast24hCostUsd = warmScheduleCosts
+    ? WARM_SCHEDULE_KEYS.reduce((sum, fn) => sum + warmScheduleCosts[fn].last24hCostUsd, 0)
     : 0;
   const {
     enabled: alertsEnabled,
@@ -187,7 +190,8 @@ export default function PortfolioSettingsPage() {
             ))}
           {warmScheduleCosts && (
             <p className="section-hint">
-              Total: ~${totalScheduledMonthlyCostUsd.toFixed(2)}/mo if all schedules run as set
+              Total: ~${totalScheduledMonthlyCostUsd.toFixed(2)}/mo if all schedules run as set · ~$
+              {totalLast24hCostUsd.toFixed(2)} est. across all Lambdas in the last 24h
             </p>
           )}
           <button

@@ -20,12 +20,14 @@ import {
   StartQueryCommand,
   GetQueryResultsCommand,
 } from "@aws-sdk/client-cloudwatch-logs";
+import { CloudWatchClient, GetMetricDataCommand } from "@aws-sdk/client-cloudwatch";
 import { parseJsonBody, corsHeaders } from "api-shared/http";
 
 const lambdaClient = new LambdaClient({});
 const ssm = new SSMClient({});
 const scheduler = new SchedulerClient({});
 const logsClient = new CloudWatchLogsClient({});
+const cloudwatch = new CloudWatchClient({});
 
 const ALIAS_NAME = process.env.LIVE_ALIAS_NAME!;
 const PARAM_NAME = process.env.WARM_SCHEDULE_PARAM_NAME!;
@@ -81,10 +83,22 @@ const REACTIVE_WINDOW_MINUTES = 60;
 // granted for, independent of traffic.
 const PC_PRICE_PER_GB_SECOND_USD = 0.000005236;
 const SECONDS_PER_HOUR = 3600;
+const SECONDS_PER_DAY = 86400;
 // Calendar months aren't a whole number of weeks - average weeks/month
 // (365.25 / 7 / 12) so a schedule's cost projects consistently regardless
 // of which month it's viewed in.
 const WEEKS_PER_MONTH = 365.25 / 7 / 12;
+const DAYS_PER_MONTH = WEEKS_PER_MONTH * 7;
+
+// Real ap-southeast-2 on-demand Lambda rates, x86 architecture, Tier-1 usage
+// (AWS Price List API - pricing.us-east-1.amazonaws.com/offers/v1.0/aws/
+// AWSLambda/current/ap-southeast-2/index.json, pulled 2026-07-28) - separate
+// from PC_PRICE_PER_GB_SECOND_USD above, which is Provisioned Concurrency's
+// own (cheaper, always-on-regardless-of-traffic) rate. This project's usage
+// is nowhere near the Tier-2/3 volume thresholds (6B/15B+ GB-seconds/month),
+// so Tier-1 is the only rate that ever actually applies.
+const ON_DEMAND_REQUEST_PRICE_USD = 0.0000002; // per request
+const ON_DEMAND_DURATION_PRICE_PER_GB_SECOND_USD = 0.0000166667; // per GB-second
 
 interface ProjectCost {
   // Real, currently-allocated PC units across every target Lambda in this
@@ -101,6 +115,13 @@ interface ProjectCost {
   // this reflects what a pending memory choice will cost once reconciled,
   // not what's costing right now.
   scheduledMonthlyCostUsd: number;
+  // Estimate, not a Cost-Explorer-verified bill: real on-demand execution
+  // cost from the last 24h's actual CloudWatch Invocations/Duration sums
+  // (see getTargetOnDemandCostUsd) plus this project's share of its
+  // scheduled PC cost, averaged to a daily figure (scheduledMonthlyCostUsd /
+  // days-per-month) since no historical PC-allocation time series is stored
+  // anywhere to reconstruct the real per-day PC hours from.
+  last24hCostUsd: number;
 }
 
 // Settings-page window picker offers exactly these curated lookback
@@ -333,8 +354,69 @@ async function getTargetLiveState(
   };
 }
 
+// Real on-demand execution cost for one target over the last 24h, from
+// CloudWatch's own Invocations/Duration sums (the two most basic,
+// universally-emitted Lambda metrics - dimensioned just by FunctionName, no
+// PC-specific dimension to get wrong) times the verified rates above. Never
+// throws - a metrics-query failure degrades to "$0 for this target" rather
+// than failing the whole cost response, same reasoning as
+// computeProjectColdStarts's per-project error isolation below.
+async function getTargetOnDemandCostUsd(functionName: string, memoryMb: number): Promise<number> {
+  try {
+    const endTime = new Date();
+    const startTime = new Date(endTime.getTime() - SECONDS_PER_DAY * 1000);
+
+    const { MetricDataResults } = await cloudwatch.send(
+      new GetMetricDataCommand({
+        StartTime: startTime,
+        EndTime: endTime,
+        MetricDataQueries: [
+          {
+            Id: "invocations",
+            MetricStat: {
+              Metric: {
+                Namespace: "AWS/Lambda",
+                MetricName: "Invocations",
+                Dimensions: [{ Name: "FunctionName", Value: functionName }],
+              },
+              Period: SECONDS_PER_DAY,
+              Stat: "Sum",
+            },
+          },
+          {
+            Id: "duration",
+            MetricStat: {
+              Metric: {
+                Namespace: "AWS/Lambda",
+                MetricName: "Duration",
+                Dimensions: [{ Name: "FunctionName", Value: functionName }],
+              },
+              Period: SECONDS_PER_DAY,
+              Stat: "Sum",
+            },
+          },
+        ],
+      })
+    );
+
+    const invocations = MetricDataResults?.find((r) => r.Id === "invocations")?.Values?.[0] ?? 0;
+    const durationMsSum = MetricDataResults?.find((r) => r.Id === "duration")?.Values?.[0] ?? 0;
+    const memoryGb = memoryMb / 1024;
+
+    return (
+      invocations * ON_DEMAND_REQUEST_PRICE_USD +
+      (durationMsSum / 1000) * memoryGb * ON_DEMAND_DURATION_PRICE_PER_GB_SECOND_USD
+    );
+  } catch (err) {
+    console.error(`getTargetOnDemandCostUsd(${functionName}) failed - reporting $0`, err);
+
+    return 0;
+  }
+}
+
 async function computeProjectCost(key: WarmScheduleKey, schedule: WarmSchedule): Promise<ProjectCost> {
-  const targetStates = await Promise.all(TARGETS_BY_PROJECT[key].map(getTargetLiveState));
+  const targetNames = TARGETS_BY_PROJECT[key];
+  const targetStates = await Promise.all(targetNames.map(getTargetLiveState));
 
   const scheduledMemoryGb = schedule.memoryMb / 1024;
   let liveConcurrency = 0;
@@ -347,11 +429,17 @@ async function computeProjectCost(key: WarmScheduleKey, schedule: WarmSchedule):
     scheduledHourlyCostUsd +=
       scheduledMemoryGb * schedule.concurrency * PC_PRICE_PER_GB_SECOND_USD * SECONDS_PER_HOUR;
   }
+  const scheduledMonthlyCostUsd = scheduledHourlyCostUsd * hoursPerWeek(schedule) * WEEKS_PER_MONTH;
+
+  const last24hOnDemandCostUsd = await Promise.all(
+    targetNames.map((name, i) => getTargetOnDemandCostUsd(name, targetStates[i].memoryMb))
+  ).then((costs) => costs.reduce((sum, cost) => sum + cost, 0));
 
   return {
     liveConcurrency,
     liveHourlyCostUsd,
-    scheduledMonthlyCostUsd: scheduledHourlyCostUsd * hoursPerWeek(schedule) * WEEKS_PER_MONTH,
+    scheduledMonthlyCostUsd,
+    last24hCostUsd: last24hOnDemandCostUsd + scheduledMonthlyCostUsd / DAYS_PER_MONTH,
   };
 }
 
