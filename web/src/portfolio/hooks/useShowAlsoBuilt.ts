@@ -21,27 +21,29 @@ function readStoredValue(): boolean {
 }
 
 export function useShowAlsoBuilt() {
-  const [showAlsoBuilt, setShowAlsoBuiltState] = useState(readStoredValue);
+  const [showAlsoBuilt, setShowAlsoBuilt] = useState(readStoredValue);
 
   useEffect(() => {
     // Picks up the toggle if another tab (or Settings, on the way back to
     // this page) changed the stored value.
     function handleStorage(e: StorageEvent) {
-      if (e.key === STORAGE_KEY) setShowAlsoBuiltState(readStoredValue());
+      if (e.key === STORAGE_KEY) setShowAlsoBuilt(readStoredValue());
     }
     window.addEventListener("storage", handleStorage);
 
     return () => window.removeEventListener("storage", handleStorage);
   }, []);
 
-  const setShowAlsoBuilt = useCallback((value: boolean) => {
+  // Wraps the plain state setter with the localStorage write, and is what
+  // callers get as `setShowAlsoBuilt`.
+  const persistShowAlsoBuilt = useCallback((value: boolean) => {
     try {
       localStorage.setItem(STORAGE_KEY, String(value));
     } catch {
       // Fail silently -- this preference is a convenience, not a requirement.
     }
-    setShowAlsoBuiltState(value);
+    setShowAlsoBuilt(value);
   }, []);
 
-  return { showAlsoBuilt, setShowAlsoBuilt };
+  return { showAlsoBuilt, setShowAlsoBuilt: persistShowAlsoBuilt };
 }

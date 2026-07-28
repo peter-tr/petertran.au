@@ -35,6 +35,16 @@ interface WarmScheduleProjectProps {
   onToggleCollapsed: () => void;
 }
 
+// Pulled out of the JSX below so the "how many warm instances right now"
+// line isn't a ternary nested inside another ternary's template literal.
+function liveConcurrencyLabel(cost: ProjectCost): string {
+  if (cost.liveConcurrency <= 0) return "Currently cold (no PC active)";
+
+  const plural = cost.liveConcurrency === 1 ? "" : "s";
+
+  return `Currently ${cost.liveConcurrency} warm instance${plural} ($${cost.liveHourlyCostUsd.toFixed(4)}/hr)`;
+}
+
 // One project's day/time editor - a controlled component whose `draft`
 // state lives in PortfolioSettingsPage, so a single "Save all" button
 // there can POST every dirty project's schedule at once instead of each
@@ -51,7 +61,7 @@ export default function WarmScheduleProject({
   disabled,
   collapsed,
   onToggleCollapsed,
-}: WarmScheduleProjectProps) {
+}: Readonly<WarmScheduleProjectProps>) {
   function toggleDay(day: Weekday): void {
     onChange({
       ...draft,
@@ -171,10 +181,8 @@ export default function WarmScheduleProject({
 
           {cost && (
             <p className="section-hint">
-              {cost.liveConcurrency > 0
-                ? `Currently ${cost.liveConcurrency} warm instance${cost.liveConcurrency === 1 ? "" : "s"} ($${cost.liveHourlyCostUsd.toFixed(4)}/hr)`
-                : "Currently cold (no PC active)"}{" "}
-              · ~${cost.scheduledMonthlyCostUsd.toFixed(2)}/mo if this schedule runs as set · ~$
+              {liveConcurrencyLabel(cost)} · ~${cost.scheduledMonthlyCostUsd.toFixed(2)}/mo if this schedule
+              runs as set · ~$
               {cost.last24hCostUsd.toFixed(2)} est. last 24h
               {reactiveStatus?.active &&
                 reactiveStatus.until &&

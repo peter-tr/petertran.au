@@ -9,7 +9,7 @@ import { useShowFooterCost } from "../hooks/useShowFooterCost";
 
 type Cost = FooterQueryResult["meta"];
 
-export default function Footer({ email }: { email?: string }) {
+export default function Footer({ email }: Readonly<{ email?: string }>) {
   const [cost, setCost] = useState<Cost | null>(null);
   const { showFooterCost } = useShowFooterCost();
 

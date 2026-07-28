@@ -13,7 +13,7 @@ const CERT_LINKS: Record<string, { url: string; Icon: typeof FaAws }> = {
   },
 };
 
-export default function SkillsSection({ skills }: { skills: SkillCategory[] }) {
+export default function SkillsSection({ skills }: Readonly<{ skills: SkillCategory[] }>) {
   return (
     <Section id="skills" typeName="SkillCategory">
       {skills.map((s) => (

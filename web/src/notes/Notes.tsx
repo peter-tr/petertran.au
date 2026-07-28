@@ -96,10 +96,12 @@ const ENTRIES: NoteEntry[] = [
           instead, which is dramatically cheaper for the same code - confirmed by rebuilding the identical
           bundle both ways and cold-starting each in isolation. One interop bug on the way: esbuild's CJS
           named exports are non-configurable <code>Object.defineProperty</code> getters, which crashes{" "}
-          <code>require-in-the-middle</code>'s monkey-patch outright (
-          <code>Cannot redefine property: handler</code>) if it tries to patch the bundle directly - fixed
-          with a two-line unbundled wrapper file that does a plain{" "}
-          <code>exports.handler = require("./app.js").handler</code> reassignment instead.
+          <code>require-in-the-middle</code>'s monkey-patch outright{" "}
+          <span>
+            (<code>Cannot redefine property: handler</code>)
+          </span>{" "}
+          if it tries to patch the bundle directly - fixed with a two-line unbundled wrapper file that does a
+          plain <code>exports.handler = require("./app.js").handler</code> reassignment instead.
         </p>
         <p>
           Shipped across portfolio, pantry, imposter, and design-studio - every project carrying the ADOT

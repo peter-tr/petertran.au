@@ -38,7 +38,7 @@ export default function EditorWorkspace({
   initialEvents,
   initialName,
   onSaved,
-}: EditorWorkspaceProps) {
+}: Readonly<EditorWorkspaceProps>) {
   const { elements, dispatch, undo, redo, canUndo, canRedo } = useEventHistory(initialEvents);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [name, setName] = useState(initialName);

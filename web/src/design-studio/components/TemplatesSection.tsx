@@ -11,7 +11,7 @@ interface TemplatesSectionProps {
   initialTemplates: Template[];
 }
 
-export default function TemplatesSection({ initialTemplates }: TemplatesSectionProps) {
+export default function TemplatesSection({ initialTemplates }: Readonly<TemplatesSectionProps>) {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("");

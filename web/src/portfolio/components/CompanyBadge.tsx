@@ -12,7 +12,7 @@ const LOGO_IMAGES: Record<string, { src: string; invert?: boolean }> = {
   "Australian Defence Force": { src: "/logos/adf.png" },
 };
 
-export default function CompanyBadge({ company }: { company: string }) {
+export default function CompanyBadge({ company }: Readonly<{ company: string }>) {
   const logo = LOGO_IMAGES[company];
   if (logo) {
     return (

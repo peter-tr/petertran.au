@@ -161,7 +161,10 @@ export default function PortfolioSettingsPage() {
             onApply={applyWarmScheduleProfile}
             onDelete={deleteWarmScheduleProfile}
           />
-          <div className="warm-schedule-days" role="group" aria-label="Cold start check window">
+          {/* A real <fieldset> rather than a <div role="group"> - same
+              grouping semantics, from the native element instead of an ARIA
+              override. */}
+          <fieldset className="warm-schedule-days" aria-label="Cold start check window">
             {COLD_START_WINDOW_OPTIONS.map((option) => (
               <button
                 key={option.minutes}
@@ -173,7 +176,7 @@ export default function PortfolioSettingsPage() {
                 {option.label}
               </button>
             ))}
-          </div>
+          </fieldset>
           <p className="section-hint">
             Cold start rate below is checked automatically, over the window selected above.
             {checkingColdStarts && " Checking…"}

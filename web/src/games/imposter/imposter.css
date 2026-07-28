@@ -338,7 +338,22 @@
   z-index: 50;
 }
 
+/* Full-bleed dismiss target behind the modal - a real <button> so the
+   backdrop is keyboard-reachable, rather than a click handler on the
+   backdrop <div> (which the modal's own controls would sit inside). */
+.imposter-modal-scrim {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: default;
+}
+
 .imposter-modal {
+  position: relative;
   width: 100%;
   max-width: 22rem;
   background: var(--panel);

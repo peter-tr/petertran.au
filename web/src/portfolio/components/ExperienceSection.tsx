@@ -4,7 +4,7 @@ import { formatRange } from "../../shared/lib/format";
 import { useCollapsedKeys } from "../hooks/useCollapsedKeys";
 import type { Experience } from "../lib/types";
 
-export default function ExperienceSection({ experience }: { experience: Experience[] }) {
+export default function ExperienceSection({ experience }: Readonly<{ experience: Experience[] }>) {
   const { isCollapsed, toggle } = useCollapsedKeys();
 
   return (
@@ -27,8 +27,8 @@ export default function ExperienceSection({ experience }: { experience: Experien
             {!collapsed && role.summary && <p className="role-summary">{role.summary}</p>}
             {!collapsed && role.highlights.length > 0 && (
               <ul className="role-highlights">
-                {role.highlights.map((h, hi) => (
-                  <li key={hi}>{h}</li>
+                {role.highlights.map((h) => (
+                  <li key={h}>{h}</li>
                 ))}
               </ul>
             )}

@@ -28,7 +28,7 @@ export default function WarmScheduleProfiles({
   onSave,
   onApply,
   onDelete,
-}: WarmScheduleProfilesProps) {
+}: Readonly<WarmScheduleProfilesProps>) {
   const [name, setName] = useState("");
   const trimmedName = name.trim();
   const busy = pending !== null;

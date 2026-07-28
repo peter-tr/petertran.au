@@ -28,7 +28,7 @@ function formatVariables(raw: string | null): string | null {
 const MAX_CLIENT_POLL_ATTEMPTS = 5;
 const CLIENT_POLL_DELAY_MS = 2200;
 
-export default function OperationRow({ op }: { op: OperationStat }) {
+export default function OperationRow({ op }: Readonly<{ op: OperationStat }>) {
   const [expanded, setExpanded] = useState(false);
   const [trace, setTrace] = useState<TraceSegment[] | null>(null);
   const [traceLoading, setTraceLoading] = useState(false);

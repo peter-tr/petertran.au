@@ -20,27 +20,29 @@ function readStoredValue(): boolean {
 }
 
 export function useShowFooterCost() {
-  const [showFooterCost, setShowFooterCostState] = useState(readStoredValue);
+  const [showFooterCost, setShowFooterCost] = useState(readStoredValue);
 
   useEffect(() => {
     // Picks up the toggle if another tab (or Settings, on the way back to
     // this page) changed the stored value.
     function handleStorage(e: StorageEvent) {
-      if (e.key === STORAGE_KEY) setShowFooterCostState(readStoredValue());
+      if (e.key === STORAGE_KEY) setShowFooterCost(readStoredValue());
     }
     window.addEventListener("storage", handleStorage);
 
     return () => window.removeEventListener("storage", handleStorage);
   }, []);
 
-  const setShowFooterCost = useCallback((value: boolean) => {
+  // Wraps the plain state setter with the localStorage write, and is what
+  // callers get as `setShowFooterCost`.
+  const persistShowFooterCost = useCallback((value: boolean) => {
     try {
       localStorage.setItem(STORAGE_KEY, String(value));
     } catch {
       // Fail silently -- this preference is a convenience, not a requirement.
     }
-    setShowFooterCostState(value);
+    setShowFooterCost(value);
   }, []);
 
-  return { showFooterCost, setShowFooterCost };
+  return { showFooterCost, setShowFooterCost: persistShowFooterCost };
 }

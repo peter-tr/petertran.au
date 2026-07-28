@@ -159,7 +159,7 @@ interface WarmScheduleResponse {
 }
 
 export function useWarmSchedule() {
-  const [config, setConfigState] = useState<WarmScheduleConfig | null>(null);
+  const [config, setConfig] = useState<WarmScheduleConfig | null>(null);
   const [costs, setCosts] = useState<WarmScheduleCosts | null>(null);
   const [profiles, setProfiles] = useState<WarmScheduleProfiles | null>(null);
   const [reactive, setReactive] = useState<WarmScheduleReactive | null>(null);
@@ -212,7 +212,7 @@ export function useWarmSchedule() {
     return fetch(ENDPOINT)
       .then((res) => res.json())
       .then((data: WarmScheduleResponse) => {
-        setConfigState(data.schedules);
+        setConfig(data.schedules);
         setCosts(data.costs);
         setProfiles(data.profiles);
         setReactive(data.reactive);
@@ -243,7 +243,7 @@ export function useWarmSchedule() {
         body: JSON.stringify({ schedules }),
       });
       const data: WarmScheduleResponse = await res.json();
-      setConfigState(data.schedules);
+      setConfig(data.schedules);
       setCosts(data.costs);
       setProfiles(data.profiles);
       setReactive(data.reactive);
@@ -270,7 +270,7 @@ export function useWarmSchedule() {
           // Unlike saveAll, "apply" can change every project's schedule at
           // once, so the whole config is replaced wholesale rather than
           // merged one key at a time.
-          setConfigState(data.schedules);
+          setConfig(data.schedules);
           setCosts(data.costs);
           setProfiles(data.profiles);
           setReactive(data.reactive);
