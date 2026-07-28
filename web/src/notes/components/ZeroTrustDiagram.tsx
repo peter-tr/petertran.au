@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { FaDisplay, FaShieldHalved, FaKey, FaLock, FaServer } from "react-icons/fa6";
 
-function NodeIcon({ x, y, children }: { x: number; y: number; children: ReactNode }) {
+function NodeIcon({ x, y, children }: Readonly<{ x: number; y: number; children: ReactNode }>) {
   return (
     <g transform={`translate(${x}, ${y})`} className="arch-node-icon">
       {children}

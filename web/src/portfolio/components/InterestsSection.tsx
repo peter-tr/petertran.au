@@ -1,7 +1,7 @@
 import Section from "./Section";
 import type { Interests } from "../lib/types";
 
-export default function InterestsSection({ interests }: { interests: Interests }) {
+export default function InterestsSection({ interests }: Readonly<{ interests: Interests }>) {
   return (
     <Section id="interests" typeName="Interests">
       <div className="skill-row">

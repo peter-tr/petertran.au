@@ -28,36 +28,44 @@ interface LocationState {
   prefillNames?: string[];
 }
 
-export default function ImposterSetup() {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const prefillNames = (location.state as LocationState | null)?.prefillNames;
+// Only the built-in word source sends a picked category id; AI games leave it
+// off entirely and (optionally) send a free-text theme instead.
+function categoryIdFor(wordSource: ImposterWordSource, categoryId: string | null): string | null | undefined {
+  return wordSource === ImposterWordSource.Builtin ? categoryId : undefined;
+}
 
-  const [categories, setCategories] = useState<ImposterCategory[] | null>(null);
-  const [categoriesError, setCategoriesError] = useState<string | null>(null);
-  const [wordSource, setWordSource] = useState<ImposterWordSource>(ImposterWordSource.Builtin);
-  const [categoryId, setCategoryId] = useState<string | null>(null);
-  const [aiThemeMode, setAiThemeMode] = useState<"surprise" | "custom">("surprise");
-  const [customCategory, setCustomCategory] = useState("");
+// A custom AI theme is only sent when the AI source is selected *and* the
+// player actually typed one - a blank box means "surprise me" either way.
+function customCategoryFor(
+  wordSource: ImposterWordSource,
+  aiThemeMode: "surprise" | "custom",
+  customCategory: string
+): string | undefined {
+  if (wordSource !== ImposterWordSource.Ai || aiThemeMode !== "custom") return undefined;
+
+  return customCategory.trim() || undefined;
+}
+
+function errorMessage(err: unknown, fallback: string): string {
+  return err instanceof Error ? err.message : fallback;
+}
+
+// This form is a stack of pick-one button rows that all share the same base
+// class and "active" modifier - one named helper instead of the same
+// `? "active" : ""` ternary inlined at all eleven of them.
+function categoryBtnClass(active: boolean): string {
+  return active ? "imposter-category-btn active" : "imposter-category-btn";
+}
+
+// The player roster and the imposter-count stepper are one self-contained
+// bundle of state - the list drives how many imposters are even allowed - so
+// they live here rather than inline in the component, which keeps the roster
+// rules readable on their own and out of the setup form's own complexity.
+function usePlayerSetup(prefillNames: string[] | undefined) {
   const [names, setNames] = useState<string[]>(prefillNames?.length ? prefillNames : ["", "", ""]);
   const [imposterCount, setImposterCount] = useState(1);
   const [imposterCountNotice, setImposterCountNotice] = useState<string | null>(null);
   const [playerListNotice, setPlayerListNotice] = useState<string | null>(null);
-  const [hintEnabled, setHintEnabled] = useState(true);
-  const [difficulty, setDifficulty] = useState<ImposterDifficulty>(ImposterDifficulty.Normal);
-  const [hideCategory, setHideCategory] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [showAbout, setShowAbout] = useState(false);
-
-  useEffect(() => {
-    runImposterQuery<ImposterCategoriesResult>(IMPOSTER_CATEGORIES_QUERY)
-      .then((res) => {
-        setCategories(res.imposterCategories);
-        setCategoryId((current) => current ?? res.imposterCategories[0]?.id ?? null);
-      })
-      .catch((err) => setCategoriesError(err instanceof Error ? err.message : "Failed to load categories"));
-  }, []);
 
   // Blank fields default to "Player N" rather than being dropped, so the
   // game can start without everyone having typed a name yet.
@@ -117,6 +125,66 @@ export default function ImposterSetup() {
     setImposterCount(effectiveImposterCount + 1);
   }
 
+  function decrementImposterCount() {
+    setImposterCountNotice(null);
+    setImposterCount(Math.max(1, effectiveImposterCount - 1));
+  }
+
+  return {
+    names,
+    effectiveNames,
+    effectiveImposterCount,
+    imposterCountNotice,
+    playerListNotice,
+    updateName,
+    addPlayer,
+    removePlayer,
+    clearNames,
+    incrementImposterCount,
+    decrementImposterCount,
+  };
+}
+
+export default function ImposterSetup() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const prefillNames = (location.state as LocationState | null)?.prefillNames;
+
+  const [categories, setCategories] = useState<ImposterCategory[] | null>(null);
+  const [categoriesError, setCategoriesError] = useState<string | null>(null);
+  const [wordSource, setWordSource] = useState<ImposterWordSource>(ImposterWordSource.Builtin);
+  const [categoryId, setCategoryId] = useState<string | null>(null);
+  const [aiThemeMode, setAiThemeMode] = useState<"surprise" | "custom">("surprise");
+  const [customCategory, setCustomCategory] = useState("");
+  const [hintEnabled, setHintEnabled] = useState(true);
+  const [difficulty, setDifficulty] = useState<ImposterDifficulty>(ImposterDifficulty.Normal);
+  const [hideCategory, setHideCategory] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showAbout, setShowAbout] = useState(false);
+  const {
+    names,
+    effectiveNames,
+    effectiveImposterCount,
+    imposterCountNotice,
+    playerListNotice,
+    updateName,
+    addPlayer,
+    removePlayer,
+    clearNames,
+    incrementImposterCount,
+    decrementImposterCount,
+  } = usePlayerSetup(prefillNames);
+
+  useEffect(() => {
+    runImposterQuery<ImposterCategoriesResult>(IMPOSTER_CATEGORIES_QUERY)
+      .then((res) => {
+        setCategories(res.imposterCategories);
+        setCategoryId((current) => current ?? res.imposterCategories[0]?.id ?? null);
+      })
+      .catch((err) => setCategoriesError(errorMessage(err, "Failed to load categories")));
+  }, []);
+
   const canSubmit =
     !submitting &&
     names.length >= MIN_PLAYERS &&
@@ -131,11 +199,8 @@ export default function ImposterSetup() {
     try {
       const res = await runImposterQuery<CreateImposterGameResult>(CREATE_IMPOSTER_GAME_MUTATION, {
         wordSource,
-        categoryId: wordSource === ImposterWordSource.Builtin ? categoryId : undefined,
-        customCategory:
-          wordSource === ImposterWordSource.Ai && aiThemeMode === "custom"
-            ? customCategory.trim() || undefined
-            : undefined,
+        categoryId: categoryIdFor(wordSource, categoryId),
+        customCategory: customCategoryFor(wordSource, aiThemeMode, customCategory),
         playerNames: effectiveNames,
         imposterCount: effectiveImposterCount,
         hintEnabled,
@@ -150,7 +215,7 @@ export default function ImposterSetup() {
       });
       navigate(`/imposter/${res.createImposterGame.gameId}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't start the game - please try again.");
+      setError(errorMessage(err, "Couldn't start the game - please try again."));
       setSubmitting(false);
     }
   }
@@ -159,7 +224,7 @@ export default function ImposterSetup() {
     <>
       <header className="imposter-head imposter-head-row">
         <h1>
-          Imposter
+          <span>Imposter</span>
           <button
             type="button"
             className="imposter-info-btn"
@@ -194,14 +259,14 @@ export default function ImposterSetup() {
           <div className="imposter-category-grid">
             <button
               type="button"
-              className={`imposter-category-btn ${wordSource === ImposterWordSource.Builtin ? "active" : ""}`}
+              className={categoryBtnClass(wordSource === ImposterWordSource.Builtin)}
               onClick={() => setWordSource(ImposterWordSource.Builtin)}
             >
               Built-in category
             </button>
             <button
               type="button"
-              className={`imposter-category-btn ${wordSource === ImposterWordSource.Ai ? "active" : ""}`}
+              className={categoryBtnClass(wordSource === ImposterWordSource.Ai)}
               onClick={() => setWordSource(ImposterWordSource.Ai)}
             >
               AI-generated
@@ -220,7 +285,7 @@ export default function ImposterSetup() {
                   <button
                     key={cat.id}
                     type="button"
-                    className={`imposter-category-btn ${categoryId === cat.id ? "active" : ""}`}
+                    className={categoryBtnClass(categoryId === cat.id)}
                     onClick={() => setCategoryId(cat.id)}
                   >
                     {cat.label}
@@ -235,14 +300,14 @@ export default function ImposterSetup() {
             <div className="imposter-category-grid">
               <button
                 type="button"
-                className={`imposter-category-btn ${aiThemeMode === "surprise" ? "active" : ""}`}
+                className={categoryBtnClass(aiThemeMode === "surprise")}
                 onClick={() => setAiThemeMode("surprise")}
               >
                 Surprise me
               </button>
               <button
                 type="button"
-                className={`imposter-category-btn ${aiThemeMode === "custom" ? "active" : ""}`}
+                className={categoryBtnClass(aiThemeMode === "custom")}
                 onClick={() => setAiThemeMode("custom")}
               >
                 Custom theme
@@ -265,14 +330,14 @@ export default function ImposterSetup() {
           <div className="imposter-category-grid">
             <button
               type="button"
-              className={`imposter-category-btn ${!hideCategory ? "active" : ""}`}
+              className={categoryBtnClass(!hideCategory)}
               onClick={() => setHideCategory(false)}
             >
               Visible
             </button>
             <button
               type="button"
-              className={`imposter-category-btn ${hideCategory ? "active" : ""}`}
+              className={categoryBtnClass(hideCategory)}
               onClick={() => setHideCategory(true)}
             >
               Hidden
@@ -330,10 +395,7 @@ export default function ImposterSetup() {
             <button
               type="button"
               className="imposter-remove-btn"
-              onClick={() => {
-                setImposterCountNotice(null);
-                setImposterCount(Math.max(1, effectiveImposterCount - 1));
-              }}
+              onClick={decrementImposterCount}
               disabled={effectiveImposterCount <= 1}
               aria-label="Fewer imposters"
             >
@@ -357,14 +419,14 @@ export default function ImposterSetup() {
           <div className="imposter-category-grid">
             <button
               type="button"
-              className={`imposter-category-btn ${hintEnabled ? "active" : ""}`}
+              className={categoryBtnClass(hintEnabled)}
               onClick={() => setHintEnabled(true)}
             >
               Enabled
             </button>
             <button
               type="button"
-              className={`imposter-category-btn ${!hintEnabled ? "active" : ""}`}
+              className={categoryBtnClass(!hintEnabled)}
               onClick={() => setHintEnabled(false)}
             >
               Disabled
@@ -383,14 +445,14 @@ export default function ImposterSetup() {
             <div className="imposter-category-grid">
               <button
                 type="button"
-                className={`imposter-category-btn ${difficulty === ImposterDifficulty.Normal ? "active" : ""}`}
+                className={categoryBtnClass(difficulty === ImposterDifficulty.Normal)}
                 onClick={() => setDifficulty(ImposterDifficulty.Normal)}
               >
                 Normal
               </button>
               <button
                 type="button"
-                className={`imposter-category-btn ${difficulty === ImposterDifficulty.Hard ? "active" : ""}`}
+                className={categoryBtnClass(difficulty === ImposterDifficulty.Hard)}
                 onClick={() => setDifficulty(ImposterDifficulty.Hard)}
               >
                 Hard

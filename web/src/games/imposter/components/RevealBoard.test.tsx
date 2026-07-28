@@ -122,8 +122,8 @@ describe("RevealBoard", () => {
     fireEvent.click(screen.getByText("Tap to reveal your word"));
     await screen.findByText("Tiger");
 
-    // Close by clicking the backdrop (modal content itself stops propagation).
-    fireEvent.click(document.querySelector(".imposter-modal-backdrop")!);
+    // Close by clicking the scrim button that sits behind the modal content.
+    fireEvent.click(document.querySelector(".imposter-modal-scrim")!);
 
     expect(screen.getByText("Alice").closest("button")).toHaveClass("imposter-box-done");
     expect(onAllRevealed).not.toHaveBeenCalled();
@@ -145,7 +145,7 @@ describe("RevealBoard", () => {
     fireEvent.click(screen.getByText("Tap to reveal your word"));
     await screen.findByText("Tiger");
 
-    fireEvent.click(document.querySelector(".imposter-modal-backdrop")!);
+    fireEvent.click(document.querySelector(".imposter-modal-scrim")!);
 
     expect(onAllRevealed).toHaveBeenCalledWith(expect.objectContaining({ phase: "DISCUSSION" }));
   });

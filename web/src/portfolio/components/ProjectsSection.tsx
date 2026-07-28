@@ -1,7 +1,7 @@
 import Section from "./Section";
 import type { Project } from "../lib/types";
 
-export default function ProjectsSection({ projects }: { projects: Project[] }) {
+export default function ProjectsSection({ projects }: Readonly<{ projects: Project[] }>) {
   return (
     <Section id="projects" typeName="Project">
       {projects.map((project) => (

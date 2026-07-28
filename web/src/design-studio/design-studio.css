@@ -560,6 +560,12 @@
   display: flex;
   align-items: center;
   gap: 0.3rem;
+  /* Rendered as a <fieldset> (native grouping semantics) - strip its default
+     border/padding/min-width so it lays out exactly like the <div> it was. */
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
 }
 
 /* Stacked -/%/+ to match the vertical rail around it, rather than staying a
@@ -920,6 +926,22 @@
 .design-studio-layer-row.selected {
   border-color: var(--type);
   background: var(--panel-2);
+}
+
+/* The row's own click target - a real <button> stretched across everything
+   left of the per-layer action buttons, styled to disappear into the row. */
+.design-studio-layer-select {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
 }
 
 .design-studio-layer-label {

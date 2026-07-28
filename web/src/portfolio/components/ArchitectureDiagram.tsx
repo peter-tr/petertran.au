@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { FaAws, FaCarrot, FaDisplay, FaGlobe, FaMasksTheater, FaPalette } from "react-icons/fa6";
 import { SiAnthropic, SiApollographql, SiGithubactions, SiTypescript } from "react-icons/si";
 
-function NodeIcon({ x, y, children }: { x: number; y: number; children: ReactNode }) {
+function NodeIcon({ x, y, children }: Readonly<{ x: number; y: number; children: ReactNode }>) {
   return (
     <g transform={`translate(${x}, ${y})`} className="arch-node-icon">
       {children}
@@ -25,7 +25,7 @@ function ExternalProjectNode({
   icon,
   label,
   path,
-}: {
+}: Readonly<{
   to: string;
   x: number;
   y: number;
@@ -34,7 +34,7 @@ function ExternalProjectNode({
   icon: ReactNode;
   label: string;
   path: string;
-}) {
+}>) {
   const centerX = x + width / 2;
   const centerY = y + height / 2;
 

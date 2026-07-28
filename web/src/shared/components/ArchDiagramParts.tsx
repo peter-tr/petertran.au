@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { FaAws, FaDisplay } from "react-icons/fa6";
 import { SiGithubactions, SiTypescript } from "react-icons/si";
 
-export function NodeIcon({ x, y, children }: { x: number; y: number; children: ReactNode }) {
+export function NodeIcon({ x, y, children }: Readonly<{ x: number; y: number; children: ReactNode }>) {
   return (
     <g transform={`translate(${x}, ${y})`} className="arch-node-icon">
       {children}
@@ -17,7 +17,7 @@ export function NodeIcon({ x, y, children }: { x: number; y: number; children: R
 // project-specific fan-out in between differs. Pulled out here once each
 // project's own diagram component started reproducing this same chrome
 // byte-for-byte (see PantryArchitectureDiagram/DesignStudioArchitectureDiagram).
-export function ArchArrowMarker({ id }: { id: string }) {
+export function ArchArrowMarker({ id }: Readonly<{ id: string }>) {
   return (
     <defs>
       <marker
@@ -52,7 +52,7 @@ export function BrowserNode() {
 // `arrowId` matches whichever <marker id="..."> the calling diagram's own
 // <ArchArrowMarker> defined - SVG marker ids must be unique per document, so
 // each diagram mints its own rather than sharing one.
-export function ProvisioningEdges({ arrowId }: { arrowId: string }) {
+export function ProvisioningEdges({ arrowId }: Readonly<{ arrowId: string }>) {
   return (
     <>
       <line x1="585" y1="390" x2="585" y2="330" className="arch-edge" markerEnd={`url(#${arrowId})`} />

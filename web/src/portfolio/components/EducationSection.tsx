@@ -7,10 +7,10 @@ import type { Education, Program } from "../lib/types";
 export default function EducationSection({
   education,
   programs,
-}: {
+}: Readonly<{
   education: Education[];
   programs: Program[];
-}) {
+}>) {
   const { isCollapsed, toggle } = useCollapsedKeys();
 
   return (

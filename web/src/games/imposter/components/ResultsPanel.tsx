@@ -11,7 +11,7 @@ interface ResultsPanelProps {
 // would have to delete before typing their own name.
 const GENERIC_NAME_PATTERN = /^Player \d+$/;
 
-export default function ResultsPanel({ game }: ResultsPanelProps) {
+export default function ResultsPanel({ game }: Readonly<ResultsPanelProps>) {
   const navigate = useNavigate();
   const imposterIds = new Set(game.imposterPlayerIds ?? []);
   const imposters = game.players.filter((p) => imposterIds.has(p.id));

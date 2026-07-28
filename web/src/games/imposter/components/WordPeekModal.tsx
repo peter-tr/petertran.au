@@ -12,7 +12,12 @@ interface WordPeekModalProps {
 // revealed (discussion screen, or re-tapping a done card on the reveal
 // board). revealImposterWord is idempotent for an already-revealed player,
 // so this is just a replay of the same call -- no separate query needed.
-export default function WordPeekModal({ gameId, playerId, playerName, onClose }: WordPeekModalProps) {
+export default function WordPeekModal({
+  gameId,
+  playerId,
+  playerName,
+  onClose,
+}: Readonly<WordPeekModalProps>) {
   const [word, setWord] = useState<string | null>(null);
   const [isImposter, setIsImposter] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -38,8 +43,12 @@ export default function WordPeekModal({ gameId, playerId, playerName, onClose }:
   }
 
   return (
-    <div className="imposter-modal-backdrop" onClick={onClose}>
-      <div className="imposter-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="imposter-modal-backdrop">
+      {/* A real button rather than a click handler on the backdrop itself, so
+          dismissing works from the keyboard and the modal's own controls
+          aren't nested inside the dismiss target. */}
+      <button type="button" className="imposter-modal-scrim" aria-label="Close" onClick={onClose} />
+      <div className="imposter-modal">
         <p className="imposter-modal-name">{playerName}</p>
         {!revealed ? (
           <>

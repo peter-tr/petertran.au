@@ -54,7 +54,7 @@ export default function Gallery() {
     <div className="design-studio-gallery">
       <header className="design-studio-gallery-head">
         <h1>
-          Design Studio
+          <span>Design Studio</span>
           <button
             type="button"
             className="design-studio-info-btn"
@@ -135,7 +135,7 @@ export default function Gallery() {
       {showCustomForm && (
         <div className="design-studio-custom-size-form">
           <label>
-            Width
+            <span>Width</span>
             <input
               type="number"
               min={CUSTOM_SIZE_MIN}
@@ -146,7 +146,7 @@ export default function Gallery() {
             />
           </label>
           <label>
-            Height
+            <span>Height</span>
             <input
               type="number"
               min={CUSTOM_SIZE_MIN}

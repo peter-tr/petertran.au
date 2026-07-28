@@ -14,7 +14,11 @@ interface RevealBoardProps {
   onAllRevealed: (game: ImposterGame) => void;
 }
 
-export default function RevealBoard({ gameId, players: playersProp, onAllRevealed }: RevealBoardProps) {
+export default function RevealBoard({
+  gameId,
+  players: playersProp,
+  onAllRevealed,
+}: Readonly<RevealBoardProps>) {
   // Ids revealed by this device but not yet reflected in the server's props
   // (the parent only polls every few seconds) - merged in below at render
   // time so a mid-modal reveal, including the very last one, never causes
@@ -80,6 +84,10 @@ export default function RevealBoard({ gameId, players: playersProp, onAllReveale
     }
   }
 
+  let revealButtonLabel = "Tap to reveal your word";
+  if (revealing) revealButtonLabel = "Revealing…";
+  else if (openPlayer?.hasRevealed) revealButtonLabel = "Tap to view your word again";
+
   return (
     <div className="imposter-board-wrap">
       <Link to="/imposter" className="imposter-back-link">
@@ -110,8 +118,12 @@ export default function RevealBoard({ gameId, players: playersProp, onAllReveale
       </div>
 
       {openPlayer && (
-        <div className="imposter-modal-backdrop" onClick={closeModal}>
-          <div className="imposter-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="imposter-modal-backdrop">
+          {/* A real button rather than a click handler on the backdrop itself,
+              so dismissing works from the keyboard and the modal's own
+              controls aren't nested inside the dismiss target. */}
+          <button type="button" className="imposter-modal-scrim" aria-label="Close" onClick={closeModal} />
+          <div className="imposter-modal">
             <p className="imposter-modal-name">{openPlayer.name}</p>
             {!revealed ? (
               <>
@@ -120,11 +132,7 @@ export default function RevealBoard({ gameId, players: playersProp, onAllReveale
                 </p>
                 {error && <p className="status-line">// {error}</p>}
                 <button className="run-btn" type="button" onClick={handleReveal} disabled={revealing}>
-                  {revealing
-                    ? "Revealing…"
-                    : openPlayer.hasRevealed
-                      ? "Tap to view your word again"
-                      : "Tap to reveal your word"}
+                  {revealButtonLabel}
                 </button>
               </>
             ) : (
