@@ -282,12 +282,6 @@ export default function ArchitectureDiagram() {
         </text>
       </g>
 
-      {/* caption for the sibling-project cluster below - sits in the gap
-          between RUM and Design Studio since neither node needs the space */}
-      <text x="880" y="94" className="arch-edge-label">
-        not federated - click to open
-      </text>
-
       {/* CloudFront */}
       <g>
         <rect x="20" y="110" width="230" height="60" rx="8" className="arch-node arch-node-edge" />
