@@ -26,7 +26,12 @@ const DEFAULT_CONFIG = {
   zeroTrustLab: DEFAULT_SCHEDULE,
 };
 
-const NO_COST: ProjectCost = { liveConcurrency: 0, liveHourlyCostUsd: 0, scheduledMonthlyCostUsd: 0 };
+const NO_COST: ProjectCost = {
+  liveConcurrency: 0,
+  liveHourlyCostUsd: 0,
+  scheduledMonthlyCostUsd: 0,
+  last24hCostUsd: 0,
+};
 const DEFAULT_COSTS = {
   portfolio: NO_COST,
   pantry: NO_COST,
@@ -59,6 +64,7 @@ describe("useWarmSchedule", () => {
     vi.resetModules();
     vi.unstubAllEnvs();
     vi.stubGlobal("fetch", vi.fn());
+    localStorage.clear();
   });
 
   it("reports unavailable and never fetches when no endpoint is configured", async () => {
@@ -200,6 +206,42 @@ describe("useWarmSchedule", () => {
 
     const lastCall = (fetch as ReturnType<typeof vi.fn>).mock.calls.at(-1)!;
     expect(JSON.parse(lastCall[1].body)).toEqual({ action: "checkColdStarts", windowMinutes: 10 });
+  });
+
+  it("persists the window selection to localStorage and a later mount picks it up", async () => {
+    vi.stubEnv("VITE_WARM_SCHEDULE_ENDPOINT", "https://api.test/warm-schedule");
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue(mockColdStartCheckResponse());
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      json: async () => ({
+        schedules: DEFAULT_CONFIG,
+        costs: DEFAULT_COSTS,
+        profiles: NO_PROFILES,
+        reactive: DEFAULT_REACTIVE,
+      }),
+    });
+
+    const { useWarmSchedule } = await import("./useWarmSchedule");
+
+    const first = renderHook(() => useWarmSchedule());
+    await waitFor(() => expect(first.result.current.checkingColdStarts).toBe(false));
+
+    act(() => first.result.current.setColdStartWindowMinutes(60));
+    expect(localStorage.getItem("portfolio:coldStartWindowMinutes")).toBe("60");
+
+    const second = renderHook(() => useWarmSchedule());
+    expect(second.result.current.coldStartWindowMinutes).toBe(60);
+  });
+
+  it("ignores a corrupt/out-of-range stored window and falls back to the 24h default", async () => {
+    vi.stubEnv("VITE_WARM_SCHEDULE_ENDPOINT", "https://api.test/warm-schedule");
+    localStorage.setItem("portfolio:coldStartWindowMinutes", "999");
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue(mockColdStartCheckResponse());
+
+    const { useWarmSchedule } = await import("./useWarmSchedule");
+
+    const { result } = renderHook(() => useWarmSchedule());
+
+    expect(result.current.coldStartWindowMinutes).toBe(1440);
   });
 
   it("surfaces a cold start check failure independently of the general error", async () => {

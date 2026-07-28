@@ -61,6 +61,13 @@ export default function WarmScheduleProject({
 
   return (
     <div className="warm-schedule">
+      <p className="warm-schedule-name">{label}</p>
+
+      {/* Two independent toggles, not a master switch + sub-option - either
+          can be on/off regardless of the other, so each gets its own
+          self-contained label describing exactly what it does rather than
+          the project name living inside just the first one (which used to
+          read as "this switch is the project, the one below is secondary"). */}
       <label className="form-label form-checkbox-label" htmlFor={`warm-schedule-${fn}-enabled`}>
         <input
           id={`warm-schedule-${fn}-enabled`}
@@ -69,10 +76,10 @@ export default function WarmScheduleProject({
           disabled={disabled}
           onChange={(e) => onChange({ ...draft, enabled: e.target.checked })}
         />{" "}
-        {label}
+        Warm on a schedule
       </label>
 
-      <label className="form-label" htmlFor={`warm-schedule-${fn}-reactive`}>
+      <label className="form-label form-checkbox-label" htmlFor={`warm-schedule-${fn}-reactive`}>
         <input
           id={`warm-schedule-${fn}-reactive`}
           type="checkbox"
@@ -80,7 +87,8 @@ export default function WarmScheduleProject({
           disabled={disabled}
           onChange={(e) => onChange({ ...draft, reactiveEnabled: e.target.checked })}
         />{" "}
-        Also warm for 1hr after a real cold start
+        Warm for 1hr after a real cold start (independent of the toggle above - works whether that&apos;s on
+        or off)
       </label>
 
       <div className="warm-schedule-days">
@@ -147,7 +155,8 @@ export default function WarmScheduleProject({
           {cost.liveConcurrency > 0
             ? `Currently ${cost.liveConcurrency} warm instance${cost.liveConcurrency === 1 ? "" : "s"} ($${cost.liveHourlyCostUsd.toFixed(4)}/hr)`
             : "Currently cold (no PC active)"}{" "}
-          · ~${cost.scheduledMonthlyCostUsd.toFixed(2)}/mo if this schedule runs as set
+          · ~${cost.scheduledMonthlyCostUsd.toFixed(2)}/mo if this schedule runs as set · ~$
+          {cost.last24hCostUsd.toFixed(2)} est. last 24h
           {reactiveStatus?.active &&
             reactiveStatus.until &&
             ` · reactively warm until ${new Date(reactiveStatus.until).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`}
