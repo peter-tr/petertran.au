@@ -63,6 +63,13 @@ function categoryBtnClass(active: boolean): string {
 // rules readable on their own and out of the setup form's own complexity.
 function usePlayerSetup(prefillNames: string[] | undefined) {
   const [names, setNames] = useState<string[]>(prefillNames?.length ? prefillNames : ["", "", ""]);
+  // Player rows have no identity beyond their slot in the roster, so a
+  // stable id per slot is generated once here (not derived from `names`,
+  // which changes on every keystroke) purely for React's list `key` - keeps
+  // each row's own DOM/focus state pinned to its slot when a player is
+  // removed from the middle of the list, rather than shifting onto the
+  // wrong row the way an index key would.
+  const [rowIds, setRowIds] = useState<string[]>(() => names.map(() => crypto.randomUUID()));
   const [imposterCount, setImposterCount] = useState(1);
   const [imposterCountNotice, setImposterCountNotice] = useState<string | null>(null);
   const [playerListNotice, setPlayerListNotice] = useState<string | null>(null);
@@ -88,6 +95,7 @@ function usePlayerSetup(prefillNames: string[] | undefined) {
     }
     setPlayerListNotice(null);
     setNames((prev) => [...prev, ""]);
+    setRowIds((prev) => [...prev, crypto.randomUUID()]);
   }
 
   function removePlayer(index: number) {
@@ -99,6 +107,7 @@ function usePlayerSetup(prefillNames: string[] | undefined) {
     }
     setPlayerListNotice(null);
     setNames((prev) => prev.filter((_, i) => i !== index));
+    setRowIds((prev) => prev.filter((_, i) => i !== index));
   }
 
   function clearNames() {
@@ -132,6 +141,7 @@ function usePlayerSetup(prefillNames: string[] | undefined) {
 
   return {
     names,
+    rowIds,
     effectiveNames,
     effectiveImposterCount,
     imposterCountNotice,
@@ -164,6 +174,7 @@ export default function ImposterSetup() {
   const [showAbout, setShowAbout] = useState(false);
   const {
     names,
+    rowIds,
     effectiveNames,
     effectiveImposterCount,
     imposterCountNotice,
@@ -367,7 +378,7 @@ export default function ImposterSetup() {
           </div>
           <div className="imposter-player-list">
             {names.map((name, i) => (
-              <div className="imposter-player-row" key={i}>
+              <div className="imposter-player-row" key={rowIds[i]}>
                 <input
                   className="form-input"
                   value={name}

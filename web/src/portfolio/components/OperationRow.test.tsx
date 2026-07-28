@@ -156,7 +156,7 @@ describe("OperationRow", () => {
 
     fireEvent.click(screen.getByText(/Resume/));
 
-    await screen.findByText(/trace fetch failed/);
+    expect(await screen.findByText(/trace fetch failed/)).toBeInTheDocument();
   });
 
   // Regression test for a bug where the `unmounted` ref was only ever set
