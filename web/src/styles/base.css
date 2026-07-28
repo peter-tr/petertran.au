@@ -360,6 +360,74 @@ a {
   opacity: 0.85;
 }
 
+/* A sibling project (Pantry, Design Studio, Imposter) linked from the
+   portfolio diagram - greyed out and dashed, like arch-node-infra, but its
+   own class since it means "separate deployment you can click through to"
+   rather than "AWS provisioning/observability". */
+.arch-node-external {
+  stroke: var(--muted-dim);
+  stroke-dasharray: 4 3;
+  opacity: 0.55;
+  transition: opacity 0.15s ease;
+}
+
+.arch-link {
+  cursor: pointer;
+}
+
+.arch-link:hover .arch-node-external,
+.arch-link:focus-visible .arch-node-external {
+  opacity: 0.9;
+}
+
+.arch-edge-secondary {
+  stroke: var(--muted-dim);
+  stroke-dasharray: 4 3;
+  opacity: 0.7;
+}
+
+.arch-arrowhead-muted {
+  fill: var(--muted-dim);
+  opacity: 0.7;
+}
+
+/* Browser is the one node every request in the portfolio diagram originates
+   from - called out with a brighter/thicker border, a small callout above
+   it, and a pulsing dot so it doesn't just blend in with the other
+   edge-tier (arch-node-edge) boxes like CloudFront/API Gateway/Route 53. */
+.arch-node-entry {
+  stroke-width: 2.5;
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--type) 55%, transparent));
+}
+
+.arch-entry-callout {
+  fill: var(--type);
+  font-size: 11px;
+  font-weight: 600;
+  text-anchor: middle;
+}
+
+.arch-entry-dot {
+  fill: var(--signal);
+  animation: arch-entry-pulse 2s ease-in-out infinite;
+}
+
+@keyframes arch-entry-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arch-entry-dot {
+    animation: none;
+  }
+}
+
 /* Shared by Footer.tsx (shared/components/Footer.tsx) across all
    projects' pages, not just portfolio's - lives here rather than
    portfolio.css so pantry/imposter pages don't need to pull in the whole
