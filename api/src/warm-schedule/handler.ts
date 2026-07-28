@@ -429,6 +429,7 @@ async function computeProjectCost(key: WarmScheduleKey, schedule: WarmSchedule):
     scheduledHourlyCostUsd +=
       scheduledMemoryGb * schedule.concurrency * PC_PRICE_PER_GB_SECOND_USD * SECONDS_PER_HOUR;
   }
+
   const scheduledMonthlyCostUsd = scheduledHourlyCostUsd * hoursPerWeek(schedule) * WEEKS_PER_MONTH;
 
   const last24hOnDemandCostUsd = await Promise.all(

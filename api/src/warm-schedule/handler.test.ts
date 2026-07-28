@@ -215,6 +215,7 @@ describe("warm-schedule handler - config GET/POST", () => {
 
   it("GET's last-24h cost combines real CloudWatch on-demand usage with an averaged share of the scheduled PC cost", async () => {
     ssmMock.on(GetParameterCommand).resolves({});
+
     const DAYS_PER_MONTH = (365.25 / 7 / 12) * 7;
     cloudwatchMock.on(GetMetricDataCommand).callsFake((input) => {
       const fnName = input.MetricDataQueries[0].MetricStat.Metric.Dimensions[0].Value;
@@ -248,8 +249,10 @@ describe("warm-schedule handler - config GET/POST", () => {
 
   it("GET's last-24h cost degrades to just the averaged PC share when a target's CloudWatch metrics query fails", async () => {
     ssmMock.on(GetParameterCommand).resolves({});
+
     const DAYS_PER_MONTH = (365.25 / 7 / 12) * 7;
     cloudwatchMock.on(GetMetricDataCommand).rejects(new Error("throttled"));
+
     const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
     const result = await handler(httpEvent("GET"));
