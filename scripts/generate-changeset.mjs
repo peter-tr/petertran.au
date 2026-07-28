@@ -52,15 +52,26 @@ if (hasChangeset) {
   process.exit(0);
 }
 
-const titleMatch = prTitle.match(/^(\w+)(\(([^)]+)\))?(!)?:\s*(.+)$/);
+// No "\s*" ahead of the final "(.+)$" - "." also matches whitespace, so
+// adjacent overlapping quantifiers there let a backtracking regex engine
+// try exponentially many ways to split the same run of spaces between the
+// two groups. Match the colon directly and trim the captured subject
+// instead - same result, no ambiguous split to backtrack over.
+const titleMatch = prTitle.match(/^(\w+)(\(([^)]+)\))?(!)?:(.+)$/);
 
 if (!titleMatch) {
   console.log(`PR title "${prTitle}" isn't Conventional Commits format - can't infer a bump.`);
   process.exit(0);
 }
 
-const [, type, , , breaking, subject] = titleMatch;
-const bump = breaking ? "major" : type === "feat" ? "minor" : "patch";
+const [, type, , , breaking, rawSubject] = titleMatch;
+const subject = rawSubject.trim();
+const bump = breaking ? "major" : bumpForType(type);
+
+function bumpForType(commitType) {
+  if (commitType === "feat") return "minor";
+  return "patch";
+}
 
 const frontmatter = [...touchedPackages].map((pkg) => `"${pkg}": ${bump}`).join("\n");
 const fileName = `.changeset/auto-${randomBytes(4).toString("hex")}.md`;

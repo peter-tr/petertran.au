@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { normalizeItemName, normalizeUnit } from "../lib/util/normalize";
 import type { InventoryItem } from "../services/inventory";
-import type { ShoppingListEntry } from "../services/shopping-list";
+import type { ShoppingListEntry, UpsertShoppingListEntryInput } from "../services/shopping-list";
 import type { PantrySettings } from "../services/settings";
 
 // In-memory mock store used only by dev/server.ts - no DynamoDB, no AWS
@@ -202,16 +202,17 @@ function createItem(input: AddInput): InventoryItem {
   };
 }
 
-function upsertShoppingListEntry(
-  name: string,
-  quantity: number | null,
-  unit: string | null,
-  note: string | null = null,
-  isStaple = false,
-  category: string | null = null,
-  recipeTag: string | null = null,
-  urgent = false
-): ShoppingListEntry {
+function upsertShoppingListEntry(input: UpsertShoppingListEntryInput): ShoppingListEntry {
+  const {
+    name,
+    quantity,
+    unit,
+    note = null,
+    isStaple = false,
+    category = null,
+    recipeTag = null,
+    urgent = false,
+  } = input;
   const normalizedUnit = unit ? normalizeUnit(unit) : null;
   const needle = normalizeItemName(name);
   const match = [...shoppingList.values()].find((e) => normalizeItemName(e.name) === needle);
@@ -245,9 +246,23 @@ function upsertShoppingListEntry(
   return entry;
 }
 
-upsertShoppingListEntry("Eggs", 1, "dozen", null, true, "Dairy", null, true);
-upsertShoppingListEntry("Bread", 1, "loaf", null, false, "Bread", null, false);
-upsertShoppingListEntry("Coffee", null, null, "The good beans, not the instant stuff", true, "Beverages");
+upsertShoppingListEntry({
+  name: "Eggs",
+  quantity: 1,
+  unit: "dozen",
+  isStaple: true,
+  category: "Dairy",
+  urgent: true,
+});
+upsertShoppingListEntry({ name: "Bread", quantity: 1, unit: "loaf", category: "Bread" });
+upsertShoppingListEntry({
+  name: "Coffee",
+  quantity: null,
+  unit: null,
+  note: "The good beans, not the instant stuff",
+  isStaple: true,
+  category: "Beverages",
+});
 
 interface MockProposedAction {
   type: string;
@@ -540,7 +555,13 @@ export const devResolvers = {
     removeInventoryItem: (_: unknown, args: { id: string }) => {
       const existing = items.get(args.id);
       if (existing?.isStaple) {
-        upsertShoppingListEntry(existing.name, null, null, null, true, existing.category);
+        upsertShoppingListEntry({
+          name: existing.name,
+          quantity: null,
+          unit: null,
+          isStaple: true,
+          category: existing.category,
+        });
       }
 
       return items.delete(args.id);
@@ -558,16 +579,16 @@ export const devResolvers = {
         urgent?: boolean | null;
       }
     ) =>
-      upsertShoppingListEntry(
-        args.name,
-        args.quantity ?? null,
-        args.unit ?? null,
-        args.note ?? null,
-        args.isStaple ?? false,
-        args.category ?? null,
-        args.recipeTag ?? null,
-        args.urgent ?? false
-      ),
+      upsertShoppingListEntry({
+        name: args.name,
+        quantity: args.quantity ?? null,
+        unit: args.unit ?? null,
+        note: args.note ?? null,
+        isStaple: args.isStaple ?? false,
+        category: args.category ?? null,
+        recipeTag: args.recipeTag ?? null,
+        urgent: args.urgent ?? false,
+      }),
     updateShoppingListEntry: (
       _: unknown,
       args: {

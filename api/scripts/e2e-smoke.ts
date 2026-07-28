@@ -1,5 +1,11 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { connect } from "node:net";
+import { fileURLToPath } from "node:url";
+
+// Resolved once via Node's module resolution (not a bare "tsx" PATH lookup)
+// so the child process is launched from a known absolute script path rather
+// than whatever "tsx" happens to resolve to on the current PATH.
+const tsxCliPath = fileURLToPath(import.meta.resolve("tsx/cli"));
 
 // Boots each service's real dev server (same in-memory mock used for local
 // `npm run dev:*`) and fires a couple of basic requests through the actual
@@ -86,12 +92,11 @@ async function runQuery(port: number, query: string): Promise<Record<string, unk
 }
 
 async function testService(service: ServiceCheck): Promise<void> {
-  // Bare "tsx", not "npx tsx" - npm already put node_modules/.bin on PATH
-  // for this script (it's invoked via `npm run test:e2e`), and going
-  // through npx again from inside a script npx itself launched added
-  // several seconds of resolution overhead per service, enough to blow
-  // past the waitForPort timeout below.
-  const child: ChildProcessWithoutNullStreams = spawn("tsx", [service.script], {
+  // process.execPath + the resolved tsx CLI script, not "npx tsx" - going
+  // through npx from inside a script npx itself launched added several
+  // seconds of resolution overhead per service, enough to blow past the
+  // waitForPort timeout below.
+  const child: ChildProcessWithoutNullStreams = spawn(process.execPath, [tsxCliPath, service.script], {
     stdio: "pipe",
   });
   let stderr = "";
@@ -142,4 +147,4 @@ async function main(): Promise<void> {
   console.log("[e2e] all services OK");
 }
 
-main();
+await main();

@@ -25,7 +25,9 @@ async function main() {
   process.exit(0);
 }
 
-main().catch((err) => {
+try {
+  await main();
+} catch (err) {
   console.error("[seed-templates] failed:", err);
   process.exit(1);
-});
+}

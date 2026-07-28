@@ -24,7 +24,13 @@ export function createCognitoAuthVerifier(config: CognitoAuthConfig) {
   // Never throws - a missing/expired/malformed token just means "treat this
   // request as unauthenticated" to the caller, not a hard failure.
   return async function verifyIdToken(authHeader: string | undefined): Promise<AuthenticatedUser | null> {
-    const token = authHeader?.match(/^Bearer\s+(.+)$/i)?.[1];
+    // A prefix match + slice, not `/^Bearer\s+(.+)$/i` - `\s` and `.` both
+    // match whitespace, so that pattern's adjacent quantifiers gave
+    // SonarQube's static analyzer a super-linear-backtracking flag (S8786).
+    // Same result for every real "Bearer <token>" header, and linear since
+    // there's no ambiguity for the engine to backtrack over.
+    const prefixMatch = authHeader?.match(/^Bearer\s+/i);
+    const token = prefixMatch ? authHeader!.slice(prefixMatch[0].length) : undefined;
     if (!token) return null;
 
     try {

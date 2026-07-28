@@ -99,6 +99,21 @@ export async function setShoppingListLastKnownPrice(
   await putShoppingListEntry(pk, { ...existing, lastKnownPrice: price });
 }
 
+// Bundles every upsertShoppingListEntry field beyond pk into one object so
+// the function stays under SonarQube's 7-parameter limit (S107) - the dev
+// mock counterpart in dev/dev-resolvers.ts takes the same shape (minus pk,
+// which it has no use for) to keep the two signatures consistent.
+export interface UpsertShoppingListEntryInput {
+  name: string;
+  quantity: number | null;
+  unit: string | null;
+  note?: string | null;
+  isStaple?: boolean;
+  category?: string | null;
+  recipeTag?: string | null;
+  urgent?: boolean;
+}
+
 // Used both automatically (a staple running out), manually (the "add to
 // shopping list" form), and by the AI command bar (plain commands and
 // missing recipe ingredients) - updates the existing entry's
@@ -106,15 +121,18 @@ export async function setShoppingListLastKnownPrice(
 // name, if one's already there.
 export async function upsertShoppingListEntry(
   pk: string,
-  name: string,
-  quantity: number | null,
-  unit: string | null,
-  note: string | null = null,
-  isStaple = false,
-  category: string | null = null,
-  recipeTag: string | null = null,
-  urgent = false
+  input: UpsertShoppingListEntryInput
 ): Promise<ShoppingListEntry> {
+  const {
+    name,
+    quantity,
+    unit,
+    note = null,
+    isStaple = false,
+    category = null,
+    recipeTag = null,
+    urgent = false,
+  } = input;
   const normalizedUnit = unit ? normalizeUnit(unit) : null;
   const existing = await getShoppingList(pk);
   const needle = normalizeItemName(name);
