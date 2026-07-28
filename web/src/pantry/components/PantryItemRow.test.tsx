@@ -59,7 +59,7 @@ describe("PantryItemRow (simple mode)", () => {
 
     expect(screen.getByText("Milk")).toBeInTheDocument();
     expect(screen.getByText("L")).toBeInTheDocument();
-    expect(screen.getByText("delete")).toBeInTheDocument();
+    expect(screen.getByLabelText("Delete Milk")).toBeInTheDocument();
     expect(screen.queryByTitle("Staple - always keep stocked")).not.toBeInTheDocument();
     expect(screen.queryByText("$4.00")).not.toBeInTheDocument();
   });

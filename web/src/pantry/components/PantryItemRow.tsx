@@ -144,8 +144,15 @@ export default function PantryItemRow({
             step={stepForUnit(item.unit)}
             disabled={busy}
           />
-          <button type="button" className="pantry-delete-btn" onClick={handleDelete} disabled={busy}>
-            delete
+          <button
+            type="button"
+            className="pantry-delete-btn"
+            onClick={handleDelete}
+            disabled={busy}
+            aria-label={`Delete ${item.name}`}
+            title="Delete"
+          >
+            ✕
           </button>
         </div>
       </li>

@@ -1345,9 +1345,24 @@
   gap: 0.6rem;
 }
 
+/* Higher specificity than the mobile media query's plain .pantry-item-name
+   and .pantry-item-controls rules below (which intentionally let the
+   detailed row's name wrap onto multiple lines on narrow screens) - simple
+   mode always wants exactly one line, so the name ellipsis-truncates and
+   the controls (unit/stepper/delete) never wrap, regardless of viewport. */
 .pantry-item-row-simple .pantry-item-name {
   cursor: default;
   border-bottom: none;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.pantry-item-row-simple .pantry-item-controls {
+  flex-shrink: 0;
+  flex-wrap: nowrap;
 }
 
 .pantry-delete-btn {
