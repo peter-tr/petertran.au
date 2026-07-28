@@ -11,6 +11,7 @@ import {
   type WarmSchedule,
 } from "./hooks/useWarmSchedule";
 import { useAlertsEnabled } from "./hooks/useAlertsEnabled";
+import { useCollapsedKeys } from "./hooks/useCollapsedKeys";
 import WarmScheduleProject from "./components/WarmScheduleProject";
 import WarmScheduleProfiles from "./components/WarmScheduleProfiles";
 import Footer from "../shared/components/Footer";
@@ -20,7 +21,7 @@ const WARM_SCHEDULE_LABELS: Record<WarmScheduleKey, string> = {
   portfolio: "portfolio",
   pantry: "pantry",
   imposter: "imposter",
-  supergraph: "supergraph (GraphQL gateway in front of the three above)",
+  supergraph: "supergraph",
   designStudio: "design-studio",
   zeroTrustLab: "zero-trust-lab (no real visitors - only speeds up your own testing of it)",
 };
@@ -88,6 +89,12 @@ export default function PortfolioSettingsPage() {
     setEnabled: setAlertsEnabled,
     available: alertsAvailable,
   } = useAlertsEnabled();
+  // In-memory only (same as ExperienceSection/EducationSection's own use of
+  // this hook) - keyed by each project's stable `fn` key, so Save/Refresh/
+  // profile actions (which replace warmScheduleConfig/Drafts with a fresh
+  // object) never reset which rows are expanded, since this state lives
+  // independently of that data.
+  const { isCollapsed: isWarmScheduleCollapsed, toggle: toggleWarmScheduleCollapsed } = useCollapsedKeys();
 
   return (
     <>
@@ -143,7 +150,8 @@ export default function PortfolioSettingsPage() {
             Keep warm with provisioned concurrency (Sydney time) - no cold starts for real visitors during the
             window you set below. Prices below are live, from each project's real Lambda memory size and
             currently-allocated provisioned concurrency. Each project can also opt in to warming reactively
-            for 1hr after a real cold start, on top of (or instead of) the scheduled window.
+            for 1hr after a real cold start - independent of the scheduled window, so it works whether that's
+            on or off.
           </p>
           <WarmScheduleProfiles
             profiles={warmScheduleProfiles}
@@ -186,6 +194,8 @@ export default function PortfolioSettingsPage() {
                 coldStart={warmScheduleColdStarts?.[fn]}
                 coldStartWindowLabel={coldStartWindowLabel}
                 disabled={warmScheduleSaving}
+                collapsed={isWarmScheduleCollapsed(fn)}
+                onToggleCollapsed={() => toggleWarmScheduleCollapsed(fn)}
               />
             ))}
           {warmScheduleCosts && (
