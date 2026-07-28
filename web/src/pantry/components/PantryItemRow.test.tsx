@@ -280,7 +280,13 @@ describe("PantryItemRow (full mode)", () => {
   it("opens the edit modal when the name is clicked", () => {
     render(
       <ul>
-        <PantryItemRow item={makeItem({ name: "Milk" })} simple={false} nerdMode={false} categories={[]} {...noop} />
+        <PantryItemRow
+          item={makeItem({ name: "Milk" })}
+          simple={false}
+          nerdMode={false}
+          categories={[]}
+          {...noop}
+        />
       </ul>
     );
 
@@ -334,5 +340,4 @@ describe("PantryItemRow (full mode)", () => {
     );
     expect(screen.getByText(/\$0\.0100/)).toBeInTheDocument();
   });
-
 });
