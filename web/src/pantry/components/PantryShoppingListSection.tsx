@@ -244,22 +244,14 @@ export default function PantryShoppingListSection({
             <div className="pantry-panel-header-controls">
               <div className="pantry-control-group">
                 <span className="pantry-control-label">Sort by</span>
-                <div className="pantry-view-tabs">
-                  <button
-                    type="button"
-                    className={`pantry-view-tab ${settings.shoppingSort !== "urgent" ? "active" : ""}`}
-                    onClick={() => onSettingsChange({ shoppingSort: "recent" })}
-                  >
-                    Recent
-                  </button>
-                  <button
-                    type="button"
-                    className={`pantry-view-tab ${settings.shoppingSort === "urgent" ? "active" : ""}`}
-                    onClick={() => onSettingsChange({ shoppingSort: "urgent" })}
-                  >
-                    Urgent
-                  </button>
-                </div>
+                <select
+                  className="pantry-category-filter"
+                  value={settings.shoppingSort === "urgent" ? "urgent" : "recent"}
+                  onChange={(e) => onSettingsChange({ shoppingSort: e.target.value })}
+                >
+                  <option value="recent">Recent</option>
+                  <option value="urgent">Urgent</option>
+                </select>
               </div>
               <div className="pantry-control-group">
                 <span className="pantry-control-label">Show</span>

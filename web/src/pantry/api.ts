@@ -262,6 +262,7 @@ const SETTINGS_FIELDS = /* GraphQL */ `
     optionsCollapsed
     collapsedGroups
     commonItems
+    inventoryListCollapsed
     shoppingListCollapsed
     showLowPriority
     categoryFilter

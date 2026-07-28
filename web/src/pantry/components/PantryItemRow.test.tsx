@@ -277,43 +277,21 @@ describe("PantryItemRow (full mode)", () => {
     expect(historyItems[1]).toHaveTextContent("2026-01-01");
   });
 
-  it("commits a renamed, trimmed name on blur, but not when unchanged or empty", () => {
-    mockRunPantryQuery.mockResolvedValue({ updateInventoryItem: makeItem() });
-
-    const item = makeItem({ name: "Milk" });
+  it("opens the edit modal when the name is clicked", () => {
     render(
       <ul>
-        <PantryItemRow item={item} simple={false} nerdMode={false} categories={[]} {...noop} />
+        <PantryItemRow
+          item={makeItem({ name: "Milk" })}
+          simple={false}
+          nerdMode={false}
+          categories={[]}
+          {...noop}
+        />
       </ul>
     );
 
-    fireEvent.click(screen.getByTitle("Click to rename"));
-
-    const input = screen.getByDisplayValue("Milk");
-    fireEvent.change(input, { target: { value: "  Oat Milk  " } });
-    fireEvent.blur(input);
-
-    expect(mockRunPantryQuery).toHaveBeenCalledWith(expect.stringContaining("UpdateInventoryItem"), {
-      id: "item-1",
-      input: { name: "Oat Milk" },
-    });
-  });
-
-  it("does not save a rename when the trimmed name is unchanged", () => {
-    const item = makeItem({ name: "Milk" });
-    render(
-      <ul>
-        <PantryItemRow item={item} simple={false} nerdMode={false} categories={[]} {...noop} />
-      </ul>
-    );
-
-    fireEvent.click(screen.getByTitle("Click to rename"));
-
-    const input = screen.getByDisplayValue("Milk");
-    fireEvent.change(input, { target: { value: "  Milk  " } });
-    fireEvent.blur(input);
-
-    expect(mockRunPantryQuery).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTitle("Click to edit"));
+    expect(screen.getByText("Edit item")).toBeInTheDocument();
   });
 
   it("shows a Coles link only when trackPrice is set and a link is derivable", () => {
@@ -361,16 +339,5 @@ describe("PantryItemRow (full mode)", () => {
       </ul>
     );
     expect(screen.getByText(/\$0\.0100/)).toBeInTheDocument();
-  });
-
-  it("opens the edit modal from the edit button", () => {
-    render(
-      <ul>
-        <PantryItemRow item={makeItem()} simple={false} nerdMode={false} categories={["Dairy"]} {...noop} />
-      </ul>
-    );
-
-    fireEvent.click(screen.getByText("edit"));
-    expect(screen.getByText("Edit item")).toBeInTheDocument();
   });
 });
