@@ -1,5 +1,48 @@
 # web
 
+## 1.7.0
+
+### Minor Changes
+
+- 56caa75: Design Studio: delete a custom template (seed templates stay protected), the "Generate with AI" panel now replaces the Layers/Properties column instead of rendering below the fold, a fixed category list replaces free-text "Save as template" categories, saved designs show a header and a relative "edited Nm/h/d ago" time, the gallery's quick-create buttons get their own row, the settings/gallery cog and info/help buttons match pantry's pattern, and the settings page gets an architecture diagram with the MongoDB rationale.
+
+  Site-wide: imposter's page header now matches pantry/design-studio's compact style with the same "i" info button; the standalone nav's "studio" link is renamed "design-studio" and "notes" moved into the footer as "experiments"; the home page's "also built" note and its settings toggle now mention design-studio too; and settings checkboxes with long descriptions now keep the checkbox and wrapped text aligned in a column instead of wrapping flush against the page edge.
+
+- 8c1bc30: pantry now refetches inventory/shopping-list/settings immediately on sign in/out instead of requiring a page refresh; portfolio settings' cold-start lookback window is remembered per-browser instead of resetting to 24h; the warm-schedule editor renames "this resume site" to "portfolio", bolds each project's name, clarifies that the schedule and reactive-warm toggles are independent, and shows a last-24h cost estimate per project and as a page total
+
+### Patch Changes
+
+- f62588e: move AI panel back inline, fix portrait canvas alignment
+- 30cdbb6: rebalance portfolio architecture diagram, add sibling project links
+- 65b090d: resume-data bug, AI-panel dedup, canvas zoom, adaptive toolbar
+- 99b2b5d: fix a broken test suite and a state-sharing bug from the cold-start auto-run change
+
+  The previous PR's automatic cold-start-check effect shared one `error` state with the initial config-load effect - since both fire independently on mount, whichever settled last could silently overwrite the other's message. Split into a separate `coldStartError`, shown alongside the existing warm-schedule error on the settings page. Also fixes `useWarmSchedule.test.ts`, which mocked `fetch` call sequences that assumed only one fetch happens on mount - the new automatic cold-start check adds a second, independent one, which was shifting every subsequent mocked response by one and crashing `saveProfile`/`applyProfile`/`deleteProfile`/`saveAll` in tests (this should have been caught by `npm run test` before the prior PR merged, not after).
+
+- dbf5cb1: auto-run the warm-schedule settings page's cold start check, and make its lookback window configurable
+
+  The check across all 6 projects completes in a few seconds, so it now runs automatically (on page load and whenever the lookback window changes) instead of needing an explicit button click. The lookback window is now a picker (10 min / 1 hour / 24 hours) instead of a fixed 24h, via a new `windowMinutes` parameter on `warm-schedule`'s `checkColdStarts` action (validated against the same curated set on both sides, same "seeded in two places" convention as `MAX_CONCURRENCY`/`MEMORY_OPTIONS_MB`). No infra changes - this reuses the IAM grants and timeout bump already shipped in the initial cold-start-check PR.
+
+- b52171e: extract the shared architecture-diagram "chrome" (arrow marker, Browser/CDK/GitHub Actions node blocks, provisioning connectors) that PantryArchitectureDiagram and DesignStudioArchitectureDiagram had each been duplicating into a shared component; also refreshes local (darwin) visual-e2e baseline snapshots for the Hero and Imposter header changes shipped in #238.
+- 54c26a4: Design Studio: fixes the "i"/"h" info/help panel text hugging the left edge of the page instead of aligning under the header; replaces the "New Poster"/"New Presentation"/"New Resume" quick-create buttons (two of which were both landscape and only ~60px apart in height) with orientation-based "New Landscape"/"New Vertical"/"New Custom…" (custom prompts for width/height, since the canvas can't be resized after creation); adds a "← Design Studio" breadcrumb to the editor page; and raises the desktop-only default zoom fit ceiling so a typical design isn't rendered smaller than the available space allows (mobile's fit is unchanged).
+- 6066999: fix design-studio Gallery footer spanning the full viewport width instead of staying in the centered content column
+- 7387aa6: move Footer into shared/ and render it on every page, fixing a cross-project boundary crossing flagged by SonarCloud's Architecture graph
+- 38fa42e: Restore explicit assertions dropped by an earlier find*-query conversion (SonarCloud S2699, BLOCKER), and fix 3 smaller regressions surfaced by a fresh SonarCloud scan: Number.NaN over NaN, a useState pair that collided names with a wrapping setter, and a stable per-row key for the imposter player list instead of array index
+- 4cab523: Replace waitFor+getBy/queryBy with find* queries in several test files (SonarCloud S9020), and collapse 8 near-identical portfolio-query-allowlist rejection tests into a single parameterized it.each block (S9020/S5976 cleanup, test-only changes)
+- cc961ea: portfolio: keep the hero's "also built ..." line to one row on mobile and prevent "design-studio" from splitting mid-word when it does wrap
+- ac70e79: Simplifies pantry's sign-in/sign-up form - no more native browser email-format/required/minLength validation popups (Cognito's own SignUp/InitiateAuth error response already surfaces a real message for a bad email or short password, so the browser's native validation was just a redundant, worse-worded copy of that), and adds a short blurb explaining why you'd bother creating an account. Also shrinks Imposter's permanently-visible tagline from the site's larger marketing-page text size down to the same muted body-copy size pantry and design-studio already use, so all three standalone pages read consistently, especially on mobile.
+- cc961ea: pantry: turn inventory/shopping list group-by and sort-by controls into dropdowns, make clicking an inventory item's name open the edit modal (matching the shopping list), and use an X icon for the inventory delete button
+- cc961ea: pantry: add an Inventory show/hide toggle to match the shopping list, rename the "priority" grouping's "Needs attention" label to "Regular", and add a "Low stock first" sort option
+- 8cdf548: fix pantry sign-in inputs zooming in on mobile Safari when focused
+- 05400b3: keep pantry inventory simple-mode rows to one line on mobile (ellipsis-truncate long names, compact ✕ delete button)
+- 7d91212: fix SonarCloud accessibility, complexity, and React key issues across the pantry UI
+- edea494: add reactive Provisioned Concurrency: 1hr warm after a real cold start, opt-in per project from the portfolio settings page, alongside a live "reactively warm until" status readout
+- ecb0caa: refresh visual-e2e linux baseline snapshots to match current font rendering
+- c42c68e: remove the "warm pantry/imposter on page load" and "delay footer/stats queries" per-browser settings toggles - neither reliably helped in practice. Also drops the "built with AWS CDK · Lambda · DynamoDB · CloudFront" line from the footer.
+- caf7a9e: Remove the clearance line from the resume page header and tighten vertical whitespace between and within the resume's collapsible sections (Experience, Education, Projects, Skills, Interests).
+- d971f21: Resolve the SonarCloud findings across the web workspace (outside pantry): swap pseudo-interactive `<div>`/`<h1>`/`<li>` click targets for real buttons and ARIA `role="group"`/`role="img"` for `<fieldset>`/SVG `<title>`, mark every component's props `Readonly<...>`, extract nested ternaries and a nested template literal, give mapped lists stable keys, make `useState` pairs symmetric, and simplify `GraphQLCode`'s token regex plus the cognitive complexity of `formatQuery` and the imposter setup form. No user-facing behaviour change.
+- 0809087: warm-schedule editor: move the schedule toggle directly above the day/time editor it controls (with the reactive-warm toggle first), state the two toggles' independence once in the shared intro instead of on every row, hide the day/time editor entirely when a project's schedule is off, drop the "(GraphQL gateway in front of the three above)" aside from the supergraph label, and let each project row collapse/expand
+
 ## 1.6.0
 
 ### Minor Changes

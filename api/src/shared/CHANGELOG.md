@@ -1,5 +1,11 @@
 # api-shared
 
+## 1.3.1
+
+### Patch Changes
+
+- 59d2354: Fix a batch of SonarCloud code-smell findings in api-shared: rewrite two backtracking-prone regexes in operation-metrics.ts and cognito-auth.ts to linear equivalents (S8786), and convert http.ts's `ALLOWED_ORIGINS` array to a `Set` (S7776).
+
 ## 1.3.0
 
 ### Minor Changes

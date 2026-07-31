@@ -1,5 +1,25 @@
 # design-studio
 
+## 0.4.0
+
+### Minor Changes
+
+- 56caa75: Design Studio: delete a custom template (seed templates stay protected), the "Generate with AI" panel now replaces the Layers/Properties column instead of rendering below the fold, a fixed category list replaces free-text "Save as template" categories, saved designs show a header and a relative "edited Nm/h/d ago" time, the gallery's quick-create buttons get their own row, the settings/gallery cog and info/help buttons match pantry's pattern, and the settings page gets an architecture diagram with the MongoDB rationale.
+
+  Site-wide: imposter's page header now matches pantry/design-studio's compact style with the same "i" info button; the standalone nav's "studio" link is renamed "design-studio" and "notes" moved into the footer as "experiments"; the home page's "also built" note and its settings toggle now mention design-studio too; and settings checkboxes with long descriptions now keep the checkbox and wrapped text aligned in a column instead of wrapping flush against the page edge.
+
+### Patch Changes
+
+- f62588e: move AI panel back inline, fix portrait canvas alignment
+- e0b43d5: bound the supergraph tool loop's own timeout
+- 5756926: reformat generate-elements files with prettier
+- 65b090d: resume-data bug, AI-panel dedup, canvas zoom, adaptive toolbar
+- c8f38f7: identify the AI tool's supergraph calls in GraphOS
+- 4cab523: Replace waitFor+getBy/queryBy with find* queries in several test files (SonarCloud S9020), and collapse 8 near-identical portfolio-query-allowlist rejection tests into a single parameterized it.each block (S9020/S5976 cleanup, test-only changes)
+- 59d2354: Fix a batch of SonarCloud code-smell findings in design-studio: reduce cognitive complexity in supergraph-tool.ts's `gatherSupergraphContext` by extracting a `resolveToolUseBlock` helper (S3776), convert seed-templates.ts's top-level-await-eligible script from an async-IIFE wrapper (S7785), and simplify a ternary to `Math.max` in generate-elements.ts (S7766).
+- Updated dependencies [59d2354]
+  - api-shared@1.3.1
+
 ## 0.3.0
 
 ### Minor Changes

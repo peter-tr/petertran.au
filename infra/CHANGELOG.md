@@ -1,5 +1,19 @@
 # infra
 
+## 1.7.0
+
+### Minor Changes
+
+- 503e568: enable GraphOS subgraph metrics, bump Router to 2.16.0, remove ADOT collector
+
+### Patch Changes
+
+- 92ff733: fix reliability code smell flagged by SonarQube: use the test MonitoringStack instance via addDependency instead of leaving it uncaptured
+- edea494: add reactive Provisioned Concurrency: 1hr warm after a real cold start, opt-in per project from the portfolio settings page, alongside a live "reactively warm until" status readout
+- 59d2354: Fix a SonarCloud cognitive-complexity finding in monitoring-stack.ts: reduce `MonitoringStack`'s constructor from 28 to under 15 by extracting alarm-topic creation, per-function/per-table registration, the alerts-settings Lambda, and dashboard-row building into named helper functions (S3776). No behavior change.
+- 8c1bc30: grant warm-schedule's Lambda `cloudwatch:GetMetricData` so it can compute the new last-24h cost estimate
+- 9e74092: fix: grant lambda:GetAlias so warm-schedule's alias self-heal (#232) can actually run - every reconcile tick for every project was silently failing with AccessDeniedException before this
+
 ## 1.6.0
 
 ### Minor Changes

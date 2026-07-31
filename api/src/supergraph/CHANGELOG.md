@@ -1,5 +1,17 @@
 # supergraph
 
+## 0.4.0
+
+### Minor Changes
+
+- 503e568: enable GraphOS subgraph metrics, bump Router to 2.16.0, remove ADOT collector
+
+### Patch Changes
+
+- 59d2354: Fix a batch of SonarCloud code-smell findings in supergraph: pin build-router-package.ts's `tar` invocation to an absolute path instead of relying on PATH lookup (S4036), and convert its top-level async-IIFE wrapper to top-level await (S7785).
+- Updated dependencies [59d2354]
+  - api-shared@1.3.1
+
 ## 0.3.0
 
 ### Minor Changes
