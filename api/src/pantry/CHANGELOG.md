@@ -1,5 +1,14 @@
 # pantry
 
+## 1.6.1
+
+### Patch Changes
+
+- cc961ea: pantry: add an Inventory show/hide toggle to match the shopping list, rename the "priority" grouping's "Needs attention" label to "Regular", and add a "Low stock first" sort option
+- 59d2354: Fix a batch of SonarCloud code-smell findings in pantry: reduce cognitive complexity in check-prices.ts's `checkTrackedPrices` and parse-command.ts's `parseCommand`/`toProposedAction` by extracting helper functions (S3776), consolidate `upsertShoppingListEntry`'s and `parseCommand`'s parameters into options objects (S107, keeping the dev-mock counterpart's signature consistent), rewrite a backtracking-prone regex and simplify a `&&` chain to optional chaining in check-prices.ts (S8786/S6582), and extract nested ternaries/template literals in check-prices.ts, parse-command.ts, and send-digest.ts into named variables (S3358/S4624).
+- Updated dependencies [59d2354]
+  - api-shared@1.3.1
+
 ## 1.6.0
 
 ### Minor Changes

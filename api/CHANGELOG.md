@@ -1,5 +1,24 @@
 # api
 
+## 1.6.0
+
+### Minor Changes
+
+- 8c1bc30: warm-schedule's cost response now includes a last-24h cost estimate per project, combining real CloudWatch invocation/duration usage with an averaged share of the scheduled provisioned-concurrency cost
+
+### Patch Changes
+
+- dbf5cb1: auto-run the warm-schedule settings page's cold start check, and make its lookback window configurable
+
+  The check across all 6 projects completes in a few seconds, so it now runs automatically (on page load and whenever the lookback window changes) instead of needing an explicit button click. The lookback window is now a picker (10 min / 1 hour / 24 hours) instead of a fixed 24h, via a new `windowMinutes` parameter on `warm-schedule`'s `checkColdStarts` action (validated against the same curated set on both sides, same "seeded in two places" convention as `MAX_CONCURRENCY`/`MEMORY_OPTIONS_MB`). No infra changes - this reuses the IAM grants and timeout bump already shipped in the initial cold-start-check PR.
+
+- 1cf8143: fix reliability bug flagged by SonarQube: add initial value to reduce() in healWeightedAlias
+- edea494: add reactive Provisioned Concurrency: 1hr warm after a real cold start, opt-in per project from the portfolio settings page, alongside a live "reactively warm until" status readout
+- 59d2354: Fix a batch of SonarCloud code-smell findings in root api/ scripts: resolve e2e-smoke.ts's `tsx` PATH-lookup lint (S4036) via Node module resolution, convert e2e-smoke.ts's async wrapper to top-level await (S7785), reduce warm-schedule/handler.ts's `processEvent` cognitive complexity by extracting per-event-type handlers (S3776), and extract a nested ternary in zero-trust-lab/edge/proxy.ts into a lookup table (S3358).
+- fba5b9c: self-heal a weighted Provisioned Concurrency alias in the warm-schedule reconciler
+
+  AWS Lambda's own alias+PC safety net pins traffic to the last-good version via a weighted `RoutingConfig` when a new version fails to warm - but a weighted alias can never have Provisioned Concurrency attached, so once this triggers every reconcile tick fails forever and the target runs cold on every invocation. Hit for real 2026-07-27 across `portfolio-graphql`, `supergraph-graphql`, and `pantry-graphql` simultaneously. `reconcileTarget()` now clears a weighted alias (pinning to whichever version is already serving traffic - zero traffic impact) before attempting to grant PC, so this recovers automatically instead of needing a manual `aws lambda update-alias`/`delete-function` fix.
+
 ## 1.5.0
 
 ### Minor Changes
